@@ -11,10 +11,13 @@ import { fileURLToPath } from 'node:url'
 import MDBReader from 'mdb-reader'
 import { accessReaderOf, extractRepository, linkRepositories, prepareSyntax, type Link, type RepositoryFacts } from '../src/index'
 
-interface Expected { name: string; url?: string; commit?: string; repositories?: Array<{ name: string; url: string; commit: string }>; stacks: string; units: string[]; calls: Array<[string, string]>; optional: Array<[string, string]>; tables?: string[]; judge?: 'runtime' }
+interface Expected { name: string; url?: string; commit?: string; repositories?: Array<{ name: string; url: string; commit: string }>; stacks: string; units: string[]; calls: Array<[string, string]>; optional: Array<[string, string]>; tables?: string[]; judge?: 'runtime'; undirected?: boolean }
 const bench = JSON.parse(readFileSync(fileURLToPath(new URL('./bench.json', import.meta.url)), 'utf8')) as { repositories: Expected[]; heldOut: Expected[] }
-// --held-out: the repositories no rule was tuned on.
+// --held-out: the repositories no rule was tuned on. --microsecend: microSecEnD's hand-drawn dataflow diagrams
+// (microsecend.json, by microsecend.ts), cloned into <cache>/microsecend.
 const heldOut = process.argv.includes('--held-out')
+const microsecend = process.argv.includes('--microsecend')
+const external = microsecend ? (JSON.parse(readFileSync(fileURLToPath(new URL('./microsecend.json', import.meta.url)), 'utf8')) as { repositories: Expected[] }).repositories : []
 await prepareSyntax()
 const cache = process.env.ASSAY_BENCH ?? join(homedir(), '.cache', 'radical-assay-bench')
 mkdirSync(cache, { recursive: true })
@@ -38,11 +41,12 @@ const lower = (call: string): string => call.replace(/db:[^ ]+/g, (m) => m.toLow
 const pct = (a: number, b: number): string => (b ? `${Math.round((100 * a) / b)}%` : '—')
 let totals = { units: [0, 0, 0], calls: [0, 0, 0] }
 const filter = process.argv.slice(2).find((a) => !a.startsWith('--'))
-for (const repo of (heldOut ? bench.heldOut : bench.repositories).filter((r) => !filter || r.name === filter)) {
+let f1 = { pairs: [0, 0, 0] }
+for (const repo of (microsecend ? external : heldOut ? bench.heldOut : bench.repositories).filter((r) => !filter || r.name === filter)) {
   // One repository, or several read and linked together (their units named <repository> or <repository>/<folder>).
   const parts = repo.repositories ?? [{ name: repo.name, url: repo.url!, commit: repo.commit! }]
   const dirs = parts.map((p) => {
-    const dir = repo.repositories ? join(cache, repo.name, p.name) : join(cache, p.name)
+    const dir = repo.repositories ? join(cache, repo.name, p.name) : join(cache, microsecend ? 'microsecend' : '', p.name)
     if (!existsSync(dir)) execFileSync('git', ['clone', '-q', '--filter=blob:none', '--no-checkout', p.url, dir])
     execFileSync('git', ['-c', 'advice.detachedHead=false', 'checkout', '-q', p.commit], { cwd: dir })
     return dir
@@ -63,20 +67,32 @@ for (const repo of (heldOut ? bench.heldOut : bench.repositories).filter((r) => 
 
   const units = new Set(facts.units.map((u) => u.path))
   const unitHits = repo.units.filter((u) => units.has(u)).length
-  // judge runtime: references between projects are structure, judged neither way.
-  const expected = new Set(repo.calls.map(([a, b]) => lower(`${a} → ${b}`)))
-  const optional = new Set(repo.optional.map(([a, b]) => lower(`${a} → ${b}`)))
+  // judge runtime: references between projects are structure, judged neither way. undirected (a dataflow diagram's
+  // flows): a call either way, only between nodes the diagram has, a deployed service by its unit or by its name.
+  const call = (a: string, b: string): string => lower(repo.undirected ? [a, b].sort().join(' ↔ ') : `${a} → ${b}`)
+  const expected = new Set(repo.calls.map(([a, b]) => call(a, b)))
+  const optional = new Set(repo.optional.map(([a, b]) => call(a, b)))
+  const nodes = new Set([...repo.units, ...repo.calls.flat()].map((n) => n.toLowerCase()))
+  const ends = (id: string, via?: string): string[] => {
+    const names = endpoints(facts, id, via)
+    const service = repo.undirected ? facts.services.find((s) => s.id === id) : undefined
+    return service?.unit ? [...names, `service:${service.name}`] : names
+  }
   // Each link once: as the expected call one of its names makes, else as its first name.
   const found = new Set<string>()
-  // Calls to observability (tracing, metrics, logs) are true but no part of what the system does: judged neither way.
-  const observability = new Set(facts.services.filter((s) => s.role === 'observability').map((s) => s.id))
+  // Calls to observability (tracing, metrics, logs) are true but no part of what the system does: judged neither way,
+  // unless the expectations are a diagram that draws them.
+  const observability = new Set(repo.undirected ? [] : facts.services.filter((s) => s.role === 'observability').map((s) => s.id))
   for (const l of links.filter((x) => (repo.judge !== 'runtime' || x.kind !== 'package') && !observability.has(x.to))) {
-    const names = endpoints(facts, l.from).flatMap((a) => endpoints(facts, l.to, l.via).map((b) => `${a} → ${b}`))
+    const pairs = ends(l.from).flatMap((a) => ends(l.to, l.via).map((b) => [a, b] as const)).filter(([a, b]) => a !== b)
+    const names = (repo.undirected ? pairs.filter(([a, b]) => nodes.has(a.toLowerCase()) && nodes.has(b.toLowerCase())) : pairs).map(([a, b]) => call(a, b))
+    if (!names.length) continue
     found.add(names.find((n) => expected.has(n)) ?? names.find((n) => optional.has(n)) ?? names[0])
   }
   const right = [...found].filter((c) => expected.has(c)).length
   const wrong = [...found].filter((c) => !expected.has(c) && !optional.has(c))
   const missed = [...expected].filter((c) => !found.has(c))
+  f1 = { pairs: [f1.pairs[0] + right, f1.pairs[1] + expected.size, f1.pairs[2] + right + wrong.length] }
   totals = { units: [totals.units[0] + unitHits, totals.units[1] + repo.units.length, totals.units[2] + units.size], calls: [totals.calls[0] + right, totals.calls[1] + expected.size, totals.calls[2] + right + wrong.length] }
 
   console.log(`\n${repo.name} (${repo.stacks}) — ${ms} ms`)
@@ -93,3 +109,8 @@ for (const repo of (heldOut ? bench.heldOut : bench.repositories).filter((r) => 
   if (facts.notes.length) console.log(`  notes: ${facts.notes.slice(0, 3).join(' | ')}`)
 }
 console.log(`\nAll: units recall ${pct(totals.units[0], totals.units[1])}, precision ${pct(totals.units[0], totals.units[2])}; calls recall ${pct(totals.calls[0], totals.calls[1])}, precision ${pct(totals.calls[0], totals.calls[2])}`)
+// F1 of the calls, as the comparison of architecture recovery tools on microSecEnD reports its edges.
+if (microsecend) {
+  const [r, p] = [f1.pairs[0] / f1.pairs[1], f1.pairs[0] / f1.pairs[2]]
+  console.log(`Calls F1 ${(2 * r * p / (r + p)).toFixed(2)} (a diagram draws units only for running services: unit precision says little here)`)
+}
