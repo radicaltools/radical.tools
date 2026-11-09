@@ -91,4 +91,19 @@ describe('radical assay: Spring Cloud and compose as they run', () => {
     expect(facts.addresses.map((a) => [a.host, a.evidence.line])).toContainEqual(['catalog', 3])
     expect(links(facts)).toContainEqual(['address', 'order', 'catalog'])
   })
+
+  it("reads a JVM unit as it is: the plugin it applies, the JUnit its tests import, the port it serves, not its tests' settings, no password", () => {
+    const facts = extractRepository(repo('blog', {
+      'util/build.gradle': "apply plugin: 'java'\napply plugin: 'maven-publish'\ndependencies {\n    compile('org.springframework.boot:spring-boot-starter-web:1.3.0')\n    testCompile('org.springframework.boot:spring-boot-starter-test:1.3.0')\n}\n",
+      'util/src/test/java/u/UtilTest.java': 'package u;\nimport org.junit.Test;\npublic class UtilTest {\n  @Test public void works() { }\n}\n',
+      'config/build.gradle': "apply plugin: 'java'\napply plugin: 'spring-boot'\ndependencies {\n    compile('org.springframework.cloud:spring-cloud-config-server')\n}\n",
+      'config/src/main/resources/application.yml': 'server:\n  port: 8888\nspring:\n  rabbitmq:\n    host: rabbitmq\n    port: 5672\neureka:\n  client:\n    serviceUrl:\n      defaultZone: http://user:secret@registry:8761/eureka/\n',
+      'config/src/test/resources/application.yml': 'spring:\n  datasource:\n    url: jdbc:hsqldb:mem:mymemdb\n',
+    }))
+    expect(facts.units.map((u) => [u.path, u.kind, u.testFramework, u.ports ?? []])).toEqual([['config', 'app', undefined, [8888]], ['util', 'library', 'junit4', []]])
+    expect(facts.databases).toEqual([])
+    expect(facts.addresses.map((a) => a.text)).toContain('http://user:***@registry:8761')
+    expect(JSON.stringify(facts)).not.toContain('secret')
+  })
 })
+

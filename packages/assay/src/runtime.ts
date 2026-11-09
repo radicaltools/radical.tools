@@ -39,7 +39,8 @@ export function addressesIn(text: string, withHostPort: boolean): Array<{ scheme
     if (/^(file|data|mailto|jdbc|urn|php)$/.test(scheme)) continue
     // A database's URL is its connection string, read as a database (code.ts), not as a call.
     if (/^(postgres(ql)?|mysql|mariadb|mongodb(\+srv)?|redis|rediss|sqlserver|mssql|oracle)$/.test(scheme) || /jdbc:[\w:]*$/i.test(text.slice(Math.max(0, m.index! - 20), m.index!))) continue
-    out.push({ scheme, host: m[2].toLowerCase(), ...(m[3] ? { port: Number(m[3]) } : {}), text: m[0], index: m.index! })
+    // A password in the address is no fact to keep (http://user:secret@registry:8761).
+    out.push({ scheme, host: m[2].toLowerCase(), ...(m[3] ? { port: Number(m[3]) } : {}), text: m[0].replace(/\/\/([^:@\s/]+):[^@\s/]+@/, '//$1:***@'), index: m.index! })
   }
   if (withHostPort) {
     for (const m of text.matchAll(/(?<![\w.\/:@-])([a-z][a-z0-9-]{1,62}(?:\.[a-z0-9-]+)*):(\d{2,5})\b/g)) {
@@ -59,7 +60,6 @@ export interface Runtime {
 
 const YAML = /\.(ya?ml)$/i
 
-/** The text's values as strings: an environment as a list ("K=V") or a map. */
 /** The variables a compose file's .env sets, each expanded with the others (CART_ADDR=cart:${CART_PORT}). */
 function dotEnv(text: string): Map<string, string> {
   const vars = new Map<string, string>()
@@ -76,6 +76,7 @@ function interpolate(text: string, vars: Map<string, string>): string {
   })
 }
 
+/** The text's values as strings: an environment as a list ("K=V") or a map. */
 function environment(env: unknown): string[] {
   if (Array.isArray(env)) return env.filter((e): e is string => typeof e === 'string').map((e) => e.slice(e.indexOf('=') + 1))
   if (env && typeof env === 'object') return Object.values(env as Record<string, unknown>).filter((v) => typeof v === 'string' || typeof v === 'number').map(String)
@@ -227,7 +228,8 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
   for (const u of units) {
     const prefix = u.path === '.' ? '' : `${u.path}/`
     const configs = [
-      ...files.list.filter((f) => f.startsWith(prefix) && !configures.has(f) && /(^|\/)(application|bootstrap)(-[\w-]+)?\.(ya?ml|properties)$|(^|\/)appsettings(\.[\w-]+)?\.json$|(^|\/)launchSettings\.json$|(^|\/)\.env(\.[\w-]+)?$/.test(f)),
+      // A test's settings (src/test/resources) are the test's, not the system's.
+      ...files.list.filter((f) => f.startsWith(prefix) && !configures.has(f) && !/(^|\/)src\/test\//.test(f) && /(^|\/)(application|bootstrap)(-[\w-]+)?\.(ya?ml|properties)$|(^|\/)appsettings(\.[\w-]+)?\.json$|(^|\/)launchSettings\.json$|(^|\/)\.env(\.[\w-]+)?$/.test(f)),
       ...[...configures].filter(([, configured]) => configured.includes(u)).map(([f]) => f),
     ]
     for (const file of configs) {
@@ -238,7 +240,8 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
       if (springName && typeof springName === 'string' && !(u.aliases ?? []).includes(springName)) u.aliases = [...(u.aliases ?? []), springName]
       const ports = [
         ...[...text.matchAll(/server\.port\s*[=:]\s*(\d{2,5})/g)].map((m) => Number(m[1])),
-        ...(/^server\s*:\s*$/m.test(text) ? [...text.matchAll(/^\s+port\s*:\s*(\d{2,5})\s*$/gm)].map((m) => Number(m[1])) : []),
+        // server.port in YAML, as its key path says (spring.rabbitmq.port is a port it calls).
+        ...((keys) => text.split('\n').flatMap((l, i) => keys[i] === 'server.port' && /^\s+port\s*:\s*(\d{2,5})\s*$/.test(l) ? [Number(/(\d{2,5})/.exec(l)![1])] : []))(keysOf(text)),
         ...(file.endsWith('launchSettings.json') ? [...text.matchAll(/"applicationUrl"\s*:\s*"([^"]+)"/g)].flatMap((m) => [...m[1].matchAll(/:(\d{2,5})/g)].map((p) => Number(p[1]))) : []),
       ]
       if (ports.length) u.ports = [...new Set([...(u.ports ?? []), ...ports])].sort((a, b) => a - b)

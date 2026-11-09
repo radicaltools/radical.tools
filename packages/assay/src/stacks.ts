@@ -51,6 +51,13 @@ const TEST_FRAMEWORKS: Array<[RegExp, TestFramework]> = [
 
 /** The unit's test framework: from its dependencies, a Gradle build's test dependencies, a Python folder's pytest files. */
 function testFrameworkOf(d: Draft, files: RepoFiles): TestFramework | undefined {
+  const prefix_ = d.path === '.' ? '' : `${d.path}/`
+  // A JVM unit's tests say which JUnit they are written in (Spring Boot's starter brought JUnit 4 before 2.2).
+  if (d.stack === 'maven' || d.stack === 'gradle') {
+    const tests = files.list.filter((f) => f.startsWith(`${prefix_}src/test/`) && /\.(java|kt|groovy)$/.test(f)).map((f) => files.read(f))
+    if (tests.some((t) => /\borg\.junit\.jupiter\b/.test(t))) return 'junit5'
+    if (tests.some((t) => /\bimport\s+org\.junit\.(Test|Assert|Before|runner)\b|@RunWith\b/.test(t))) return 'junit4'
+  }
   const named = TEST_FRAMEWORKS.find(([re]) => d.deps.some((dep) => re.test(dep)))?.[1]
   if (named) return named
   const prefix = d.path === '.' ? '' : `${d.path}/`
@@ -277,7 +284,8 @@ function gradle(files: RepoFiles): Draft[] {
     if (path === '.' && /\binclude\b/.test(settings) && !/\b(implementation|api|compile)\b/.test(text)) continue
     const rootName = /rootProject\.name\s*=\s*['"]([^'"]+)['"]/.exec(settings)?.[1]
     const d = draft('gradle', path, file, path === '.' ? rootName : undefined, 1)
-    if (/\b(application|org\.springframework\.boot)\b/.test(text)) d.reasons.push('it applies the application or Spring Boot plugin')
+    // The application or Spring Boot plugin applied, not a Spring Boot library depended on.
+    if (/\bapply\s+plugin\s*:\s*['"](application|org\.springframework\.boot|spring-boot)['"]|\bid\s*\(?\s*['"](application|org\.springframework\.boot)['"]|^\s*(application|java-application)\s*$|\balias\(\s*libs\.plugins\.[\w.]*spring[\w.]*boot\b/m.test(text)) d.reasons.push('it applies the application or Spring Boot plugin')
     const main = javaMain(files, path)
     if (main) d.reasons.push(main)
     // A project dependency in any configuration (implementation, api, testImplementation, baselineProfile, lintPublish, …):
