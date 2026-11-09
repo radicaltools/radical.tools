@@ -33,7 +33,7 @@ const LIBRARY_SETTINGS: Array<[RegExp, RegExp]> = [
 ]
 
 /** The dotted key each line of a YAML or properties text sets or lies under. */
-function keysOf(text: string): string[] {
+export function keysOf(text: string): string[] {
   const stack: Array<{ indent: number; key: string }> = []
   return text.split('\n').map((line) => {
     const property = /^\s*([\w.-]+)\s*[=:]/.exec(line)

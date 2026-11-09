@@ -73,10 +73,12 @@ for (const repo of (microsecend ? external : heldOut ? bench.heldOut : bench.rep
   const expected = new Set(repo.calls.map(([a, b]) => call(a, b)))
   const optional = new Set(repo.optional.map(([a, b]) => call(a, b)))
   const nodes = new Set([...repo.units, ...repo.calls.flat()].map((n) => n.toLowerCase()))
-  const ends = (id: string, via?: string): string[] => {
+  // Undirected, a unit is also named by the deployed services the link rests on (account-mongodb runs mongodb).
+  const ends = (id: string, via?: string, cited: string[] = []): string[] => {
     const names = endpoints(facts, id, via)
-    const service = repo.undirected ? facts.services.find((s) => s.id === id) : undefined
-    return service?.unit ? [...names, `service:${service.name}`] : names
+    if (!repo.undirected) return names
+    const services = facts.services.filter((s) => s.unit && (s.id === id || (cited.includes(s.id) && s.unit === id)))
+    return [...names, ...services.map((s) => `service:${s.name}`)]
   }
   // Each link once: as the expected call one of its names makes, else as its first name.
   const found = new Set<string>()
@@ -84,7 +86,7 @@ for (const repo of (microsecend ? external : heldOut ? bench.heldOut : bench.rep
   // unless the expectations are a diagram that draws them.
   const observability = new Set(repo.undirected ? [] : facts.services.filter((s) => s.role === 'observability').map((s) => s.id))
   for (const l of links.filter((x) => (repo.judge !== 'runtime' || x.kind !== 'package') && !observability.has(x.to))) {
-    const pairs = ends(l.from).flatMap((a) => ends(l.to, l.via).map((b) => [a, b] as const)).filter(([a, b]) => a !== b)
+    const pairs = ends(l.from, undefined, l.facts).flatMap((a) => ends(l.to, l.via, l.facts).map((b) => [a, b] as const)).filter(([a, b]) => a !== b)
     const names = (repo.undirected ? pairs.filter(([a, b]) => nodes.has(a.toLowerCase()) && nodes.has(b.toLowerCase())) : pairs).map(([a, b]) => call(a, b))
     if (!names.length) continue
     found.add(names.find((n) => expected.has(n)) ?? names.find((n) => optional.has(n)) ?? names[0])

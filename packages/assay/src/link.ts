@@ -157,5 +157,35 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
     if (link && via) link.via = via
   }
 
+  // Spring Cloud's defaults: a client of Eureka, of a config server, of Kafka or of RabbitMQ that names no server of its
+  // kind connects to the one its repository has, as Spring Cloud does on its own machine or network.
+  for (const r of repositories) {
+    const deps = r.dependencies.filter((d) => !d.target)
+    const has = (u: Unit, re: RegExp): boolean => deps.some((d) => d.unit === u.id && re.test(d.package))
+    for (const c of CONVENTIONS) {
+      const servers = [
+        ...r.units.filter((u) => c.server && has(u, c.server)).map((u) => u.id),
+        ...(c.image ? services.filter((s) => repoOf(s.id) === r.repository && c.image!.test(`${s.image ?? ''} ${s.name}`) && !s.unit).map((s) => s.id) : []),
+        ...(c.image ? r.units.filter((u) => c.image!.test(u.name) && !has(u, c.client)).map((u) => u.id) : []),
+      ]
+      if (new Set(servers).size !== 1) continue
+      // Only an app connects: a library is bundled into the apps that use it.
+      for (const u of r.units.filter((x) => x.kind === 'app' && x.id !== servers[0] && !(c.server && has(x, c.server)))) {
+        const dep = deps.find((d) => d.unit === u.id && c.client.test(d.package))
+        // Named already: the client's addresses reach a server of this kind.
+        if (!dep || [...links.values()].some((l) => l.from === u.id && l.to === servers[0])) continue
+        add('address', u.id, servers[0], 'inferred', [dep.id, servers[0]], `${c.name} client (${dep.package}): the repository's only ${c.name}`)
+      }
+    }
+  }
+
   return [...links.values()].sort((a, b) => a.id.localeCompare(b.id))
 }
+
+/** Spring Cloud's servers a client finds by default: the client's dependency, the server's (a unit) or its image. */
+const CONVENTIONS: Array<{ name: string; client: RegExp; server?: RegExp; image?: RegExp }> = [
+  { name: 'Eureka server', client: /(^|:)spring-cloud-starter(-netflix)?-eureka(-client)?$|(^|:)eureka-client$/, server: /(^|:)spring-cloud-(starter-(netflix-)?)?eureka-server$|(^|:)eureka-server$/ },
+  { name: 'config server', client: /(^|:)spring-cloud-(starter-config|config-client)$/, server: /(^|:)spring-cloud-config-server$/ },
+  { name: 'Kafka broker', client: /(^|:)(spring-kafka|kafka-clients|kafka-streams|spring-cloud-stream-binder-kafka(-streams)?|spring-cloud-starter-stream-kafka)$/, image: /\bkafka\b(?!-ui|-manager|drop)/i },
+  { name: 'RabbitMQ broker', client: /(^|:)(spring-boot-starter-amqp|spring-rabbit|amqp-client|spring-cloud-stream-binder-rabbit|spring-cloud-starter-(stream|bus)-(rabbit|amqp))$/, image: /rabbit/i },
+]

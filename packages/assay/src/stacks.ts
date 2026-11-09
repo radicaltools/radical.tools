@@ -618,13 +618,24 @@ function vb6(files: RepoFiles, groups: GroupFact[], repo: string): Draft[] {
 // ── Docker ───────────────────────────────────────────────────────────────────
 
 /** A folder with a Dockerfile no manifest claims runs something: an app in the language its base image names. */
+/** A compose file's services: its services map, or in compose's first format (no version, no services key) its top
+ *  level, where every entry is a service with an image or a build. */
+export function composeServices<T = Record<string, unknown>>(doc: unknown): Record<string, T> {
+  if (!doc || typeof doc !== 'object') return {}
+  const d = doc as { services?: Record<string, T>; version?: unknown }
+  if (d.services && typeof d.services === 'object') return d.services
+  const entries = Object.entries(d)
+  const v1 = d.version === undefined && entries.length > 0 && entries.every(([, v]) => !!v && typeof v === 'object' && ('image' in (v as object) || 'build' in (v as object)))
+  return v1 ? (d as Record<string, T>) : {}
+}
+
 /** Each folder a compose service is built from, with the folders its services mount as volumes (./web:/web). */
 export function composeMounts(files: RepoFiles): Map<string, string[]> {
   const out = new Map<string, string[]>()
   for (const file of files.list.filter((f) => /(^|\/)(docker-)?compose[^/]*\.ya?ml$/i.test(f))) {
     let doc: { services?: Record<string, { build?: unknown; volumes?: unknown }> } | undefined
     try { doc = load(files.read(file)) as typeof doc } catch { continue }
-    for (const def of Object.values(doc?.services ?? {})) {
+    for (const def of Object.values(composeServices<{ build?: unknown; volumes?: unknown }>(doc))) {
       const build = typeof def?.build === 'string' ? def.build : typeof (def?.build as { context?: unknown })?.context === 'string' ? (def.build as { context: string }).context : null
       const context = build === null ? null : resolveFrom(dirOf(file), build)
       if (context === null) continue
