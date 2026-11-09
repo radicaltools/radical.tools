@@ -121,7 +121,7 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
   facts.notes.push(...code.notes)
   // The tables its schemas and ORM classes declare, with those its code names (a schema in no unit's folder is that of the
   // units using the database it creates, by their code or the services running them); its statuses; where its code is entered.
-  const domain = readDomain(files, repo, facts.units, code.tables, facts.databases, options.access)
+  const domain = readDomain(files, repo, facts.units, code.tables, facts.databases, options.access, facts.dependencies)
   facts.notes.push(...domain.notes)
   facts.tables = domain.tables
   facts.states = domain.states

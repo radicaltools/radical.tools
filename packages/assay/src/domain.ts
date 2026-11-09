@@ -10,11 +10,12 @@
 
 import { readFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
-import type { DatabaseFact, StateFact, TableFact, Unit } from './facts'
+import type { DatabaseFact, DependencyFact, StateFact, TableFact, Unit } from './facts'
 import { GENERATED, RepoFiles, TEST_FILE, dirOf, escapeRe, lineAt, owner } from './files'
 import { withoutVbComments } from './code'
 import { laravelMigrations } from './laravel'
 import { ectoMigrations, railsSchema } from './rails-ecto'
+import { strings } from './syntax'
 
 type Column = NonNullable<TableFact['columns']>[number]
 type Reference = NonNullable<TableFact['references']>[number]
@@ -249,8 +250,11 @@ function jpa(text: string, file: string): Array<Omit<Declared, 'unit'>> {
 const CS_SIMPLE = /^(int|long|short|byte|string|decimal|double|float|bool|char|Guid|DateTime|DateTimeOffset|DateOnly|TimeOnly|TimeSpan|Int\d+|UInt\d+|String|Decimal|Boolean|byte\[\])\??$/
 
 /** Entity Framework Core: the classes a DbContext's DbSets name (or [Table] marks), their tables by the DbSet's name. */
-function efCore(files: RepoFiles, sources: string[]): Array<Omit<Declared, 'unit'>> {
+function efCore(files: RepoFiles, sources: string[], unitOf: (file: string) => string | undefined = () => '', reaches: (unit: string) => Set<string> = (u) => new Set([u])): Array<Omit<Declared, 'unit'>> {
+  // The DbSets of each unit: a class is an entity of the unit whose DbContext names it, not of another with a class of
+  // its name (a service reading the table with Dapper).
   const sets = new Map<string, string>()
+  const setsIn = new Map<string, Set<string>>()
   // The tables classes map to, each with where it is said: two modules may each have a class of one name.
   const mapped = new Map<string, Array<{ table: string; file: string }>>()
   const map = (className: string, table: string, schema: string | undefined, file: string): void => {
@@ -258,7 +262,10 @@ function efCore(files: RepoFiles, sources: string[]): Array<Omit<Declared, 'unit
   }
   for (const f of sources.filter((x) => x.endsWith('.cs'))) {
     const text = files.read(f)
-    for (const m of text.matchAll(/\bDbSet<(\w+)>\s+(\w+)/g)) sets.set(m[1], m[2])
+    for (const m of text.matchAll(/\bDbSet<(\w+)>\s+(\w+)/g)) {
+      sets.set(m[1], m[2])
+      for (const u of reaches(unitOf(f) ?? '')) setsIn.set(m[1], (setsIn.get(m[1]) ?? new Set()).add(u))
+    }
     for (const m of text.matchAll(/\bEntity<(\w+)>\(\)\s*\.ToTable\(\s*"([^"]+)"(?:\s*,\s*"([^"]+)")?/g)) map(m[1], m[2], m[3], f)
     // A configuration class: IEntityTypeConfiguration<Member> with builder.ToTable("Members", "meetings").
     const configured = /\bIEntityTypeConfiguration<(\w+)>/.exec(text)?.[1]
@@ -276,7 +283,8 @@ function efCore(files: RepoFiles, sources: string[]): Array<Omit<Declared, 'unit
     // [Table("order", Schema = "accounting")] names its table over the DbSet's name, other attributes around it.
     for (const m of text.matchAll(/(\[Table\(\s*"([^"]+)"([^\]]*)\]\s*)?(?:\[[^\]]*\]\s*)*(?:(?:public|internal|sealed|partial|abstract)\s+)*class\s+(\w+)/g)) {
       const name = m[4]
-      if (!sets.has(name) && !m[2] && !mapped.has(name)) continue
+      const mappedHere = (mapped.get(name) ?? []).some((x) => reaches(unitOf(x.file) ?? '').has(unitOf(f) ?? ''))
+      if (!(sets.has(name) && setsIn.get(name)!.has(unitOf(f) ?? '')) && !m[2] && !mappedHere) continue
       const schema = /\bSchema\s*=\s*"([^"]+)"/.exec(m[3] ?? '')?.[1]
       const attributed = m[2] && (schema && !DEFAULT_SCHEMA.test(schema) ? `${schema}.${m[2]}` : m[2])
       const declared: Omit<Declared, 'unit'> = { table: attributed || (tableOf(name, f) ?? sets.get(name)!), className: name, declared: 'Entity Framework Core', columns: [], references: [], evidence: { file: f, line: lineAt(text, m.index! + (m[1]?.length ?? 0)) } }
@@ -604,7 +612,7 @@ const SYSTEM_TABLE = /^(sys\w*|information_schema|dual|msys\w*|sqlite_\w+|pg_\w+
 const VIEW_NAME = /^(v|vw|view|appview|qry|query)_|_(v|vw|view|qry)$/i
 
 /** The tables of the repository's schemas and ORM classes, merged with those its code names (`named`), and its statuses. */
-export function readDomain(files: RepoFiles, repo: string, units: Unit[], named: TableFact[], used: DatabaseFact[] = [], access?: AccessReader): DomainFacts {
+export function readDomain(files: RepoFiles, repo: string, units: Unit[], named: TableFact[], used: DatabaseFact[] = [], access?: AccessReader, dependencies: DependencyFact[] = []): DomainFacts {
   const declared: Declared[] = []
   const notes: string[] = []
   // An Access file the repository holds is the schema of the units whose code uses it (the one that holds it, else).
@@ -695,13 +703,29 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     const vb = /^\.(bas|cls|frm|ctl|vb)$/.test(ext)
     const text = vb ? withoutVbComments(raw) : ext === '.py' ? raw : withoutComments(raw)
     if ((ext === '.java' || ext === '.kt') && /@Entity\b/.test(text)) declared.push(...jpa(text, file).map((t) => ({ ...t, unit })))
+    // SQL a string of the code creates a table with (Dapper's CREATE TABLE joined over lines with +), read from the
+    // syntax tree's strings; each table on the line it is on.
+    if ((ext === '.cs' || ext === '.java') && /CREATE\s+TABLE/i.test(raw)) {
+      for (const str of strings(ext === '.cs' ? 'csharp' : 'java', raw).filter((x) => /CREATE\s+TABLE/i.test(x.text))) {
+        declared.push(...readSchema(str.text, file).tables.map((t) => ({ ...t, unit, evidence: { file, line: t.evidence.line + str.row } })))
+      }
+    }
     if (ext === '.py' && (/__tablename__/.test(text) || [...models].some((m) => new RegExp(`\\bclass\\s+${m}\\b`).test(text)))) declared.push(...python(text, file, models).map((t) => ({ ...t, unit })))
     if (ext === '.php' && /ORM\\Entity\b/.test(text)) declared.push(...doctrine(text, file).map((t) => ({ ...t, unit })))
     if (/\.[cm]?tsx?$/.test(ext) && /@Entity\(/.test(text)) declared.push(...typeOrm(text, file).map((t) => ({ ...t, unit })))
     enums.push(...codeEnums(text, file).map((e) => ({ ...e, unit })))
   }
   const csharp = sources.filter((f) => f.endsWith('.cs'))
-  if (csharp.length) for (const t of efCore(files, csharp)) { const unit = own(t.evidence.file); if (unit) declared.push({ ...t, unit }) }
+  // A DbContext's unit and the units it references (a clean architecture's Core) hold its entities.
+  const reaches = (from: string): Set<string> => {
+    const seen = new Set([from])
+    for (let grew = true; grew;) {
+      grew = false
+      for (const d of dependencies) if (d.target && seen.has(d.unit) && !seen.has(d.target)) { seen.add(d.target); grew = true }
+    }
+    return seen
+  }
+  if (csharp.length) for (const t of efCore(files, csharp, (f) => own(f)?.id, reaches)) { const unit = own(t.evidence.file); if (unit) declared.push({ ...t, unit }) }
   for (const file of files.named(/\.prisma$/)) {
     const unit = own(file)
     if (!unit) continue

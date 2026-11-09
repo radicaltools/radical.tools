@@ -116,4 +116,44 @@ describe('radical assay: code read through syntax trees', () => {
     }))
     expect(routes(facts).map(([name]) => name)).toEqual(['GET /customermanagement', 'ALL /customermanagement/details', 'POST /customermanagement/register'])
   })
+
+  it('reads the tables SQL in a string of the code creates, joined with + over lines, each on its line', () => {
+    const facts = extractRepository(repo('garage', {
+      'src/Invoice/Invoice.csproj': '<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="Dapper" Version="2.1.0" /></ItemGroup></Project>',
+      'src/Invoice/Repository.cs': [
+        'public class Repository',
+        '{',
+        '    public async Task Init(IDbConnection conn)',
+        '    {',
+        '        string sql = "IF OBJECT_ID(\'Planning\') IS NULL " +',
+        '              "CREATE TABLE Planning (" +',
+        '              "  Id varchar(50) NOT NULL," +',
+        '              "  PRIMARY KEY(Id));" +',
+        '              // the events of a planning',
+        '              "CREATE TABLE PlanningEvent (" +',
+        '              "  Id varchar(50) NOT NULL REFERENCES Planning," +',
+        '              "  Version int NOT NULL);";',
+        '        await conn.ExecuteAsync(sql);',
+        '    }',
+        '}',
+        '',
+      ].join('\n'),
+    }))
+    expect(facts.tables.map((t) => [t.table, t.evidence.line, t.columns?.map((c) => c.name), t.references?.map((r) => r.table)])).toEqual([
+      ['Planning', 6, ['Id'], []],
+      ['PlanningEvent', 10, ['Id', 'Version'], ['Planning']],
+    ])
+  })
+
+  it("reads an Entity Framework class as an entity only of a unit its DbContext's project reaches", () => {
+    const facts = extractRepository(repo('shop', {
+      'src/Core/Core.csproj': '<Project Sdk="Microsoft.NET.Sdk"></Project>',
+      'src/Core/Order.cs': 'public class Order\n{\n    public int Id { get; set; }\n}\n',
+      'src/Infrastructure/Infrastructure.csproj': '<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><ProjectReference Include="../Core/Core.csproj" /></ItemGroup></Project>',
+      'src/Infrastructure/ShopContext.cs': 'public class ShopContext : DbContext\n{\n    public DbSet<Order> Orders { get; set; }\n}\n',
+      'src/Web/Web.csproj': '<Project Sdk="Microsoft.NET.Sdk.Web"></Project>',
+      'src/Web/Order.cs': 'public class Order\n{\n    public string Number { get; set; }\n}\n',
+    }))
+    expect(facts.tables.map((t) => [t.unit.split(':unit:')[1], t.table])).toEqual([['src/Core', 'Orders']])
+  })
 })
