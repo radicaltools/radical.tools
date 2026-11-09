@@ -85,7 +85,8 @@ for (const repo of (microsecend ? external : heldOut ? bench.heldOut : bench.rep
   // Calls to observability (tracing, metrics, logs) are true but no part of what the system does: judged neither way,
   // unless the expectations are a diagram that draws them.
   const observability = new Set(repo.undirected ? [] : facts.services.filter((s) => s.role === 'observability').map((s) => s.id))
-  for (const l of links.filter((x) => (repo.judge !== 'runtime' || x.kind !== 'package') && !observability.has(x.to))) {
+  // A message between units is judged neither way: the bench writes messaging as calls of the broker.
+  for (const l of links.filter((x) => (repo.judge !== 'runtime' || x.kind !== 'package') && x.kind !== 'message' && !observability.has(x.to))) {
     const pairs = ends(l.from, undefined, l.facts).flatMap((a) => ends(l.to, l.via, l.facts).map((b) => [a, b] as const)).filter(([a, b]) => a !== b)
     const names = (repo.undirected ? pairs.filter(([a, b]) => nodes.has(a.toLowerCase()) && nodes.has(b.toLowerCase())) : pairs).map(([a, b]) => call(a, b))
     if (!names.length) continue

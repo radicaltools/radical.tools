@@ -157,6 +157,15 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
     if (link && via) link.via = via
   }
 
+  // Messages: a unit that publishes on a channel (a topic, a queue, a message type) calls each unit consuming it, those
+  // of the publisher's repository first.
+  const messages = repositories.flatMap((r) => r.messages ?? [])
+  for (const pub of messages.filter((m) => m.role === 'publishes')) {
+    const all = messages.filter((m) => m.role === 'consumes' && m.unit !== pub.unit && m.channel.toLowerCase() === pub.channel.toLowerCase())
+    const own = all.filter((m) => repoOf(m.unit) === repoOf(pub.unit))
+    for (const con of own.length ? own : all) add('message', pub.unit, con.unit, 'inferred', [pub.id, con.id], `${pub.via} ${pub.channel}`)
+  }
+
   // Spring Cloud's defaults: a client of Eureka, of a config server, of Kafka or of RabbitMQ that names no server of its
   // kind connects to the one its repository has, as Spring Cloud does on its own machine or network.
   for (const r of repositories) {

@@ -5,20 +5,37 @@
 import { basename } from 'node:path'
 import type { Unit } from './facts'
 import { dirOf, owner, type RepoFiles } from './files'
-import { load } from './yaml'
+import { load, loadAll } from './yaml'
 
 /** A Spring Boot unit's own settings files. */
 const SETTINGS = /(^|\/)(application|bootstrap)(-[\w-]+)?\.(ya?ml|properties)$/
 
 /** What a settings text sets at a dotted key (spring.application.name), in YAML or properties. */
+/** A setting's value in a properties or YAML text (all its documents), its key matched as Spring binds it: case, dashes
+ *  and underscores aside (searchLocations is search-locations), dotted at any level (spring.application.name: x). */
 function setting(text: string, key: string): string | undefined {
-  const property = new RegExp(`^\\s*${key.replace(/\./g, '\\.')}\\s*[=:]\\s*(\\S+)`, 'm').exec(text)?.[1]
-  if (property) return property
-  try {
-    let value: unknown = load(text)
-    for (const k of key.split('.')) value = value && typeof value === 'object' ? (value as Record<string, unknown>)[k] : undefined
-    return typeof value === 'string' ? value : undefined
-  } catch { return undefined }
+  const bare = (k: string): string => k.toLowerCase().replace(/[-_]/g, '')
+  const want = bare(key)
+  for (const m of text.matchAll(/^\s*([\w.-]+)\s*[=:]\s*(\S+)/gm)) if (bare(m[1]) === want && !/^[|>]$/.test(m[2])) return m[2]
+  let docs: unknown[]
+  try { docs = loadAll(text) } catch { return undefined }
+  const find = (value: unknown, rest: string[]): string | undefined => {
+    if (!rest.length) return typeof value === 'string' || typeof value === 'number' ? String(value) : undefined
+    if (!value || typeof value !== 'object') return undefined
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      const parts = k.split('.').map(bare)
+      if (parts.every((p, i) => p === bare(rest[i] ?? ''))) {
+        const found = find(v, rest.slice(parts.length))
+        if (found !== undefined) return found
+      }
+    }
+    return undefined
+  }
+  for (const doc of docs) {
+    const found = find(doc, key.split('.'))
+    if (found !== undefined) return found
+  }
+  return undefined
 }
 
 /** Settings a client library reads, by their key, and the dependencies that bring the library. */
@@ -100,20 +117,26 @@ export function springConfigOwners(files: RepoFiles, units: Unit[]): Map<string,
   return out
 }
 
-/** A Spring setting of a unit (server.servlet.context-path), from its own application and bootstrap files or the config
- *  server's files that configure it: the first a key path matching `key` sets, ${KEY:default} read as its default. */
-export function springSetting(files: RepoFiles, units: Unit[], unit: Unit, key: RegExp): string | undefined {
+/** The Spring settings of a unit whose key paths match `key`, from its own application and bootstrap files or the config
+ *  server's files that configure it, each with its file and line; ${KEY:default} read as its default. */
+export function springSettings(files: RepoFiles, units: Unit[], unit: Unit, key: RegExp): Array<{ key: string; value: string; file: string; line: number }> {
   const prefix = unit.path === '.' ? '' : `${unit.path}/`
   const own = files.list.filter((f) => f.startsWith(prefix) && /(^|\/)(application|bootstrap)(-[\w-]+)?\.(ya?ml|properties)$/.test(f) && owner(units, f)?.id === unit.id)
   const configured = [...springConfigOwners(files, units)].filter(([, us]) => us.some((u) => u.id === unit.id)).map(([f]) => f)
+  const out: Array<{ key: string; value: string; file: string; line: number }> = []
   for (const file of [...own, ...configured]) {
     const text = files.read(file)
     const keys = keysOf(text)
     for (const [i, line] of text.split('\n').entries()) {
       if (!key.test(keys[i]) || /^\s*#/.test(line)) continue
       const value = /[:=]\s*["']?([^"'#\s]+)/.exec(line.slice(line.indexOf(keys[i].split('.').pop()!)))?.[1]
-      if (value) return value.replace(/^\$\{[\w.-]+:([^}]*)\}$/, '$1')
+      if (value) out.push({ key: keys[i], value: value.replace(/^\$\{[\w.-]+:([^}]*)\}$/, '$1'), file, line: i + 1 })
     }
   }
-  return undefined
+  return out
+}
+
+/** A Spring setting of a unit (server.servlet.context-path): the first its files set. */
+export function springSetting(files: RepoFiles, units: Unit[], unit: Unit, key: RegExp): string | undefined {
+  return springSettings(files, units, unit, key)[0]?.value
 }

@@ -20,6 +20,7 @@ import { readEntries } from './entries'
 import { readForms } from './forms'
 import { emptyFacts, type ApiFact, type RepositoryFacts, type TestFact, type Unit } from './facts'
 import { GIT, RepoFiles, lineOf, owner, posix } from './files'
+import { readMessages } from './messages'
 import { readRuntime } from './runtime'
 import { readDocuments } from './sources'
 import { readStacks } from './stacks'
@@ -133,6 +134,8 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
     facts.databases.push(db)
   }
   facts.entries = readEntries(files, repo, facts.units)
+  // The messages its units publish and consume, which link.ts joins by their channel.
+  facts.messages = readMessages(files, repo, facts.units)
   // A desktop application's forms are its screens, read from their files.
   facts.screens = readForms(files, repo, facts.units)
 
