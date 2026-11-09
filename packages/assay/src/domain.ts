@@ -10,11 +10,12 @@
 
 import { readFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
-import type { DatabaseFact, DependencyFact, StateFact, TableFact, Unit } from './facts'
+import type { DatabaseFact, DependencyFact, RoutineFact, StateFact, TableFact, Unit } from './facts'
 import { GENERATED, RepoFiles, TEST_FILE, dirOf, escapeRe, lineAt, owner } from './files'
 import { withoutVbComments } from './code'
 import { laravelMigrations } from './laravel'
 import { ectoMigrations, railsSchema } from './rails-ecto'
+import { dialectOf, readRoutines, withoutSqlCommentsOrStrings, type ReadRoutine } from './routines'
 import { strings } from './syntax'
 
 type Column = NonNullable<TableFact['columns']>[number]
@@ -88,6 +89,8 @@ function topLevel(body: string, separator = ','): Array<{ text: string; at: numb
 }
 
 /** SQL without its comments (--, # in MySQL, /* … *\/), its lines kept. */
+/** A database's scripts: SQL, and Oracle's files of PL/SQL (package specs and bodies, procedures, functions, triggers). */
+const SQL_SCRIPT = /\.(sql|pks|pkb|pls|plb|pck|spc|bdy|prc|fnc|trg|tps|tpb|ddl)$/i
 const withoutSqlComments = (sql: string): string => sql.replace(/--[^\n]*|(^|[ \t,(])#[^\n'"]*$/gm, (m) => ' '.repeat(m.length)).replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
 
 const SQL_NAME = '[`"[]?(?:\\w+[`"\\]]?\\.)?[`"[]?([A-Za-z_][\\w$]*(?:-[\\w$]+)*)[`"\\]]?'
@@ -102,10 +105,12 @@ export function readSchema(sql: string, file: string): { tables: Array<Omit<Decl
   const states: SchemaState[] = []
   // Views are no tables: code selecting from one names no table of the domain.
   const views = [...text.matchAll(new RegExp(`\\b(?:create|alter)\\s+(?:or\\s+(?:replace|alter)\\s+)?(?:materialized\\s+)?view\\s+(?:if\\s+not\\s+exists\\s+)?${SQL_NAME}`, 'gi'))].map((m) => m[1])
-  // The database the script creates, in the engine its dialect shows.
-  const engine = /^\s*GO\s*$|\[dbo\]|\bnvarchar\b|\bIDENTITY\s*\(/im.test(text) ? 'SQL Server' : /`|\bENGINE\s*=|\bAUTO_INCREMENT\b/i.test(text) ? 'MySQL' : /\bSERIAL\b|::\w|\bplpgsql\b/i.test(text) ? 'PostgreSQL' : 'SQL'
-  const databases = [...text.matchAll(new RegExp(`\\bcreate\\s+(?:database|schema)\\s+(?:if\\s+not\\s+exists\\s+)?${SQL_NAME}`, 'gi'))]
-    .filter((m) => /database/i.test(m[0]))
+  // (A sequence too: code selecting its last_value names no table either.)
+  views.push(...[...text.matchAll(new RegExp(`\\bcreate\\s+sequence\\s+(?:if\\s+not\\s+exists\\s+)?${SQL_NAME}`, 'gi'))].map((m) => m[1]))
+  // The database the script creates, in the engine its dialect shows: MySQL's schema is one, Oracle's database link none.
+  const engine = dialectOf(text) ?? 'SQL'
+  const databases = [...text.matchAll(new RegExp(`\\bcreate\\s+(?:database|schema)\\s+(?!link\\b)(?:if\\s+not\\s+exists\\s+)?${SQL_NAME}`, 'gi'))]
+    .filter((m) => /database/i.test(m[0]) || engine === 'MySQL')
     .map((m) => ({ name: m[1], engine, line: lineAt(text, m.index!) }))
   // PostgreSQL: CREATE TYPE order_status AS ENUM ('new', 'paid').
   const types = new Map<string, SchemaState>()
@@ -114,9 +119,10 @@ export function readSchema(sql: string, file: string): { tables: Array<Omit<Decl
     if (values.length < 2) continue
     types.set(m[1].toLowerCase(), { name: m[1], values, file, line: lineAt(text, m.index!) })
   }
-  for (const m of text.matchAll(new RegExp(`\\bcreate\\s+table\\s+(?:if\\s+not\\s+exists\\s+)?${SQL_NAME}\\s*\\(`, 'gi'))) {
+  // (Oracle's and SQL Server's temporary tables too: CREATE GLOBAL TEMPORARY TABLE.)
+  for (const m of text.matchAll(new RegExp(`\\bcreate\\s+(?:(?:global|private)\\s+temporary\\s+)?table\\s+(?:if\\s+not\\s+exists\\s+)?${SQL_NAME}\\s*\\(`, 'gi'))) {
     // A table in a schema other than the default one keeps it: two schemas may hold one name.
-    const schema = /^create\s+table\s+(?:if\s+not\s+exists\s+)?[`"[]?(\w+)[`"\]]?\s*\./i.exec(m[0])?.[1]
+    const schema = /^create\s+(?:(?:global|private)\s+temporary\s+)?table\s+(?:if\s+not\s+exists\s+)?[`"[]?(\w+)[`"\]]?\s*\./i.exec(m[0])?.[1]
     const table = schema && !DEFAULT_SCHEMA.test(schema) ? `${schema}.${m[1]}` : m[1]
     const open = m.index! + m[0].length - 1
     const body = enclosed(text, open)
@@ -148,12 +154,20 @@ export function readSchema(sql: string, file: string): { tables: Array<Omit<Decl
       if (enumType) { enumType.table = table; enumType.column = name }
     }
   }
-  for (const m of text.matchAll(new RegExp(`\\balter\\s+table\\s+(?:only\\s+)?(?:if\\s+exists\\s+)?${SQL_NAME}\\s+add\\s+(?:constraint\\s+\\S+\\s+)?foreign\\s+key\\s*\\(([^)]*)\\)\\s*references\\s+${SQL_NAME}`, 'gi'))) {
-    const line = lineAt(text, m.index!)
-    const reference = { column: unquote(m[2].split(',')[0].trim()), table: m[3], line }
-    const known = tables.find((t) => t.table.toLowerCase() === m[1].toLowerCase())
-    if (known) known.references.push(reference)
-    else tables.push({ table: m[1], declared: 'SQL', columns: [], references: [reference], evidence: { file, line } })
+  // A table of another's shape: Oracle's object table (CREATE TABLE x OF type), PostgreSQL's partition (PARTITION OF).
+  for (const m of text.matchAll(new RegExp(`\\bcreate\\s+table\\s+(?:if\\s+not\\s+exists\\s+)?${SQL_NAME}\\s+(?:partition\\s+)?of\\s+${SQL_NAME}`, 'gi'))) {
+    if (!tables.some((t) => t.table.toLowerCase() === m[1].toLowerCase())) tables.push({ table: m[1], declared: 'SQL', columns: [], references: [], evidence: { file, line: lineAt(text, m.index!) } })
+  }
+  // ALTER TABLE x ADD CONSTRAINT c FOREIGN KEY (…) REFERENCES y, and Oracle's ADD ( CONSTRAINT pk PRIMARY KEY (…),
+  // CONSTRAINT c FOREIGN KEY (…) REFERENCES y ): each foreign key the statement adds.
+  for (const m of text.matchAll(new RegExp(`\\balter\\s+table\\s+(?:only\\s+)?(?:if\\s+exists\\s+)?${SQL_NAME}\\s+add\\b[^;]*`, 'gi'))) {
+    for (const fk of m[0].matchAll(new RegExp(`\\bforeign\\s+key\\s*\\(([^)]*)\\)\\s*references\\s+${SQL_NAME}`, 'gi'))) {
+      const line = lineAt(text, m.index! + fk.index!)
+      const reference = { column: unquote(fk[1].split(',')[0].trim()), table: fk[2], line }
+      const known = tables.find((t) => t.table.toLowerCase() === m[1].toLowerCase())
+      if (known) known.references.push(reference)
+      else tables.push({ table: m[1], declared: 'SQL', columns: [], references: [reference], evidence: { file, line } })
+    }
   }
   for (const t of types.values()) if (isStatus(t.name)) states.push(t)
   // Tables the script drops or renames, in order: those it created before go or change name here, earlier scripts' with them.
@@ -594,6 +608,8 @@ const SETS = 60
 
 export interface DomainFacts {
   tables: TableFact[]
+  /** The stored routines its scripts create. */
+  routines: RoutineFact[]
   states: StateFact[]
   /** The databases SQL files create. */
   databases: DatabaseFact[]
@@ -649,9 +665,27 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
   // An Ecto repository's structure.sql is a dump of its time; its migrations beside it are what runs.
   const ecto = files.list.filter((f) => /(^|\/)priv\/[^/]+\/migrations\/[^/]+\.exs$/.test(f) && !!own(f))
   const dumped = (file: string): boolean => /(^|\/)priv\/[^/]+\/structure\.sql$/.test(file) && ecto.some((m) => m.startsWith(`${dirOf(file)}/migrations/`))
-  // A down migration (golang-migrate's and dbmate's .down.sql, Flyway's U__ undo) undoes its up one and never runs forward.
-  for (const file of files.list.filter((f) => /\.sql$/i.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata)\//i.test(f) && !dumped(f) && !/\.down\.sql$|(^|\/)U\d+__[^/]*\.sql$/i.test(f))) {
+  // A down migration (golang-migrate's and dbmate's .down.sql, Flyway's U__ undo, Sqitch's revert/ and verify/) undoes
+  // or checks its up one and never runs forward.
+  const routines: Array<ReadRoutine & { unit?: Unit; folder: string }> = []
+  // The routines a script drops and creates no more after: an installer's helpers dropped at its end. A teardown
+  // script drops nothing that stays: one named for it (drop, uninstall, cleanup), or one that drops and creates nothing
+  // and is no versioned migration (Oracle's doe_v3.sql beside its coe_v3.sql).
+  const dropped = new Map<string, Set<string>>()
+  for (const file of files.list.filter((f) => SQL_SCRIPT.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata|revert|verify)\//i.test(f) && !dumped(f) && !/\.down\.sql$|(^|\/)U\d+__[^/]*\.sql$/i.test(f))) {
     const schema = readSchema(files.read(file), file)
+    const clean = withoutSqlCommentsOrStrings(files.read(file))
+    const created = readRoutines(clean, file)
+    const teardown = /(^|\/|_|-)(drop|uninstall|cleanup|clean|teardown|remove)[^/]*$/i.test(file)
+      || (/\bdrop\s+(table|package|procedure|function|trigger)\b/i.test(clean) && !/\bcreate\b/i.test(clean) && !/(^|\/)(migrations?|migrate|changelog|db\/changes)\/|(^|\/)(V\d+|\d+)[^/]*$/i.test(file))
+    if (!teardown) {
+      for (const m of clean.matchAll(/\bdrop\s+(package|procedure|proc|function|trigger)\s+(?:if\s+exists\s+)?(?:[`"[]?\w+[`"\]]?\s*\.\s*)?[`"[]?([A-Za-z_][\w$#]*)/gi)) {
+        const name = m[2].toLowerCase()
+        const kinds = /^trigger$/i.test(m[1]) ? 'trigger' : /^package$/i.test(m[1]) ? 'package' : 'routine'
+        if (created.some((r) => r.name === name && r.evidence.line > lineAt(clean, m.index!))) continue
+        dropped.set(name, new Set([...(dropped.get(name) ?? []), kinds]))
+      }
+    }
     for (const v of schema.views) views.add(v.toLowerCase())
     // A schema in no unit's folder is that of every unit whose code names one of its tables (the only unit, else).
     const unit = own(file)
@@ -661,7 +695,7 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     const users = unit ? [unit] : units.length === 1 ? units : units.filter((u) => named.some((t) => t.unit === u.id && names.has(bare(t.table).toLowerCase())) || used.some((d) => d.unit === u.id && !!d.name && scriptDbs.has(d.name.toLowerCase())))
     for (const u of users) {
       // An earlier script's table this one drops or renames.
-      for (const c of schema.changes) {
+      for (const c of teardown ? [] : schema.changes) {
         for (let i = declared.length - 1; i >= 0; i--) {
           const d = declared[i]
           if (d.unit !== u || d.declared !== 'SQL' || bare(d.table).toLowerCase() !== bare('drop' in c ? c.drop : c.from).toLowerCase()) continue
@@ -670,12 +704,15 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
         }
       }
       declared.push(...schema.tables.map((t) => ({ ...t, unit: u })))
+      if (unit || users.length === 1) routines.push(...created.map((r) => ({ ...r, unit: u, folder: u.path })))
       schemaStates.push(...schema.states.map((s) => ({ ...s, unit: u })))
       for (const db of schema.databases) {
         const id = `${repo}:db:${u.path}:${db.engine}/${db.name}`
         if (!databases.some((d) => d.id === id)) databases.push({ id, unit: u.id, engine: db.engine, name: db.name, evidence: { file, line: db.line } })
       }
     }
+    // Routines no one unit holds or claims are the database's own: a PL/SQL library, a shared schema's packages.
+    if (!unit && users.length !== 1) routines.push(...created.map((r) => ({ ...r, folder: dirOf(file) })))
   }
   // Laravel's migrations, in the order they run: the tables the last one leaves, per unit.
   const migrations = files.list.filter((f) => /(^|\/)database\/migrations\/[^/]+\.php$/.test(f) && !!own(f))
@@ -889,8 +926,34 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     }
   }
   // A view, or a database's own table, that the code names is no table of the domain.
-  for (const [id, t] of tables) if (!t.declared && (views.has(bare(t.table).toLowerCase()) || VIEW_NAME.test(bare(t.table)) || SYSTEM_TABLE.test(bare(t.table)) || /^(sys|system|information_schema|pg_catalog)\./i.test(t.table))) tables.delete(id)
-  return { tables: [...tables.values()], states, databases, notes }
+  // (Nor a function the code selects from: FROM check_missions().)
+  for (const [id, t] of tables) if (!t.declared && (views.has(bare(t.table).toLowerCase()) || routines.some((r) => r.name === bare(t.table).toLowerCase()) || VIEW_NAME.test(bare(t.table)) || SYSTEM_TABLE.test(bare(t.table)) || /^(sys|system|information_schema|pg_catalog)\./i.test(t.table))) tables.delete(id)
+  // The routines, their bodies' tables and calls kept to those the repository knows.
+  const tableNames = new Set([...tables.values()].map((t) => bare(t.table).toLowerCase()))
+  // (A package dropped takes its members with it.)
+  const gone = (r: ReadRoutine): boolean => {
+    const kinds = dropped.get(r.name.split('.')[0])
+    if (!kinds) return false
+    return r.name.includes('.') || r.kind === 'package' ? kinds.has('package') : kinds.has(r.kind === 'trigger' ? 'trigger' : 'routine')
+  }
+  for (let i = routines.length - 1; i >= 0; i--) if (gone(routines[i])) routines.splice(i, 1)
+  const routineNames = new Set(routines.map((r) => r.name))
+  const known = (call: string, from: string): string | undefined => {
+    // A package's member calls a sibling by its bare name.
+    const pkg = from.includes('.') ? from.split('.')[0] : undefined
+    return routineNames.has(call) ? call : pkg && routineNames.has(`${pkg}.${call}`) ? `${pkg}.${call}` : undefined
+  }
+  const routineFacts: RoutineFact[] = []
+  for (const r of routines) {
+    // A PostgreSQL trigger may share its function's name.
+    const id = `${repo}:routine:${r.folder}:${r.kind === 'trigger' ? 'trigger:' : ''}${r.name}`
+    if (routineFacts.some((x) => x.id === id)) continue
+    const reads = (r.reads ?? []).filter((t) => tableNames.has(t))
+    const writes = (r.writes ?? []).filter((t) => tableNames.has(t))
+    const calls = [...new Set((r.calls ?? []).map((c) => known(c, r.name)).filter((c): c is string => !!c && (r.kind === 'trigger' || c !== r.name)))]
+    routineFacts.push({ id, ...(r.unit ? { unit: r.unit.id } : {}), name: r.name, kind: r.kind, ...(r.dialect ? { dialect: r.dialect } : {}), ...(r.table ? { table: r.table } : {}), ...(reads.length ? { reads } : {}), ...(writes.length ? { writes } : {}), ...(calls.length ? { calls } : {}), evidence: r.evidence })
+  }
+  return { tables: [...tables.values()], states, databases, routines: routineFacts, notes }
 }
 
 /** What an Access file reader must offer: mdb-reader's MDBReader, which the MCP server and the bench hand over. */

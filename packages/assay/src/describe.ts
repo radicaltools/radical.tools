@@ -18,11 +18,22 @@ const domainLines = (r: RepositoryFacts): string[] => {
   return [
     ...(declared.length ? [`  tables declared (${declared.map((t) => t.declared).filter((d, i, a) => a.indexOf(d) === i).join(', ')}): ${declared.map((t) => `${t.table} (${t.columns?.length ?? 0} columns${t.references?.length ? `, → ${t.references.map((x) => x.table).join(', ')}` : ''})`).join('; ')}${keys ? ` — ${count(keys, 'foreign key')}` : ''}`] : []),
     ...r.states.map((s) => `  - ${s.id}: ${s.name}${s.flags ? ` (columns ${s.flags.map((f) => f.column).join(', ')})` : s.table ? ` (${s.table}.${s.column})` : ''}: ${s.values.join(', ')}${s.initial ? ` (a new one starts ${s.initial})` : ''}; ${count(s.sets.length, 'line sets', 'lines set')} a value`),
+    ...(r.routines?.length ? [`  stored routines: ${[...routineKinds(r)].map(([k, n]) => count(n, k)).join(', ')} (assay_facts with kind routines; routineCalls for the code's calls)`] : []),
     ...(r.entries.length ? [`  entry points: ${[...kinds].map(([k, n]) => count(n, ...names[k])).join(', ')} (assay_facts with kind entries)`] : []),
   ]
 }
 
 const count = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`
+
+/** A repository's stored routines counted by kind, the ones only its code calls apart. */
+const routineKinds = (r: RepositoryFacts): Map<string, number> => {
+  const kinds = new Map<string, number>()
+  for (const x of r.routines ?? []) {
+    const kind = x.called ? 'routine only called' : x.name.includes('.') && x.kind !== 'package' ? `package ${x.kind}` : x.kind
+    kinds.set(kind, (kinds.get(kind) ?? 0) + 1)
+  }
+  return kinds
+}
 
 /** At most this many units, services and databases of a repository are named in a brief description. */
 const BRIEF = 25
@@ -39,7 +50,7 @@ export function describeFacts(repositories: RepositoryFacts[], links: Link[], fr
       `${r.repository} (${relative(from, r.dir) || '.'}${r.commit ? `, ${r.commit.slice(0, 7)}` : ', no commit'}): ${[
         count(r.units.length, 'unit'), count(r.dependencies.length, 'dependency', 'dependencies'), count(r.apis.length, 'API operation'),
         count(r.urls.length, 'URL path'), count(r.clients.length, 'gRPC client'), count(r.addresses.length, 'address', 'addresses'),
-        count(r.services.length, 'deployed service'), count(r.databases.length, 'database'), count(r.tables.length, 'table'),
+        count(r.services.length, 'deployed service'), count(r.databases.length, 'database'), count(r.tables.length, 'table'), count((r.routines ?? []).length, 'stored routine'),
         count(r.states.length, 'status', 'statuses'), count(r.screens.length, 'form'), count(r.entries.length, 'entry point'), count(r.groups.length, 'group'), count(r.tests.length, 'test'), count(r.documents.length, 'document'),
       ].filter((c, i) => i === 0 || !c.startsWith('0 ')).join(', ')}.`,
       ...first(r.units, 'units', r.repository).map((u) => (typeof u === 'string' ? u : unitLine(u))),

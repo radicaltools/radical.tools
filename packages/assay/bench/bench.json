@@ -1072,6 +1072,10 @@
         [
           "Projeto VB6-SQL Server-WorkFlow/Classes VB6/SIS - Básico/ADRRBR_SIS_Conexao - Adaptada",
           "db:adrrbr01"
+        ],
+        [
+          "Projeto VB6-SQL Server-WorkFlow/Classes VB6/GRF - Controle Gráfico/ADRRBR_GRF_Trab_Fases",
+          "routine:fnc_grf_trabalho_fase_atual"
         ]
       ],
       "tables": [

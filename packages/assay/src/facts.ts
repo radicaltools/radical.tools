@@ -24,7 +24,7 @@ export interface Evidence {
 }
 
 /** The stack a unit is read from. */
-export type Stack = 'npm' | 'maven' | 'gradle' | 'go' | 'dotnet' | 'python' | 'php' | 'ruby' | 'elixir' | 'rust' | 'vb6' | 'docker'
+export type Stack = 'npm' | 'maven' | 'gradle' | 'ant' | 'go' | 'dotnet' | 'python' | 'php' | 'ruby' | 'elixir' | 'rust' | 'vb6' | 'sql' | 'docker'
 
 /** A unit of the repository: a project with a manifest of its own (or a folder with a Dockerfile). */
 export interface Unit {
@@ -184,6 +184,38 @@ export interface StateFact {
   evidence: Evidence
 }
 
+/** A stored routine a database's scripts create: a procedure, a function, a package or one of its members, a trigger. */
+export interface RoutineFact {
+  id: string
+  /** The unit whose scripts create it; none for a routine known only from the code's calls of it. */
+  unit?: string
+  /** Lower-case, as code calls it: proc, pkg (a package), pkg.member, a trigger's name. */
+  name: string
+  kind: 'procedure' | 'function' | 'package' | 'trigger'
+  /** Oracle (PL/SQL), SQL Server (T-SQL), PostgreSQL (PL/pgSQL), MySQL. */
+  dialect?: string
+  /** A trigger's table. */
+  table?: string
+  /** The tables its body reads and writes, and the routines it calls, by name. */
+  reads?: string[]
+  writes?: string[]
+  calls?: string[]
+  /** Created by no script of the run: the code calls it, the database holds it. */
+  called?: boolean
+  evidence: Evidence
+}
+
+/** A unit's code calling a stored routine: JDBC's prepareCall, Spring's SimpleJdbcCall, JPA's @Procedure, ADO.NET's
+ *  CommandType.StoredProcedure, Python's callproc, EXEC or CALL in its SQL. */
+export interface RoutineCallFact {
+  id: string
+  unit: string
+  /** The routine's lower-case name: pkg.member where a package or catalog names it. */
+  routine: string
+  via: string
+  evidence: Evidence
+}
+
 /** A message a unit's code publishes or consumes: on a topic, a queue or an exchange by name, or of a message type a
  *  bus routes by its type (MassTransit). */
 export interface MessageFact {
@@ -270,6 +302,8 @@ export interface RepositoryFacts {
   states: StateFact[]
   entries: EntryFact[]
   messages: MessageFact[]
+  routines: RoutineFact[]
+  routineCalls: RoutineCallFact[]
   groups: GroupFact[]
   tests: TestFact[]
   documents: DocumentFact[]
@@ -291,11 +325,11 @@ export const factsFileOf = (dir: string, name: string, root: string): string =>
 const FORMAT = 'radical-assay-facts/1'
 
 /** The lists of facts a repository's facts hold. */
-export const FACT_LISTS = ['units', 'dependencies', 'apis', 'urls', 'clients', 'addresses', 'services', 'databases', 'tables', 'states', 'entries', 'messages', 'groups', 'tests', 'documents', 'screens', 'paths'] as const
+export const FACT_LISTS = ['units', 'dependencies', 'apis', 'urls', 'clients', 'addresses', 'services', 'databases', 'tables', 'states', 'entries', 'messages', 'routines', 'routineCalls', 'groups', 'tests', 'documents', 'screens', 'paths'] as const
 
 /** No facts yet: every list empty. */
 export const emptyFacts = (repository: string, dir: string): RepositoryFacts => ({
-  repository, dir, units: [], dependencies: [], apis: [], urls: [], clients: [], addresses: [], services: [], databases: [], tables: [], states: [], entries: [], messages: [], groups: [], tests: [], documents: [], screens: [], paths: [], notes: [],
+  repository, dir, units: [], dependencies: [], apis: [], urls: [], clients: [], addresses: [], services: [], databases: [], tables: [], states: [], entries: [], messages: [], routines: [], routineCalls: [], groups: [], tests: [], documents: [], screens: [], paths: [], notes: [],
 })
 
 /** The facts as written to FACTS_FILE: without the absolute folder, which is the reader's. */
@@ -318,8 +352,8 @@ export interface Link {
   /** package: a manifest or project reference; http: a path an OpenAPI description declares; grpc: a client of a service
    *  another unit registers; address: a host naming another unit or service; runtime: depends_on in a deployment;
    *  data: a database the unit connects to; message: a topic, queue or message type one unit publishes and another
-   *  consumes. */
-  kind: 'package' | 'http' | 'grpc' | 'address' | 'runtime' | 'data' | 'message'
+   *  consumes; routine: a stored routine the unit's code calls. */
+  kind: 'package' | 'http' | 'grpc' | 'address' | 'runtime' | 'data' | 'message' | 'routine'
   from: string
   /** A unit, or a service or database fact. */
   to: string
@@ -333,12 +367,12 @@ export interface Link {
   via?: string
 }
 
-export type FactKind = 'unit' | 'dependency' | 'api' | 'url' | 'client' | 'address' | 'service' | 'database' | 'table' | 'state' | 'entry' | 'message' | 'group' | 'test' | 'document' | 'screen' | 'path' | 'link'
-export type AnyFact = Unit | DependencyFact | ApiFact | UrlFact | ClientFact | AddressFact | ServiceFact | DatabaseFact | TableFact | StateFact | EntryFact | MessageFact | GroupFact | TestFact | DocumentFact | ScreenFact | PathFact | Link
+export type FactKind = 'unit' | 'dependency' | 'api' | 'url' | 'client' | 'address' | 'service' | 'database' | 'table' | 'state' | 'entry' | 'message' | 'routine' | 'routine-call' | 'group' | 'test' | 'document' | 'screen' | 'path' | 'link'
+export type AnyFact = Unit | DependencyFact | ApiFact | UrlFact | ClientFact | AddressFact | ServiceFact | DatabaseFact | TableFact | StateFact | EntryFact | MessageFact | RoutineFact | RoutineCallFact | GroupFact | TestFact | DocumentFact | ScreenFact | PathFact | Link
 
 const KIND_OF: Record<(typeof FACT_LISTS)[number], FactKind> = {
   units: 'unit', dependencies: 'dependency', apis: 'api', urls: 'url', clients: 'client', addresses: 'address',
-  services: 'service', databases: 'database', tables: 'table', states: 'state', entries: 'entry', messages: 'message', groups: 'group', tests: 'test', documents: 'document', screens: 'screen', paths: 'path',
+  services: 'service', databases: 'database', tables: 'table', states: 'state', entries: 'entry', messages: 'message', routines: 'routine', routineCalls: 'routine-call', groups: 'group', tests: 'test', documents: 'document', screens: 'screen', paths: 'path',
 }
 
 /** Every fact of the repositories by id, links included. */
