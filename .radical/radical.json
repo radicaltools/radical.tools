@@ -3417,6 +3417,12 @@
     ] },
     { "element": "24085eb1-d88b-44c7-8693-874aeff86d66", "name": "A JVM unit as it is", "tests": [
       "packages/assay/tests/spring-cloud.test.ts › radical assay: Spring Cloud and compose as they run › reads a JVM unit as it is: the plugin it applies, the JUnit its tests import, the port it serves, not its tests' settings, no password"
+    ] },
+    { "element": "0e76618e-7acf-46d3-bbc8-f9fdbfbdf7ea", "name": "A Go module of several mains", "tests": [
+      "packages/assay/tests/large.test.ts › radical assay: what large repositories hold › reads a Go module's shared packages as its main app's, its gorilla/mux routes under their subrouters, no down migration"
+    ] },
+    { "element": "e760f9dd-47e7-4845-80bf-e0d53ccad15b", "name": "Tooling, test folders, $(SolutionDir) and Django's urls", "tests": [
+      "packages/assay/tests/large.test.ts › radical assay: what large repositories hold › leaves tooling's folders out, builds a folder of tests for tests, and reads $(SolutionDir) and Django's urls.py"
     ] }
   ]
 }
