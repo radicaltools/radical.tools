@@ -376,10 +376,9 @@ with 720 extra; now all found, none extra, and tuned on. An agent modelled Schem
 over MCP (run 26, `/Volumes/data/Dev/assay-runs/26-databases`, 13 minutes, $7.8); most of its findings
 are fixed. Open:
 
-- **The metamodel mutes a database**: a database cannot call (interacts from a database), be used by a
-  person (Schemaverse is played in psql), realise an entity, implement a state machine or perform a
-  step. The logic of both systems sits in an element the model can't relate. A decision for the
-  metamodel, with routines as elements of their own.
+- ~~**The metamodel mutes a database**~~: done (ADR A database can hold and run code, 2026-11-09). A
+  database may call out, be used by a person, hold components, realise an entity, implement a state
+  machine and perform a step; it still delivers nothing to a person.
 - **pgTAP tests**: 12 files of pgTAP assertions gave no test facts; scenarios on database behaviour
   had nothing to rest on.
 - **pg_cron jobs, views and rules as an API, RLS policies, materialized views, dynamic SQL** (a
@@ -400,11 +399,10 @@ library, Schemaverse, two Java apps calling Oracle routines): untouched units
 19/22, calls 4/26, tables 55/77, routines 991/991 with 63 extra; now 22/22,
 26/26, 76/77 and 991/991 with 2 extra; tuned on now. Open:
 
-- **Routines as elements**: the metamodel allows no component inside a
-  database, so a database names its routines in its description and a call is
-  a relation to the database labelled with the routine. A routine of its own
-  (a component type of a database, or a component allowed there) would let a
-  view show which code calls which package.
+- ~~**Routines as elements**~~: done (ADR A database can hold and run code). A
+  stored package is a component inside its database, its members in its
+  description, and a call of a member a relation to it; a procedure outside a
+  package stays in the database's description, with no type of its own.
 - **Tables no CREATE TABLE names**: Oracle XML DB's `purchaseorder`, created by
   registering an XSD (`xdb:defaultTable`).
 - **A table dropped with its triggers**: Schemaverse's `event_id_dealer` went

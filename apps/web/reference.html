@@ -103,10 +103,10 @@
               <tr><td><strong>Person</strong></td><td>Someone who uses or runs the system: a customer, an operator, another team.</td><td>Root, group. Never inside a system.</td><td>External</td></tr>
               <tr><td><strong>Software System</strong></td><td>Something that delivers value and is owned by one team: yours, or one you depend on.</td><td>Root, group, system; in Radical also a domain, as the bounded context that realises it.</td><td>External</td></tr>
               <tr><td><strong>Container</strong></td><td>Something that runs or stores data and is deployed on its own: a service, a worker, a mobile app.</td><td>System, or a group inside one.</td><td>Technology, External</td></tr>
-              <tr><td><strong>Database</strong></td><td>A container that stores data and never starts an interaction.</td><td>System, or a group inside one.</td><td>Technology, External</td></tr>
+              <tr><td><strong>Database</strong></td><td>A container that stores data, and may run code that calls out: its packages and routines.</td><td>System, or a group inside one.</td><td>Technology, External</td></tr>
               <tr><td><strong>Web App</strong></td><td>A container that is a browser front end; it may hold components.</td><td>System, or a group inside one.</td><td>Technology, External</td></tr>
               <tr><td><strong>Queue</strong></td><td>A container that carries messages between containers.</td><td>System, or a group inside one.</td><td>Technology, External</td></tr>
-              <tr><td><strong>Component</strong></td><td>A part of a container behind a clear interface: a controller, an adapter.</td><td>Container, web app, or a group inside one. Never straight in a system.</td><td>Technology, External</td></tr>
+              <tr><td><strong>Component</strong></td><td>A part of a container behind a clear interface: a controller, an adapter.</td><td>Container, web app, database, or a group inside one. Never straight in a system.</td><td>Technology, External</td></tr>
               <tr><td><strong>Group</strong></td><td>A labelled boundary with no meaning of its own: a team, a layer, a zone. No relation starts or ends at a group.</td><td>Root, group, system.</td><td>—</td></tr>
             </tbody>
           </table>
@@ -176,7 +176,7 @@
           <table class="doc-table">
             <thead><tr><th>Relation</th><th>From → to</th><th>Fields</th><th>Meaning</th></tr></thead>
             <tbody>
-              <tr><td><strong>Interacts</strong></td><td>Person → system, container, web app, component<br/>System → person, system, container, database, web app, queue, component<br/>Container, Web App → person, system, container, database, web app, queue<br/>Component → component, container, web app, database, queue, system<br/>Queue → container, web app, component</td><td>Technology</td><td>The source calls, uses, sends to or delivers to the target. Draw it from the initiator. A database never initiates; nothing touches a group.</td></tr>
+              <tr><td><strong>Interacts</strong></td><td>Person → system, container, web app, component, database<br/>System → person, system, container, database, web app, queue, component<br/>Container, Web App → person, system, container, database, web app, queue<br/>Component → component, container, web app, database, queue, system<br/>Database → system, container, database, web app, queue, component<br/>Queue → container, web app, component</td><td>Technology</td><td>The source calls, uses, sends to or delivers to the target. Draw it from the initiator. A database delivers nothing to a person; nothing touches a group.</td></tr>
             </tbody>
           </table>
         </div>
@@ -185,7 +185,7 @@
           <table class="doc-table">
             <thead><tr><th>Relation</th><th>From → to</th><th>Fields</th><th>Meaning</th></tr></thead>
             <tbody>
-              <tr><td><strong>Realises</strong></td><td>System, container → domain<br/>System, container, component, web app → entity</td><td>—</td><td>The bounded context that implements the domain; the element that owns the entity's data.</td></tr>
+              <tr><td><strong>Realises</strong></td><td>System, container → domain<br/>System, container, component, web app, database → entity</td><td>—</td><td>The bounded context that implements the domain; the element that owns the entity's data.</td></tr>
               <tr><td><strong>Part of</strong></td><td>Entity → entity</td><td>—</td><td>A part of an aggregate points to its root.</td></tr>
               <tr><td><strong>References</strong></td><td>Entity → entity</td><td>Cardinality (one, many)</td><td>One aggregate refers to another by id.</td></tr>
               <tr><td><strong>Depends on</strong></td><td>Domain → domain</td><td>—</td><td>The source needs the target to do its work.</td></tr>
@@ -211,10 +211,10 @@
             <thead><tr><th>Relation</th><th>From → to</th><th>Fields</th><th>Meaning</th></tr></thead>
             <tbody>
               <tr><td><strong>Lifecycle of</strong></td><td>State machine → entity</td><td>—</td><td>One machine per entity.</td></tr>
-              <tr><td><strong>Implements</strong></td><td>System, container, component, web app → state machine<br/>Fitness function → ADR</td><td>—</td><td>This element runs the machine; this check verifies that the decision still holds.</td></tr>
+              <tr><td><strong>Implements</strong></td><td>System, container, component, web app, database → state machine<br/>Fitness function → ADR</td><td>—</td><td>This element runs the machine; this check verifies that the decision still holds.</td></tr>
               <tr><td><strong>Transition</strong></td><td>State, pseudostate → state, pseudostate, within one machine</td><td>Event, Guard, Actions, Raises, Kind (external, internal)</td><td>Labelled <code>event [guard] / actions ^raised</code>. No event means a completion transition.</td></tr>
               <tr><td><strong>Emits</strong></td><td>Person, system, container, component, web app, queue, state machine, state → event</td><td>On (entry, exit, do) for a state</td><td>This element raises the event.</td></tr>
-              <tr><td><strong>Performed by</strong></td><td>Step → person, system, container, component, web app</td><td>—</td><td>Who does the step.</td></tr>
+              <tr><td><strong>Performed by</strong></td><td>Step → person, system, container, component, web app, database</td><td>—</td><td>Who does the step.</td></tr>
             </tbody>
           </table>
         </div>
