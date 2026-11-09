@@ -3396,6 +3396,12 @@
     ] },
     { "element": "ed378400-884f-4337-9967-5458042d9fb2", "name": "A host a Spring placeholder defaults to", "tests": [
       "packages/assay/tests/spring-cloud.test.ts › radical assay: Spring Cloud and compose as they run › reads a host a Spring placeholder defaults to"
+    ] },
+    { "element": "da9355a1-a283-447a-87d2-bd11b7c1fb47", "name": "Tables SQL in a string creates", "tests": [
+      "packages/assay/tests/syntax.test.ts › radical assay: code read through syntax trees › reads the tables SQL in a string of the code creates, joined with + over lines, each on its line"
+    ] },
+    { "element": "c1ff38d8-74dd-4fb6-8c2c-471023f6c07a", "name": "Entities where the DbContext reaches", "tests": [
+      "packages/assay/tests/syntax.test.ts › radical assay: code read through syntax trees › reads an Entity Framework class as an entity only of a unit its DbContext's project reaches"
     ] }
   ]
 }
