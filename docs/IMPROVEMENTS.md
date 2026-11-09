@@ -360,6 +360,44 @@ several selected elements is one undo step, relations and nests alike`
 failed once in a full local run on feat/radical-assay (2026-11-02, which
 does not touch Studio) and passed three times alone in 9.7 s.
 
+### Dogfooding (2026-11-08): nine more repositories held out
+
+Nine more repositories were written down by hand before Assay ran on them
+(committed first): three VB6 programs (a hotel, a pharmacy, a payroll),
+Maybe (Rails), Plausible analytics (Elixir, PostgreSQL and ClickHouse),
+zero-to-production (Rust), the OpenTelemetry demo (eleven languages), a .NET
+microservices sample and Now in Android (Kotlin, 36 Gradle modules).
+Untouched: units 82/87 (precision 98 %), calls 47/162 (precision 62 %),
+tables 124/265. Units held on stacks Assay did not know, through their
+Dockerfiles; calls and tables did not. The causes: Gradle's type-safe
+accessors and convention plugins unread (0/83 in Now in Android); Ruby,
+Elixir and Rust no stacks; Rails' `schema.rb`, Ecto's migrations, Room and
+`database.yml` unread; compose files read without their `.env` (the
+OpenTelemetry demo's services all ran the root); a root `package.json` of
+markdownlint and a `tools.go` module as units; Entity Framework's `[Table]`
+lost to the DbSet's name beside another attribute. Fixed: units 86/87
+(precision 100 %), calls 157/162 (precision 98 %), tables 262/265; tuned on
+now. The tuned bench reads as before, as do robot-shop, eShop and sockshop.
+Two expectations were changed before Assay ran: Payrollv2's database is its
+engine (the name is only in an obfuscated file), and Postmark is an optional
+call of zero-to-production (external APIs are optional in the bench). Open:
+
+- **A held-out set again.** robot-shop, eShop and sockshop are still the
+  only held-out repositories, all seen.
+- **Tests in a `test/` folder.** The OpenTelemetry demo's `test/telemetry`
+  (a pytest container) is no unit: folders named `test` are skipped as
+  fixtures.
+- **CMake and native code.** `currency → currency/genproto`
+  (`add_subdirectory`) is unread; C++ is no stack.
+- **Values built from parts.** Fraud detection and email reach flagd through
+  `FLAGD_HOST` and `FLAGD_PORT` set apart; a React Native app's backend
+  address is unread.
+- **A local Redis.** zero-to-production's `redis://127.0.0.1:6379` is named
+  `db:127.0.0.1`; the bench writes `service:redis`.
+- **Data migrations.** Plausible's `priv/data_migrations` create three
+  ClickHouse tables (`location_data`, `acquisition_channel_*`) a mix task
+  runs; they are not read.
+
 ### Dogfooding (2026-11-08): an agent's run on three systems of services
 
 Run 21 (`/Volumes/data/Dev/assay-runs/21-services`): an agent ran Assay over
@@ -390,6 +428,27 @@ as no entities (12 of 30). Open, from the reports:
 - **assay_apply's description** says a document may back an observed item;
   the server refuses it. Plan elements take no `properties` (a domain's kind).
 
+Run 23 (`23-services`, 2026-11-08, after the procedure asked for an entity
+per table and the scorer stopped counting test projects and join tables as
+missed; $8.9, 17 minutes): units 95 %, calls 100 % (precision 100 %),
+tables as entities 97 % (run 22 re-scored: 95 %, 100 %, 52 %). New in its
+report, open:
+
+- **Django foreign keys without a target.** Most of bakerydemo's references
+  have `table: ""` (`image_id`, `page_id`, `person_id`), so `partOf` and
+  `references` cannot rest on them.
+- **Tables in C# strings.** Dapper services' `CREATE TABLE` in C# strings is
+  unparsed (no columns, the `REFERENCES WorkshopPlanning` key lost), and
+  their tables are labelled Entity Framework Core.
+- **Ports a unit calls read as ports it listens on** (`notification-service`
+  listens on 465 and 27017); Seq is `role: other`, not observability; hosts
+  in fixtures JSON and `.pre-commit-config.yaml` are addresses.
+- **A Python unit at the root is named `.`**, and Wagtail's
+  `WagtailPageTestCase` tests are no test framework to it.
+- **The plan's schema** does not say step keys are unique across a plan, not
+  per process (42 refusals); `assay_answer` cannot set a requirement's need
+  back to *Found in the code*.
+
 ### Dogfooding (2026-11-08): nine repositories held out
 
 Nine new repositories were written down by hand before Assay ran on them
@@ -404,8 +463,8 @@ read; workspace roots, vendored Bootstrap and runner images as units; a
 root Go module claiming the services' main packages. Fixed: calls 80/82
 (precision 89 %), tables 55/55, units 100 %; tuned on now. Open:
 
-- **A held-out set again.** Only robot-shop, eShop and sockshop are held
-  out, all seen; the next round needs new repositories.
+- ~~**A held-out set again.**~~ Done: nine more repositories held out
+  (2026-11-08, see above).
 - ~~**A client in a shared library.**~~ Done: a gRPC client a library's
   function makes is a client of each unit that imports the library and calls
   the function (wild-workouts' trainings → trainer, users).

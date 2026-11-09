@@ -24,7 +24,7 @@ export interface Evidence {
 }
 
 /** The stack a unit is read from. */
-export type Stack = 'npm' | 'maven' | 'gradle' | 'go' | 'dotnet' | 'python' | 'php' | 'vb6' | 'docker'
+export type Stack = 'npm' | 'maven' | 'gradle' | 'go' | 'dotnet' | 'python' | 'php' | 'ruby' | 'elixir' | 'rust' | 'vb6' | 'docker'
 
 /** A unit of the repository: a project with a manifest of its own (or a folder with a Dockerfile). */
 export interface Unit {

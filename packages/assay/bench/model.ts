@@ -7,7 +7,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { deserializeFromMdFolder, type FolderFiles } from '@radical/common/formats/mdFolder'
-import { scoreModel, type Expectations, type WrittenItem } from './score'
+import { joinsOnly, scoreModel, type Expectations, type RunFacts, type WrittenItem } from './score'
 
 const [central, ...names] = process.argv.slice(2)
 if (!central || !names.length) {
@@ -31,12 +31,17 @@ function folderFiles(dir: string): FolderFiles {
 
 const { data } = deserializeFromMdFolder(folderFiles(join(central, '.radical', 'model')))
 const run = JSON.parse(readFileSync(join(central, '.radical', 'assay', 'run.json'), 'utf8')) as { repositories?: Array<{ name: string; dir: string }>; written: Array<WrittenItem & { evidence?: Array<{ fact?: string }> }> }
-// The deployed services of the run's repositories, from their facts (in the repository, or the central one's for a folder of code).
+// The deployed services, units of tests and join tables of the run's repositories, from their facts (in the repository, or
+// the central one's for a folder of code).
 const services: Record<string, { name: string; unit?: string }> = {}
+const facts: Required<RunFacts> = { services, tests: [], joins: [] }
 for (const r of run.repositories ?? []) {
   for (const file of [join(central, r.dir, '.radical', 'assay', 'facts.json'), join(central, '.radical', 'assay', 'facts', `${r.name}.json`)]) {
     try {
-      for (const s of (JSON.parse(readFileSync(file, 'utf8')) as { services?: Array<{ id: string; name: string; unit?: string }> }).services ?? []) services[s.id] = { name: s.name, ...(s.unit ? { unit: s.unit } : {}) }
+      const read = JSON.parse(readFileSync(file, 'utf8')) as { services?: Array<{ id: string; name: string; unit?: string }>; units?: Array<{ id: string; kind: string }>; tables?: Array<{ id: string } & Parameters<typeof joinsOnly>[0]> }
+      for (const s of read.services ?? []) services[s.id] = { name: s.name, ...(s.unit ? { unit: s.unit } : {}) }
+      facts.tests.push(...(read.units ?? []).filter((u) => u.kind === 'tests').map((u) => u.id))
+      facts.joins.push(...(read.tables ?? []).filter(joinsOnly).map((t) => t.id))
       break
     } catch { /* not there */ }
   }
@@ -48,15 +53,17 @@ const totals = { units: [0, 0, 0], calls: [0, 0, 0], tables: [0, 0] }
 for (const name of names) {
   const expected = [...bench.repositories, ...bench.heldOut].find((r) => r.name === name)
   if (!expected) { console.error(`no bench entry ${name}`); process.exit(2) }
-  const s = scoreModel(expected, data.nodes, data.relations, written, services)
+  const s = scoreModel(expected, data.nodes, data.relations, written, facts)
   console.log(`\n${name}`)
   console.log(`  units: ${s.units.found}/${s.units.expected} in elements (recall ${pct(s.units.found, s.units.expected)}), ${s.units.read} built from (precision ${pct(s.units.found, s.units.read)})`)
   for (const u of s.units.missed) console.log(`    missed unit ${u}`)
   for (const u of s.units.extra) console.log(`    extra unit ${u}`)
+  if (s.units.tests) console.log(`    not counted (tests, no elements by the procedure): ${s.units.tests.join(', ')}`)
   console.log(`  calls: recall ${pct(s.calls.right, s.calls.expected)} (${s.calls.right}/${s.calls.expected}), precision ${pct(s.calls.right, s.calls.right + s.calls.wrong.length)} (${s.calls.wrong.length} not stated)`)
   for (const c of s.calls.missed) console.log(`    missed ${c}`)
   for (const c of s.calls.wrong) console.log(`    not stated ${c}`)
   if (s.tables) console.log(`  tables as entities: ${s.tables.found}/${s.tables.expected}${s.tables.missed.length ? `, missed ${s.tables.missed.join(', ')}` : ''}`)
+  if (s.tables?.joins) console.log(`    not counted (join tables, no entities by the procedure): ${s.tables.joins.join(', ')}`)
   totals.units = [totals.units[0] + s.units.found, totals.units[1] + s.units.expected, totals.units[2] + s.units.read]
   totals.calls = [totals.calls[0] + s.calls.right, totals.calls[1] + s.calls.expected, totals.calls[2] + s.calls.right + s.calls.wrong.length]
   if (s.tables) totals.tables = [totals.tables[0] + s.tables.found, totals.tables[1] + s.tables.expected]

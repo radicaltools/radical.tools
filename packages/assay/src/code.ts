@@ -13,7 +13,7 @@ import { GENERATED, RepoFiles, TEST_FILE, escapeRe, lineAt, owner } from './file
 import { settingsFor, springConfigOwners } from './spring'
 import { inlineValues, vbValues, type VbValues } from './values'
 
-const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.go', '.py', '.java', '.kt', '.cs', '.vb', '.bas', '.cls', '.frm', '.ctl', '.dsr', '.dob', '.pag', '.php', '.rb', '.scala', '.fs'])
+const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.go', '.py', '.java', '.kt', '.cs', '.vb', '.bas', '.cls', '.frm', '.ctl', '.dsr', '.dob', '.pag', '.php', '.rb', '.ex', '.exs', '.rs', '.scala', '.fs'])
 const CONFIG = /\.(json|ya?ml|properties|config|xml|ini|udl|env|toml|conf|template|tmpl)$|(^|\/)\.env(\.[\w-]+)?$/i
 /** Paths that name a file, not an endpoint. */
 const FILE_PATH = /\.(js|mjs|cjs|ts|tsx|jsx|css|scss|map|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|html?|json|md|txt|xml|ya?ml|pdf|zip|wasm|exe|dll|so|sh)$/i
@@ -38,6 +38,10 @@ export function urlPathOf(literal: string): string | null {
 }
 
 /** Where an address calls nothing: CI configuration, translations, lock files. */
+/** A framework's migrations: Rails', Ecto's, Laravel's. */
+export const MIGRATION = /(^|\/)(db\/migrate|priv\/[^/]+\/migrations|database\/migrations)\//
+/** A CI pipeline's files: the databases its jobs start are the tests', not the system's. */
+const CI = /(^|\/)(\.github|\.gitlab|\.circleci|\.buildkite)\/|(^|\/)(\.gitlab-ci|azure-pipelines|bitbucket-pipelines|\.travis)\.ya?ml$/i
 const NO_CALLS = /(^|\/)(\.github|\.gitlab|\.circleci|lang|langs|language|languages|lenguajes|idiomas|locale|locales|i18n|l10n|translations?)\/|(^|\/)(package-lock|npm-shrinkwrap)\.json$/i
 /** A line whose address names a page's link, an XML namespace or a schema, not a call. */
 const NOT_CALLED = /\bhref\s*=|\bxmlns(?::\w+)?\s*=|schemaLocation\s*=|["']\$schema["']\s*:/i
@@ -87,6 +91,43 @@ const VB_STRING = /()"((?:[^"\n]|"")*)"/g
 /** VB source: modules, classes, forms, controls, designers and documents. */
 const VB_CODE = /\.(bas|cls|frm|ctl|dsr|dob|pag|vb)$/i
 
+const RAILS_ADAPTERS: Record<string, string> = { postgresql: 'postgresql', postgis: 'postgresql', mysql2: 'mysql', trilogy: 'mysql', mysql: 'mysql', sqlserver: 'sqlserver', sqlite3: 'sqlite' }
+
+/** Rails' database.yml as one connection URL on the database line of the environment that runs (production, else
+ *  development, else the first), its settings merged with those it inherits (<<: *default); ERB's ENV.fetch("K") { "v" }
+ *  and ENV["K"] || "v" read as their defaults. Every other line is emptied (lines hold). */
+export function railsDatabases(text: string): string {
+  const erb = text
+    .replace(/<%=\s*ENV\.fetch\(\s*["']\w+["']\s*(?:,\s*["']?([^"')]*?)["']?\s*)?\)\s*(?:\{\s*["']?([^"'}]*?)["']?\s*\})?\s*%>/g, (_, a?: string, b?: string) => (b ?? a ?? '').trim())
+    .replace(/<%=\s*ENV\[\s*["']\w+["']\s*\]\s*(?:\|\|\s*["']([^"']*)["'])?\s*%>/g, (_, a?: string) => a ?? '')
+  const lines = erb.split('\n')
+  const sections = new Map<string, { anchor?: string; inherits?: string; settings: Record<string, { value: string; line: number }> }>()
+  let current: { anchor?: string; inherits?: string; settings: Record<string, { value: string; line: number }> } | undefined
+  for (const [i, line] of lines.entries()) {
+    const top = /^([\w-]+):\s*(?:&([\w-]+))?\s*$/.exec(line)
+    if (top) { current = { ...(top[2] ? { anchor: top[2] } : {}), settings: {} }; sections.set(top[1], current); continue }
+    const merge = /^\s+<<:\s*\*([\w-]+)/.exec(line)
+    if (merge && current) { current.inherits = merge[1]; continue }
+    const kv = /^\s+([\w-]+):\s*["']?([^"'#\n]*?)["']?\s*$/.exec(line)
+    if (kv && current) current.settings[kv[1]] = { value: kv[2], line: i }
+  }
+  const byAnchor = (a: string) => [...sections.values()].find((s) => s.anchor === a)
+  const merged = (s: NonNullable<typeof current>, depth = 0): Record<string, { value: string; line: number }> =>
+    ({ ...(s.inherits && depth < 5 && byAnchor(s.inherits) ? merged(byAnchor(s.inherits)!, depth + 1) : {}), ...s.settings })
+  const env = sections.get('production') ?? sections.get('development') ?? [...sections.values()].find((s) => !s.anchor)
+  const blank = lines.map(() => '')
+  if (!env) return blank.join('\n')
+  const settings = merged(env)
+  const scheme = RAILS_ADAPTERS[settings.adapter?.value ?? '']
+  const at = settings.url ?? settings.database
+  if (at) {
+    blank[at.line] = settings.url ? `url: ${settings.url.value}`
+      : scheme === 'sqlite' ? `database: sqlite:///${settings.database!.value}`
+        : scheme ? `database: ${scheme}://${settings.host?.value || 'localhost'}/${settings.database!.value}` : ''
+  }
+  return blank.join('\n')
+}
+
 /** A database a connection string names. */
 export function connectionOf(text: string): { engine: string; server?: string; name?: string; explicit?: boolean } | null {
   const field = (k: string) => new RegExp(`(?:^|;)\\s*(?:${k})\\s*=\\s*([^;"']*)`, 'i').exec(text)?.[1]?.trim() || undefined
@@ -114,7 +155,8 @@ export function connectionOf(text: string): { engine: string; server?: string; n
   if (provider && (/SQLOLEDB|SQLNCLI|MSOLEDBSQL|OLEDB|MSDA|OraOLEDB|IBMDA|DB2OLEDB/i.test(provider) || /Data Source\s*=/i.test(text))) {
     const engine = /SQLOLEDB|SQLNCLI|MSOLEDBSQL/i.test(provider) ? 'SQL Server' : /Jet\.OLEDB|ACE\.OLEDB/i.test(provider) ? 'Access' : /OraOLEDB|MSDAORA/i.test(provider) ? 'Oracle' : /MSDASQL/i.test(provider) ? 'ODBC' : provider
     const source = field('Data Source')
-    const file = source && /\.(mdb|accdb)$/i.test(source) ? source.split(/[\\/]/).pop() : undefined
+    // Jet and ACE open a file, whatever its name ends in (pharmacy.dll).
+    const file = source && (/\.(mdb|accdb)$/i.test(source) || /Jet\.OLEDB|ACE\.OLEDB/i.test(provider)) ? source.split(/[\\/]/).pop() : undefined
     return { engine, ...(source && !file ? { server: source } : {}), ...((field('Initial Catalog') ?? file) ? { name: field('Initial Catalog') ?? file } : {}), explicit: true }
   }
   const dsn = field('DSN')
@@ -130,8 +172,12 @@ export function connectionOf(text: string): { engine: string; server?: string; n
     const file = sqlite[1].split(/[\\/]/).pop() ?? ''
     return /^[\w.-]+$/.test(file) && !/memory/i.test(file) ? { engine: 'SQLite', name: file } : null
   }
-  // A user and password taken from the environment (postgres:${POSTGRES_PASSWORD}@db) leave the server and name read.
-  const url = /\b(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/(?:(?:\$\{[^{}]*\}|[^@\s/])+@)?([\w.-]+)(?::\d+)?(?:\/([\w-]+))?/i.exec(text)
+  // ClickHouse: its URL, or its HTTP interface on port 8123 (http://events_db:8123/events).
+  const clickhouse = /\bclickhouse:\/\/(?:[^@\s/]+@)?([\w.-]+)(?::\d+)?(?:\/([\w-]+))?|\bhttps?:\/\/([\w.-]+):8123\/([\w-]+)/i.exec(text)
+  if (clickhouse) return { engine: 'ClickHouse', server: clickhouse[1] ?? clickhouse[3], ...((clickhouse[2] ?? clickhouse[4]) ? { name: clickhouse[2] ?? clickhouse[4] } : {}) }
+  // A user and password taken from the environment (postgres:${POSTGRES_PASSWORD}@db) leave the server and name read; a
+  // host filled in at run time (#{socket_dir}) is none.
+  const url = /\b(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/(?:(?:[$#]\{[^{}]*\}|[^@\s/])+@)?([\w.-]+)(?::\d+)?(?=[/?\s"'<]|$)(?:\/([\w-]+))?/i.exec(text)
   if (url) {
     const engine = { postgres: 'PostgreSQL', postgresql: 'PostgreSQL', mysql: 'MySQL', mongodb: 'MongoDB', 'mongodb+srv': 'MongoDB', redis: 'Redis', sqlserver: 'SQL Server', mssql: 'SQL Server' }[url[1].toLowerCase()]!
     return { engine, server: url[2], ...(url[3] ? { name: url[3] } : {}) }
@@ -227,10 +273,13 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     text = text.replace(/\$\{([\w.-]+):([^${}\n]*)\}/g, (_, key: string, value: string) => (value.startsWith('?') ? `\${${key}}` : value.replace(/^-/, '')))
     // A compose file's or a deployment manifest's connection strings are the services' it runs (runtime.ts).
     const deployment = config && (/(^|\/)(docker-)?compose[^/]*\.ya?ml$/i.test(file) || /^\s*kind\s*:\s*(Deployment|StatefulSet|DaemonSet|Service|Job|CronJob|ConfigMap)\b/m.test(text))
+    // Rails' config/database.yml: ENV.fetch("POSTGRES_DB") { "maybe_production" } is its default, each environment's
+    // settings a connection (the production one first, else development's).
+    if (/(^|\/)config\/database\.ya?ml$/.test(file)) text = railsDatabases(text)
     const at = (index: number) => ({ file, line: lineAt(text, index) })
 
     // Connection strings, in code and configuration alike.
-    for (const m of deployment ? [] : text.matchAll(/\bsqlite:\/\/\/?[^\s"'<]+|[\w-]*(?::[^@\s"']*)?@tcp\([\w.:-]+\)\/[\w-]+|\b(?:mysql|pgsql|sqlsrv|oci|sqlite):[^"'\s]*?dbname=[^"'\s]+|\bDRIVER\s*=\s*\{[^}\n]*\}[^"'\n]*|(?:Provider|DSN|Data Source|Server|Host)\s*=[^"'\n]*(?:;[^"'\n]*)+|jdbc:[^\s"'<]+|\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/[^\s"'<]+/gi)) {
+    for (const m of deployment || CI.test(file) ? [] : text.matchAll(/\bclickhouse:\/\/[^\s"'<]+|\bhttps?:\/\/[\w.-]+:8123\/[\w-]+|\bsqlite:\/\/\/?[^\s"'<]+|[\w-]*(?::[^@\s"']*)?@tcp\([\w.:-]+\)\/[\w-]+|\b(?:mysql|pgsql|sqlsrv|oci|sqlite):[^"'\s]*?dbname=[^"'\s]+|\bDRIVER\s*=\s*\{[^}\n]*\}[^"'\n]*|(?:Provider|DSN|Data Source|Server|Host)\s*=[^"'\n]*(?:;[^"'\n]*)+|jdbc:[^\s"'<]+|\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/[^\s"'<]+/gi)) {
       const db = connectionOf(m[0])
       if (!db) continue
       // A name filled in at run time ($dsn, {db}, %DB%) names nothing.
@@ -250,6 +299,21 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       if (out.databases.some((d) => d.id === id)) continue
       seen.add(id)
       out.databases.push({ id, unit: unit.id, engine: db.engine, ...(db.server ? { server: db.server } : {}), ...(db.name ? { name: db.name } : {}), evidence: at(m.index!) })
+    }
+
+    // A .NET project on SQLite (Microsoft.EntityFrameworkCore.Sqlite, Microsoft.Data.Sqlite): its settings'
+    // "Data Source=discountdb" alone names the database file.
+    if (config && /(^|\/)appsettings(\.[\w-]+)?\.json$/i.test(file) && /\bSqlite\b/i.test(files.read(unit.evidence.file))) {
+      for (const m of text.matchAll(/"Data Source\s*=\s*([\w.-]+)"/gi)) {
+        const id = `${repo}:db:${unit.path}:SQLite/${m[1]}`
+        if (once(id)) out.databases.push({ id, unit: unit.id, engine: 'SQLite', name: m[1], evidence: at(m.index!) })
+      }
+    }
+
+    // An Android app's SQLite database, by the name Room gives its file.
+    for (const m of ext === '.kt' || ext === '.java' ? text.matchAll(/\bRoom\.databaseBuilder\s*\([^,()]+,\s*[\w.:]+\s*,\s*"([\w.-]+)"/g) : []) {
+      const id = `${repo}:db:${unit.path}:SQLite/${m[1]}`
+      if (once(id)) out.databases.push({ id, unit: unit.id, engine: 'SQLite', name: m[1], evidence: at(m.index!) })
     }
 
     // A VB6 data control reads a table, or the table its SQL names: RecordSource = "Users", in its properties or its code.
@@ -359,9 +423,10 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
         const id = `${repo}:address:${unit.path}:${a.text}`
         if (once(id)) out.addresses.push({ id, unit: unit.id, ...(a.scheme ? { scheme: a.scheme } : {}), host: a.host, ...(a.port ? { port: a.port } : {}), text: a.text, evidence: at(m.index!) })
       }
-      // JPQL (a Spring Data @Query, createQuery) names entities, not tables.
+      // JPQL (a Spring Data @Query, createQuery) names entities, not tables; a migration's SQL names the tables of its
+      // time, which the replayed migrations or the schema already hold.
       const jpql = /\.(java|kt)$/.test(file) && /@Query\s*\(|\bcreateQuery\s*\(/.test(lineText) && !/nativeQuery\s*=\s*true/.test(lineText)
-      for (const table of jpql ? [] : tablesOf(literal)) {
+      for (const table of jpql || MIGRATION.test(file) ? [] : tablesOf(literal)) {
         const id = `${repo}:table:${unit.path}:${table.toLowerCase()}`
         if (once(id)) out.tables.push({ id, unit: unit.id, table, evidence: at(m.index!) })
       }

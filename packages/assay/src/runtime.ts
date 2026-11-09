@@ -19,7 +19,7 @@ const ROLES: Array<[RegExp, ServiceFact['role'], string?]> = [
   [/mssql|sql-server|sqlserver|azure-sql-edge/, 'database', 'SQL Server'], [/(^|\/)oracle|gvenzl\/oracle/, 'database', 'Oracle'],
   [/(^|\/)cassandra/, 'database', 'Cassandra'], [/elasticsearch|opensearch/, 'database', 'Elasticsearch'], [/spanner/, 'database', 'Spanner'],
   [/(^|\/)(redis|valkey|memcached)/, 'cache'], [/rabbitmq|kafka|nats|activemq|pulsar|redpanda/, 'queue'],
-  [/zipkin|jaeger|prometheus|grafana|fluentd|fluent-bit|logstash|loki|otel|opentelemetry|tempo|kibana|log-server|elastic\/apm|datadog|newrelic/, 'observability'],
+  [/zipkin|jaeger|prometheus|grafana|fluentd|fluent-bit|logstash|loki|otel|opentelemetry|tempo|kibana|log-server|elastic\/apm|datadog|newrelic|opamp/, 'observability'],
 ]
 
 export const roleOf = (image: string): { role: ServiceFact['role']; engine?: string } => {
@@ -59,6 +59,22 @@ export interface Runtime {
 const YAML = /\.(ya?ml)$/i
 
 /** The text's values as strings: an environment as a list ("K=V") or a map. */
+/** The variables a compose file's .env sets, each expanded with the others (CART_ADDR=cart:${CART_PORT}). */
+function dotEnv(text: string): Map<string, string> {
+  const vars = new Map<string, string>()
+  for (const m of text.matchAll(/^\s*(?:export\s+)?([A-Za-z_]\w*)\s*=\s*(?:"([^"\n]*)"|'([^'\n]*)'|([^#\n]*?))\s*(?:#.*)?$/gm)) vars.set(m[1], m[2] ?? m[3] ?? m[4] ?? '')
+  for (let pass = 0; pass < 5; pass++) for (const [k, v] of vars) vars.set(k, interpolate(v, vars))
+  return vars
+}
+
+/** Compose's interpolation: ${VAR}, ${VAR:-default}, ${VAR-default}, $VAR, from the variables known; unknown ones stay. */
+function interpolate(text: string, vars: Map<string, string>): string {
+  return text.replace(/\$\{([A-Za-z_]\w*)(?::?-([^}]*))?\}|\$([A-Za-z_]\w*)/g, (m, braced?: string, fallback?: string, bare?: string) => {
+    const value = vars.get(braced ?? bare!)
+    return value !== undefined && value !== '' ? value : fallback ?? m
+  })
+}
+
 function environment(env: unknown): string[] {
   if (Array.isArray(env)) return env.filter((e): e is string => typeof e === 'string').map((e) => e.slice(e.indexOf('=') + 1))
   if (env && typeof env === 'object') return Object.values(env as Record<string, unknown>).filter((v) => typeof v === 'string' || typeof v === 'number').map(String)
@@ -127,8 +143,11 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
     if (!text || /\{\{.*\}\}/.test(text)) continue
     // docker-compose: a top-level services map.
     if (/(^|\/)(docker-)?compose[^/]*\.ya?ml$/i.test(file) || /^services\s*:/m.test(text) && /^\s+(image|build)\s*:/m.test(text)) {
+      // The .env beside it sets what it interpolates, and what a variable it passes by name only (- CART_ADDR) holds.
+      const vars = dotEnv(files.read(`${dirOf(file) === '.' ? '' : `${dirOf(file)}/`}.env`))
+      const given = vars.size ? interpolate(text, vars).replace(/^(\s*-\s*)([A-Za-z_]\w*)\s*$/gm, (m, lead: string, name: string) => (vars.has(name) ? `${lead}${name}=${vars.get(name)}` : m)) : text
       let doc: { services?: Record<string, Record<string, unknown>> }
-      try { doc = load(text) as typeof doc } catch (error) { notes.push(`${file} does not read as YAML: ${(error as Error).message.split('\n')[0]}`); continue }
+      try { doc = load(given) as typeof doc } catch (error) { notes.push(`${file} does not read as YAML: ${(error as Error).message.split('\n')[0]}`); continue }
       for (const [name, def] of Object.entries(doc?.services ?? {})) {
         if (!def || typeof def !== 'object') continue
         const image = typeof def.image === 'string' ? def.image : undefined

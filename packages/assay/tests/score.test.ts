@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { scoreModel } from '../bench/score'
+import { joinsOnly, scoreModel } from '../bench/score'
 
 describe("radical assay: an agent's model on the bench", () => {
   it('scores the units its elements are built from, its relations as calls and its entities as tables, naming what it missed', () => {
@@ -36,7 +36,26 @@ describe("radical assay: an agent's model on the bench", () => {
       { id: 'n-db', kind: 'element', facts: ['piggy:service:account-mongodb'] },
     ]
     const services = { 'piggy:service:rabbitmq': { name: 'rabbitmq' }, 'piggy:service:account-mongodb': { name: 'account-mongodb', unit: 'piggy:unit:mongodb' } }
-    expect(scoreModel(expected, nodes, relations, written, services).calls).toEqual({ right: 2, expected: 2, wrong: [], missed: [] })
+    expect(scoreModel(expected, nodes, relations, written, { services }).calls).toEqual({ right: 2, expected: 2, wrong: [], missed: [] })
+  })
+
+  it('counts no units of tests nor join tables as missed, and a unit a database rests on through its service as built', () => {
+    const expected = { name: 'garage', units: ['src/Invoice', 'src/Invoice.Tests', 'mongodb'], calls: [] as Array<[string, string]>, optional: [], tables: ['invoice', 'customer', 'invoice_customer'] }
+    const nodes = [{ id: 'n-invoice', type: 'container', label: 'Invoice' }, { id: 'n-db', type: 'database', label: 'Invoice DB' }, { id: 'n-e', type: 'entity', label: 'Invoice' }]
+    const written = [
+      { id: 'n-invoice', kind: 'element', facts: ['garage:unit:src/Invoice'] },
+      { id: 'n-db', kind: 'element', facts: ['garage:service:invoice-mongodb'] },
+      { id: 'n-e', kind: 'entity', facts: ['garage:table:src/Invoice:invoice'] },
+    ]
+    const s = scoreModel(expected, nodes, [], written, {
+      services: { 'garage:service:invoice-mongodb': { name: 'invoice-mongodb', unit: 'garage:unit:mongodb' } },
+      tests: ['garage:unit:src/Invoice.Tests'],
+      joins: ['garage:table:src/Invoice:invoice_customer'],
+    })
+    expect(s.units).toEqual({ found: 2, expected: 2, read: 2, missed: [], extra: [], tests: ['src/Invoice.Tests'] })
+    expect(s.tables).toEqual({ found: 1, expected: 2, missed: ['customer'], joins: ['invoice_customer'] })
+    const join = { references: [{ column: 'invoice_id', table: 'invoice' }, { column: 'customer_id', table: 'customer' }] }
+    expect([joinsOnly({ ...join, columns: [{ name: 'id' }] }), joinsOnly({ ...join, columns: [{ name: 'amount' }] })]).toEqual([true, false])
   })
 
   it('scores a library bundled into a container as the container calling the library', () => {

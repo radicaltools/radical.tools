@@ -11,9 +11,10 @@
 import { readFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import type { DatabaseFact, StateFact, TableFact, Unit } from './facts'
-import { GENERATED, RepoFiles, TEST_FILE, escapeRe, lineAt, owner } from './files'
+import { GENERATED, RepoFiles, TEST_FILE, dirOf, escapeRe, lineAt, owner } from './files'
 import { withoutVbComments } from './code'
 import { laravelMigrations } from './laravel'
+import { ectoMigrations, railsSchema } from './rails-ecto'
 
 type Column = NonNullable<TableFact['columns']>[number]
 type Reference = NonNullable<TableFact['references']>[number]
@@ -203,9 +204,17 @@ function jpa(text: string, file: string): Array<Omit<Declared, 'unit'>> {
     const cls = /\bclass\s+(\w+)/.exec(text.slice(m.index!))
     if (!cls) continue
     const head = text.slice(m.index!, m.index! + cls.index)
-    const named = /@Table\s*\(\s*(?:name\s*=\s*)?"([^"]+)"/.exec(head)?.[1] ?? /@Table\s*\([^)]*\bname\s*=\s*"([^"]+)"/.exec(text.slice(Math.max(0, m.index! - 400), m.index! + cls.index))?.[1]
+    // Room names its table in @Entity(tableName = …), whose foreign keys reference other entities' classes.
+    const room = /^@Entity\s*\([^]*?\btableName\s*=\s*"([^"]+)"/.exec(head)?.[1]
+    const named = room ?? /@Table\s*\(\s*(?:name\s*=\s*)?"([^"]+)"/.exec(head)?.[1] ?? /@Table\s*\([^)]*\bname\s*=\s*"([^"]+)"/.exec(text.slice(Math.max(0, m.index! - 400), m.index! + cls.index))?.[1]
     const at = m.index! + cls.index
-    const declared: Omit<Declared, 'unit'> = { table: named ?? snake(cls[1]), className: cls[1], declared: 'JPA', columns: [], references: [], evidence: { file, line: lineAt(text, at) } }
+    const roomish = room !== undefined || /^import\s+androidx\.room\./m.test(text)
+    const declared: Omit<Declared, 'unit'> = { table: named ?? (roomish ? cls[1] : snake(cls[1])), className: cls[1], declared: roomish ? 'Room' : 'JPA', columns: [], references: [], evidence: { file, line: lineAt(text, at) } }
+    if (roomish) {
+      for (const fk of head.matchAll(/\bForeignKey\s*\(\s*entity\s*=\s*(\w+)::class[^]*?childColumns\s*=\s*(?:\[|arrayOf\()\s*"(\w+)"/g)) {
+        declared.references.push({ column: fk[2], table: '', className: fk[1], line: lineAt(text, m.index! + fk.index!) })
+      }
+    }
     out.push(declared)
     const body = classBody(text, at)
     if (!body) continue
@@ -264,10 +273,13 @@ function efCore(files: RepoFiles, sources: string[]): Array<Omit<Declared, 'unit
   const out: Array<Omit<Declared, 'unit'>> = []
   for (const f of sources.filter((x) => x.endsWith('.cs'))) {
     const text = withoutComments(files.read(f))
-    for (const m of text.matchAll(/(\[Table\(\s*"([^"]+)"[^\]]*\]\s*)?(?:(?:public|internal|sealed|partial|abstract)\s+)*class\s+(\w+)/g)) {
-      const name = m[3]
+    // [Table("order", Schema = "accounting")] names its table over the DbSet's name, other attributes around it.
+    for (const m of text.matchAll(/(\[Table\(\s*"([^"]+)"([^\]]*)\]\s*)?(?:\[[^\]]*\]\s*)*(?:(?:public|internal|sealed|partial|abstract)\s+)*class\s+(\w+)/g)) {
+      const name = m[4]
       if (!sets.has(name) && !m[2] && !mapped.has(name)) continue
-      const declared: Omit<Declared, 'unit'> = { table: m[2] ?? tableOf(name, f) ?? sets.get(name)!, className: name, declared: 'Entity Framework Core', columns: [], references: [], evidence: { file: f, line: lineAt(text, m.index! + (m[1]?.length ?? 0)) } }
+      const schema = /\bSchema\s*=\s*"([^"]+)"/.exec(m[3] ?? '')?.[1]
+      const attributed = m[2] && (schema && !DEFAULT_SCHEMA.test(schema) ? `${schema}.${m[2]}` : m[2])
+      const declared: Omit<Declared, 'unit'> = { table: attributed || (tableOf(name, f) ?? sets.get(name)!), className: name, declared: 'Entity Framework Core', columns: [], references: [], evidence: { file: f, line: lineAt(text, m.index! + (m[1]?.length ?? 0)) } }
       out.push(declared)
       const body = classBody(text, m.index! + m[0].length)
       if (!body) continue
@@ -624,7 +636,10 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
   const own = (file: string): Unit | undefined => (GENERATED.test(file) ? undefined : owner(units, file))
   const views = new Set<string>()
   const databases: DatabaseFact[] = []
-  for (const file of files.list.filter((f) => /\.sql$/i.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata)\//i.test(f))) {
+  // An Ecto repository's structure.sql is a dump of its time; its migrations beside it are what runs.
+  const ecto = files.list.filter((f) => /(^|\/)priv\/[^/]+\/migrations\/[^/]+\.exs$/.test(f) && !!own(f))
+  const dumped = (file: string): boolean => /(^|\/)priv\/[^/]+\/structure\.sql$/.test(file) && ecto.some((m) => m.startsWith(`${dirOf(file)}/migrations/`))
+  for (const file of files.list.filter((f) => /\.sql$/i.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata)\//i.test(f) && !dumped(f))) {
     const schema = readSchema(files.read(file), file)
     for (const v of schema.views) views.add(v.toLowerCase())
     // A schema in no unit's folder is that of every unit whose code names one of its tables (the only unit, else).
@@ -656,6 +671,18 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
   for (const unit of new Set(migrations.map((f) => own(f)!))) {
     const mine = migrations.filter((f) => own(f) === unit).map((file) => ({ file, text: withoutComments(files.read(file)) }))
     declared.push(...laravelMigrations(mine).map((t) => ({ ...t, declared: 'Laravel', unit })))
+  }
+  // Rails' db/schema.rb, and Ecto's migrations per repository folder (priv/repo, priv/ingest_repo), in the order they run.
+  for (const file of files.list.filter((f) => /(^|\/)db\/schema\.rb$/.test(f) && !!own(f))) declared.push(...railsSchema(files.read(file), file).map((t) => ({ ...t, declared: 'Rails', unit: own(file)! })))
+  // SQL a migration loads by name (execute unwrap("create-events-v2")) is the one file of that name the repository holds.
+  const sqlFiles = files.list.filter((f) => /\.sql(\.eex)?$/i.test(f))
+  const loaded = (call: string, name: string): string => {
+    const found = sqlFiles.filter((f) => f.slice(f.lastIndexOf('/') + 1).replace(/\.sql(\.eex)?$/i, '') === name)
+    return found.length === 1 ? `execute """${files.read(found[0]).replace(/\n/g, ' ')}"""` : call
+  }
+  for (const folder of new Set(ecto.map(dirOf))) {
+    const mine = ecto.filter((f) => dirOf(f) === folder).map((file) => ({ file, text: files.read(file).replace(/\bexecute\s*\(?\s*\w+\(\s*"([\w-]+)"[^\n]*/g, loaded) }))
+    declared.push(...ectoMigrations(mine).map((t) => ({ ...t, declared: 'Ecto', unit: own(mine[0].file)! })))
   }
   const sources = files.list.filter((f) => SOURCE.test(f) && !TEST_FILE.test(f) && !!own(f))
   // Django's models, known across the repository: a model may derive from another app's.
@@ -717,7 +744,7 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
   const tables = new Map<string, TableFact>()
   for (const t of named) {
     // A database's own schema holds no table of the system (sys.master_files).
-    if (/^(sys|information_schema)$/i.test(schemaOf(t.table) ?? '')) continue
+    if (/^(sys|system|information_schema|pg_catalog)$/i.test(schemaOf(t.table) ?? '')) continue
     const name = nameOf(t.table)
     const id = `${repo}:table:${unitPath.get(t.unit) ?? ''}:${name.toLowerCase()}`
     if (!tables.has(id)) tables.set(id, { ...t, id, table: name, inCode: true })
@@ -835,7 +862,7 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     }
   }
   // A view, or a database's own table, that the code names is no table of the domain.
-  for (const [id, t] of tables) if (!t.declared && (views.has(bare(t.table).toLowerCase()) || VIEW_NAME.test(bare(t.table)) || SYSTEM_TABLE.test(bare(t.table)) || /^(sys|information_schema)\./i.test(t.table))) tables.delete(id)
+  for (const [id, t] of tables) if (!t.declared && (views.has(bare(t.table).toLowerCase()) || VIEW_NAME.test(bare(t.table)) || SYSTEM_TABLE.test(bare(t.table)) || /^(sys|system|information_schema|pg_catalog)\./i.test(t.table))) tables.delete(id)
   return { tables: [...tables.values()], states, databases, notes }
 }
 
