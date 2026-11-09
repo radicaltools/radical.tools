@@ -3456,6 +3456,21 @@
     ] },
     { "element": "6e044ae9-1a72-4031-a1b6-f8537cafc305", "name": "Oracle's connections", "tests": [
       "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › reads the Oracle database a JDBC URL, a TNS descriptor, an Easy Connect string and makedsn name"
+    ] },
+    { "element": "7e4c3b87-1423-49cc-8032-2c08dcda4f1a", "name": "Routine names Spring code holds", "tests": [
+      "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › resolves the names Spring code gives a routine: a variable, a package configured through a getter, a StoredProcedure subclass, a named query, and no call in a comment or a page's markup"
+    ] },
+    { "element": "be64de56-85e2-41f5-ae9b-d4b431ee629a", "name": "A library of SQL alone", "tests": [
+      "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › reads a library of SQL alone by its top folders, its examples, a runner's drops, the code of a coverage folder, and no developer tooling"
+    ] },
+    { "element": "40a52f98-bcbe-4c56-a146-f720fd799bff", "name": "A Sqitch project in its plan's order", "tests": [
+      "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › follows a Sqitch project in its plan: columns added and dropped, reworks and reverts aside, a routine to its statement, flags set the PL/pgSQL way, SvelteKit routes, and a backup job no database"
+    ] },
+    { "element": "01cc9e43-bfee-407e-9a9b-75017aaf56a6", "name": "Entity Framework's snapshot, SQLite in code, a package's services", "tests": [
+      "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › reads Entity Framework's tables from its migrations' snapshot, SQLite named in code, and the services an Oracle package calls"
+    ] },
+    { "element": "92395d99-9585-4956-b222-a8fbba371ccf", "name": "Stored routines listed by package", "tests": [
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › lists a package's members in its row, each short, when assay_facts lists the stored routines, and names them for an entity no unit's code uses"
     ] }
   ]
 }
