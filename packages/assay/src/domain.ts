@@ -649,7 +649,8 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
   // An Ecto repository's structure.sql is a dump of its time; its migrations beside it are what runs.
   const ecto = files.list.filter((f) => /(^|\/)priv\/[^/]+\/migrations\/[^/]+\.exs$/.test(f) && !!own(f))
   const dumped = (file: string): boolean => /(^|\/)priv\/[^/]+\/structure\.sql$/.test(file) && ecto.some((m) => m.startsWith(`${dirOf(file)}/migrations/`))
-  for (const file of files.list.filter((f) => /\.sql$/i.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata)\//i.test(f) && !dumped(f))) {
+  // A down migration (golang-migrate's and dbmate's .down.sql, Flyway's U__ undo) undoes its up one and never runs forward.
+  for (const file of files.list.filter((f) => /\.sql$/i.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata)\//i.test(f) && !dumped(f) && !/\.down\.sql$|(^|\/)U\d+__[^/]*\.sql$/i.test(f))) {
     const schema = readSchema(files.read(file), file)
     for (const v of schema.views) views.add(v.toLowerCase())
     // A schema in no unit's folder is that of every unit whose code names one of its tables (the only unit, else).

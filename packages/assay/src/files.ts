@@ -156,6 +156,10 @@ export function owner(units: Unit[], file: string): Unit | undefined {
     const inside = u.path === '.' || file === u.path || file.startsWith(`${u.path}/`)
     if (inside && (!best || best.path === '.' || u.path.length > best.path.length)) best = u
   }
+  if (best) return best
+  // In no unit's folder: the unit building the shared code it is in (a Go module's packages beside its main ones).
+  let at = -1
+  for (const u of units) for (const s of u.shares ?? []) if ((s === '.' || file.startsWith(`${s}/`)) && s.length > at) { best = u; at = s.length }
   return best
 }
 

@@ -71,6 +71,9 @@ function java(text: string, bindings: Map<string, string>): Found[] {
 }
 
 const MESSAGE_TYPE = /\b(?:IConsumer|IIntegrationEventHandler|IHandleMessages|IEventHandler)<\s*(\w+)\s*>/g
+/** A file's handlers of a bus: IConsumer<T> is MassTransit's only where the file uses MassTransit (nopCommerce's is an
+ *  in-process event of one application). */
+const busTypes = (text: string): string[] => [...text.matchAll(MESSAGE_TYPE)].filter((m) => !m[0].startsWith('IConsumer') || /\busing\s+MassTransit\b|\bConsumeContext</.test(text)).map((m) => m[1])
 
 /** Other languages by their calls: what each line publishes or consumes. */
 function byText(text: string, ext: string, consumed: Set<string>): Found[] {
@@ -101,7 +104,7 @@ function byText(text: string, ext: string, consumed: Set<string>): Found[] {
   if (ext === '.cs') {
     for (const m of text.matchAll(/\.ProduceAsync\(\s*"([\w.-]+)"|\.Produce\(\s*"([\w.-]+)"/g)) add('publishes', m[1] ?? m[2], 'Kafka', m.index!)
     for (const m of text.matchAll(/\.Subscribe\(\s*"([\w.-]+)"/g)) add('consumes', m[1], 'Kafka', m.index!)
-    for (const m of text.matchAll(MESSAGE_TYPE)) add('consumes', m[1], 'message bus', m.index!)
+    for (const m of text.matchAll(MESSAGE_TYPE)) if (busTypes(text).includes(m[1])) add('consumes', m[1], 'message bus', m.index!)
     // A message of a type some unit handles is created to be published (it may be stored first and sent by an outbox).
     for (const m of text.matchAll(/\bnew\s+(\w+)\s*\(/g)) if (consumed.has(m[1])) add('publishes', m[1], 'message bus', m.index!)
   }
@@ -114,7 +117,7 @@ export function readMessages(files: RepoFiles, repo: string, units: Unit[]): Mes
   const seen = new Set<string>()
   const sources = files.list.filter((f) => /\.(java|[cm]?[jt]sx?|py|go|cs)$/.test(f) && !TEST_FILE.test(f) && !GENERATED.test(f))
   // The message types any unit handles: a type a .NET bus routes by.
-  const consumed = new Set(sources.filter((f) => f.endsWith('.cs')).flatMap((f) => [...files.read(f).matchAll(MESSAGE_TYPE)].map((m) => m[1])))
+  const consumed = new Set(sources.filter((f) => f.endsWith('.cs')).flatMap((f) => busTypes(files.read(f))))
   const bindingsOf = new Map<string, Map<string, string>>()
   for (const file of sources) {
     const unit = owner(units, file)

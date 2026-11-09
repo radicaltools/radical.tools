@@ -1,4 +1,11 @@
 {
-  "runtime": ["tree-sitter.js", "tree-sitter.wasm"],
-  "grammars": { "java": "tree-sitter-java.wasm", "csharp": "tree-sitter-c-sharp.wasm" }
+  "runtime": [
+    "tree-sitter.js",
+    "tree-sitter.wasm"
+  ],
+  "grammars": {
+    "java": "tree-sitter-java.wasm",
+    "csharp": "tree-sitter-c-sharp.wasm",
+    "go": "tree-sitter-go.wasm"
+  }
 }
