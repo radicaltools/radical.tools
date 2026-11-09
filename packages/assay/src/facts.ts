@@ -158,7 +158,8 @@ export interface TableFact {
   /** Where it is declared, its columns known: SQL (CREATE TABLE), JPA, Entity Framework Core, Django, SQLAlchemy, TypeORM, Prisma. */
   declared?: string
   /** Its columns, as declared; `type` as written (for an ORM class, the field's type). */
-  columns?: Array<{ name: string; type?: string; notNull?: boolean; line: number }>
+  /** …each with its line, in `file` where a later script's ALTER TABLE adds it. */
+  columns?: Array<{ name: string; type?: string; notNull?: boolean; line: number; file?: string }>
   /** Its foreign keys: the column and the table it references (an ORM class's reference names the table its class maps). */
   references?: Array<{ column?: string; table: string; line: number }>
   evidence: Evidence

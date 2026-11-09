@@ -13,7 +13,7 @@
 
 import type { RoutineCallFact, RoutineFact, Unit } from './facts'
 import { withoutVbComments } from './code'
-import { GENERATED, RepoFiles, TEST_FILE, lineAt, owner } from './files'
+import { GENERATED, RepoFiles, TEST_FILE, lineAt, owner, withoutComments } from './files'
 
 export type ReadRoutine = Omit<RoutineFact, 'id' | 'unit'>
 
@@ -50,6 +50,8 @@ export function bodyUses(body: string): { reads: string[]; writes: string[]; cal
   }
   for (const m of body.matchAll(/\b(?:exec(?:ute)?|call|perform)\s+(?:[`"[]?\w+[`"\]]?\s*\.\s*)?([`"[]?[A-Za-z_][\w$#]*[`"\]]?(?:\s*\.\s*[A-Za-z_][\w$#]*)?)/gi)) calls.add(m[1].replace(/[`"[\]\s]/g, '').toLowerCase())
   for (const m of body.matchAll(/\b([A-Za-z_][\w$#]*(?:\.[A-Za-z_][\w$#]*)?)\s*\(/g)) calls.add(m[1].toLowerCase())
+  // (PL/SQL calls a procedure without parentheses too, as a statement of its own: add_page;)
+  for (const m of body.matchAll(/^\s*([A-Za-z_][\w$#]*(?:\.[A-Za-z_][\w$#]*)?)\s*;/gm)) calls.add(m[1].toLowerCase())
   for (const t of ['dual']) reads.delete(t)
   return { reads: [...reads], writes: [...writes], calls: [...calls] }
 }
@@ -82,6 +84,19 @@ function packageMembers(body: string): Array<{ index: number; kind: string; name
   return members
 }
 
+/** A routine's statement within what follows its CREATE: to the close of a PostgreSQL body ($$ … $$), else to Oracle's
+ *  / line or SQL Server's GO (a REVOKE ON PROCEDURE tic_open() after it is no call). */
+function statementOf(text: string): string {
+  // (AS $$ or DO $$ opens one; Oracle's $$NO_OP is a conditional compilation flag.)
+  const open = /\b(?:as|do)\s+(\$\w*\$)/i.exec(text)
+  if (open) {
+    const close = text.indexOf(open[1], open.index + open[0].length)
+    if (close >= 0) return text.slice(0, close + open[1].length)
+  }
+  const end = /^[ \t]*(?:\/|GO)[ \t]*$/im.exec(text)
+  return end ? text.slice(0, end.index) : text
+}
+
 const CREATE = new RegExp(String.raw`\bcreate\s+(?:or\s+(?:replace|alter)\s+)?(?:definer\s*=\s*\S+\s+)?(?:(?:non)?editionable\s+)?(package\s+body|package|procedure|proc|function|trigger)\s+(?:if\s+not\s+exists\s+)?(${NAME})`, 'gi')
 
 /** The routines a script creates, each with its line and what its body touches. */
@@ -95,7 +110,7 @@ export function readRoutines(sql: string, file: string): ReadRoutine[] {
     const kindWord = m[1].toLowerCase().replace(/\s+/g, ' ')
     const name = bare(m[3])
     const end = next.find((i) => i > m.index!) ?? sql.length
-    const body = sql.slice(m.index! + m[0].length, end)
+    const body = statementOf(sql.slice(m.index! + m[0].length, end))
     const line = lineAt(sql, m.index!)
     const evidence = { file, line }
     if (kindWord === 'package' || kindWord === 'package body') {
@@ -134,45 +149,105 @@ const routineName = (name: string): string => {
 /** A database's script. */
 const SQL_FILE = /\.(sql|pks|pkb|pls|plb|pck|spc|bdy|prc|fnc|trg|tps|tpb|ddl)$/i
 
-/** A routine's name in code: a string, or a constant (upper case) that holds one. */
-const ARG = String.raw`(?:"([\w$#.[\]]+)"|((?:[A-Za-z_]\w*\.)*[A-Z][A-Z0-9_]*)\b)`
+/** An argument's code, up to the comma or parenthesis closing it (one level of parentheses inside: getPkgName()). */
+const ARG1 = String.raw`((?:"[^"\n]*"|[^(),"\n]|\([^()\n]*\))+?)`
+
+/** Top-level parts of an expression split at a separator outside strings and parentheses. */
+function parts(expr: string, separator: string): string[] {
+  const out: string[] = []
+  let depth = 0
+  let quoted = false
+  let start = 0
+  for (let i = 0; i < expr.length; i++) {
+    const c = expr[i]
+    if (c === '"' && expr[i - 1] !== '\\') quoted = !quoted
+    else if (!quoted && c === '(') depth++
+    else if (!quoted && c === ')') depth--
+    else if (!quoted && depth === 0 && c === separator) { out.push(expr.slice(start, i)); start = i + 1 }
+  }
+  return [...out, expr.slice(start)]
+}
+
+/** The string an expression of code holds, where its parts are known: a literal, a variable or constant, a getter of a
+ *  field (pkgCfg.getPkgName() → pkgName), a + b, Joiner.on(".").join(a, b), String.format("%s.%s", a, b). */
+export function stringValue(expr: string, env: Map<string, string>): string | undefined {
+  const e = expr.trim()
+  const literal = /^"([^"\\]*)"$/.exec(e)
+  if (literal) return literal[1]
+  const joiner = /^Joiner\.on\(\s*"([^"]*)"\s*\)\.join\(([\s\S]*)\)$/.exec(e)
+  if (joiner) { const values = parts(joiner[2], ',').map((x) => stringValue(x, env)); return values.every((v) => v !== undefined) ? values.join(joiner[1]) : undefined }
+  const format = /^String\.format\(\s*"([^"]*)"\s*,([\s\S]*)\)$/.exec(e)
+  if (format) {
+    const values = parts(format[2], ',').map((x) => stringValue(x, env))
+    if (values.some((v) => v === undefined)) return undefined
+    let n = 0
+    return format[1].replace(/%s/g, () => values[n++] ?? '')
+  }
+  const concat = parts(e, '+')
+  if (concat.length > 1) { const values = concat.map((x) => stringValue(x, env)); return values.every((v) => v !== undefined) ? values.join('') : undefined }
+  const name = /^(?:[A-Za-z_]\w*\.)*([A-Za-z_]\w*)(\(\s*\))?$/.exec(e)
+  if (!name) return undefined
+  if (name[2]) { const field = /^get([A-Z]\w*)$/.exec(name[1]); return env.get(name[1]) ?? (field ? env.get(field[1][0].toLowerCase() + field[1].slice(1)) : undefined) }
+  return env.get(name[1])
+}
+
+/** The strings a file's code holds by name: its variables and constants (String name = <expr>;), in order. */
+function fileStrings(text: string, repository: Map<string, string>): Map<string, string> {
+  const env = new Map(repository)
+  const twice = new Set<string>()
+  for (const m of text.matchAll(/\b(?:String|string|var|val|const)\s+([A-Za-z_]\w*)\s*(?::\s*String\s*)?=\s*([^;\n]+)/g)) {
+    const value = stringValue(m[2].replace(/;\s*$/, ''), env)
+    if (value === undefined) continue
+    if (env.has(m[1]) && env.get(m[1]) !== value && !repository.has(m[1])) twice.add(m[1])
+    env.set(m[1], value)
+  }
+  for (const name of twice) env.delete(name)
+  return env
+}
+
 const ROUTINE = String.raw`([\`"[]?[A-Za-z_][\w$#]*[\`"\]]?(?:\s*\.\s*[\`"[]?[A-Za-z_][\w$#]*[\`"\]]?){0,2})`
 
 /** The stored routines a source file's code calls, each with its line and how. */
 export function routineCallsIn(text: string, constants: Map<string, string> = new Map()): Array<{ routine: string; via: string; index: number }> {
   const out: Array<{ routine: string; via: string; index: number }> = []
-  const add = (name: string, via: string, index: number): void => { out.push({ routine: routineName(name), via, index }) }
-  // A name as a string or as a constant holding one (IConstants.F_GET_EMPLOYEE).
-  const value = (literal: string | undefined, constant: string | undefined): string | undefined => literal ?? (constant ? constants.get(constant.split('.').pop()!) : undefined)
+  const add = (name: string | undefined, via: string, index: number): void => { if (name) out.push({ routine: routineName(name), via, index }) }
+  // A name as a string, or as code holding one: a constant, a variable, a getter of a configured field, a concatenation.
+  const env = fileStrings(text, constants)
+  const value = (expr: string | undefined): string | undefined => (expr === undefined ? undefined : stringValue(expr, env))
+  // A named stored procedure query names its procedure (@NamedStoredProcedureQuery(name = …, procedureName = …)).
+  const named = (expr: string | undefined): string | undefined => { const name = value(expr); return name === undefined ? undefined : env.get(`@named:${name}`) }
   // JDBC's and ODBC's call escape, a PL/SQL block, EXEC or CALL in a string of SQL.
   for (const m of text.matchAll(new RegExp(String.raw`\{\s*(?:\?\s*=\s*)?call\s+${ROUTINE}`, 'gi'))) add(m[1], 'JDBC', m.index!)
-  for (const m of text.matchAll(new RegExp(String.raw`["'\`][ \t]*begin\s+(?::\w+\s*:=\s*)?${ROUTINE}\s*[(;]`, 'gi'))) add(m[1], 'PL/SQL block', m.index!)
+  for (const m of text.matchAll(new RegExp(String.raw`["'\`][ \t]*begin\s+(?:(?::\w+|\?)\s*:=\s*)?${ROUTINE}\s*[(;]`, 'gi'))) add(m[1], 'PL/SQL block', m.index!)
   // (CALL with its parentheses next to the name, EXEC before its parameters or the string's end: "Call us" and
   // "Call failed (%1)" are no calls;
   // the statement on the quote's line: a string's closing quote before a line of code is none.)
   for (const m of text.matchAll(new RegExp(String.raw`["'\`][ \t]*call[ \t]+${ROUTINE}\(`, 'gi'))) add(m[1], 'SQL', m.index!)
   for (const m of text.matchAll(new RegExp(String.raw`["'\`][ \t]*exec(?:ute)?[ \t]+(?:@\w+[ \t]*=[ \t]*)?${ROUTINE}[ \t]*(?=["'\`;]|[ \t]+[@:?'"]|\(|$)`, 'gim'))) add(m[1], 'SQL', m.index!)
   // Spring's SimpleJdbcCall: withProcedureName or withFunctionName, in the package withCatalogName names.
-  for (const m of text.matchAll(new RegExp(String.raw`\.with(?:Procedure|Function)Name\(\s*${ARG}\s*\)`, 'g'))) {
-    const name = value(m[1], m[2])
+  for (const m of text.matchAll(new RegExp(String.raw`\.with(?:Procedure|Function)Name\(\s*${ARG1}\s*\)`, 'g'))) {
+    const name = value(m[1])
     if (!name) continue
     const statement = text.slice(Math.max(0, text.lastIndexOf(';', m.index!) + 1), text.indexOf(';', m.index!) + 1 || text.length)
-    const catalog = new RegExp(String.raw`\.withCatalogName\(\s*${ARG}\s*\)`).exec(statement)
-    const pkg = catalog ? value(catalog[1], catalog[2]) : undefined
+    const catalog = new RegExp(String.raw`\.withCatalogName\(\s*${ARG1}\s*\)`).exec(statement)
+    const pkg = catalog ? value(catalog[1]) : undefined
     add(pkg ? `${pkg}.${name}` : name, 'Spring SimpleJdbcCall', m.index!)
   }
-  // JPA: @Procedure, a named stored procedure query, createStoredProcedureQuery.
-  for (const m of text.matchAll(new RegExp(String.raw`@Procedure\(\s*(?:(?:procedureName|value|name)\s*=\s*)?${ARG}|\bprocedureName\s*=\s*${ARG}|\bcreateStoredProcedureQuery\(\s*${ARG}`, 'g'))) {
-    const name = value(m[1], m[2]) ?? value(m[3], m[4]) ?? value(m[5], m[6])
-    if (name) add(name, 'JPA', m.index!)
+  // Spring's StoredProcedure: a subclass naming its procedure through setSql or its constructor.
+  if (/\bextends\s+StoredProcedure\b/.test(text)) {
+    for (const m of text.matchAll(new RegExp(String.raw`\bsetSql\(\s*${ARG1}\s*\)|\bsuper\(\s*[^,()]+,\s*${ARG1}\s*[,)]`, 'g'))) add(value(m[1] ?? m[2]), 'Spring StoredProcedure', m.index!)
+  }
+  // JPA: @Procedure (by its procedure, or by the name of a named query), a named stored procedure query's procedure,
+  // createStoredProcedureQuery and createNamedStoredProcedureQuery.
+  for (const m of text.matchAll(new RegExp(String.raw`@Procedure\(\s*(?:(procedureName|value|name)\s*=\s*)?${ARG1}\s*[,)]|\bprocedureName\s*=\s*${ARG1}\s*[,)]|\bcreateStoredProcedureQuery\(\s*${ARG1}\s*[,)]|\bcreateNamedStoredProcedureQuery\(\s*${ARG1}\s*\)`, 'g'))) {
+    add(m[2] !== undefined ? (m[1] === 'name' ? named(m[2]) : value(m[2])) : m[3] !== undefined ? value(m[3]) : m[4] !== undefined ? value(m[4]) : named(m[5]), 'JPA', m.index!)
   }
   // ADO.NET and Dapper: the command text or the query's first string, where the command is a stored procedure.
   for (const m of text.matchAll(/\bCommandType\.StoredProcedure\b|\badCmdStoredProc\b/g)) {
     // The command's name stands before its type: in the command's text, its constructor, or the query's first argument.
     const before = text.slice(Math.max(0, m.index! - 600), m.index!)
-    const named = [...before.matchAll(new RegExp(String.raw`\bCommandText\s*=\s*${ARG}|\bnew\s+\w*Command\(\s*${ARG}|\b(?:Query|Execute|QueryFirst|QuerySingle|QueryMultiple)\w*(?:<[^>]*>)?\(\s*(?:\w+\s*,\s*)?${ARG}`, 'g'))].pop()
-    const name = named ? value(named[1], named[2]) ?? value(named[3], named[4]) ?? value(named[5], named[6]) : undefined
-    if (name) add(name, m[0] === 'adCmdStoredProc' ? 'ADO' : 'ADO.NET', m.index!)
+    const found = [...before.matchAll(new RegExp(String.raw`\bCommandText\s*=\s*${ARG1}\s*[;\n]|\bnew\s+\w*Command\(\s*${ARG1}\s*[,)]|\b(?:Query|Execute|QueryFirst|QuerySingle|QueryMultiple)\w*(?:<[^>]*>)?\(\s*(?:\w+\s*,\s*)?${ARG1}\s*[,)]`, 'g'))].pop()
+    if (found) add(value(found[1] ?? found[2] ?? found[3]), m[0] === 'adCmdStoredProc' ? 'ADO' : 'ADO.NET', m.index!)
   }
   // A function a query selects (SELECT f($1), FROM f()), PostgreSQL's way of calling one: a call only where the
   // repository creates a routine of that name (extract.ts), count( and now( being the database's own.
@@ -201,6 +276,24 @@ export function readRoutineCalls(files: RepoFiles, repo: string, units: Unit[]):
     }
   }
   for (const name of twice) constants.delete(name)
+  // Spring's configured fields (@Value("${pkg.name}") String pkgName) hold their properties' values, and a named stored
+  // procedure query its procedure.
+  const properties = new Map<string, string>()
+  for (const file of files.list.filter((f) => /\.properties$/.test(f) && !TEST_FILE.test(f) && !/(^|\/)src\/test\//.test(f))) {
+    for (const m of files.read(file).matchAll(/^\s*([\w.-]+)\s*[=:]\s*([\w$#.]+)\s*$/gm)) if (!properties.has(m[1])) properties.set(m[1], m[2])
+  }
+  for (const file of sources.filter((f) => /\.(java|kt)$/i.test(f))) {
+    const text = withoutComments(files.read(file))
+    for (const m of text.matchAll(/@Value\(\s*"\$\{([\w.-]+)(?::([\w$#.]*))?\}"\s*\)\s*(?:(?:private|protected|public|final|static)\s+)*(?:String\s+|lateinit\s+var\s+|var\s+|val\s+)?(\w+)/g)) {
+      const configured = properties.get(m[1]) ?? m[2]
+      if (configured) constants.set(m[3], configured)
+    }
+    for (const m of text.matchAll(/@NamedStoredProcedureQuery\s*\(([^)]*(?:\([^)]*\)[^)]*)*)\)/g)) {
+      const name = /\bname\s*=\s*"([^"]+)"/.exec(m[1])?.[1]
+      const procedure = /\bprocedureName\s*=\s*"([^"]+)"/.exec(m[1])?.[1]
+      if (name && procedure) constants.set(`@named:${name}`, procedure)
+    }
+  }
   // A database project's scripts (a demo, an installer, another schema's) calling a routine: a call only where another
   // unit creates a routine of that name (extract.ts), to_char( and nvl( being the database's own.
   for (const unit of units.filter((u) => u.stack === 'sql')) {
@@ -219,7 +312,10 @@ export function readRoutineCalls(files: RepoFiles, repo: string, units: Unit[]):
     const unit = owner(units, file)
     if (!unit) continue
     // (VB's comments start with a quote, as a string of another language does.)
-    const text = /\.(vb|bas|cls|frm)$/i.test(file) ? withoutVbComments(files.read(file)) : files.read(file)
+    // (A Svelte or Vue component's markup only shows SQL, sql="SELECT attack(…)": its script runs it.)
+    const raw = files.read(file)
+    const code = /\.(svelte|vue)$/i.test(file) ? raw.replace(/<script\b[^>]*>([\s\S]*?)<\/script>|[^\n]/g, (m, script?: string) => (script === undefined ? ' ' : m)) : raw
+    const text = /\.(vb|bas|cls|frm)$/i.test(file) ? withoutVbComments(code) : /\.(java|kt|cs|[cm]?[jt]sx?|svelte|vue|go|php)$/i.test(file) ? withoutComments(code) : code
     if (!/call|exec|begin|select|Procedure|StoredProc|callproc|callfunc/i.test(text) || (/\.xml$/i.test(file) && !/\{\s*(?:\?\s*=\s*)?call\s/i.test(text))) continue
     for (const c of routineCallsIn(text, constants)) {
       const id = `${repo}:routine-call:${unit.path}:${c.routine}`

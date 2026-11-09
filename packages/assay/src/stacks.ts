@@ -12,7 +12,7 @@
 import { load } from './yaml'
 import { basename } from 'node:path'
 import type { DependencyFact, GroupFact, Stack, TestFramework, Unit } from './facts'
-import { RepoFiles, TEST_FILE, dirOf, escapeRe, lineAt, lineOf, resolveFrom } from './files'
+import { DEV_TOOLING, RepoFiles, TEST_FILE, dirOf, escapeRe, lineAt, lineOf, resolveFrom } from './files'
 import { buildReferences } from './msbuild'
 
 export interface StackUnits {
@@ -623,8 +623,15 @@ function sqlFolders(files: RepoFiles, claimed: string[]): Draft[] {
   })
   if (claimed.length) return projects
   const inUnit = (f: string): boolean => [...claimed, ...sqitch].some((c) => c === '.' || f.startsWith(`${c}/`))
-  const scripts = files.list.filter((f) => SCRIPT.test(f) && !inTests(f) && !inUnit(f) && !/(^|\/)(migrations?|db\/migrate|seeds?)\//i.test(f) && DDL.test(files.read(f)))
-  const dirs = [...new Set(scripts.map(dirOf))].sort((a, b) => a.length - b.length)
+  // (A library's examples and demos are part of it here: they ship with its scripts.)
+  const scripts = files.list.filter((f) => SCRIPT.test(f) && !/(^|\/)(tests?|__tests__|fixtures?|testdata)\//i.test(f) && !inUnit(f) && !DEV_TOOLING.test(f) && !/(^|\/)(migrations?|db\/migrate|seeds?)\//i.test(f) && DDL.test(files.read(f)))
+  // Each top folder is one library or schema (source/ of source/packages and source/tables), a folder holding schemas
+  // (db/, sql/, schemas/) holding one per folder below it.
+  const top = (dir: string): string => {
+    const segs = dir.split('/')
+    return dir === '.' ? '.' : /^(db|database|databases|sql|schemas?|scripts)$/i.test(segs[0]) && segs.length > 1 ? segs.slice(0, 2).join('/') : segs[0]
+  }
+  const dirs = [...new Set(scripts.map((f) => top(dirOf(f))))].sort((a, b) => a.length - b.length)
   const kept: string[] = []
   for (const d of dirs) if (!kept.some((k) => k === '.' || d.startsWith(`${k}/`))) kept.push(d)
   const under = (dir: string) => scripts.filter((f) => dir === '.' || f.startsWith(`${dir}/`))

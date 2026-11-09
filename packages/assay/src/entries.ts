@@ -81,7 +81,7 @@ export function readEntries(files: RepoFiles, repo: string, units: Unit[]): Entr
     return contexts.get(unit.id)!
   }
   for (const file of files.list) {
-    if (!SOURCE.test(file) || TEST_FILE.test(file) || GENERATED.test(file)) continue
+    if ((!SOURCE.test(file) && !/(^|\/)src\/routes\/(?:[^/]+\/)*\+page\.svelte$/.test(file)) || TEST_FILE.test(file) || GENERATED.test(file)) continue
     const unit = owner(units, file)
     if (!unit) continue
     const raw = files.read(file)
@@ -95,6 +95,16 @@ export function readEntries(files: RepoFiles, repo: string, units: Unit[]): Entr
 
     if (ext === '.frm') { vbForm(withoutVbComments(raw), file, unit, add) }
     if (ext === '.frm' || ext === '.bas' || ext === '.cls') { vbHandlers(withoutVbComments(raw), file, unit, add, vbCases()); continue }
+
+    // SvelteKit's routes by their files: src/routes/**/+server.ts handles the methods it exports, +page.svelte is a page
+    // (GET); a (group) folder adds nothing to the path, [id] is a parameter.
+    const sveltekit = /(^|\/)src\/routes\/((?:[^/]+\/)*)\+(server\.[jt]s|page\.svelte)$/.exec(file)
+    if (sveltekit) {
+      const path = `/${sveltekit[2].split('/').filter((s) => s && !/^\(.*\)$/.test(s)).map((s) => s.replace(/\[(?:\.\.\.)?(\w+)(?:=\w+)?\]/g, '{$1}')).join('/')}`.replace(/\/$/, '') || '/'
+      if (sveltekit[3].startsWith('server')) {
+        for (const m of raw.matchAll(/\bexport\s+(?:const|async\s+function|function)\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD|fallback)\b/g)) route(m[1] === 'fallback' ? 'ALL' : m[1], path, m.index!)
+      } else route('GET', path, 0)
+    }
 
     if (/^\.[cm]?[jt]sx?$/.test(ext)) {
       if (JS_SERVER.test(raw) || unit.technology.some((t) => JS_SERVER_TECH.test(t))) {

@@ -8,6 +8,7 @@
 // cites the facts of both sides.
 
 import type { AddressFact, ApiFact, Link, RepositoryFacts, ServiceFact, Unit, UrlFact } from './facts'
+import { NOT_SERVICE_HOST } from './code'
 
 /** Ports many programs listen on: a remote address on one of them names no unit by its port. */
 const COMMON_PORTS = new Set([20, 21, 22, 23, 25, 53, 80, 110, 143, 443, 465, 587, 993, 995, 1433, 1521, 3000, 3306, 4200, 5000, 5001, 5173, 5432, 5672, 6379, 8000, 8008, 8080, 8081, 8443, 8888, 9000, 9090, 9200, 11211, 27017])
@@ -122,8 +123,8 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
     const best = listening.length > 1 ? Math.max(...listening.map(shared)) : 0
     const nearest = listening.length > 1 && best > 0 ? listening.filter((u) => shared(u) === best) : listening
     const byPort = (nearest.length === 1 ? nearest : []).map((u) => ({ unit: u, service: undefined as ServiceFact | undefined }))
-    // A vocabulary's domain (schema.org in JSON-LD, w3.org in a namespace) names a standard, no service.
-    if (/(^|\.)(schema\.org|w3\.org|json-schema\.org|xmlsoap\.org|purl\.org|ogp\.me|openxmlformats\.org|example\.(com|org|net))$/i.test(a.host)) continue
+    // A vocabulary's domain (schema.org in JSON-LD, w3.org in a namespace) or a code host's names no service.
+    if (NOT_SERVICE_HOST.test(a.host)) continue
     // A subdomain of a public domain (api.github.com, docs.mattermost.com) names no unit by its first label; a product's
     // own domain (plausible.io) may name the unit serving it.
     const publicHost = /\.(com|org|net|io|dev|co|app|ai|cloud|info|biz|gov|edu|me|so|sh)(\.[a-z]{2})?$/i.test(a.host) && a.host.replace(/\.(co|com|org|net)\.[a-z]{2}$/i, '.x').split('.').length > 2

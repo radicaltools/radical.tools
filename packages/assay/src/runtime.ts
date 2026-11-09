@@ -141,7 +141,7 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
     const fact = { id, ...rest }
     services.push(fact)
     const { role, engine } = roleOf(s.image ?? '')
-    if (role === 'database' && engine) databases.push({ id: `${repo}:db:service:${s.name}`, service: id, engine, name: s.name, evidence: s.evidence })
+    if (role === 'database' && s.role !== 'other' && engine) databases.push({ id: `${repo}:db:service:${s.name}`, service: id, engine, name: s.name, evidence: s.evidence })
     return fact
   }
   const addAddresses = (texts: string[], file: string, text: string, owner: { unit?: string; service?: string }) => {
@@ -177,13 +177,17 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
         // The project its Dockerfile builds, where the context holds several.
         const dockerPath = context !== null ? resolveFrom(context, dockerfile ?? 'Dockerfile') : null
         const mounted = (Array.isArray(def.volumes) ? def.volumes : []).filter((v): v is string => typeof v === 'string' && /^\.{1,2}(\/|:)/.test(v)).map((v) => resolveFrom(dirOf(file), v.split(':')[0])).filter((v): v is string => !!v && v !== '.')
-        const unit = (context !== null && dockerPath ? builtBy(files.read(dockerPath), units, context) : undefined) ?? unitFor(units, name, image, built, mounted)
+        // A stock image made to run a script of its own (entrypoint: ["/bin/sh", "/backup.sh"]: pg_dump in postgres's image)
+        // is a job using that program's tools, no server of it and no unit its image is named for.
+        const command = [def.entrypoint, def.command].flat().filter((c) => c !== undefined && c !== null).map(String).join(' ')
+        const runsScript = !!image && build === null && /^\s*(\/bin\/)?(ba)?sh\b|\.(sh|py|js)\b/.test(command)
+        const unit = (context !== null && dockerPath ? builtBy(files.read(dockerPath), units, context) : undefined) ?? unitFor(units, name, runsScript ? undefined : image, built, mounted)
         // A service waited for until it completes (condition: service_completed_successfully) runs before, not for, this one.
         // Compose's first format links services it talks to (links: ["db:database"]), as depends_on does since.
         const linked = Array.isArray(def.links) ? def.links.map((l) => String(l).split(':')[0]) : []
         const dependsOn = linked.length && !def.depends_on ? linked : Array.isArray(def.depends_on) ? def.depends_on.map(String) : def.depends_on && typeof def.depends_on === 'object'
           ? Object.entries(def.depends_on as Record<string, { condition?: unknown } | null>).filter(([, d]) => d?.condition !== 'service_completed_successfully').map(([n]) => n) : []
-        const s = service({ name, file, ...(unit ? { unit: unit.id } : {}), ...(image ? { image } : {}), role: unit ? 'app' : roleOf(`${image ?? ''} ${name}`).role, dependsOn, evidence: { file, line: lineOf(text, new RegExp(`^\\s+${escapeRe(name)}\\s*:`, 'm')) } })
+        const s = service({ name, file, ...(unit ? { unit: unit.id } : {}), ...(image ? { image } : {}), role: unit ? 'app' : runsScript ? 'other' : roleOf(`${image ?? ''} ${name}`).role, dependsOn, evidence: { file, line: lineOf(text, new RegExp(`^\\s+${escapeRe(name)}\\s*:`, 'm')) } })
         // The ports it publishes on this machine ("127.0.0.1:3002:8080", "8080:80", { published: 8080 }).
         for (const p of Array.isArray(def.ports) ? def.ports : []) {
           const parts = typeof p === 'string' || typeof p === 'number' ? String(p).split(':') : []
@@ -209,7 +213,7 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
         if (pgName && !/[$%{}]/.test(pgName)) {
           const host = pg('PGHOST')
           const id = `${repo}:db:${unit!.path}:PostgreSQL/${pgName}`
-          if (!databases.some((d) => d.id === id)) databases.push({ id, unit: unit!.id, engine: 'PostgreSQL', name: pgName, ...(host && !host.startsWith('/') && !/[$%{}]/.test(host) ? { server: host } : {}), evidence: { file, line: lineOf(text, 'PGDATABASE') } })
+          if (!databases.some((d) => d.id === id)) databases.push({ id, unit: unit!.id, engine: 'PostgreSQL', name: pgName, ...(host && !host.startsWith('/') && !/[$%{}]/.test(host) ? { server: host } : {}), evidence: { file, line: lineAt(text, Math.max(0, text.indexOf('PGDATABASE', Math.max(0, text.search(new RegExp(`^\\s+${escapeRe(name)}\\s*:`, 'm')))))) } })
         }
       }
       continue

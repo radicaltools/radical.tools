@@ -11,7 +11,7 @@
 import { readFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import type { DatabaseFact, DependencyFact, RoutineFact, StateFact, TableFact, Unit } from './facts'
-import { GENERATED, RepoFiles, TEST_FILE, dirOf, escapeRe, lineAt, owner } from './files'
+import { DEV_TOOLING, GENERATED, RepoFiles, TEST_FILE, dirOf, escapeRe, lineAt, owner, resolveFrom, withoutComments } from './files'
 import { withoutVbComments } from './code'
 import { laravelMigrations } from './laravel'
 import { ectoMigrations, railsSchema } from './rails-ecto'
@@ -91,6 +91,8 @@ function topLevel(body: string, separator = ','): Array<{ text: string; at: numb
 /** SQL without its comments (--, # in MySQL, /* … *\/), its lines kept. */
 /** A database's scripts: SQL, and Oracle's files of PL/SQL (package specs and bodies, procedures, functions, triggers). */
 const SQL_SCRIPT = /\.(sql|pks|pkb|pls|plb|pck|spc|bdy|prc|fnc|trg|tps|tpb|ddl)$/i
+/** A script named for undoing an install: drop_x.sql, hr_drop.sql, x-drop-objects.sql, uninstall.sql. */
+const TEARDOWN = /(^|\/)(drop|uninstall|cleanup|clean|teardown|remove)([_.-][^/]*)?$|[_-](drop|uninstall|cleanup|clean|teardown|remove)([_-][a-z]+)?\.\w+$/i
 const withoutSqlComments = (sql: string): string => sql.replace(/--[^\n]*|(^|[ \t,(])#[^\n'"]*$/gm, (m) => ' '.repeat(m.length)).replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
 
 const SQL_NAME = '[`"[]?(?:\\w+[`"\\]]?\\.)?[`"[]?([A-Za-z_][\\w$]*(?:-[\\w$]+)*)[`"\\]]?'
@@ -98,8 +100,33 @@ const NOT_COLUMNS = /^(constraint|primary|unique|key|index|fulltext|spatial|excl
 
 export interface SchemaState { name: string; values: string[]; initial?: string; table?: string; column?: string; file: string; line: number }
 
+/** The files in the order their scripts run: a Sqitch project's deploy/ scripts in its plan's order (a reworked change
+ *  where it last appears), the rest as listed. */
+function sqitchOrder(files: RepoFiles, list: string[]): string[] {
+  const out = [...list]
+  for (const plan of files.named(/^sqitch\.plan$/)) {
+    const deploy = `${dirOf(plan) === '.' ? '' : `${dirOf(plan)}/`}deploy/`
+    const changes = files.read(plan).split('\n').map((l) => /^([A-Za-z_][\w-]*)\s/.exec(l)?.[1]).filter((c): c is string => !!c)
+    const rank = (f: string): number => { const i = changes.lastIndexOf(f.slice(deploy.length).replace(/\.sql$/i, '')); return i < 0 ? changes.length : i }
+    const slots = out.map((f, i) => (f.startsWith(deploy) && !f.slice(deploy.length).includes('/') ? i : -1)).filter((i) => i >= 0)
+    const ordered = slots.map((i) => out[i]).sort((a, b) => rank(a) - rank(b))
+    slots.forEach((slot, k) => { out[slot] = ordered[k] })
+  }
+  return out
+}
+
+/** A column an ALTER TABLE adds to a table or drops from it. */
+type ColumnChange = { table: string; add?: { name: string; type?: string; line: number }; drop?: string }
+
+/** A table with a column added or dropped, the added one in `file` when another script adds it. */
+function applyColumn(t: Omit<Declared, 'unit'>, c: ColumnChange, file?: string): void {
+  const columns = (t.columns ??= [])
+  if (c.add && !columns.some((x) => x.name.toLowerCase() === c.add!.name.toLowerCase())) columns.push({ ...c.add, ...(file && file !== t.evidence.file ? { file } : {}) })
+  if (c.drop) for (let i = columns.length - 1; i >= 0; i--) if (columns[i].name.toLowerCase() === c.drop.toLowerCase()) columns.splice(i, 1)
+}
+
 /** The tables an SQL file creates and alters, with their columns, foreign keys and the values a status column takes. */
-export function readSchema(sql: string, file: string): { tables: Array<Omit<Declared, 'unit'>>; states: SchemaState[]; views: string[]; databases: Array<{ name: string; engine: string; line: number }>; changes: Array<{ drop: string } | { from: string; to: string }> } {
+export function readSchema(sql: string, file: string): { tables: Array<Omit<Declared, 'unit'>>; states: SchemaState[]; views: string[]; databases: Array<{ name: string; engine: string; line: number }>; changes: Array<{ drop: string } | { from: string; to: string }>; columnChanges: ColumnChange[] } {
   const text = withoutSqlComments(sql)
   const tables: Array<Omit<Declared, 'unit'>> = []
   const states: SchemaState[] = []
@@ -183,14 +210,33 @@ export function readSchema(sql: string, file: string): { tables: Array<Omit<Decl
     else { const { from, to } = e.change; for (const t of tables) if (named(t, from)) t.table = t.table.replace(/[^.]+$/, to) }
     changes.push(e.change)
   }
-  return { tables, states, views, databases, changes }
+  // Columns an ALTER TABLE adds or drops (ADD COLUMN x, Oracle's ADD ( a …, b … ), DROP COLUMN x), in order: those of
+  // this script's tables here, an earlier script's in domain.ts.
+  const columnChanges: ColumnChange[] = []
+  for (const m of text.matchAll(new RegExp(`\\balter\\s+table\\s+(?:only\\s+)?(?:if\\s+exists\\s+)?${SQL_NAME}\\s+((?:add|drop)\\b[^;]*)`, 'gi'))) {
+    const line = lineAt(text, m.index!)
+    for (const { text: action } of topLevel(m[2])) {
+      const add = /^add\s+(?:column\s+)?(?:if\s+not\s+exists\s+)?(?:\(([\s\S]*)\)|([`"[]?\w+[`"\]]?)\s+([^\s,]+))/i.exec(action.trim())
+      const drop = /^drop\s+(?:column\s+)?(?:if\s+exists\s+)?(?:\(([^)]*)\)|([`"[]?\w+[`"\]]?))/i.exec(action.trim())
+      if (add) {
+        const items = add[1] !== undefined ? topLevel(add[1]).map((x) => x.text.trim().split(/\s+/)) : [[add[2], add[3]]]
+        for (const [name, type] of items) if (name && !NOT_COLUMNS.test(name) && !/^(constraint|primary|foreign|unique|check|index|key)$/i.test(name)) columnChanges.push({ table: m[1], add: { name: unquote(name), ...(type ? { type } : {}), line } })
+      } else if (drop) {
+        for (const name of drop[1] !== undefined ? drop[1].split(',') : [drop[2]]) if (name && !/^(constraint|primary|foreign|unique|check|index|key|default|not)$/i.test(name.trim())) columnChanges.push({ table: m[1], drop: unquote(name.trim()) })
+      }
+    }
+  }
+  for (const c of [...columnChanges]) {
+    const t = tables.find((x) => bare(x.table).toLowerCase() === bare(c.table).toLowerCase())
+    if (!t) continue
+    applyColumn(t, c)
+    columnChanges.splice(columnChanges.indexOf(c), 1)
+  }
+  return { tables, states, views, databases, changes, columnChanges }
 }
 
 // ── ORM classes ──────────────────────────────────────────────────────────────
 
-/** Code without its comments (// and /* … *\/), its lines kept. */
-const withoutComments = (code: string): string =>
-  code.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:"'])\/\/[^\n]*/g, (m, lead: string) => lead + ' '.repeat(m.length - lead.length))
 
 /** A class's body in braces, after `from`. */
 function classBody(text: string, from: number): { body: string; start: number } | null {
@@ -274,6 +320,14 @@ function efCore(files: RepoFiles, sources: string[], unitOf: (file: string) => s
   const map = (className: string, table: string, schema: string | undefined, file: string): void => {
     mapped.set(className, [...(mapped.get(className) ?? []), { table: schema && !DEFAULT_SCHEMA.test(schema) ? `${schema}.${table}` : table, file }])
   }
+  // Where a unit's migrations hold a model snapshot, its tables are the snapshot's classes: a DbSet of another class (a
+  // keyless query result, PetCount) maps to no table its migrations create.
+  const snapshots = new Map<string, Set<string>>()
+  for (const f of sources.filter((x) => /ModelSnapshot\.cs$/.test(x))) {
+    const classes = [...files.read(f).matchAll(/\bEntity\(\s*"(?:[\w.]+\.)?(\w+)"/g)].map((m) => m[1])
+    const unit = unitOf(f) ?? ''
+    snapshots.set(unit, new Set([...(snapshots.get(unit) ?? []), ...classes]))
+  }
   for (const f of sources.filter((x) => x.endsWith('.cs'))) {
     const text = files.read(f)
     for (const m of text.matchAll(/\bDbSet<(\w+)>\s+(\w+)/g)) {
@@ -297,6 +351,7 @@ function efCore(files: RepoFiles, sources: string[], unitOf: (file: string) => s
     // [Table("order", Schema = "accounting")] names its table over the DbSet's name, other attributes around it.
     for (const m of text.matchAll(/(\[Table\(\s*"([^"]+)"([^\]]*)\]\s*)?(?:\[[^\]]*\]\s*)*(?:(?:public|internal|sealed|partial|abstract)\s+)*class\s+(\w+)/g)) {
       const name = m[4]
+      if (snapshots.get(unitOf(f) ?? '') && !snapshots.get(unitOf(f) ?? '')!.has(name) && !m[2]) continue
       const mappedHere = (mapped.get(name) ?? []).some((x) => reaches(unitOf(x.file) ?? '').has(unitOf(f) ?? ''))
       if (!(sets.has(name) && setsIn.get(name)!.has(unitOf(f) ?? '')) && !m[2] && !mappedHere) continue
       const schema = /\bSchema\s*=\s*"([^"]+)"/.exec(m[3] ?? '')?.[1]
@@ -578,7 +633,7 @@ function codeEnums(text: string, file: string): CodeEnum[] {
 const BOOLEAN = /^(bool|boolean|bit|tinyint\s*\(\s*1\s*\)|BooleanField|NullBooleanField)$/i
 const DATE = /^(date|datetime2?|smalldatetime|timestamp(tz)?|timestamp\s+with(out)?\s+time\s+zone|DateTime\??|DateTimeOffset\??|LocalDate(Time)?|Instant|Date|DateTimeField|DateField)$/i
 /** Names of a condition a row is in: is_dead, has_paid, banned, deleted. */
-const CONDITION = /^(is|has|was)_?[a-z]|^(deleted|banned|blocked|locked|closed|paid|archived|cancell?ed|approved|verified|suspended|dead|online|disabled|expired|completed|shipped|delivered|refunded|void(ed)?)$/i
+const CONDITION = /^(is|has|was)_?[a-z]|^(deleted|banned|blocked|locked|closed|paid|archived|cancell?ed|approved|verified|suspended|dead|online|disabled|expired|completed|shipped|delivered|refunded|void(ed)?|destroyed|enabled|active|inactive|published|hidden|accepted|rejected|confirmed|resolved|finished|started|processed|sent|dismissed|frozen|retired|alive)$/i
 /** A date an event stamps: a past participle and at, on, date or time (paid_at, PaidOn, shipped_date); not when a row was made or touched. */
 const EVENT_DATE = /^(?!(created|updated|modified|inserted|changed|last|birth|dob))[a-z]*?(ed|paid|sent|sold|built|done|won|lost|made)_?(at|on|date|time)$/i
 /** An SQL date type, nullable unless NOT NULL; an ORM's is nullable only when it says so (DateTime?). */
@@ -669,15 +724,21 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
   // or checks its up one and never runs forward.
   const routines: Array<ReadRoutine & { unit?: Unit; folder: string }> = []
   // The routines a script drops and creates no more after: an installer's helpers dropped at its end. A teardown
-  // script drops nothing that stays: one named for it (drop, uninstall, cleanup), or one that drops and creates nothing
-  // and is no versioned migration (Oracle's doe_v3.sql beside its coe_v3.sql).
+  // script drops nothing that stays: one named for it (drop, uninstall, cleanup), or one that drops and creates nothing,
+  // runs no other script (SQL*Plus's @@ creates what a runner drops at its end) and is no versioned migration (Oracle's
+  // doe_v3.sql beside its coe_v3.sql).
   const dropped = new Map<string, Set<string>>()
-  for (const file of files.list.filter((f) => SQL_SCRIPT.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata|revert|verify)\//i.test(f) && !dumped(f) && !/\.down\.sql$|(^|\/)U\d+__[^/]*\.sql$/i.test(f))) {
+  // (A script named for dropping that an installing script runs, @@drop_demo.sql at a runner's end, is that runner's.)
+  const scripts = files.list.filter((f) => SQL_SCRIPT.test(f))
+  const runByInstall = new Set(scripts.filter((f) => !TEARDOWN.test(f)).flatMap((f) => [...files.read(f).matchAll(/^\s*@@?\s*([^\s;]+)/gm)].map((m) => resolveFrom(dirOf(f), m[1].replace(/^\$\{?\w+\}?\//, '')))).filter((f): f is string => !!f))
+  // (Sqitch's reworked scripts, deploy/procedure-tic@v1.1.sql, are earlier versions of the one without @.)
+  for (const file of sqitchOrder(files, files.list).filter((f) => SQL_SCRIPT.test(f) && !/@[^/]*\.sql$/i.test(f) && !DEV_TOOLING.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata|revert|verify)\//i.test(f) && !dumped(f) && !/\.down\.sql$|(^|\/)U\d+__[^/]*\.sql$/i.test(f))) {
     const schema = readSchema(files.read(file), file)
     const clean = withoutSqlCommentsOrStrings(files.read(file))
     const created = readRoutines(clean, file)
-    const teardown = /(^|\/|_|-)(drop|uninstall|cleanup|clean|teardown|remove)[^/]*$/i.test(file)
-      || (/\bdrop\s+(table|package|procedure|function|trigger)\b/i.test(clean) && !/\bcreate\b/i.test(clean) && !/(^|\/)(migrations?|migrate|changelog|db\/changes)\/|(^|\/)(V\d+|\d+)[^/]*$/i.test(file))
+    // (A migration or a Sqitch change is named for what it does: player-drop_password.sql drops a column, not the schema.)
+    const teardown = !runByInstall.has(file) && ((TEARDOWN.test(file) && !/(^|\/)(deploy|migrations?|migrate|changelog)\//i.test(file))
+      || (/\bdrop\s+(table|package|procedure|function|trigger)\b/i.test(clean) && !/\bcreate\b/i.test(clean) && !/^\s*(?:@@?|start\s+)\S/im.test(clean) && !/(^|\/)(migrations?|migrate|changelog|db\/changes)\/|(^|\/)(V\d+|\d+)[^/]*$/i.test(file)))
     if (!teardown) {
       for (const m of clean.matchAll(/\bdrop\s+(package|procedure|proc|function|trigger)\s+(?:if\s+exists\s+)?(?:[`"[]?\w+[`"\]]?\s*\.\s*)?[`"[]?([A-Za-z_][\w$#]*)/gi)) {
         const name = m[2].toLowerCase()
@@ -702,6 +763,11 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
           if ('drop' in c) declared.splice(i, 1)
           else d.table = d.table.replace(/[^.]+$/, c.to)
         }
+      }
+      // An earlier script's table this one adds a column to or drops one from.
+      for (const c of teardown ? [] : schema.columnChanges) {
+        const d = [...declared].reverse().find((x) => x.unit === u && x.declared === 'SQL' && bare(x.table).toLowerCase() === bare(c.table).toLowerCase())
+        if (d) applyColumn(d, c, file)
       }
       declared.push(...schema.tables.map((t) => ({ ...t, unit: u })))
       if (unit || users.length === 1) routines.push(...created.map((r) => ({ ...r, unit: u, folder: u.path })))
@@ -891,20 +957,22 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     const tokens = states.map((s) => ({
       state: s,
       values: flagsOf.has(s.id) ? flagsOf.get(s.id)!.flatMap((f) => [
-        { value: f.value, re: new RegExp(`\\b${escapeRe(f.column)}\\b["'\\])]*\\s*=\\s*(?:-?1\\b|true\\b|now\\b|now\\s*\\(|getdate\\s*\\(|current_timestamp|sysdate|new\\s+date|datetime\\.(?:utc)?now|date\\s*\\(|instant\\.now|localdatetime\\.now|timezone\\.now|datetime\\.(?:utc)?now\\()`, 'i') },
-        { value: `not ${f.value}`, re: new RegExp(`\\b${escapeRe(f.column)}\\b["'\\])]*\\s*=\\s*(?:0\\b|false\\b|null\\b|nothing\\b|none\\b)`, 'i') },
+        // (PL/pgSQL's NEW.approved := 't', Oracle's and MySQL's 'Y' and 'N' too.)
+        { value: f.value, re: new RegExp(`\\b${escapeRe(f.column)}\\b["'\\])]*\\s*:?=\\s*(?:-?1\\b|true\\b|'(?:t|true|y|1)'|now\\b|now\\s*\\(|getdate\\s*\\(|current_timestamp|sysdate|new\\s+date|datetime\\.(?:utc)?now|date\\s*\\(|instant\\.now|localdatetime\\.now|timezone\\.now|datetime\\.(?:utc)?now\\()`, 'i') },
+        { value: `not ${f.value}`, re: new RegExp(`\\b${escapeRe(f.column)}\\b["'\\])]*\\s*:?=\\s*(?:0\\b|false\\b|null\\b|nothing\\b|none\\b|'(?:f|false|n|0)')`, 'i') },
       ]) : s.values.map((value) => {
         const spellings = [value, ...(aliasesOf.get(s.id)?.get(value) ?? [])]
         const member = aliasesOf.has(s.id) ? `\\b${escapeRe(s.name)}\\.${escapeRe(value)}\\b|` : ''
         return { value, re: new RegExp(`${member}(['"])(?:${spellings.map(escapeRe).join('|')})\\1`, aliasesOf.has(s.id) ? '' : 'i') }
       }),
     }))
-    for (const file of [...sources, ...files.list.filter((f) => /\.sql$/i.test(f) && !TEST_FILE.test(f))]) {
+    for (const file of [...sources, ...files.list.filter((f) => /\.sql$/i.test(f) && !/@[^/]*\.sql$/i.test(f) && !/(^|\/)(revert|verify)\//i.test(f) && !TEST_FILE.test(f))]) {
       const unit = own(file)
       if (!unit) continue
       const raw = files.read(file)
       const vb = /\.(bas|cls|frm|ctl|vb)$/i.test(file)
-      const lines = (vb ? withoutVbComments(raw) : raw).split('\n')
+      // (A comment sets nothing: -- approves them with UPDATE trophy SET approved = true.)
+      const lines = (vb ? withoutVbComments(raw) : /\.sql$/i.test(file) ? withoutSqlComments(raw) : /\.(java|kt|cs|[cm]?[jt]sx?|go|php|rs|scala)$/i.test(file) ? withoutComments(raw) : raw).split('\n')
       lines.forEach((line, i) => {
         const sql = SQL_SET.exec(line)
         // An UPDATE's assignments, before its WHERE; elsewhere a line that sets rather than compares.

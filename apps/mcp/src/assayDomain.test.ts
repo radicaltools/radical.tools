@@ -78,7 +78,7 @@ describe('Radical Assay over MCP: the domain, processes and lifecycles', () => {
     const applied = await call('assay_apply', { plan: DOMAIN })
     expect(applied.ok).toBe(true)
     expect(applied.text).toContain('Wrote 1 element, 2 entities and 2 relations into the central model.')
-    expect(applied.text).toContain('No element realises "Customer": no unit\'s code names their tables (a schema file is no use of them).')
+    expect(applied.text).toContain('No element realises "Customer": no unit\'s code names their tables (a schema file is no use of them), though a stored routine may use them.')
     const all = await nodes()
     const sales = all.find((n) => n.label === 'Sales')!
     const order = all.find((n) => n.label === 'Order')!

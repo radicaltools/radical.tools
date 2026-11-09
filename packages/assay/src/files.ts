@@ -10,6 +10,14 @@ import { join, sep } from 'node:path'
 import type { Unit } from './facts'
 
 /** Folders that hold no source of the repository's own. */
+/** Code without its comments (// and /* … *\/), its lines kept. */
+export const withoutComments = (code: string): string =>
+  code.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:"'])\/\/[^\n]*/g, (m, lead: string) => lead + ' '.repeat(m.length - lead.length))
+
+/** A repository's own developer tooling at its top (development/, dev-tools/, tooling/): a database's helper scripts
+ *  there (a third party's profiling package) are no part of the system. */
+export const DEV_TOOLING = /^(development|dev-tools|tooling)\//i
+
 export const SKIPPED = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.nuxt', '.turbo', '.cache', '.radical', 'vendor', 'target', '.venv', 'venv', '__pycache__', 'bin', 'obj', '.gradle', '.idea', '.vs', '.svelte-kit', 'storybook-static'])
 /** Libraries copied into a web application's folder (ASP.NET's wwwroot/lib, Bower's components): not its own source. */
 const VENDORED = /(^|\/)(wwwroot\/lib|bower_components)\//i
@@ -107,7 +115,11 @@ export class RepoFiles {
     const deployment = (f: string): boolean => /(^|\/)build\//.test(f) && /(^|\/)((docker-)?compose[^/]*\.ya?ml|Dockerfile)$/i.test(f)
     // In a repository, a build folder git tracks holds what was written, not built (build/postgres/create_tables.sql):
     // a build's output is ignored, so git lists none of it.
-    const skipped = (f: string): boolean => VENDORED.test(f) || (!deployment(f) && f.split('/').slice(0, -1).some((seg, i, segs) => SKIPPED.has(seg) && !(seg === 'build' && (listing.git || builds.has(segs.slice(0, i + 1).join('/'))))))
+    // So does a coverage folder git tracks, but for a report's files: the code of a coverage feature (utPLSQL's
+    // source/core/coverage/ut_coverage.pkb), not a test run's report.
+    const report = (f: string): boolean => /\.(html?|css|js|json|xml|info|lcov|png|svg|gif|txt|gz)$/i.test(f)
+    const kept = (seg: string, f: string, at: string): boolean => (seg === 'build' && (listing.git || builds.has(at))) || (seg === 'coverage' && !!listing.git && !report(f))
+    const skipped = (f: string): boolean => VENDORED.test(f) || (!deployment(f) && f.split('/').slice(0, -1).some((seg, i, segs) => SKIPPED.has(seg) && !kept(seg, f, segs.slice(0, i + 1).join('/'))))
     this.list = listing.files.filter((f) => !skipped(f)).sort()
     this.set = new Set(this.list)
     this.nested = listing.nested.sort()

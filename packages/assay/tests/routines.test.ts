@@ -247,6 +247,136 @@ describe('radical assay: stored routines and the code calling them', () => {
     expect(facts.databases.map((d) => [d.engine, d.name])).toEqual([['Oracle', 'XE']])
   })
 
+  it("resolves the names Spring code gives a routine: a variable, a package configured through a getter, a StoredProcedure subclass, a named query, and no call in a comment or a page's markup", () => {
+    const facts = extractRepository(repo('hr', {
+      'pom.xml': '<project><artifactId>hr</artifactId></project>',
+      'src/main/resources/hr.pkg.properties': 'pkg.name=HR_UTILS\n',
+      'src/main/java/hr/PkgConfig.java': 'class PkgConfig {\n  @Value("${pkg.name}")\n  private String pkgName;\n  public String getPkgName() { return pkgName; }\n}\n',
+      'src/main/java/hr/Regions.java': [
+        'class Regions {',
+        '  List<Region> all() {',
+        '    final String procedure_name = "GET_REGIONS";',
+        '    return new SimpleJdbcCall(ds).withCatalogName(pkgCfg.getPkgName()).withProcedureName(procedure_name).execute();',
+        '  }',
+        '  void remove() { conn.prepareCall("begin ? := hr_utils.remove_employees(?); end;"); }',
+        '  // conn.prepareCall("{call hr_utils.old_api(?)}");',
+        '  protected abstract class Departments extends StoredProcedure {',
+        '    protected final static String PROCEDURE = "GET_DEPARTMENTS";',
+        '    Departments() { final String strStmt = Joiner.on(".").join(pkgCfg.getPkgName(), PROCEDURE); setSql(strStmt); }',
+        '  }',
+        '}',
+        '',
+      ].join('\n'),
+      'src/main/java/hr/Employee.java': '@NamedStoredProcedureQuery(name = "addEmployee", procedureName = "EMPLOYEEPROCEDURE", parameters = { @StoredProcedureParameter(mode = ParameterMode.IN, name = "p_id", type = Long.class) })\nclass Employee {}\n',
+      'src/main/java/hr/Procedures.java': 'class Procedures {\n  void add() { em.createNamedStoredProcedureQuery("addEmployee").execute(); }\n}\n',
+      'web/package.json': '{ "name": "web", "scripts": { "start": "vite" } }',
+      'web/src/routes/+page.svelte': '<script>\n  const run = () => db.query("SELECT refuel_ship(1)");\n</script>\n<Pin sql="SELECT attack(1, 2)" />\n',
+      'db/game.sql': 'CREATE FUNCTION refuel_ship(id INT) RETURNS INT AS $$ BEGIN RETURN 1; END $$ LANGUAGE plpgsql;\nCREATE FUNCTION attack(a INT, b INT) RETURNS INT AS $$ BEGIN RETURN 1; END $$ LANGUAGE plpgsql;\n',
+    }))
+    expect(facts.routineCalls.map((c) => [c.unit.split(':unit:')[1], c.routine, c.via]).sort()).toEqual([
+      ['.', 'employeeprocedure', 'JPA'], ['.', 'hr_utils.get_departments', 'Spring StoredProcedure'], ['.', 'hr_utils.get_regions', 'Spring SimpleJdbcCall'],
+      ['.', 'hr_utils.remove_employees', 'PL/SQL block'], ['web', 'refuel_ship', 'SQL function'],
+    ])
+  })
+
+  it("reads a library of SQL alone by its top folders, its examples, a runner's drops, the code of a coverage folder, and no developer tooling", () => {
+    const facts = extractRepository(repo('utlib', {
+      'source/install.sql': '@@core/ut.pks\n@@core/ut.pkb\n@@core/coverage/ut_coverage.pks\n',
+      'source/core/ut.pks': 'CREATE OR REPLACE PACKAGE ut AS\n  PROCEDURE run;\nEND;\n/\n',
+      'source/core/ut.pkb': [
+        'CREATE OR REPLACE PACKAGE BODY ut AS',
+        '  -- $$NO_OP disables the calls',
+        '  PROCEDURE run IS',
+        '  BEGIN',
+        '    $if $$no_op $then',
+        '      null;',
+        '    $else',
+        '      ut_coverage.coverage_start;',
+        '    $end',
+        '  END run;',
+        'END;',
+        '/',
+        '',
+      ].join('\n'),
+      'source/core/coverage/ut_coverage.pks': 'CREATE OR REPLACE PACKAGE ut_coverage AS\n  PROCEDURE coverage_start;\nEND;\n/\n',
+      'source/core/coverage/report.html': '<html><a href="https://example.com/x">x</a></html>',
+      'source/uninstall.sql': 'DROP PACKAGE ut;\nDROP PACKAGE ut_coverage;\n',
+      'examples/award_bonus/run.sql': '@@award_bonus.prc\nexec ut.run;\n@@drop_award_bonus.sql\n',
+      'examples/award_bonus/award_bonus.prc': 'CREATE OR REPLACE PROCEDURE award_bonus AS BEGIN NULL; END;\n/\n',
+      'examples/award_bonus/drop_award_bonus.sql': 'DROP PROCEDURE award_bonus;\n',
+      'examples/rooms/run_remove_rooms_test.sql': 'CREATE TABLE rooms (id NUMBER(6));\n',
+      'development/mystats/mystats_pkg.sql': 'CREATE OR REPLACE PACKAGE mystats_pkg AS\n  PROCEDURE ms_start;\nEND;\n/\n',
+    }))
+    expect(facts.units.map((u) => u.path)).toEqual(['examples', 'source'])
+    expect(routines(facts).map((r) => r[1]).sort()).toEqual(['ut', 'ut.run', 'ut_coverage', 'ut_coverage.coverage_start'])
+    expect(facts.routines.find((r) => r.name === 'ut.run')?.calls).toEqual(['ut_coverage.coverage_start'])
+    expect(facts.tables.map((t) => t.table)).toEqual(['rooms'])
+    expect(linkRepositories([facts]).map((l) => [l.kind, l.from.split(':unit:')[1], l.to.split(':unit:')[1]])).toContainEqual(['routine', 'examples', 'source'])
+  })
+
+  it('follows a Sqitch project in its plan: columns added and dropped, reworks and reverts aside, a routine to its statement, flags set the PL/pgSQL way, SvelteKit routes, and a backup job no database', () => {
+    const facts = extractRepository(repo('game', {
+      'schema/sqitch.plan': '%project=game\n\ntable-player 2026-01-01T00:00:00Z dev <d@x> # players\nplayer-drop_password [table-player] 2026-01-02T00:00:00Z dev <d@x> # no passwords\nprocedure-tic 2026-01-03T00:00:00Z dev <d@x> # the clock\n',
+      'schema/deploy/table-player.sql': 'CREATE TABLE player (id SERIAL PRIMARY KEY, password CHAR(40), approved BOOLEAN NOT NULL DEFAULT false);\n',
+      'schema/deploy/player-drop_password.sql': 'ALTER TABLE player DROP COLUMN password;\nALTER TABLE player ADD COLUMN shared boolean NOT NULL DEFAULT false;\n',
+      'schema/deploy/procedure-tic.sql': [
+        'CREATE OR REPLACE PROCEDURE tic_open() AS $$ BEGIN NULL; END $$ LANGUAGE plpgsql;',
+        'CREATE OR REPLACE PROCEDURE tic_close() AS $$',
+        'BEGIN',
+        "  UPDATE player SET approved = 't';",
+        'END $$ LANGUAGE plpgsql;',
+        'REVOKE ALL ON PROCEDURE tic_open() FROM PUBLIC;',
+        'CREATE OR REPLACE FUNCTION player_changed() RETURNS trigger AS $$',
+        'BEGIN',
+        "  -- the referee approves them with UPDATE player SET approved = true",
+        "  NEW.approved := 'f';",
+        '  RETURN NEW;',
+        'END $$ LANGUAGE plpgsql;',
+        '',
+      ].join('\n'),
+      'schema/deploy/procedure-tic@v1.0.sql': 'CREATE OR REPLACE PROCEDURE tic_legacy() AS $$ BEGIN NULL; END $$ LANGUAGE plpgsql;\n',
+      'schema/revert/table-player.sql': 'DROP TABLE player;\n',
+      'web/package.json': '{ "name": "web", "scripts": { "start": "vite" }, "devDependencies": { "@sveltejs/kit": "2.0.0" } }',
+      'web/src/routes/(public)/fleet/[id]/+page.svelte': '<h1>Fleet</h1>\n',
+      'web/src/routes/api/sql/+server.ts': 'export const POST = async () => new Response()\n',
+      'web/src/lib/seo.ts': "export const REPO = 'https://github.com/game/game'\n",
+      'docker/compose.yml': 'services:\n  web:\n    build:\n      context: ../web\n    environment:\n      PGHOST: db\n      PGDATABASE: game\n  backup:\n    image: postgres:16\n    entrypoint: ["/bin/sh", "/backup.sh"]\n    environment:\n      PGHOST: db\n',
+    }))
+    expect(facts.tables.find((t) => t.table === 'player')?.columns?.map((c) => [c.name, c.file])).toEqual([['id', undefined], ['approved', undefined], ['shared', 'schema/deploy/player-drop_password.sql']])
+    expect(routines(facts).map((r) => r[1])).toEqual(['tic_open', 'tic_close', 'player_changed'])
+    expect(facts.routines.find((r) => r.name === 'tic_close')).toMatchObject({ writes: ['player'] })
+    expect(facts.routines.find((r) => r.name === 'tic_close')?.calls).toBeUndefined()
+    expect(facts.states.find((s) => s.table === 'player')?.sets.map((x) => [x.value, x.line])).toEqual([['approved', 4], ['not approved', 10]])
+    expect(facts.entries.map((e) => e.name)).toEqual(['GET /fleet/{id}', 'POST /api/sql'])
+    expect(facts.urls).toEqual([])
+    expect(facts.databases.map((d) => [d.unit?.split(':unit:')[1], d.name, d.evidence.line])).toEqual([['web', 'game', 7]])
+  })
+
+  it("reads Entity Framework's tables from its migrations' snapshot, SQLite named in code, and the services an Oracle package calls", () => {
+    const facts = extractRepository(repo('apps', {
+      'pets/Pets.csproj': '<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="3.0.0" /></ItemGroup></Project>',
+      'pets/Program.cs': 'class PetContext : DbContext {\n  public DbSet<Pet> Pets { get; set; }\n  public DbSet<PetCount> PetCounts { get; set; }\n  protected override void OnConfiguring(DbContextOptionsBuilder options) => options.UseSqlite("Data Source=pets.db");\n}\npublic class Pet { public int Id { get; set; } }\npublic class PetCount { public int Count { get; set; } }\n',
+      'pets/Migrations/PetContextModelSnapshot.cs': 'modelBuilder.Entity("Pets.Pet", b => { b.ToTable("Pets"); });\n',
+    }))
+    expect(facts.tables.map((t) => t.table)).toEqual(['Pets'])
+    expect(facts.databases.map((d) => [d.engine, d.name])).toEqual([['SQLite', 'pets.db']])
+    // A library of PL/SQL calls the services its packages name, no page's link or namespace.
+    const library = extractRepository(repo('lib', {
+      'ora/slack_util_pkg.pkb': [
+        'CREATE OR REPLACE PACKAGE BODY slack_util_pkg AS',
+        "  g_url CONSTANT VARCHAR2(100) := 'https://hooks.slack.com/services/';",
+        "  g_ns CONSTANT VARCHAR2(100) := 'http://schemas.microsoft.com/exchange/services';",
+        '  PROCEDURE help IS BEGIN',
+        "    htp.anchor('http://www.google.com/search?q=x', 'Google');",
+        '  END help;',
+        'END;',
+        '/',
+        '',
+      ].join('\n'),
+    }))
+    expect(library.addresses.map((a) => [a.unit?.split(':unit:')[1], a.host])).toEqual([['ora', 'hooks.slack.com']])
+  })
+
   it('reads the Oracle database a JDBC URL, a TNS descriptor, an Easy Connect string and makedsn name', () => {
     const facts = extractRepository(repo('ora', {
       'svc/pom.xml': '<project><artifactId>svc</artifactId></project>',
