@@ -365,6 +365,33 @@ feat/assay-syntax (2026-11-09, which does not touch Studio) and once in 4
 runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main.
 
+### Dogfooding (2026-11-09): microSecEnD, an external ground truth
+
+microSecEnD's 17 hand-drawn dataflow diagrams of Java microservice
+applications became bench entries (`microsecend.json`, committed before Assay
+ran on them). Untouched: calls F1 0.69 (recall 54 %, precision 97 %); the
+published comparison's best tool reaches 0.86 on the same diagrams, though its
+F1 may count nodes too. Tuned on them since: F1 0.87 (recall 80 %, precision
+95 %), so they are no longer a held-out measure. An agent's run on three of
+them (run 24, `/Volumes/data/Dev/assay-runs/24-microsecend`, 15 minutes,
+$7.7) scored calls 96 % / 91 % against 89 % / 91 % for the facts alone: the
+agent reads what the readers miss (an Apache proxy's members) and loses
+nothing. Open:
+
+- **Configuration in another repository** (a config server's git URI):
+  noted now, but read only when given as a repository of the run, and then
+  not mapped to its clients.
+- **Dashboards fed through their UI** (Hystrix, Turbine streams), Weave
+  Scope, a consul cluster joined by its command line, logstash's output in its
+  pipeline file, a tracing server set in a config repository: drawn by the
+  diagrams, read by no reader.
+- **An Apache httpd configuration** (ProxyPass, BalancerMember) in a folder
+  of no unit is read by nothing.
+- **Compose `links:` read as calls** point the wrong way where the linked
+  service calls the linking one (a Hystrix dashboard polls the services).
+- **A held-out set again**: microSecEnD is tuned on now; the comparison's
+  newer benchmark, or other datasets, could hold out the next round.
+
 ### Dogfooding (2026-11-09): Assay reads code through syntax trees
 
 Routes in Java and C# are read from tree-sitter's syntax trees (ADR Assay
