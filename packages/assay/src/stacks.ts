@@ -51,6 +51,13 @@ const TEST_FRAMEWORKS: Array<[RegExp, TestFramework]> = [
 
 /** The unit's test framework: from its dependencies, a Gradle build's test dependencies, a Python folder's pytest files. */
 function testFrameworkOf(d: Draft, files: RepoFiles): TestFramework | undefined {
+  const prefix_ = d.path === '.' ? '' : `${d.path}/`
+  // A JVM unit's tests say which JUnit they are written in (Spring Boot's starter brought JUnit 4 before 2.2).
+  if (d.stack === 'maven' || d.stack === 'gradle') {
+    const tests = files.list.filter((f) => f.startsWith(`${prefix_}src/test/`) && /\.(java|kt|groovy)$/.test(f)).map((f) => files.read(f))
+    if (tests.some((t) => /\borg\.junit\.jupiter\b/.test(t))) return 'junit5'
+    if (tests.some((t) => /\bimport\s+org\.junit\.(Test|Assert|Before|runner)\b|@RunWith\b/.test(t))) return 'junit4'
+  }
   const named = TEST_FRAMEWORKS.find(([re]) => d.deps.some((dep) => re.test(dep)))?.[1]
   if (named) return named
   const prefix = d.path === '.' ? '' : `${d.path}/`
@@ -277,7 +284,8 @@ function gradle(files: RepoFiles): Draft[] {
     if (path === '.' && /\binclude\b/.test(settings) && !/\b(implementation|api|compile)\b/.test(text)) continue
     const rootName = /rootProject\.name\s*=\s*['"]([^'"]+)['"]/.exec(settings)?.[1]
     const d = draft('gradle', path, file, path === '.' ? rootName : undefined, 1)
-    if (/\b(application|org\.springframework\.boot)\b/.test(text)) d.reasons.push('it applies the application or Spring Boot plugin')
+    // The application or Spring Boot plugin applied, not a Spring Boot library depended on.
+    if (/\bapply\s+plugin\s*:\s*['"](application|org\.springframework\.boot|spring-boot)['"]|\bid\s*\(?\s*['"](application|org\.springframework\.boot)['"]|^\s*(application|java-application)\s*$|\balias\(\s*libs\.plugins\.[\w.]*spring[\w.]*boot\b/m.test(text)) d.reasons.push('it applies the application or Spring Boot plugin')
     const main = javaMain(files, path)
     if (main) d.reasons.push(main)
     // A project dependency in any configuration (implementation, api, testImplementation, baselineProfile, lintPublish, …):
@@ -618,13 +626,24 @@ function vb6(files: RepoFiles, groups: GroupFact[], repo: string): Draft[] {
 // ── Docker ───────────────────────────────────────────────────────────────────
 
 /** A folder with a Dockerfile no manifest claims runs something: an app in the language its base image names. */
+/** A compose file's services: its services map, or in compose's first format (no version, no services key) its top
+ *  level, where every entry is a service with an image or a build. */
+export function composeServices<T = Record<string, unknown>>(doc: unknown): Record<string, T> {
+  if (!doc || typeof doc !== 'object') return {}
+  const d = doc as { services?: Record<string, T>; version?: unknown }
+  if (d.services && typeof d.services === 'object') return d.services
+  const entries = Object.entries(d)
+  const v1 = d.version === undefined && entries.length > 0 && entries.every(([, v]) => !!v && typeof v === 'object' && ('image' in (v as object) || 'build' in (v as object)))
+  return v1 ? (d as Record<string, T>) : {}
+}
+
 /** Each folder a compose service is built from, with the folders its services mount as volumes (./web:/web). */
 export function composeMounts(files: RepoFiles): Map<string, string[]> {
   const out = new Map<string, string[]>()
   for (const file of files.list.filter((f) => /(^|\/)(docker-)?compose[^/]*\.ya?ml$/i.test(f))) {
     let doc: { services?: Record<string, { build?: unknown; volumes?: unknown }> } | undefined
     try { doc = load(files.read(file)) as typeof doc } catch { continue }
-    for (const def of Object.values(doc?.services ?? {})) {
+    for (const def of Object.values(composeServices<{ build?: unknown; volumes?: unknown }>(doc))) {
       const build = typeof def?.build === 'string' ? def.build : typeof (def?.build as { context?: unknown })?.context === 'string' ? (def.build as { context: string }).context : null
       const context = build === null ? null : resolveFrom(dirOf(file), build)
       if (context === null) continue

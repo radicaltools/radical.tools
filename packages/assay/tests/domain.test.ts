@@ -160,6 +160,35 @@ describe('radical assay: tables and their structure', () => {
     const efOrder = cs.tables.find((t) => t.table === 'Orders')!
     expect([efOrder.declared, efOrder.columns!.map((c) => c.name), efOrder.references]).toEqual(['Entity Framework Core', ['Id', 'CustomerId'], [{ column: 'CustomerId', table: 'Customers', line: 4 }]])
   })
+
+  it("reads a Django foreign key's target from the line after its parenthesis", () => {
+    const facts = extractRepository(repo('bakery', {
+      'manage.py': 'import django\n',
+      'requirements.txt': 'django\n',
+      'breads/models.py': [
+        'from django.db import models',
+        '',
+        'class Country(models.Model):',
+        '    title = models.CharField(max_length=100)',
+        '',
+        'class BreadPage(models.Model):',
+        '    origin = models.ForeignKey(',
+        '        Country,',
+        '        on_delete=models.SET_NULL,',
+        '        null=True,',
+        '    )',
+        '    bread_type = models.ForeignKey(',
+        '        "breads.BreadType",',
+        '        on_delete=models.SET_NULL,',
+        '    )',
+        '',
+        'class BreadType(models.Model):',
+        '    title = models.CharField(max_length=255)',
+        '',
+      ].join('\n'),
+    }))
+    expect(facts.tables.find((t) => t.table === 'breads_breadpage')?.references?.map((r) => [r.column, r.table])).toEqual([['origin_id', 'breads_country'], ['bread_type_id', 'breads_breadtype']])
+  })
 })
 
 describe('radical assay: status values', () => {

@@ -10,7 +10,8 @@ import { load, loadAll } from './yaml'
 import type { AddressFact, DatabaseFact, ServiceFact, Unit } from './facts'
 import { readAspire } from './aspire'
 import { connectionOf } from './code'
-import { settingsFor, springConfigOwners } from './spring'
+import { keysOf, settingsFor, springConfigOwners } from './spring'
+import { composeServices } from './stacks'
 import { RepoFiles, dirOf, escapeRe, lineAt, lineOf, owner, resolveFrom } from './files'
 
 /** What an image runs, by its name. */
@@ -38,7 +39,8 @@ export function addressesIn(text: string, withHostPort: boolean): Array<{ scheme
     if (/^(file|data|mailto|jdbc|urn|php)$/.test(scheme)) continue
     // A database's URL is its connection string, read as a database (code.ts), not as a call.
     if (/^(postgres(ql)?|mysql|mariadb|mongodb(\+srv)?|redis|rediss|sqlserver|mssql|oracle)$/.test(scheme) || /jdbc:[\w:]*$/i.test(text.slice(Math.max(0, m.index! - 20), m.index!))) continue
-    out.push({ scheme, host: m[2].toLowerCase(), ...(m[3] ? { port: Number(m[3]) } : {}), text: m[0], index: m.index! })
+    // A password in the address is no fact to keep (http://user:secret@registry:8761).
+    out.push({ scheme, host: m[2].toLowerCase(), ...(m[3] ? { port: Number(m[3]) } : {}), text: m[0].replace(/\/\/([^:@\s/]+):[^@\s/]+@/, '//$1:***@'), index: m.index! })
   }
   if (withHostPort) {
     for (const m of text.matchAll(/(?<![\w.\/:@-])([a-z][a-z0-9-]{1,62}(?:\.[a-z0-9-]+)*):(\d{2,5})\b/g)) {
@@ -58,7 +60,6 @@ export interface Runtime {
 
 const YAML = /\.(ya?ml)$/i
 
-/** The text's values as strings: an environment as a list ("K=V") or a map. */
 /** The variables a compose file's .env sets, each expanded with the others (CART_ADDR=cart:${CART_PORT}). */
 function dotEnv(text: string): Map<string, string> {
   const vars = new Map<string, string>()
@@ -75,6 +76,7 @@ function interpolate(text: string, vars: Map<string, string>): string {
   })
 }
 
+/** The text's values as strings: an environment as a list ("K=V") or a map. */
 function environment(env: unknown): string[] {
   if (Array.isArray(env)) return env.filter((e): e is string => typeof e === 'string').map((e) => e.slice(e.indexOf('=') + 1))
   if (env && typeof env === 'object') return Object.values(env as Record<string, unknown>).filter((v) => typeof v === 'string' || typeof v === 'number').map(String)
@@ -91,7 +93,16 @@ function unitFor(units: Unit[], name: string, image: string | undefined, built: 
   const inMounts = units.filter((u) => mounted.some((m) => u.path === m || u.path.startsWith(`${m}/`)))
   if (inMounts.length === 1) return inMounts[0]
   const names = [name, image?.split('/').pop()?.split(':')[0]].filter((n): n is string => !!n).map((n) => n.toLowerCase())
-  return units.find((u) => [u.name, ...(u.aliases ?? []), u.path.split('/').pop() ?? ''].some((a) => names.includes(a.toLowerCase())))
+  const known = (u: Unit): string[] => [u.name, ...(u.aliases ?? []), u.path.split('/').pop() ?? ''].filter(Boolean).map((a) => a.toLowerCase())
+  const exact = units.find((u) => known(u).some((a) => names.includes(a)))
+  if (exact) return exact
+  // The same name spelt with or without its separators (configserver, config-server), or an image named for the unit
+  // with a prefix (basic-config-server; a service's own name with one, valkey-cart, is no such name): only when one unit
+  // is so named.
+  const bare = (n: string): string => n.replace(/[-_.]/g, '')
+  const imageName = image?.split('/').pop()?.split(':')[0]?.toLowerCase()
+  const loose = units.filter((u) => known(u).some((a) => a.length >= 4 && (names.some((n) => bare(n) === bare(a)) || (!!imageName && (imageName.endsWith(`-${a}`) || imageName.endsWith(`_${a}`))))))
+  return loose.length === 1 ? loose[0] : undefined
 }
 
 /** The unit of those in the build's context that its Dockerfile builds or publishes (dotnet publish "X.csproj"). */
@@ -148,7 +159,7 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
       const given = vars.size ? interpolate(text, vars).replace(/^(\s*-\s*)([A-Za-z_]\w*)\s*$/gm, (m, lead: string, name: string) => (vars.has(name) ? `${lead}${name}=${vars.get(name)}` : m)) : text
       let doc: { services?: Record<string, Record<string, unknown>> }
       try { doc = load(given) as typeof doc } catch (error) { notes.push(`${file} does not read as YAML: ${(error as Error).message.split('\n')[0]}`); continue }
-      for (const [name, def] of Object.entries(doc?.services ?? {})) {
+      for (const [name, def] of Object.entries(composeServices(doc))) {
         if (!def || typeof def !== 'object') continue
         const image = typeof def.image === 'string' ? def.image : undefined
         const build = typeof def.build === 'string' ? def.build : typeof (def.build as { context?: unknown })?.context === 'string' ? (def.build as { context: string }).context : null
@@ -161,7 +172,9 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
         const mounted = (Array.isArray(def.volumes) ? def.volumes : []).filter((v): v is string => typeof v === 'string' && /^\.{1,2}(\/|:)/.test(v)).map((v) => resolveFrom(dirOf(file), v.split(':')[0])).filter((v): v is string => !!v && v !== '.')
         const unit = (context !== null && dockerPath ? builtBy(files.read(dockerPath), units, context) : undefined) ?? unitFor(units, name, image, built, mounted)
         // A service waited for until it completes (condition: service_completed_successfully) runs before, not for, this one.
-        const dependsOn = Array.isArray(def.depends_on) ? def.depends_on.map(String) : def.depends_on && typeof def.depends_on === 'object'
+        // Compose's first format links services it talks to (links: ["db:database"]), as depends_on does since.
+        const linked = Array.isArray(def.links) ? def.links.map((l) => String(l).split(':')[0]) : []
+        const dependsOn = linked.length && !def.depends_on ? linked : Array.isArray(def.depends_on) ? def.depends_on.map(String) : def.depends_on && typeof def.depends_on === 'object'
           ? Object.entries(def.depends_on as Record<string, { condition?: unknown } | null>).filter(([, d]) => d?.condition !== 'service_completed_successfully').map(([n]) => n) : []
         const s = service({ name, file, ...(unit ? { unit: unit.id } : {}), ...(image ? { image } : {}), role: unit ? 'app' : roleOf(`${image ?? ''} ${name}`).role, dependsOn, evidence: { file, line: lineOf(text, new RegExp(`^\\s+${escapeRe(name)}\\s*:`, 'm')) } })
         // The ports it publishes on this machine ("127.0.0.1:3002:8080", "8080:80", { published: 8080 }).
@@ -215,7 +228,8 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
   for (const u of units) {
     const prefix = u.path === '.' ? '' : `${u.path}/`
     const configs = [
-      ...files.list.filter((f) => f.startsWith(prefix) && !configures.has(f) && /(^|\/)(application|bootstrap)(-[\w-]+)?\.(ya?ml|properties)$|(^|\/)appsettings(\.[\w-]+)?\.json$|(^|\/)launchSettings\.json$|(^|\/)\.env(\.[\w-]+)?$/.test(f)),
+      // A test's settings (src/test/resources) are the test's, not the system's.
+      ...files.list.filter((f) => f.startsWith(prefix) && !configures.has(f) && !/(^|\/)src\/test\//.test(f) && /(^|\/)(application|bootstrap)(-[\w-]+)?\.(ya?ml|properties)$|(^|\/)appsettings(\.[\w-]+)?\.json$|(^|\/)launchSettings\.json$|(^|\/)\.env(\.[\w-]+)?$/.test(f)),
       ...[...configures].filter(([, configured]) => configured.includes(u)).map(([f]) => f),
     ]
     for (const file of configs) {
@@ -226,7 +240,8 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
       if (springName && typeof springName === 'string' && !(u.aliases ?? []).includes(springName)) u.aliases = [...(u.aliases ?? []), springName]
       const ports = [
         ...[...text.matchAll(/server\.port\s*[=:]\s*(\d{2,5})/g)].map((m) => Number(m[1])),
-        ...(/^server\s*:\s*$/m.test(text) ? [...text.matchAll(/^\s+port\s*:\s*(\d{2,5})\s*$/gm)].map((m) => Number(m[1])) : []),
+        // server.port in YAML, as its key path says (spring.rabbitmq.port is a port it calls).
+        ...((keys) => text.split('\n').flatMap((l, i) => keys[i] === 'server.port' && /^\s+port\s*:\s*(\d{2,5})\s*$/.test(l) ? [Number(/(\d{2,5})/.exec(l)![1])] : []))(keysOf(text)),
         ...(file.endsWith('launchSettings.json') ? [...text.matchAll(/"applicationUrl"\s*:\s*"([^"]+)"/g)].flatMap((m) => [...m[1].matchAll(/:(\d{2,5})/g)].map((p) => Number(p[1]))) : []),
       ]
       if (ports.length) u.ports = [...new Set([...(u.ports ?? []), ...ports])].sort((a, b) => a - b)
@@ -249,6 +264,15 @@ export function readRuntime(files: RepoFiles, repo: string, units: Unit[]): Runt
     const dockerfile = files.read(`${prefix}Dockerfile`)
     const exposed = [...dockerfile.matchAll(/^EXPOSE\s+(.+)$/gmi)].flatMap((m) => m[1].split(/\s+/).map((p) => Number(p.split('/')[0]))).filter((p) => p > 0)
     if (exposed.length) u.ports = [...new Set([...(u.ports ?? []), ...exposed])].sort((a, b) => a - b)
+  }
+  // A config server serving its clients' configuration from another repository: what it configures is read there.
+  for (const file of files.list.filter((f) => /(^|\/)(application|bootstrap)(-[\w-]+)?\.(ya?ml|properties)$/.test(f))) {
+    const text = files.read(file)
+    const keys = keysOf(text)
+    for (const [i, line] of text.split('\n').entries()) {
+      const uri = /^spring\.cloud\.config\.server\.git\.uri$/.test(keys[i] ?? '') && !/^\s*#/.test(line) ? /(https?:\/\/[^\s"'#]+|git@[^\s"'#]+)/.exec(line)?.[1] : undefined
+      if (uri) notes.push(`${file}:${i + 1} serves its clients' configuration from ${uri}, another repository: give it to Assay too, to read the addresses and ports it sets`)
+    }
   }
   return { services, addresses, databases, notes }
 }

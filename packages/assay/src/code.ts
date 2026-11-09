@@ -259,7 +259,8 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     const ext = extname(file).toLowerCase()
     const config = CONFIG.test(file)
     if (!SOURCE.has(ext) && !config) continue
-    if (!unit || GENERATED.test(file) || (TEST_FILE.test(file) && !config)) continue
+    // A test's settings (src/test/resources: an in-memory database, a stub's address) are the test's, not the system's.
+    if (!unit || GENERATED.test(file) || (TEST_FILE.test(file) && !config) || (config && /(^|\/)src\/test\//.test(file))) continue
     let text = configures.has(file) ? settingsFor(files, file, unit) : files.read(file)
     if (!text) continue
     // VB6 continues a string over lines: "a" & _ ⏎ "b" is "ab".
@@ -269,7 +270,8 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     // A commented line of a configuration file sets nothing (lines hold: it is emptied, not removed).
     if (config && /\.(ya?ml|properties|env|toml|conf|ini)$|(^|\/)\.env(\.[\w-]+)?$/i.test(file)) text = text.replace(/^[ \t]*#.*$/gm, '').replace(/\.ini$/i.test(file) ? /^[ \t]*;.*$/gm : /$^/, '')
     // ${key:default} (${KEY:-default}) is its default where nothing sets it, for every reader below (on its line: lines
-    // hold); ${KEY:?message} has none.
+    // hold); ${KEY:?message} has none. The setting's name tells what the default is (a host's), so it is read before.
+    const unresolved = text
     text = text.replace(/\$\{([\w.-]+):([^${}\n]*)\}/g, (_, key: string, value: string) => (value.startsWith('?') ? `\${${key}}` : value.replace(/^-/, '')))
     // A compose file's or a deployment manifest's connection strings are the services' it runs (runtime.ts).
     const deployment = config && (/(^|\/)(docker-)?compose[^/]*\.ya?ml$/i.test(file) || /^\s*kind\s*:\s*(Deployment|StatefulSet|DaemonSet|Service|Job|CronJob|ConfigMap)\b/m.test(text))
@@ -307,6 +309,16 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       for (const m of text.matchAll(/"Data Source\s*=\s*([\w.-]+)"/gi)) {
         const id = `${repo}:db:${unit.path}:SQLite/${m[1]}`
         if (once(id)) out.databases.push({ id, unit: unit.id, engine: 'SQLite', name: m[1], evidence: at(m.index!) })
+      }
+    }
+
+    // A Prometheus configuration's scrape targets: the services it reads metrics from (targets: ['api-gateway:8080']).
+    if (config && /^scrape_configs\s*:/m.test(text)) {
+      for (const list of text.matchAll(/\btargets\s*:\s*\[([^\]]*)\]/g)) {
+        for (const t of list[1].matchAll(/["']([a-z][\w.-]*):(\d{2,5})["']/gi)) {
+          const id = `${repo}:address:${unit.path}:scrape:${t[1]}:${t[2]}`
+          if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'scrape', host: t[1].toLowerCase(), port: Number(t[2]), text: t[0], evidence: at(list.index!) })
+        }
       }
     }
 
@@ -365,10 +377,10 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
     }
 
     // A host given as a default: process.env.CART_HOST || 'cart', os.getenv('CART_HOST', 'cart'), ${cart.host:cart}.
-    for (const m of text.matchAll(DEFAULT_HOST)) {
+    for (const m of unresolved.matchAll(DEFAULT_HOST)) {
       const host = (m[1] ?? m[2] ?? m[3] ?? m[4] ?? m[5]).toLowerCase()
       const id = `${repo}:address:${unit.path}:default:${host}`
-      if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'default', host, text: m[0], evidence: at(m.index!) })
+      if (once(id)) out.addresses.push({ id, unit: unit.id, scheme: 'default', host, text: m[0], evidence: { file, line: lineAt(unresolved, m.index!) } })
     }
 
     for (const m of text.matchAll(NAMED_HOST)) {

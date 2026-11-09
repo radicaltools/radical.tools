@@ -84,3 +84,42 @@ export function literal(node: Node): string {
 
 /** The children of a node of a type, named or by field. */
 export const childrenOf = (node: Node, type: string): Node[] => node.namedChildren.filter((c): c is Node => !!c && c.type === type)
+
+const STRING = /^(string_literal|verbatim_string_literal|raw_string_literal|text_block)$/
+
+/** The text of a string literal: its content, quotes and prefixes off (Java "…" and """…""", C# "…", @"…", """…"""). */
+function contentOf(node: Node): string {
+  return node.text.replace(/^(?:[@$u8]*)("""+|")/, '').replace(/("""+|")(?:u8)?$/, '')
+}
+
+/** The strings of a file's code, each with the row (0-based) it starts on: a literal, or literals joined with + into
+ *  one (a statement written over lines); a part of the join that is no literal stands as a space. Each part keeps its
+ *  own line, so a line within the string is a line of the file. */
+export function strings(grammar: Grammar, text: string): Array<{ text: string; row: number }> {
+  const out: Array<{ text: string; row: number }> = []
+  const parts = (node: Node): Node[] => node.type === 'binary_expression' && node.childForFieldName('operator')?.text === '+'
+    ? [...parts(node.childForFieldName('left')!), ...parts(node.childForFieldName('right')!)]
+    : node.type === 'parenthesized_expression' && node.namedChildren[0] ? parts(node.namedChildren[0]) : [node]
+  const walk = (node: Node): void => {
+    if (node.type === 'binary_expression' && node.childForFieldName('operator')?.text === '+') {
+      const all = parts(node)
+      if (all.some((p) => STRING.test(p.type))) {
+        const row = all[0].startPosition.row
+        let joined = ''
+        let at = row
+        for (const p of all) {
+          // Lines hold: each part starts on its own row of the file.
+          while (at < p.startPosition.row) { joined += '\n'; at++ }
+          joined += STRING.test(p.type) ? contentOf(p) : ' '
+          at = p.endPosition.row
+        }
+        out.push({ text: joined, row })
+        return
+      }
+    }
+    if (STRING.test(node.type)) { out.push({ text: contentOf(node), row: node.startPosition.row }); return }
+    for (const child of node.namedChildren) if (child) walk(child)
+  }
+  walk(parse(grammar, text).rootNode)
+  return out
+}

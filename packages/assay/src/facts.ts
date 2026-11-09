@@ -178,6 +178,19 @@ export interface StateFact {
   evidence: Evidence
 }
 
+/** A message a unit's code publishes or consumes: on a topic, a queue or an exchange by name, or of a message type a
+ *  bus routes by its type (MassTransit). */
+export interface MessageFact {
+  id: string
+  unit: string
+  role: 'publishes' | 'consumes'
+  /** The topic, queue or exchange; for a bus routing by type, the message type. */
+  channel: string
+  /** Kafka, RabbitMQ, a Spring Cloud Stream binding, MassTransit. */
+  via: string
+  evidence: Evidence
+}
+
 /** Where a user, a clock or another system enters a unit's code. */
 export interface EntryFact {
   id: string
@@ -250,6 +263,7 @@ export interface RepositoryFacts {
   tables: TableFact[]
   states: StateFact[]
   entries: EntryFact[]
+  messages: MessageFact[]
   groups: GroupFact[]
   tests: TestFact[]
   documents: DocumentFact[]
@@ -271,11 +285,11 @@ export const factsFileOf = (dir: string, name: string, root: string): string =>
 const FORMAT = 'radical-assay-facts/1'
 
 /** The lists of facts a repository's facts hold. */
-export const FACT_LISTS = ['units', 'dependencies', 'apis', 'urls', 'clients', 'addresses', 'services', 'databases', 'tables', 'states', 'entries', 'groups', 'tests', 'documents', 'screens', 'paths'] as const
+export const FACT_LISTS = ['units', 'dependencies', 'apis', 'urls', 'clients', 'addresses', 'services', 'databases', 'tables', 'states', 'entries', 'messages', 'groups', 'tests', 'documents', 'screens', 'paths'] as const
 
 /** No facts yet: every list empty. */
 export const emptyFacts = (repository: string, dir: string): RepositoryFacts => ({
-  repository, dir, units: [], dependencies: [], apis: [], urls: [], clients: [], addresses: [], services: [], databases: [], tables: [], states: [], entries: [], groups: [], tests: [], documents: [], screens: [], paths: [], notes: [],
+  repository, dir, units: [], dependencies: [], apis: [], urls: [], clients: [], addresses: [], services: [], databases: [], tables: [], states: [], entries: [], messages: [], groups: [], tests: [], documents: [], screens: [], paths: [], notes: [],
 })
 
 /** The facts as written to FACTS_FILE: without the absolute folder, which is the reader's. */
@@ -297,8 +311,9 @@ export interface Link {
   id: string
   /** package: a manifest or project reference; http: a path an OpenAPI description declares; grpc: a client of a service
    *  another unit registers; address: a host naming another unit or service; runtime: depends_on in a deployment;
-   *  data: a database the unit connects to. */
-  kind: 'package' | 'http' | 'grpc' | 'address' | 'runtime' | 'data'
+   *  data: a database the unit connects to; message: a topic, queue or message type one unit publishes and another
+   *  consumes. */
+  kind: 'package' | 'http' | 'grpc' | 'address' | 'runtime' | 'data' | 'message'
   from: string
   /** A unit, or a service or database fact. */
   to: string
@@ -312,12 +327,12 @@ export interface Link {
   via?: string
 }
 
-export type FactKind = 'unit' | 'dependency' | 'api' | 'url' | 'client' | 'address' | 'service' | 'database' | 'table' | 'state' | 'entry' | 'group' | 'test' | 'document' | 'screen' | 'path' | 'link'
-export type AnyFact = Unit | DependencyFact | ApiFact | UrlFact | ClientFact | AddressFact | ServiceFact | DatabaseFact | TableFact | StateFact | EntryFact | GroupFact | TestFact | DocumentFact | ScreenFact | PathFact | Link
+export type FactKind = 'unit' | 'dependency' | 'api' | 'url' | 'client' | 'address' | 'service' | 'database' | 'table' | 'state' | 'entry' | 'message' | 'group' | 'test' | 'document' | 'screen' | 'path' | 'link'
+export type AnyFact = Unit | DependencyFact | ApiFact | UrlFact | ClientFact | AddressFact | ServiceFact | DatabaseFact | TableFact | StateFact | EntryFact | MessageFact | GroupFact | TestFact | DocumentFact | ScreenFact | PathFact | Link
 
 const KIND_OF: Record<(typeof FACT_LISTS)[number], FactKind> = {
   units: 'unit', dependencies: 'dependency', apis: 'api', urls: 'url', clients: 'client', addresses: 'address',
-  services: 'service', databases: 'database', tables: 'table', states: 'state', entries: 'entry', groups: 'group', tests: 'test', documents: 'document', screens: 'screen', paths: 'path',
+  services: 'service', databases: 'database', tables: 'table', states: 'state', entries: 'entry', messages: 'message', groups: 'group', tests: 'test', documents: 'document', screens: 'screen', paths: 'path',
 }
 
 /** Every fact of the repositories by id, links included. */

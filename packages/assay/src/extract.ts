@@ -20,6 +20,7 @@ import { readEntries } from './entries'
 import { readForms } from './forms'
 import { emptyFacts, type ApiFact, type RepositoryFacts, type TestFact, type Unit } from './facts'
 import { GIT, RepoFiles, lineOf, owner, posix } from './files'
+import { readMessages } from './messages'
 import { readRuntime } from './runtime'
 import { readDocuments } from './sources'
 import { readStacks } from './stacks'
@@ -121,7 +122,7 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
   facts.notes.push(...code.notes)
   // The tables its schemas and ORM classes declare, with those its code names (a schema in no unit's folder is that of the
   // units using the database it creates, by their code or the services running them); its statuses; where its code is entered.
-  const domain = readDomain(files, repo, facts.units, code.tables, facts.databases, options.access)
+  const domain = readDomain(files, repo, facts.units, code.tables, facts.databases, options.access, facts.dependencies)
   facts.notes.push(...domain.notes)
   facts.tables = domain.tables
   facts.states = domain.states
@@ -133,6 +134,8 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
     facts.databases.push(db)
   }
   facts.entries = readEntries(files, repo, facts.units)
+  // The messages its units publish and consume, which link.ts joins by their channel.
+  facts.messages = readMessages(files, repo, facts.units)
   // A desktop application's forms are its screens, read from their files.
   facts.screens = readForms(files, repo, facts.units)
 

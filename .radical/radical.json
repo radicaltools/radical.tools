@@ -3381,6 +3381,42 @@
     ] },
     { "element": "c32eac71-fa0f-499c-8240-6c834b1b0c2a", "name": "MVC routes by convention", "tests": [
       "packages/assay/tests/syntax.test.ts › radical assay: code read through syntax trees › routes an MVC controller with no route template by convention"
+    ] },
+    { "element": "09aed2c5-4920-4413-83a7-748112c965b2", "name": "Spring Cloud clients find the only server", "tests": [
+      "packages/assay/tests/spring-cloud.test.ts › radical assay: Spring Cloud and compose as they run › links a client of Eureka, a config server, Kafka or RabbitMQ that names none to the repository's only one, apps only"
+    ] },
+    { "element": "4dd24d36-0eb2-45ea-8e4f-f02f1d1fc8c3", "name": "Configuration served from another repository", "tests": [
+      "packages/assay/tests/spring-cloud.test.ts › radical assay: Spring Cloud and compose as they run › notes a config server that serves its configuration from another repository"
+    ] },
+    { "element": "f3d69200-34a6-429a-8206-80e687d8bd94", "name": "Compose's first format and images named for units", "tests": [
+      "packages/assay/tests/spring-cloud.test.ts › radical assay: Spring Cloud and compose as they run › reads compose's first format with its links, and a service's image named for a unit with a prefix"
+    ] },
+    { "element": "069bfc62-f673-446a-9e30-3aa8c37b6c52", "name": "Deployment under build/ and Prometheus targets", "tests": [
+      "packages/assay/tests/spring-cloud.test.ts › radical assay: Spring Cloud and compose as they run › reads deployment written into build/, and the services a Prometheus configuration scrapes"
+    ] },
+    { "element": "ed378400-884f-4337-9967-5458042d9fb2", "name": "A host a Spring placeholder defaults to", "tests": [
+      "packages/assay/tests/spring-cloud.test.ts › radical assay: Spring Cloud and compose as they run › reads a host a Spring placeholder defaults to"
+    ] },
+    { "element": "da9355a1-a283-447a-87d2-bd11b7c1fb47", "name": "Tables SQL in a string creates", "tests": [
+      "packages/assay/tests/syntax.test.ts › radical assay: code read through syntax trees › reads the tables SQL in a string of the code creates, joined with + over lines, each on its line"
+    ] },
+    { "element": "c1ff38d8-74dd-4fb6-8c2c-471023f6c07a", "name": "Entities where the DbContext reaches", "tests": [
+      "packages/assay/tests/syntax.test.ts › radical assay: code read through syntax trees › reads an Entity Framework class as an entity only of a unit its DbContext's project reaches"
+    ] },
+    { "element": "73fe0c42-71cf-4fdd-a2cb-294cc4082ebb", "name": "A Django foreign key broken over lines", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: tables and their structure › reads a Django foreign key's target from the line after its parenthesis"
+    ] },
+    { "element": "67a89bbc-4e19-4523-9140-ef4f5f00d4b0", "name": "Spring Kafka topics linked", "tests": [
+      "packages/assay/tests/messages.test.ts › radical assay: the messages units exchange › reads what Spring Kafka publishes and its listeners consume, none in a comment, and links them by topic"
+    ] },
+    { "element": "32a13804-26ba-45d8-af34-0066aee4f10b", "name": "Spring Cloud Stream's bindings", "tests": [
+      "packages/assay/tests/messages.test.ts › radical assay: the messages units exchange › reads Spring Cloud Stream's bindings to the destinations its configuration gives them"
+    ] },
+    { "element": "462552ba-f87e-43a5-b0a7-f8d6869616b4", "name": "A bus by message type, kafkajs and pika", "tests": [
+      "packages/assay/tests/messages.test.ts › radical assay: the messages units exchange › reads a .NET bus by message type, and kafkajs and pika by their calls"
+    ] },
+    { "element": "24085eb1-d88b-44c7-8693-874aeff86d66", "name": "A JVM unit as it is", "tests": [
+      "packages/assay/tests/spring-cloud.test.ts › radical assay: Spring Cloud and compose as they run › reads a JVM unit as it is: the plugin it applies, the JUnit its tests import, the port it serves, not its tests' settings, no password"
     ] }
   ]
 }
