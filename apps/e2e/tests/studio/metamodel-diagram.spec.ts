@@ -46,7 +46,7 @@ test('the Diagram tab draws every node type and its relations', async ({ page, s
   // By default every containment edge and every type's properties are shown.
   await expect(legend.getByRole('checkbox', { name: 'Show Contains' })).toBeChecked()
   await expect(legend.getByRole('checkbox', { name: 'Show properties on boxes' })).toBeChecked()
-  await expect(diagram.locator('.react-flow__edge[data-testid^="rf__edge-contains:"]')).toHaveCount(52)
+  await expect(diagram.locator('.react-flow__edge[data-testid^="rf__edge-contains:"]')).toHaveCount(53)
   await expect(diagram.getByTestId('rf__node-requirement').getByText('ears_type')).toBeVisible()
 
   // With Contains off, Blueprint and Group (no relation type reaches them)
@@ -157,7 +157,7 @@ test('the diagram stays drawn on a slow machine', async ({ page, studio }) => {
   await editor.getByRole('tab', { name: 'Diagram' }).click()
   const diagram = editor.locator('.mmd-canvas')
   await expect(diagram.locator('.mmd-status')).toHaveCount(0, { timeout: 60_000 })
-  await expect(diagram.locator('.react-flow__edge')).toHaveCount(145)
+  await expect(diagram.locator('.react-flow__edge')).toHaveCount(151)
   await expect(diagram.getByTestId('rf__node-requirement')).toBeVisible()
 })
 

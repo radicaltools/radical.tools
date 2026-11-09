@@ -3471,6 +3471,21 @@
     ] },
     { "element": "92395d99-9585-4956-b222-a8fbba371ccf", "name": "Stored routines listed by package", "tests": [
       "apps/mcp/src/assay.test.ts › Radical Assay over MCP › lists a package's members in its row, each short, when assay_facts lists the stored routines, and names them for an entity no unit's code uses"
+    ] },
+    { "element": "d6e2d195-7e07-4a76-b1b4-e9bd46f1d8d1", "name": "A database that runs code", "tests": [
+      "packages/common/tests/databaseCode.test.ts › A database that runs code › lets a component sit in a database, a database call what a container calls and a person use one, in both built-in metamodels, and refuses a database delivering to a person",
+      "packages/common/tests/databaseCode.test.ts › A database that runs code › lets a database realise an entity, implement a state machine and perform a step on the Radical metamodel, and the Components viewpoint draw it with its components",
+      "packages/ui/tests/webappPhysics.test.ts › Live layout physics with a web app parent › lays out a database holding components as a group around them"
+    ] },
+    { "element": "4fb96163-0172-489c-b4f7-1eaec8c58f6e", "name": "A stored package in its database", "tests": [
+      "packages/assay/tests/plan.test.ts › radical assay: the plan › takes a stored package as a component of its database, observed on its routine fact, and a call of one of its members as a relation to it",
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › makes the component holding a stored package realise the entity whose table only its routines use"
+    ] },
+    { "element": "f924ee45-d017-4bdf-8063-32eaf8584516", "name": "Database code rule tests", "tests": [
+      "packages/common/tests/databaseCode.test.ts",
+      "packages/ui/tests/webappPhysics.test.ts",
+      "packages/assay/tests/plan.test.ts › radical assay: the plan › takes a stored package as a component of its database, observed on its routine fact, and a call of one of its members as a relation to it",
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › makes the component holding a stored package realise the entity whose table only its routines use"
     ] }
   ]
 }

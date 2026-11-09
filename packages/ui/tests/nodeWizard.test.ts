@@ -211,7 +211,7 @@ describe('addNodes', () => {
   it('stops at the node the metamodel refuses and keeps the ones before it', () => {
     const ids = store().addNodes([
       { node: draft('requirement', 'Kept') },
-      { node: { ...draft('component', 'Refused'), parentId: 'db' } },
+      { node: { ...draft('container', 'Refused'), parentId: 'db' } },
       { node: draft('requirement', 'Never reached') },
     ])
     expect(ids).toHaveLength(1)

@@ -51,7 +51,7 @@ describe('radical assay: code cited by the agent', () => {
       'elements[1] (B): cites repository nowhere, which is not one of the run\'s',
       'elements[2] (C): observed, so it rests on facts; a citation backs only an inferred claim: drop its citations, or mark it inferred',
       'elements[2] (C): facts must list the ids of the facts it rests on',
-      'elements[2] (C): observed, but cites no unit, API, service or database fact that states it',
+      'elements[2] (C): observed, but cites no unit, API, service, database or stored routine fact that states it',
       'elements[3] (D): names billing-vb6/bin, which the repository does not have',
       'elements[4] (E): facts must list the ids of the facts it rests on, or citations the code or documents it quotes',
     ])

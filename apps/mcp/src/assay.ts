@@ -118,12 +118,15 @@ export const ASSAY_PROCEDURE = [
   '   database their scripts build, a database element, not a container: those of one repository installed into one',
   '   database (a library and its extras, the sample schemas of one instance) are one element built from all of them, its',
   '   description naming each; demos and examples of a library stay out unless the user wants them, as tests do. Stored',
-  '   routines (assay_facts with kind "routines") are no elements: a database element names in its description the',
-  '   routines it holds (packages with their members, procedures, functions, triggers with their tables), citing their',
-  '   facts; a routine in no unit\'s folder is the database\'s its callers connect to. The routine links of one caller',
-  '   to one database are one relation, labelled with what it calls ("calls tic_open, tic_close and 2 more"), observed,',
+  '   routines (assay_facts with kind "routines"): a package is a component inside the database element that holds it',
+  '   (technology: its dialect, PL/SQL package; observed, citing its routine fact), its members named in its description;',
+  '   procedures, functions and triggers outside a package are no elements: the database element names them in its',
+  '   description (triggers with their tables), citing their facts; a routine in no unit\'s folder is the database\'s its',
+  '   callers connect to. The routine links of one caller to one package\'s component, or to one database for routines',
+  '   outside a package, are one relation, labelled with what it calls ("calls tic_open, tic_close and 2 more"), observed,',
   '   citing the links (a call in a string the page only shows is no call: leave it out); a routine known only from the',
-  '   calls (called) is held by the database the caller connects to. The',
+  '   calls (called) is held by the database the caller connects to. A database\'s own code calls out too: its address',
+  '   links (a package\'s URL) are relations from the package\'s component, or the database, to the service. The',
   '   System context view shows systems and people only: relate each person to the system they use, and a system to',
   '   another where a link crosses them, inferred, citing those links (or, with no link, the address facts and the code',
   '   that show the call). What the documents name but no code shows (a',
@@ -180,7 +183,8 @@ export const ASSAY_PROCEDURE = [
   '   code shows (a join, a lookup by a column) goes in relations instead: relationType references, inferred, citing the',
   '   code. The server writes',
   '   the entities observed and relates each element of the run built from a unit whose code names the table to it',
-  '   (realises). Make a view of them (create_view with viewpoint "Domain model").',
+  '   (realises), or, where none does, the element holding the stored routines that use it (a package\'s component, else',
+  '   the database). Make a view of them (create_view with viewpoint "Domain model").',
   '6. Processes stage. Read the entry points (assay_facts with kind "entries": routes, VB6 forms, menu items and buttons',
   '   with their Click handlers, scheduled jobs, message handlers), the explored paths and the code behind them (assay_read',
   '   at the handler\'s line), and write what a user or the system does from start to end: one process per task a person',
@@ -1177,7 +1181,7 @@ export class Assay {
         ...(plan.processes.length ? [`${plural(written.filter((w) => w.kind === 'process').length, 'process').replace(/processs$/, 'processes')} of ${plural(written.filter((w) => w.kind === 'step').length, 'step')}`] : []),
         ...(plan.stateMachines.length ? [`${plural(written.filter((w) => w.kind === 'state-machine').length, 'state machine')} of ${plural(written.filter((w) => w.kind === 'state' && !w.key.endsWith(':initial')).length, 'state')}`] : []),
       ].join(', ')} and ${plural(written.filter((w) => w.kind === 'relation').length, 'relation')} into the central model${plan.processes.length || plan.stateMachines.length ? ' (processes and state machines inferred, as read from the code: no proposal)' : ''}.`,
-      ...(this.unrealised.length ? [`No element realises ${this.unrealised.map((x) => `"${x}`).join(', ')}: no unit's code names their tables (a schema file is no use of them), though a stored routine may use them. Relate the element that holds or uses their data yourself (a container calling those routines), inferred, citing the code or the routine facts, if one does.`] : []),
+      ...(this.unrealised.length ? [`No element realises ${this.unrealised.map((x) => `"${x}`).join(', ')}: no unit's code names their tables (a schema file is no use of them), though a stored routine may use them, and no element of the run holds those. Relate the element that holds or uses their data yourself (the database holding those routines, a container calling them), inferred, citing the code or the routine facts, if one does.`] : []),
       ...(written.some((w) => w.basis) ? [`Transitions: ${written.filter((w) => w.basis === 'sets').length} rest on a line of the code that sets their target, ${written.filter((w) => w.basis === 'quoted').length} on a quotation the server could not match to such a line in the state facts${plan.stateMachines.every((m) => !(m.facts ?? []).length) ? ' (the machines cite no state fact: that is expected)' : ''} (marked "quoted" in ${RUN_FILE}: read them again if the quotation does not show the target set).`] : []),
       ...(proposals.length ? ['', `${proposals.length} proposal${proposals.length === 1 ? '' : 's'} for the user, written only when accepted (assay_answer):`, ...proposals.map((p) => this.describe(p, label, run, proposals))] : []),
     ]
@@ -1211,9 +1215,9 @@ export class Assay {
       written.push({ id: Object.keys(facade.getRelations()).find((rid) => !before.has(rid)) ?? '', key: `${from}->${to}`, kind: 'relation', label: extra.label ?? relationType, confidence: extra.confidence ?? 'inferred', facts: extra.facts ?? [], ...(extra.citations?.length ? { citations: extra.citations } : {}), ...(extra.basis ? { basis: extra.basis } : {}) })
     }
     const table = (id: string): TableFact | undefined => (run.facts.get(id)?.kind === 'table' ? run.facts.get(id)!.fact as TableFact : undefined)
-    /** The containers, components and web applications of the run built from `unit`. */
+    /** The containers, components, web applications and databases of the run built from `unit` (or citing the fact). */
     const builtFrom = (unit: string): string[] => [...new Set([...run.written, ...written]
-      .filter((w) => w.kind === 'element' && w.facts.includes(unit) && ['container', 'component', 'webapp'].includes(facade.getNodes()[w.id]?.type ?? ''))
+      .filter((w) => w.kind === 'element' && w.facts.includes(unit) && ['container', 'component', 'webapp', 'database'].includes(facade.getNodes()[w.id]?.type ?? ''))
       .map((w) => w.id))]
 
     for (const e of plan.entities) {
@@ -1237,10 +1241,24 @@ export class Assay {
       // A schema file alone names it nowhere a unit uses it.
       const named = [...run.facts.values()].filter((f) => f.kind === 'table' && (f.fact as TableFact).inCode && names.has(tableName((f.fact as TableFact).table))).map((f) => f.fact as TableFact)
       if (!named.some((t) => builtFrom(t.unit).length)) {
-        // The stored routines that write or read its tables say where its data is used.
+        // The stored routines that write or read its tables say where its data is used: the elements holding them (a
+        // package's component), else the database built from their unit, realise it.
         const routines = [...run.facts.values()].filter((f) => f.kind === 'routine').map((f) => f.fact as RoutineFact)
-          .filter((r) => [...(r.writes ?? []), ...(r.reads ?? [])].some((t) => names.has(tableName(t)))).map((r) => r.name)
-        this.unrealised.push(routines.length ? `${e.label}" (its tables used by the stored routines ${[...new Set(routines)].slice(0, 6).join(', ')}${routines.length > 6 ? ', …' : ''})` : `${e.label}"`)
+          .filter((r) => [...(r.writes ?? []), ...(r.reads ?? [])].some((t) => names.has(tableName(t))))
+        const holders = new Map<string, string[]>()
+        for (const r of routines) {
+          // A package's member is held by the element citing the package.
+          const pkg = r.name.includes('.') ? `${r.id.slice(0, r.id.length - r.name.length)}${r.name.split('.')[0]}` : undefined
+          const held = [...builtFrom(r.id), ...(pkg ? builtFrom(pkg) : [])]
+          for (const element of held.length ? held : r.unit ? builtFrom(r.unit) : []) holders.set(element, [...(holders.get(element) ?? []), r.id])
+        }
+        for (const [element, ids] of holders) {
+          if (realised.has(`${element}->${e.key}`)) continue
+          realised.add(`${element}->${e.key}`)
+          await relate(element, e.key, 'realises', `${facade.getNodes()[element]?.label} realises "${e.label}"`, { confidence: 'observed', facts: ids })
+        }
+        const used = [...new Set(routines.map((r) => r.name))]
+        if (!holders.size) this.unrealised.push(used.length ? `${e.label}" (its tables used by the stored routines ${used.slice(0, 6).join(', ')}${used.length > 6 ? ', …' : ''})` : `${e.label}"`)
       }
       for (const unit of new Set(named.map((t) => t.unit))) {
         for (const element of builtFrom(unit)) {

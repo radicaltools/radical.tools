@@ -94,6 +94,49 @@ describe('Radical Assay over MCP', () => {
     expect(applied.text).toContain('No element realises "Page" (its tables used by the stored routines pdf.add_page)')
   })
 
+  it('makes the component holding a stored package realise the entity whose table only its routines use', async () => {
+    const { call, nodes } = await central(() => {
+      const dir = join(realpathSync(mkdtempSync(join(tmpdir(), 'assay-package-'))), 'code')
+      const files: Record<string, string> = {
+        'lib/ora/pdf.pks': 'CREATE OR REPLACE PACKAGE pdf AS\n  PROCEDURE add_page;\nEND pdf;\n/\n',
+        'lib/ora/pdf.pkb': 'CREATE OR REPLACE PACKAGE BODY pdf AS\n  PROCEDURE add_page IS\n  BEGIN\n    INSERT INTO pages (id) VALUES (1);\n  END add_page;\nEND pdf;\n/\n',
+        'lib/ora/tables.sql': 'CREATE TABLE pages (id NUMBER(6));\n',
+        'app/pom.xml': '<project><groupId>a</groupId><artifactId>app</artifactId></project>\n',
+        'app/src/main/java/a/Pages.java': 'package a;\nclass Pages {\n  void add() { conn.prepareCall("{call pdf.add_page}"); }\n}\n',
+      }
+      for (const [path, text] of Object.entries(files)) {
+        mkdirSync(dirname(join(dir, path)), { recursive: true })
+        writeFileSync(join(dir, path), text)
+      }
+      for (const r of ['lib', 'app']) execFileSync('git', ['init', '-q'], { cwd: join(dir, r) })
+      return dir
+    })
+    expect((await call('assay_start', { directories: ['../code'] })).ok).toBe(true)
+    const { facts: links } = JSON.parse((await call('assay_facts', { kind: 'links' })).text) as { facts: Array<{ id: string; kind: string }> }
+    const calls = links.find((l) => l.kind === 'routine')!.id
+    const c4 = await call('assay_apply', { plan: {
+      elements: [
+        { key: 'docs', type: 'system', label: 'Documents', facts: ['lib:unit:ora', 'app:unit:.'], confidence: 'inferred' },
+        { key: 'db', type: 'database', label: 'PDF library', parent: 'docs', units: ['lib:unit:ora'], facts: ['lib:unit:ora'], confidence: 'observed' },
+        { key: 'pdf', type: 'component', label: 'pdf', parent: 'db', technology: 'PL/SQL package', facts: ['lib:routine:ora:pdf'], confidence: 'observed' },
+        { key: 'app', type: 'container', label: 'App', parent: 'docs', units: ['app:unit:.'], facts: ['app:unit:.'], confidence: 'observed' },
+      ],
+      relations: [{ from: 'app', to: 'pdf', relationType: 'interacts', label: 'calls add_page', facts: [calls], confidence: 'observed' }],
+    } })
+    expect(c4.ok).toBe(true)
+    const domain = await call('assay_apply', { plan: {
+      elements: [{ key: 'printing', type: 'domain', label: 'Printing', facts: ['lib:table:ora:pages'], confidence: 'inferred' }],
+      entities: [{ key: 'page', label: 'Page', tables: ['lib:table:ora:pages'], parent: 'printing' }],
+    } })
+    expect(domain.ok).toBe(true)
+    expect(domain.text).not.toContain('No element realises')
+    const all = await nodes()
+    const byLabel = (label: string) => all.find((n) => n.label === label)!
+    expect(byLabel('pdf').parentId).toBe(byLabel('PDF library').id)
+    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS' })).text).rows as Array<{ relationType: string; sourceLabel: string; targetLabel: string }>
+    expect(relations.map((r) => [r.relationType, r.sourceLabel, r.targetLabel]).sort()).toEqual([['interacts', 'App', 'pdf'], ['realises', 'pdf', 'Page']])
+  })
+
   it('answers assay_start in brief, gives the procedure apart, and pages the links by size', async () => {
     const { call } = await central(many)
     const started = await call('assay_start', { directories: ['../code'] })
@@ -136,7 +179,7 @@ describe('Radical Assay over MCP', () => {
     const { call, nodes } = await central()
     await call('assay_start', { directories: ['../shop'] })
     const bare = await call('assay_apply', { plan: { elements: [{ key: 'x', type: 'container', label: 'X', facts: [], confidence: 'observed' }] } })
-    expect(bare).toEqual({ ok: false, text: 'assay_apply: the plan is refused, nothing was written:\n- elements[0] (X): facts must list the ids of the facts it rests on\n- elements[0] (X): observed, but cites no unit, API, service or database fact that states it' })
+    expect(bare).toEqual({ ok: false, text: 'assay_apply: the plan is refused, nothing was written:\n- elements[0] (X): facts must list the ids of the facts it rests on\n- elements[0] (X): observed, but cites no unit, API, service, database or stored routine fact that states it' })
     const forbidden = await call('assay_apply', { plan: { ...C4, relations: [{ from: 'shop', to: 'orders', relationType: 'part-of', facts: [`link:http:${WEB}->${ORDERS}`], confidence: 'inferred' }] } })
     expect(forbidden.ok).toBe(false)
     expect(forbidden.text).toMatch(/^assay_apply: the plan is refused, nothing was written:\n- relations shop → orders: /)

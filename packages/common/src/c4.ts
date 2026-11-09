@@ -4,9 +4,10 @@ import { builtInGovernanceMetamodel, type Metamodel, type NodeTypeDef } from './
 
 export type C4ElementType = 'person' | 'system' | 'container' | 'component' | 'database' | 'webapp' | 'queue' | 'domain' | 'group' | 'adr' | 'fitness-fn' | 'need' | 'requirement' | 'scenario' | 'blueprint' | 'mockup' | 'state-machine' | 'state' | 'pseudostate' | 'event' | 'entity' | 'process' | 'step'
 
-/** Types that act as containers (can hold children, collapse, auto-resize). */
+/** Types that act as containers (can hold children, collapse, auto-resize);
+ *  a database holds its code's components. */
 export const CONTAINER_TYPES: ReadonlySet<string> = new Set([
-  'system', 'container', 'webapp', 'domain', 'group', 'blueprint', 'state-machine', 'state', 'process', 'step',
+  'system', 'container', 'webapp', 'database', 'domain', 'group', 'blueprint', 'state-machine', 'state', 'process', 'step',
 ])
 
 /** True when the given node-type id behaves as a parent container. */

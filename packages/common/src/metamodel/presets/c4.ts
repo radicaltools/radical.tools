@@ -87,7 +87,8 @@ export function builtInC4Metamodel(): Metamodel {
   //  • person                    → root only, or inside a group
   //  • system                    → root OR inside another system / group
   //  • container                 → inside a system or group
-  //  • component                 → inside a container or group
+  //  • component                 → inside a container, web app, database or
+  //                                group (a database's code: an Oracle package)
   //  • database / webapp / queue → inside a system or group
   //  • group                     → root OR inside another group (recursive,
   //                                purely organisational — no semantics) OR
@@ -97,7 +98,7 @@ export function builtInC4Metamodel(): Metamodel {
     person:    ['group'],
     system:    ['system', 'group'],
     container: ['system', 'group'],
-    component: ['container', 'webapp', 'group'],
+    component: ['container', 'webapp', 'database', 'group'],
     database:  ['system', 'group'],
     webapp:    ['system', 'group'],
     queue:     ['system', 'group'],
@@ -140,8 +141,9 @@ export function builtInC4Metamodel(): Metamodel {
   // Relation rules.
   //
   // "Interacts" — any meaningful interaction between C4 elements:
-  //   initiator calls/uses/delivers-to a target.
-  //   Forbids database → * (passive store, never initiates).
+  //   initiator calls/uses/delivers-to a target. A database may run code and
+  //   call out (PL/SQL's UTL_HTTP, a database link), but delivers to no person:
+  //   a mail server or a service does.
   const DELIVERS = { forwardLabel: 'Delivers to', inverseLabel: 'Receives from' }
   const interactsPairs: RelationPair[] = [
     // Person interacts with the system surface, and with other people (a
@@ -151,6 +153,8 @@ export function builtInC4Metamodel(): Metamodel {
     { from: 'person', to: 'container' },
     { from: 'person', to: 'webapp' },
     { from: 'person', to: 'component' },
+    // …and works in a database directly (an analyst's SQL client)
+    { from: 'person', to: 'database' },
 
     // System-level dependencies; to a person a relation delivers (Structurizr's
     // delivers(): "Sends e-mails to")
@@ -181,6 +185,14 @@ export function builtInC4Metamodel(): Metamodel {
     { from: 'webapp', to: 'webapp' },
     { from: 'webapp', to: 'queue' },
     { from: 'webapp', to: 'component' },
+
+    // A database's code calls out
+    { from: 'database', to: 'system' },
+    { from: 'database', to: 'container' },
+    { from: 'database', to: 'database' },
+    { from: 'database', to: 'webapp' },
+    { from: 'database', to: 'queue' },
+    { from: 'database', to: 'component' },
 
     // Queues fan out to consumers
     { from: 'queue', to: 'container' },
