@@ -367,6 +367,29 @@ feat/assay-syntax (2026-11-09, which does not touch Studio) and once in 4
 runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main.
 
+### Dogfooding (2026-11-09): seven more held out on routines, and an agent on two databases
+
+Seven repositories were held out on stored routines (HRUtils-SB, springboot-oracle-stored-proc,
+aspnetcore-api-sqlproc, EFRawSQLSample, WebAPIStoredProcedureCall, OraOpenSource Logger, utPLSQL),
+written down before Assay read them: untouched units 7/9, calls 14/24, tables 21/29, routines 383/418
+with 720 extra; now all found, none extra, and tuned on. An agent modelled Schemaverse and Alexandria
+over MCP (run 26, `/Volumes/data/Dev/assay-runs/26-databases`, 13 minutes, $7.8); most of its findings
+are fixed. Open:
+
+- **The metamodel mutes a database**: a database cannot call (interacts from a database), be used by a
+  person (Schemaverse is played in psql), realise an entity, implement a state machine or perform a
+  step. The logic of both systems sits in an element the model can't relate. A decision for the
+  metamodel, with routines as elements of their own.
+- **pgTAP tests**: 12 files of pgTAP assertions gave no test facts; scenarios on database behaviour
+  had nothing to rest on.
+- **pg_cron jobs, views and rules as an API, RLS policies, materialized views, dynamic SQL** (a
+  function created as `FLEET_SCRIPT_<id>`) are not read.
+- **SQL a page shows in its script** (starter snippets a player runs as themselves) still reads as
+  the page's calls.
+- **A personal sample config** (`sqitch-sample.conf`) gives an address; **a socket** (`PGHOST:
+  /var/run/postgresql`) gives the data link no `via`.
+- **COBOL's and Pro*C's `EXEC SQL CALL`**: no public repository found to measure on.
+
 ### Dogfooding (2026-11-09): stored routines, Oracle, and six database repositories held out
 
 Assay reads the routines SQL scripts create (PL/SQL packages and members,
