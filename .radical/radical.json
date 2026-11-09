@@ -3402,6 +3402,9 @@
     ] },
     { "element": "c1ff38d8-74dd-4fb6-8c2c-471023f6c07a", "name": "Entities where the DbContext reaches", "tests": [
       "packages/assay/tests/syntax.test.ts › radical assay: code read through syntax trees › reads an Entity Framework class as an entity only of a unit its DbContext's project reaches"
+    ] },
+    { "element": "73fe0c42-71cf-4fdd-a2cb-294cc4082ebb", "name": "A Django foreign key broken over lines", "tests": [
+      "packages/assay/tests/domain.test.ts › radical assay: tables and their structure › reads a Django foreign key's target from the line after its parenthesis"
     ] }
   ]
 }
