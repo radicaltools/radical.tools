@@ -91,4 +91,29 @@ describe('radical assay: code read through syntax trees', () => {
       ['GET /api/workshopplanning/refresh', 'src/Workshop/Controllers/WorkshopPlanningController.cs:19'],
     ])
   })
+
+  it('routes an MVC controller with no route template by convention', () => {
+    const facts = extractRepository(repo('webapp', {
+      'src/WebApp/WebApp.csproj': '<Project Sdk="Microsoft.NET.Sdk.Web"></Project>',
+      'src/WebApp/Controllers/CustomerManagementController.cs': [
+        'public class CustomerManagementController : Controller',
+        '{',
+        '    public CustomerManagementController(ICustomerApi api) { }',
+        '',
+        '    [HttpGet]',
+        '    public async Task<IActionResult> Index() => View();',
+        '',
+        '    public IActionResult Details(string id) => View();',
+        '',
+        '    [HttpPost]',
+        '    public async Task<IActionResult> RegisterAsync([FromForm] NewCustomer model) => View();',
+        '',
+        '    private IActionResult Helper() => View();',
+        '    public ValidationOutcome Validate(NewCustomer model) => null;',
+        '}',
+        '',
+      ].join('\n'),
+    }))
+    expect(routes(facts).map(([name]) => name)).toEqual(['GET /customermanagement', 'ALL /customermanagement/details', 'POST /customermanagement/register'])
+  })
 })
