@@ -92,6 +92,14 @@ try {
     const saved = await call(client, 'search_model', { query: 'LIST NODES WHERE type = "system"' })
     assert(saved.includes('Package shop') && saved.includes('Package bank'), 'Model writes must survive a server restart')
     await readFile(join(folder, 'radical.md'))
+    // Assay parses code with the tree-sitter grammars shipped beside the bundle: a controller's route under its class's.
+    const code = join(temporary, 'code')
+    await mkdir(join(code, 'src'), { recursive: true })
+    await writeFile(join(code, 'pom.xml'), '<project><artifactId>shop</artifactId></project>')
+    await writeFile(join(code, 'src', 'OrderController.java'), '@RestController\n@RequestMapping("/orders")\nclass OrderController {\n  @GetMapping("/{id}")\n  Order get(String id) { return null; }\n}\n')
+    await call(client, 'assay_start', { directories: [code] })
+    const entries = await call(client, 'assay_facts', { kind: 'entries' })
+    assert(entries.includes('GET /orders/{id}'), `Installed server must parse code with its grammars: ${entries.slice(0, 400)}`)
   } finally { await client.close() }
 
   if (output) {
@@ -99,7 +107,7 @@ try {
     await copyFile(tarball, join(output, packed.filename))
   }
   console.log(`Package verified: ${manifest.name}@${manifest.version} (${packed.files.length} files, ${packed.size} bytes).`)
-  console.log('Clean install, executable, MCP handshake, disk writes, restart, Smart Layout and Hub catalogue passed.')
+  console.log('Clean install, executable, MCP handshake, disk writes, restart, Smart Layout, Hub catalogue and Assay\'s syntax trees passed.')
 } finally {
   await rm(temporary, { recursive: true, force: true })
 }

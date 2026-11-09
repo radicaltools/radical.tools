@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { FACTS_FILE, FOLDER_FACTS_DIR, UNPACKED_DIR, describeFacts, extractRepository, factsFileOf, ignored, isRepository, linkRepositories, repositoriesIn, serializeFacts, type RepositoryFacts } from '@radical/assay'
+import { FACTS_FILE, FOLDER_FACTS_DIR, UNPACKED_DIR, describeFacts, extractRepository, factsFileOf, ignored, isRepository, linkRepositories, prepareSyntax, repositoriesIn, serializeFacts, type RepositoryFacts } from '@radical/assay'
 import type { Io } from './check'
 
 export const ASSAY_USAGE = `Usage: radical assay extract <directory or .zip>… [--report <repository>=<path>]… [--json]
@@ -68,6 +68,8 @@ export async function assayCommand(args: string[], io: Io): Promise<number> {
   const unknown = [...reports.keys()].filter((name) => !found.dirs.some((d) => d.endsWith(`/${name}`) || d.endsWith(`\\${name}`)))
   if (unknown.length) { io.err(`--report names no repository of the run: ${unknown.join(', ')}`); return 2 }
 
+  // The grammars the readers parse code with, loaded once.
+  await prepareSyntax()
   const repositories: RepositoryFacts[] = []
   for (const dir of found.dirs) {
     const facts = extractRepository(dir, reports.size ? { reports: reports.get(dir.split(/[\\/]/).pop()!) } : {})

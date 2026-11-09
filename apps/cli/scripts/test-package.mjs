@@ -69,12 +69,20 @@ try {
   assert.match(exported, /<!doctype html>/)
   assert.match(exported, /Radical is the source of truth/)
   assert.match(exported, /No elements in this wiki view/)
+  // Assay parses code with the tree-sitter grammars shipped beside the bundle: a controller's route under its class's.
+  const code = join(project, 'code')
+  await mkdir(join(code, 'src'), { recursive: true })
+  await writeFile(join(code, 'pom.xml'), '<project><artifactId>shop</artifactId></project>')
+  await writeFile(join(code, 'src', 'OrderController.java'), '@RestController\n@RequestMapping("/orders")\nclass OrderController {\n  @GetMapping("/{id}")\n  Order get(String id) { return null; }\n}\n')
+  radical('assay', 'extract', 'code')
+  const facts = JSON.parse(await readFile(join(project, '.radical', 'assay', 'facts', 'code.json'), 'utf8'))
+  assert.deepEqual(facts.entries.filter((e) => e.kind === 'route').map((e) => e.name), ['GET /orders/{id}'])
   if (output) {
     await mkdir(output, { recursive: true })
     await copyFile(tarball, join(output, packed.filename))
   }
   console.log(`Package verified: ${manifest.name}@${manifest.version} (${packed.files.length} files, ${packed.size} bytes).`)
-  console.log('Offline production install, executable, version, help and model check passed.')
+  console.log('Offline production install, executable, version, help, model check and Assay\'s syntax trees passed.')
 } finally {
   // Delete only the directory this check created under the OS temp directory.
   assert(dirname(temporary) === resolve(tmpdir()) && temporary.startsWith(join(tmpdir(), 'radical-cli-package-')))

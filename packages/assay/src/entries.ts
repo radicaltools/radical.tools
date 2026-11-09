@@ -11,6 +11,8 @@ import { extname } from 'node:path'
 import type { EntryFact, Unit } from './facts'
 import { GENERATED, RepoFiles, TEST_FILE, lineAt, owner } from './files'
 import { withoutVbComments } from './code'
+import { springSetting } from './spring'
+import { childrenOf, literal, parse, type Node } from './syntax'
 
 const SOURCE = /\.(ts|tsx|js|jsx|mjs|cjs|mts|cts|java|kt|cs|py|go|frm|bas|cls)$/i
 /** A server framework a JavaScript file uses: only there is app.get('/x', …) a route, not a call. */
@@ -22,6 +24,9 @@ const joinPath = (base: string, path: string): string => {
   const joined = `/${[base, path].map((p) => p.replace(/^\/+|\/+$/g, '')).filter(Boolean).join('/')}`
   return joined.replace(/\/+/g, '/')
 }
+
+/** Where a row (0-based) of a text starts. */
+const rowIndex = (text: string, row: number): number => { let at = 0; for (let i = 0; i < row && at >= 0; i++) at = text.indexOf('\n', at) + 1; return Math.max(at, 0) }
 
 /** A VB6 caption as the user sees it: & marks the access key, && is an ampersand. */
 const caption = (text: string): string => text.replace(/""/g, '"').replace(/&&/g, '\u0000').replace(/&/g, '').replace(/\u0000/g, '&').trim()
@@ -54,6 +59,12 @@ export function readEntries(files: RepoFiles, repo: string, units: Unit[]): Entr
       }
     }
     return cases
+  }
+  // A Spring application's servlet context path, which its routes are under.
+  const contexts = new Map<string, string>()
+  const contextPath = (unit: Unit): string => {
+    if (!contexts.has(unit.id)) contexts.set(unit.id, springSetting(files, units, unit, /^server\.(servlet\.)?context-path$/) ?? '')
+    return contexts.get(unit.id)!
   }
   for (const file of files.list) {
     if (!SOURCE.test(file) || TEST_FILE.test(file) || GENERATED.test(file)) continue
@@ -89,10 +100,12 @@ export function readEntries(files: RepoFiles, repo: string, units: Unit[]): Entr
       for (const m of raw.matchAll(/\.consume\(\s*['"]([^'"]+)['"]|\.subscribe\(\s*\{\s*topics?\s*:\s*\[?\s*['"]([^'"]+)['"]/g)) add(unit, 'handler', 'consume', { detail: m[1] ?? m[2], evidence: at(m.index!) })
     }
 
+    // Java's routes from its syntax tree (ADR Assay reads code through syntax trees); Kotlin's, with no grammar yet, by text.
+    if (ext === '.java') for (const r of springRoutes(raw)) route(r.method, joinPath(contextPath(unit), r.path), rowIndex(raw, r.row))
     if (ext === '.java' || ext === '.kt') {
       const base = /@RequestMapping\(\s*(?:(?:value|path)\s*=\s*)?\{?\s*"([^"]*)"[^)]*\)\s*(?:@\w+(?:\([^)]*\))?\s*)*(?:public\s+|open\s+|internal\s+)?(?:final\s+)?class\b/.exec(raw)?.[1] ?? ''
-      for (const m of raw.matchAll(/@(Get|Post|Put|Patch|Delete)Mapping\b(?:\(\s*(?:(?:value|path)\s*=\s*)?\{?\s*(?:"([^"]*)")?[^)]*\))?/g)) route(m[1], joinPath(base, m[2] ?? ''), m.index!)
-      for (const m of raw.matchAll(/@RequestMapping\(([^)]*method\s*=\s*\{?\s*RequestMethod\.(\w+)[^)]*)\)/g)) {
+      for (const m of ext === '.java' ? [] : raw.matchAll(/@(Get|Post|Put|Patch|Delete)Mapping\b(?:\(\s*(?:(?:value|path)\s*=\s*)?\{?\s*(?:"([^"]*)")?[^)]*\))?/g)) route(m[1], joinPath(base, m[2] ?? ''), m.index!)
+      for (const m of ext === '.java' ? [] : raw.matchAll(/@RequestMapping\(([^)]*method\s*=\s*\{?\s*RequestMethod\.(\w+)[^)]*)\)/g)) {
         route(m[2], joinPath(base, /(?:value|path)\s*=\s*\{?\s*"([^"]*)"/.exec(m[1])?.[1] ?? /^\s*"([^"]*)"/.exec(m[1])?.[1] ?? ''), m.index!)
       }
       for (const m of raw.matchAll(/@Scheduled\(([^)]*)\)/g)) add(unit, 'job', methodAfter(raw, m.index!) ?? 'scheduled', { detail: m[1].trim(), evidence: at(m.index!) })
@@ -103,15 +116,7 @@ export function readEntries(files: RepoFiles, repo: string, units: Unit[]): Entr
     }
 
     if (ext === '.cs') {
-      for (const cls of raw.matchAll(/((?:\[[^\]]*\]\s*)*)(?:public\s+)?(?:sealed\s+|partial\s+|abstract\s+)*class\s+(\w+)/g)) {
-        const name = cls[2]
-        const template = /\[Route\(\s*"([^"]*)"\s*\)\]/.exec(cls[1])?.[1]
-        if (!template && !/Controller(Base)?\b/.test(raw.slice(cls.index!, cls.index! + cls[0].length + 80))) continue
-        const base = (template ?? '').replace(/\[controller\]/gi, name.replace(/Controller$/, '').toLowerCase())
-        const end = raw.indexOf('\nclass ', cls.index! + 1)
-        const body = raw.slice(cls.index!, end < 0 ? undefined : end)
-        for (const m of body.matchAll(/\[Http(Get|Post|Put|Patch|Delete)(?:\(\s*"([^"]*)"\s*\))?\]/g)) route(m[1], joinPath(base, m[2] ?? ''), cls.index! + m.index!)
-      }
+      for (const r of aspNetRoutes(raw)) route(r.method, r.path, rowIndex(raw, r.row))
       for (const m of raw.matchAll(/\.Map(Get|Post|Put|Patch|Delete)\(\s*"([^"]*)"/g)) route(m[1], m[2], m.index!)
       for (const m of raw.matchAll(/\bRecurringJob\.AddOrUpdate(?:<\w+>)?\(\s*"([^"]+)"|\[TimerTrigger\(\s*"([^"]+)"/g)) add(unit, 'job', methodAfter(raw, m.index!) ?? 'recurring', { detail: m[1] ?? m[2], evidence: at(m.index!) })
       for (const m of raw.matchAll(/\bIConsumer<(\w+)>|\[ServiceBusTrigger\(\s*"([^"]+)"/g)) add(unit, 'handler', m[1] ? `consume ${m[1]}` : methodAfter(raw, m.index!) ?? 'handler', { ...(m[2] ? { detail: m[2] } : {}), evidence: at(m.index!) })
@@ -132,6 +137,114 @@ export function readEntries(files: RepoFiles, repo: string, units: Unit[]): Entr
         route(method, path, m.index!)
       }
       for (const m of raw.matchAll(/\.(GET|POST|PUT|PATCH|DELETE|Get|Post|Put|Patch|Delete)\(\s*"(\/[^"]*)"/g)) route(m[1], m[2], m.index!)
+    }
+  }
+  return out
+}
+
+/** A route a tree gives, on the row (0-based) of the annotation or attribute that declares it. */
+interface Route { method: string; path: string; row: number }
+
+/** An annotation's or attribute's string arguments: those named (value = "/x", path = {"/a", "/b"}) or positional. */
+function stringsOf(args: Node | null, names: string[]): string[] {
+  if (!args) return []
+  const out: string[] = []
+  for (const arg of args.namedChildren) {
+    if (!arg) continue
+    const named = arg.type === 'element_value_pair' ? arg.childForFieldName('key')?.text
+      : arg.type === 'attribute_argument' && arg.namedChildren.length > 1 ? arg.namedChildren[0]?.text : undefined
+    if (named !== undefined && !names.includes(named)) continue
+    const value = arg.type === 'element_value_pair' ? arg.childForFieldName('value') : arg.type === 'attribute_argument' ? arg.namedChildren[arg.namedChildren.length - 1] : arg
+    const strings = value?.type === 'string_literal' || value?.type === 'verbatim_string_literal' ? [value] : value?.type === 'element_value_array_initializer' ? childrenOf(value, 'string_literal') : []
+    out.push(...strings.map(literal))
+  }
+  return out
+}
+
+/** The annotations of a Java declaration, by name. */
+function annotations(decl: Node): Array<{ name: string; args: Node | null; node: Node }> {
+  const modifiers = childrenOf(decl, 'modifiers')[0]
+  return (modifiers?.namedChildren ?? []).filter((a): a is Node => !!a && /annotation$/.test(a.type))
+    .map((a) => ({ name: a.childForFieldName('name')?.text.split('.').pop() ?? '', args: a.childForFieldName('arguments'), node: a }))
+}
+
+/** A Spring controller's routes: each method's mapping under its class's @RequestMapping; none of a Feign client's
+ *  interface (its methods call another service) and none in a comment. */
+function springRoutes(text: string): Route[] {
+  const out: Route[] = []
+  const walk = (node: Node, base: string[], client: boolean): void => {
+    for (const child of node.namedChildren) {
+      if (!child) continue
+      if (child.type === 'class_declaration' || child.type === 'interface_declaration' || child.type === 'record_declaration') {
+        const own = annotations(child)
+        const mapping = own.find((a) => a.name === 'RequestMapping')
+        const paths = mapping ? stringsOf(mapping.args, ['value', 'path']) : []
+        walk(childrenOf(child, child.type === 'interface_declaration' ? 'interface_body' : 'class_body')[0] ?? child, paths.length ? paths : [''], client || own.some((a) => /^(FeignClient|HttpExchange)$/.test(a.name)))
+        continue
+      }
+      if (child.type !== 'method_declaration' || client) continue
+      for (const a of annotations(child)) {
+        const verb = /^(Get|Post|Put|Patch|Delete)Mapping$/.exec(a.name)?.[1]
+        const methods = verb ? [verb] : a.name === 'RequestMapping' ? [...(a.args?.text ?? '').matchAll(/RequestMethod\.(\w+)/g)].map((m) => m[1]) : []
+        if (!verb && a.name !== 'RequestMapping') continue
+        const paths = stringsOf(a.args, ['value', 'path'])
+        for (const b of base) for (const p of paths.length ? paths : ['']) for (const m of methods.length ? methods : ['ALL']) out.push({ method: m, path: joinPath(b, p), row: a.node.startPosition.row })
+      }
+    }
+  }
+  walk(parse('java', text).rootNode, [''], false)
+  return out
+}
+
+/** The attributes of a C# declaration, by name (Route, HttpGet, ApiController), with their argument lists. */
+function attributes(decl: Node): Array<{ name: string; args: Node | null; node: Node }> {
+  return childrenOf(decl, 'attribute_list').flatMap((l) => childrenOf(l, 'attribute'))
+    .map((a) => ({ name: (a.childForFieldName('name')?.text ?? '').split('.').pop()!.replace(/Attribute$/, ''), args: childrenOf(a, 'attribute_argument_list')[0] ?? null, node: a }))
+}
+
+/** What an MVC action returns. */
+const MVC_RESULT = /\b(I?ActionResult|ViewResult|PartialViewResult|JsonResult|ContentResult|FileResult|RedirectResult|RedirectToActionResult|StatusCodeResult)\b/
+
+/** An ASP.NET Core controller's routes: each action's template ([HttpGet("{id}")], [Route("x")]) under its class's
+ *  [Route], with [controller] and [action] filled in; a template starting with / or ~/ stands alone. A controller with
+ *  no [Route] and no [ApiController] is routed by convention: each public action at /{controller}/{action}, Index at
+ *  /{controller}. */
+function aspNetRoutes(text: string): Route[] {
+  const out: Route[] = []
+  for (const cls of parse('csharp', text).rootNode.descendantsOfType('class_declaration')) {
+    if (!cls) continue
+    const name = cls.childForFieldName('name')?.text ?? ''
+    const own = attributes(cls)
+    const bases = own.filter((a) => /^(Route|RoutePrefix)$/.test(a.name)).flatMap((a) => stringsOf(a.args, ['template', 'Template']).slice(0, 1))
+    const api = own.some((a) => a.name === 'ApiController')
+    const derived = /\bController(Base)?\b/.test(cls.childForFieldName('bases')?.text ?? childrenOf(cls, 'base_list')[0]?.text ?? '')
+    const controller = /Controller$/.test(name) || api || bases.length > 0 || derived
+    if (!controller) continue
+    const conventional = derived && !api && !bases.length
+    const token = (template: string, action: string): string => template.replace(/\[controller\]/gi, name.replace(/Controller$/, '').toLowerCase()).replace(/\[action\]/gi, action.replace(/Async$/, '').toLowerCase())
+    for (const method of (cls.childForFieldName('body') ?? childrenOf(cls, 'declaration_list')[0])?.namedChildren ?? []) {
+      if (!method || method.type !== 'method_declaration') continue
+      const action = method.childForFieldName('name')?.text ?? ''
+      const attrs = attributes(method)
+      const verbs = attrs.filter((a) => /^Http(Get|Post|Put|Patch|Delete)$/.test(a.name))
+      const routes = attrs.filter((a) => a.name === 'Route').flatMap((a) => stringsOf(a.args, ['template', 'Template']).slice(0, 1))
+      const modifiers = method.namedChildren.filter((c) => c?.type === 'modifier').map((c) => c!.text)
+      const isAction = modifiers.includes('public') && !modifiers.includes('static') && !attrs.some((a) => a.name === 'NonAction')
+        && (verbs.length > 0 || MVC_RESULT.test(method.childForFieldName('returns')?.text ?? ''))
+      if (conventional && isAction && !routes.length && verbs.every((v) => !stringsOf(v.args, ['template', 'Template']).length)) {
+        const path = joinPath(`/${name.replace(/Controller$/, '').toLowerCase()}`, /^Index(Async)?$/.test(action) ? '' : action.replace(/Async$/, '').toLowerCase())
+        for (const v of verbs.length ? verbs : [{ name: 'HttpALL', node: method }]) out.push({ method: v.name.replace(/^Http/, ''), path, row: v.node.startPosition.row })
+        continue
+      }
+      if (!verbs.length && !routes.length) continue
+      for (const v of verbs.length ? verbs : [{ name: 'HttpALL', args: null, node: attrs.find((a) => a.name === 'Route')!.node }]) {
+        const own_ = stringsOf(v.args, ['template', 'Template'])
+        for (const template of own_.length ? own_ : routes.length ? routes : ['']) {
+          const alone = /^~?\//.test(template)
+          const path = alone ? joinPath('', template.replace(/^~/, '')) : joinPath(bases[0] ?? '', template)
+          out.push({ method: v.name.replace(/^Http/, ''), path: token(path, action), row: v.node.startPosition.row })
+        }
+      }
     }
   }
   return out

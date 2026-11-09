@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./fixtures": "./tests/shop.ts"
+    "./fixtures": "./tests/shop.ts",
+    "./grammars": "./src/grammars.json"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -14,6 +15,7 @@
   },
   "dependencies": {
     "@radical/common": "*",
+    "@vscode/tree-sitter-wasm": "^0.3.1",
     "fflate": "^0.8.3",
     "htmlparser2": "^10.1.0",
     "js-yaml": "^4.1.0",
