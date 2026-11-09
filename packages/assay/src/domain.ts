@@ -371,10 +371,12 @@ function python(text: string, file: string, models: Set<string>): Array<Omit<Dec
     const table = tablename ?? /^\s*db_table\s*=\s*['"](\w+)['"]/m.exec(all)?.[1] ?? `${app ? `${app}_` : ''}${c.name.toLowerCase()}`
     const declared: Omit<Declared, 'unit'> = { table, className: c.name, declared: django ? 'Django' : 'SQLAlchemy', columns: [], references: [], evidence: { file, line: c.line } }
     out.push(declared)
-    for (const b of c.body) {
+    for (const [bi, b] of c.body.entries()) {
       if (django) {
         const f = /^\s+(\w+)\s*=\s*(?:models\.)?(\w+)\((.*)$/.exec(b.text)
         if (!f || !/Field$|^(ForeignKey|OneToOneField|ParentalKey)$/.test(f[2]) || (!/^\s+\w+\s*=\s*models\./.test(b.text) && !/^(ForeignKey|OneToOneField|ParentalKey|ManyToManyField|ParentalManyToManyField)$/.test(f[2]))) continue
+        // The arguments, from the next line where the call breaks after its parenthesis.
+        if (!f[3].trim()) f[3] = c.body.slice(bi + 1).find((x) => x.text.trim())?.text ?? ''
         const target = /^\s*['"]?(?:\w+\.)?(\w+)['"]?/.exec(f[3])?.[1] ?? ''
         if (/^(ForeignKey|OneToOneField|ParentalKey)$/.test(f[2])) {
           declared.references.push({ column: `${f[1]}_id`, table: '', className: target === 'self' ? c.name : target, line: b.line })
