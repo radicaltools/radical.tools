@@ -373,7 +373,7 @@ Six repositories were written down before Assay read them, their tests too (file
 sith-demo-db and sbsdb_k2_renovation on utPLSQL, basejump, pgxn-manager and timesheet-backend on pgTAP. Read first
 with the test reader written on Schemaverse and utPLSQL: tests 1 633/1 691, units 11/15, calls 3/20, tables 51/303,
 routines 752/971, missed where a Perl distribution, a Supabase project, a 34 MB DDL export and an installer's cleanup
-were. Now tests 1 690/1 691, units 13/15, calls 17/20, tables 301/303, routines 965/971; the other benches as before.
+were. Now tests 1 690/1 691, units 15/15, calls 18/20, tables 301/303, routines 965/971; the other benches as before.
 Open:
 
 - ~~**A library of SQL beside other units**~~: done (user's choice, 2026-11-10). A top folder of scripts no other
