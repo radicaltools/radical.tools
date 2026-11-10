@@ -3486,6 +3486,13 @@
       "packages/ui/tests/webappPhysics.test.ts",
       "packages/assay/tests/plan.test.ts › radical assay: the plan › takes a stored package as a component of its database, observed on its routine fact, and a call of one of its members as a relation to it",
       "apps/mcp/src/assay.test.ts › Radical Assay over MCP › makes the component holding a stored package realise the entity whose table only its routines use"
+    ] },
+    { "element": "c38c6bb3-b803-4098-b486-b306ced8ab3a", "name": "A game in its database", "tests": [
+      "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › runs a Sqitch change's reworked script where the plan first has it, reads a flag set only by := or an UPDATE's SET, and no query a page only shows"
+    ] },
+    { "element": "f400da87-609d-4e18-b9c1-13850fae959a", "name": "Packages calling packages", "tests": [
+      "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › links a stored package to the packages its members call, and counts the members in their packages' rows",
+      "apps/mcp/src/assay.test.ts › Radical Assay over MCP › makes the component whose stored routines write a table realise its entity beside the container whose code names it, and takes the package's unit for its scenarios"
     ] }
   ]
 }

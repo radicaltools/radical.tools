@@ -35,6 +35,13 @@ const routineKinds = (r: RepositoryFacts): Map<string, number> => {
   return kinds
 }
 
+/** A repository's stored routines as assay_facts lists them, a package's members counted apart: they are in its row. */
+const routineCount = (r: RepositoryFacts): string => {
+  const members = (r.routines ?? []).filter((x) => x.name.includes('.') && x.kind !== 'package').length
+  const rows = (r.routines ?? []).length - members
+  return `${count(rows, 'stored routine')}${members ? ` (with ${count(members, 'package member')} in their packages' rows)` : ''}`
+}
+
 /** At most this many units, services and databases of a repository are named in a brief description. */
 const BRIEF = 25
 
@@ -50,7 +57,7 @@ export function describeFacts(repositories: RepositoryFacts[], links: Link[], fr
       `${r.repository} (${relative(from, r.dir) || '.'}${r.commit ? `, ${r.commit.slice(0, 7)}` : ', no commit'}): ${[
         count(r.units.length, 'unit'), count(r.dependencies.length, 'dependency', 'dependencies'), count(r.apis.length, 'API operation'),
         count(r.urls.length, 'URL path'), count(r.clients.length, 'gRPC client'), count(r.addresses.length, 'address', 'addresses'),
-        count(r.services.length, 'deployed service'), count(r.databases.length, 'database'), count(r.tables.length, 'table'), count((r.routines ?? []).length, 'stored routine'),
+        count(r.services.length, 'deployed service'), count(r.databases.length, 'database'), count(r.tables.length, 'table'), routineCount(r),
         count(r.states.length, 'status', 'statuses'), count(r.screens.length, 'form'), count(r.entries.length, 'entry point'), count(r.groups.length, 'group'), count(r.tests.length, 'test'), count(r.documents.length, 'document'),
       ].filter((c, i) => i === 0 || !c.startsWith('0 ')).join(', ')}.`,
       ...first(r.units, 'units', r.repository).map((u) => (typeof u === 'string' ? u : unitLine(u))),

@@ -13,7 +13,7 @@
 
 import type { RoutineCallFact, RoutineFact, Unit } from './facts'
 import { withoutVbComments } from './code'
-import { GENERATED, RepoFiles, TEST_FILE, lineAt, owner, withoutComments } from './files'
+import { GENERATED, RepoFiles, TEST_FILE, lineAt, owner, shownOnly, withoutComments } from './files'
 
 export type ReadRoutine = Omit<RoutineFact, 'id' | 'unit'>
 
@@ -33,8 +33,24 @@ export function dialectOf(sql: string): string | undefined {
   if (/^\s*GO\s*$|\bnvarchar\b|\[dbo\]|\bIDENTITY\s*\(|\bcreate\s+(?:or\s+alter\s+)?proc\b/im.test(sql)) return 'SQL Server'
   // (MySQL's DELIMITER $$ before PostgreSQL's $$.)
   if (/^\s*DELIMITER\s+\S+|`|\bENGINE\s*=|\bAUTO_INCREMENT\b/im.test(sql)) return 'MySQL'
-  if (/\blanguage\s+'?plpgsql'?|\$\$|\$function\$|\bSERIAL\b|::\w/i.test(sql)) return 'PostgreSQL'
+  if (/\blanguage\s+'?plpgsql'?|\$\w*\$|\bSERIAL\b|::\w/i.test(sql)) return 'PostgreSQL'
   return undefined
+}
+
+/** A component's script, its markup blanked (lines kept); with `expressions`, Svelte's {…} in the markup kept too. */
+function scriptOf(component: string, expressions: boolean): string {
+  return component.replace(/<script\b[^>]*>[\s\S]*?<\/script>|[^<]+|</g, (m) => {
+    if (m.startsWith('<script')) return m
+    if (!expressions) return m.replace(/[^\n]/g, ' ')
+    let depth = 0
+    let out = ''
+    for (const c of m) {
+      if (c === '{') depth++
+      out += depth > 0 || c === '\n' ? c : ' '
+      if (c === '}' && depth > 0) depth--
+    }
+    return out
+  })
 }
 
 /** What a routine's body touches: tables written (INSERT, UPDATE, DELETE, MERGE), tables read (FROM, JOIN), and names
@@ -208,7 +224,7 @@ function fileStrings(text: string, repository: Map<string, string>): Map<string,
 const ROUTINE = String.raw`([\`"[]?[A-Za-z_][\w$#]*[\`"\]]?(?:\s*\.\s*[\`"[]?[A-Za-z_][\w$#]*[\`"\]]?){0,2})`
 
 /** The stored routines a source file's code calls, each with its line and how. */
-export function routineCallsIn(text: string, constants: Map<string, string> = new Map()): Array<{ routine: string; via: string; index: number }> {
+export function routineCallsIn(text: string, constants: Map<string, string> = new Map(), file?: string): Array<{ routine: string; via: string; index: number }> {
   const out: Array<{ routine: string; via: string; index: number }> = []
   const add = (name: string | undefined, via: string, index: number): void => { if (name) out.push({ routine: routineName(name), via, index }) }
   // A name as a string, or as code holding one: a constant, a variable, a getter of a configured field, a concatenation.
@@ -252,6 +268,8 @@ export function routineCallsIn(text: string, constants: Map<string, string> = ne
   // A function a query selects (SELECT f($1), FROM f()), PostgreSQL's way of calling one: a call only where the
   // repository creates a routine of that name (extract.ts), count( and now( being the database's own.
   for (const q of text.matchAll(/(["'`])[ \t]*select\b((?:(?!\1)[^\\\n]|\\.)*)\1/gi)) {
+    // (A page's example query a player runs, or the text it shows, is no call of the page's.)
+    if (file && shownOnly(text, q.index!, file)) continue
     for (const f of q[2].matchAll(/\b([A-Za-z_][\w$#]*(?:\.[A-Za-z_][\w$#]*)?)\s*\(/g)) add(f[1], 'SQL function', q.index! + q[0].indexOf(q[2]) + f.index!)
   }
   // Python's DB-API: cursor.callproc, cx_Oracle's and python-oracledb's callfunc.
@@ -312,12 +330,13 @@ export function readRoutineCalls(files: RepoFiles, repo: string, units: Unit[]):
     const unit = owner(units, file)
     if (!unit) continue
     // (VB's comments start with a quote, as a string of another language does.)
-    // (A Svelte or Vue component's markup only shows SQL, sql="SELECT attack(…)": its script runs it.)
+    // (A Svelte or Vue component's markup only shows SQL, sql="SELECT attack(…)": its script runs it, and so do a
+    // Svelte component's expressions in braces, onclick={() => quick(`SELECT refuel_ship(${id})`)}.)
     const raw = files.read(file)
-    const code = /\.(svelte|vue)$/i.test(file) ? raw.replace(/<script\b[^>]*>([\s\S]*?)<\/script>|[^\n]/g, (m, script?: string) => (script === undefined ? ' ' : m)) : raw
+    const code = /\.(svelte|vue)$/i.test(file) ? scriptOf(raw, /\.svelte$/i.test(file)) : raw
     const text = /\.(vb|bas|cls|frm)$/i.test(file) ? withoutVbComments(code) : /\.(java|kt|cs|[cm]?[jt]sx?|svelte|vue|go|php)$/i.test(file) ? withoutComments(code) : code
     if (!/call|exec|begin|select|Procedure|StoredProc|callproc|callfunc/i.test(text) || (/\.xml$/i.test(file) && !/\{\s*(?:\?\s*=\s*)?call\s/i.test(text))) continue
-    for (const c of routineCallsIn(text, constants)) {
+    for (const c of routineCallsIn(text, constants, file)) {
       const id = `${repo}:routine-call:${unit.path}:${c.routine}`
       if (!out.some((x) => x.id === id)) out.push({ id, unit: unit.id, routine: c.routine, via: c.via, evidence: { file, line: lineAt(text, c.index) } })
     }

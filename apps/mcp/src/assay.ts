@@ -126,7 +126,11 @@ export const ASSAY_PROCEDURE = [
   '   outside a package, are one relation, labelled with what it calls ("calls tic_open, tic_close and 2 more"), observed,',
   '   citing the links (a call in a string the page only shows is no call: leave it out); a routine known only from the',
   '   calls (called) is held by the database the caller connects to. A database\'s own code calls out too: its address',
-  '   links (a package\'s URL) are relations from the package\'s component, or the database, to the service. The',
+  '   links (a package\'s URL) are relations from the package\'s component, or the database, to the service, and the',
+  '   routine links from one package to another (its members calling the other\'s) are relations between their',
+  '   components, labelled with what one calls. A database built from units of stack sql is observed: the units state',
+  '   it. A deployed service of role other with no unit (a reverse proxy, a backup job) is a container built from its',
+  '   service fact where it is in the requests\' path or uses a database, else it stays out. The',
   '   System context view shows systems and people only: relate each person to the system they use, and a system to',
   '   another where a link crosses them, inferred, citing those links (or, with no link, the address facts and the code',
   '   that show the call). What the documents name but no code shows (a',
@@ -645,6 +649,13 @@ export const ASSAY_TOOL_DEFS: ToolDef[] = [
 ]
 
 export const ASSAY_TOOLS = new Set(ASSAY_TOOL_DEFS.map((tool) => tool.name))
+
+/** The unit an element written is built from: a unit it cites, else the unit whose scripts create a stored routine it
+ *  cites (a package's component inside its database). */
+function unitOfWritten(run: Run, w: Written): string | undefined {
+  return w.facts.find((f) => run.facts.get(f)?.kind === 'unit')
+    ?? w.facts.map((f) => run.facts.get(f)).filter((f) => f?.kind === 'routine').map((f) => (f!.fact as RoutineFact).unit).find((u) => !!u)
+}
 
 /** One assay_* call's result. `commit` updates the run once the call's
  *  changes are on disk; `afterWrite` then writes the files beside the model
@@ -1240,25 +1251,27 @@ export class Assay {
       const names = new Set(e.tables.map((id) => tableName(table(id)?.table ?? '')))
       // A schema file alone names it nowhere a unit uses it.
       const named = [...run.facts.values()].filter((f) => f.kind === 'table' && (f.fact as TableFact).inCode && names.has(tableName((f.fact as TableFact).table))).map((f) => f.fact as TableFact)
-      if (!named.some((t) => builtFrom(t.unit).length)) {
-        // The stored routines that write or read its tables say where its data is used: the elements holding them (a
-        // package's component), else the database built from their unit, realise it.
-        const routines = [...run.facts.values()].filter((f) => f.kind === 'routine').map((f) => f.fact as RoutineFact)
-          .filter((r) => [...(r.writes ?? []), ...(r.reads ?? [])].some((t) => names.has(tableName(t))))
-        const holders = new Map<string, string[]>()
-        for (const r of routines) {
-          // A package's member is held by the element citing the package.
-          const pkg = r.name.includes('.') ? `${r.id.slice(0, r.id.length - r.name.length)}${r.name.split('.')[0]}` : undefined
-          const held = [...builtFrom(r.id), ...(pkg ? builtFrom(pkg) : [])]
-          for (const element of held.length ? held : r.unit ? builtFrom(r.unit) : []) holders.set(element, [...(holders.get(element) ?? []), r.id])
-        }
-        for (const [element, ids] of holders) {
-          if (realised.has(`${element}->${e.key}`)) continue
-          realised.add(`${element}->${e.key}`)
-          await relate(element, e.key, 'realises', `${facade.getNodes()[element]?.label} realises "${e.label}"`, { confidence: 'observed', facts: ids })
-        }
+      // The stored routines that write its tables hold its data: the elements holding them (a package's component, else
+      // the database built from their unit) realise it, beside a unit's code naming it. Where no unit's code names it,
+      // the routines that only read it say where it is used too.
+      const coded = named.some((t) => builtFrom(t.unit).length)
+      const routines = [...run.facts.values()].filter((f) => f.kind === 'routine').map((f) => f.fact as RoutineFact)
+        .filter((r) => [...(r.writes ?? []), ...(coded ? [] : r.reads ?? [])].some((t) => names.has(tableName(t))))
+      const holders = new Map<string, string[]>()
+      for (const r of routines) {
+        // A package's member is held by the element citing the package.
+        const pkg = r.name.includes('.') ? `${r.id.slice(0, r.id.length - r.name.length)}${r.name.split('.')[0]}` : undefined
+        const held = [...builtFrom(r.id), ...(pkg ? builtFrom(pkg) : [])]
+        for (const element of held.length ? held : r.unit ? builtFrom(r.unit) : []) holders.set(element, [...(holders.get(element) ?? []), r.id])
+      }
+      for (const [element, ids] of holders) {
+        if (realised.has(`${element}->${e.key}`)) continue
+        realised.add(`${element}->${e.key}`)
+        await relate(element, e.key, 'realises', `${facade.getNodes()[element]?.label} realises "${e.label}"`, { confidence: 'observed', facts: ids })
+      }
+      if (!coded && !holders.size) {
         const used = [...new Set(routines.map((r) => r.name))]
-        if (!holders.size) this.unrealised.push(used.length ? `${e.label}" (its tables used by the stored routines ${used.slice(0, 6).join(', ')}${used.length > 6 ? ', …' : ''})` : `${e.label}"`)
+        this.unrealised.push(used.length ? `${e.label}" (its tables used by the stored routines ${used.slice(0, 6).join(', ')}${used.length > 6 ? ', …' : ''})` : `${e.label}"`)
       }
       for (const unit of new Set(named.map((t) => t.unit))) {
         for (const element of builtFrom(unit)) {
@@ -1516,7 +1529,7 @@ export class Assay {
   /** What becomes of a scenario drawn from the code, as a proposal says it: its element named by a key or an id. */
   private pendingTestNote(run: Run, element: string | undefined, pending: Proposal[]): string {
     const built = element ? run.written.find((w) => w.id === element || w.key === element) : undefined
-    const unitId = built?.facts.find((f) => run.facts.get(f)?.kind === 'unit')
+    const unitId = built && unitOfWritten(run, built)
     if (built && !unitId) return `${built.label} is built from no unit of this run: accepted, the scenario only`
     if (!unitId || pending.some((x) => x.kind === 'requirement' && x.requirement.key === element)) return 'a pending test is written when accepted, where its unit has a test framework'
     const unit = run.facts.get(unitId)!.fact as Unit
@@ -1528,7 +1541,8 @@ export class Assay {
   /** The pending test of the scenarios drawn from the code, for the unit that builds `element`; or why there is none. */
   private skeletonFor(run: Run, element: string | undefined, requirement: string, scenarios: Array<{ id: string; label: string; given: string; when: string; then: string; citations?: Citation[] }>): ({ repository: string; scenarios: string[] } & Skeleton) | { note: string } {
     const none = (why: string) => ({ note: `Its scenario${scenarios.length === 1 ? '' : 's'} from the code ${scenarios.length === 1 ? 'has' : 'have'} no pending test: ${why}.` })
-    const unitId = element ? run.written.find((w) => w.id === element)?.facts.find((f) => run.facts.get(f)?.kind === 'unit') : undefined
+    const built = element ? run.written.find((w) => w.id === element) : undefined
+    const unitId = built && unitOfWritten(run, built)
     if (!element) return none('nothing satisfies it yet')
     if (!unitId) return none('the element that satisfies it is built from no unit of this run')
     const unit = run.facts.get(unitId)!.fact as Unit

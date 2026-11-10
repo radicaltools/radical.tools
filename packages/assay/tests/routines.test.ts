@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { checkPlan, extractRepository, factIndex, linkRepositories, parsePlan } from '../src/index'
+import { describeFacts } from '../src/describe'
 
 /** A git repository of `files` (path → text) in a fresh folder. */
 function repo(name: string, files: Record<string, string>): string {
@@ -391,5 +392,64 @@ describe('radical assay: stored routines and the code calling them', () => {
       ['py', 'Oracle', 'archive-db', 'ARCH'], ['py', 'Oracle', 'reports-db', 'REPORTS'],
       ['svc', 'Oracle', 'dbhost.corp', 'ORCLPDB1'], ['svc', 'Oracle', 'olddb', 'LEGACY'],
     ])
+  })
+  it("runs a Sqitch change's reworked script where the plan first has it, reads a flag set only by := or an UPDATE's SET, and no query a page only shows", () => {
+    const facts = extractRepository(repo('game', {
+      'schema/sqitch.plan': '%project=game\n\ntable-ship 2026-01-01T00:00:00Z dev <d@x> # ships\ntrigger-destroy_ship [table-ship] 2026-01-02T00:00:00Z dev <d@x> # destroy\nfunction-get_player_id 2026-01-02T00:00:00Z dev <d@x> # who\ndata-missions 2026-01-02T00:00:00Z dev <d@x> # hints\n@v1.0 2026-01-03T00:00:00Z dev <d@x> # first release\n\ntrigger-destroy_ship [trigger-destroy_ship@v1.0] 2026-01-04T00:00:00Z dev <d@x> # no cache\n',
+      'schema/deploy/table-ship.sql': 'CREATE TABLE ship (id SERIAL PRIMARY KEY, current_health integer, destroyed boolean NOT NULL DEFAULT false);\n',
+      'schema/deploy/trigger-destroy_ship@v1.0.sql': [
+        'CREATE OR REPLACE FUNCTION destroy_ship() RETURNS trigger AS $$ BEGIN DELETE FROM ships_near; RETURN NEW; END $$ LANGUAGE plpgsql;',
+        'CREATE TRIGGER destroy_ship AFTER UPDATE ON ship FOR EACH ROW EXECUTE PROCEDURE destroy_ship();',
+        '',
+      ].join('\n'),
+      'schema/deploy/trigger-destroy_ship.sql': [
+        'CREATE OR REPLACE FUNCTION destroy_ship() RETURNS trigger AS $$',
+        'BEGIN',
+        '  UPDATE ship SET destroyed = true',
+        '  WHERE id = NEW.id AND current_health <= 0;',
+        '  SELECT 1 FROM ship S WHERE S.current_health > 0',
+        "    AND S.destroyed='f';",
+        '  RETURN NEW;',
+        'END $$ LANGUAGE plpgsql;',
+        '',
+      ].join('\n'),
+      'schema/deploy/function-get_player_id.sql': 'CREATE OR REPLACE FUNCTION get_player_id(name) RETURNS integer AS $get_player_id$\n  SELECT 1;\n$get_player_id$ LANGUAGE sql;\n'
+        + ['current_round', 'refuel_ship', 'attack'].map((f) => `CREATE OR REPLACE FUNCTION ${f}() RETURNS integer AS $$ BEGIN RETURN 1; END $$ LANGUAGE plpgsql;\n`).join(''),
+      'schema/deploy/data-missions.sql': "INSERT INTO mission VALUES (1,\n 'Revive a ship: UPDATE ship SET destroyed = false; then wait');\n",
+      'web/package.json': '{ "name": "web", "scripts": { "start": "vite" }, "dependencies": { "pg": "8.0.0" }, "devDependencies": { "@sveltejs/kit": "2.0.0" } }',
+      'web/src/routes/play/+page.svelte': [
+        '<script lang="ts">',
+        "  const starters = [['Prices', 'SELECT * FROM price_list;'], ['Refuel', 'SELECT refuel_ship(1);']];",
+        '  function describe(e) {',
+        "    switch (e.action) { case 'ATTACK': return `SELECT attack(${e.id});` }",
+        '  }',
+        "  async function load() { await runSql('SELECT current_round();') }",
+        '</script>',
+        '<Pin sql="SELECT attack(ship, id) FROM ships_in_range;" />',
+        '<button onclick={() => quick(`SELECT refuel_ship(${selected.id});`)}>Refuel</button>',
+        '',
+      ].join('\n'),
+    }))
+    expect(facts.routines.filter((r) => r.name === 'destroy_ship').map((r) => [r.kind, r.evidence.file, r.evidence.line])).toEqual([
+      ['function', 'schema/deploy/trigger-destroy_ship.sql', 1], ['trigger', 'schema/deploy/trigger-destroy_ship@v1.0.sql', 2],
+    ])
+    expect(facts.routines.find((r) => r.name === 'destroy_ship' && r.kind === 'function')).toMatchObject({ writes: ['ship'] })
+    expect(facts.routines.find((r) => r.name === 'get_player_id')?.dialect).toBe('PostgreSQL')
+    expect(facts.states.find((s) => s.table === 'ship')?.sets.map((x) => [x.value, x.file, x.line])).toEqual([['destroyed', 'schema/deploy/trigger-destroy_ship.sql', 3]])
+    expect(facts.routineCalls.map((c) => [c.routine, c.evidence.line])).toEqual([['current_round', 6], ['refuel_ship', 9]])
+    expect(facts.tables.filter((t) => !t.declared).map((t) => t.table)).toEqual([])
+  })
+
+  it('links a stored package to the packages its members call, and counts the members in their packages\' rows', () => {
+    const facts = extractRepository(repo('lib', {
+      'ora/http_util_pkg.pks': 'CREATE OR REPLACE PACKAGE http_util_pkg AS\n  FUNCTION get_blob(p_url VARCHAR2) RETURN BLOB;\nEND http_util_pkg;\n/\n',
+      'ora/http_util_pkg.pkb': 'CREATE OR REPLACE PACKAGE BODY http_util_pkg AS\n  FUNCTION get_blob(p_url VARCHAR2) RETURN BLOB IS\n  BEGIN\n    RETURN NULL;\n  END get_blob;\nEND http_util_pkg;\n/\n',
+      'ora/s3_pkg.pks': 'CREATE OR REPLACE PACKAGE s3_pkg AS\n  FUNCTION get_object(p_key VARCHAR2) RETURN BLOB;\nEND s3_pkg;\n/\n',
+      'ora/s3_pkg.pkb': 'CREATE OR REPLACE PACKAGE BODY s3_pkg AS\n  FUNCTION get_object(p_key VARCHAR2) RETURN BLOB IS\n  BEGIN\n    RETURN http_util_pkg.get_blob(p_key);\n  END get_object;\nEND s3_pkg;\n/\n',
+    }))
+    expect(linkRepositories([facts]).filter((l) => l.kind === 'routine').map((l) => [l.from.split(':routine:')[1], l.to.split(':routine:')[1], l.detail])).toEqual([
+      ['ora:s3_pkg', 'ora:http_util_pkg', 'calls http_util_pkg.get_blob'],
+    ])
+    expect(describeFacts([facts], [], facts.dir)[0]).toContain('2 stored routines (with 2 package members in their packages\' rows)')
   })
 })
