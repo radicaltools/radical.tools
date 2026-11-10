@@ -640,6 +640,8 @@ function rust(files: RepoFiles): Draft[] {
 /** A script that creates a database's objects: tables, views, procedures, functions, packages, triggers. */
 const DDL = /\bcreate\s+(?:or\s+(?:replace|alter)\s+)?(?:(?:non)?editionable\s+|global\s+temporary\s+)?(?:table|view|procedure|proc|function|package|trigger)\b/i
 const SCRIPT = /\.(sql|pks|pkb|pls|plb|pck|spc|bdy|prc|fnc|trg|tps|tpb|ddl)$/i
+/** The code another unit may use a database's tables and routines in. */
+const CODE = /\.(java|kt|scala|groovy|cs|vb|bas|cls|frm|ctl|fs|py|[cm]?[jt]sx?|go|php|rb|pm|pl|ex|exs|rs|xml|ya?ml|properties)$/i
 
 /** A database's projects: a Sqitch project (sqitch.plan) or a Supabase project (config.toml with its migrations/) beside any units, and in a repository made of a database's
  *  scripts alone, each highest folder holding them (one schema's or one library's), a folder of migrations or seed data
@@ -655,7 +657,8 @@ function sqlFolders(files: RepoFiles, claimed: string[]): Draft[] {
     d.aliases.push(basename(path === '.' ? files.root : path))
     return d
   })
-  if (claimed.length) return projects
+  // (Beside a database project, Sqitch's or Supabase's, the repository's database is that project.)
+  if (claimed.length && projects.length) return projects
   const inUnit = (f: string): boolean => [...claimed, ...sqitch].some((c) => c === '.' || f.startsWith(`${c}/`))
   // (A library's examples and demos are part of it here: they ship with its scripts.)
   const scripts = files.list.filter((f) => SCRIPT.test(f) && !/(^|\/)(tests?|__tests__|fixtures?|testdata)\//i.test(f) && !inUnit(f) && !DEV_TOOLING.test(f) && !/(^|\/)(migrations?|db\/migrate|seeds?)\//i.test(f) && DDL.test(files.read(f)))
@@ -669,7 +672,15 @@ function sqlFolders(files: RepoFiles, claimed: string[]): Draft[] {
   const kept: string[] = []
   for (const d of dirs) if (!kept.some((k) => k === '.' || d.startsWith(`${k}/`))) kept.push(d)
   const under = (dir: string) => scripts.filter((f) => dir === '.' || f.startsWith(`${dir}/`))
-  return [...projects, ...kept.map((path) => {
+  // Beside other units, a folder of scripts is the schema of the units whose code names its tables or calls its
+  // routines; one no other unit's code uses (its tests aside) is a unit of its own (a PL/SQL library beside its IDE's
+  // extension).
+  const code = claimed.length ? files.list.filter((f) => CODE.test(f) && !SCRIPT.test(f) && !TEST_FILE.test(f) && claimed.some((c) => c === '.' || f.startsWith(`${c}/`))).map((f) => files.read(f).toLowerCase()) : []
+  const used = (dir: string): boolean => {
+    const names = new Set(under(dir).flatMap((f) => [...files.read(f).matchAll(/\bcreate\s+(?:or\s+replace\s+)?(?:(?:non)?editionable\s+|global\s+temporary\s+)?(?:table|package|procedure|function)\s+(?:body\s+)?(?:(?:if\s+not\s+exists\s+)?)(?:[`"[]?\w+[`"\]]?\.)?[`"[]?(\w{3,})/gi)].map((m) => m[1].toLowerCase())))
+    return [...names].some((n) => code.some((text) => new RegExp(`\\b${escapeRe(n)}\\b`).test(text)))
+  }
+  return [...projects, ...kept.filter((path) => !claimed.length || (path !== '.' && !claimed.some((c) => c === '.' || c.startsWith(`${path}/`) || path.startsWith(`${c}/`)) && !used(path))).map((path) => {
     const d = draft('sql', path, under(path)[0], undefined, 1)
     d.aliases.push(basename(path === '.' ? files.root : path))
     return d

@@ -115,13 +115,13 @@ const REQUIRED: Record<string, number> = {
   ok: 1, is: 2, isnt: 2, matches: 2, imatches: 2, doesnt_match: 2, doesnt_imatch: 2, alike: 2, ialike: 2, unalike: 2, unialike: 2,
   cmp_ok: 3, pass: 0, fail: 0, isa_ok: 2, throws_like: 2, throws_ilike: 2, throws_matching: 2, throws_imatching: 2, lives_ok: 1,
   performs_ok: 2, performs_within: 3, results_eq: 2, results_ne: 2, set_eq: 2, set_ne: 2, set_has: 2, set_hasnt: 2, bag_eq: 2, bag_ne: 2,
-  bag_has: 2, bag_hasnt: 2, is_empty: 1, isnt_empty: 1, row_eq: 2,
+  bag_has: 2, bag_hasnt: 2, is_empty: 1, isnt_empty: 1, row_eq: 2, skip: 0,
 }
 const STRUCTURE = /^(has|hasnt)_\w+$|^col_\w+$|^\w+_are$|^(is|isnt)_\w+$|^\w+_(owner|privs)_is$|^function_(lang_is|returns)$|^(fk_ok|index_is_type|index_is_unique|index_is_primary|trigger_is|domain_type_is|domain_type_isnt|cast_context_is|language_is_trusted|policy_cmd_is|enum_has_labels|rule_is_instead|rule_is_on|volatility_is|throws_ok)$/
 /** Structure tests whose shortest form ends with a value they check, by that form's number of arguments. */
 const VALUE_LAST: Record<string, number> = { col_default_is: 3, col_type_is: 3 }
 /** pgTAP's functions that report nothing: the plan, diagnostics, the TODO markers. */
-const NO_TEST = /^(plan|no_plan|finish|diag|note|todo|todo_start|todo_end|in_todo|skip|runtests|do_tap|explain)$/
+const NO_TEST = /^(plan|no_plan|finish|diag|note|todo|todo_start|todo_end|in_todo|runtests|do_tap|explain)$/
 
 /** The top-level arguments of a call whose text starts after its opening parenthesis: their texts, and where the call ends. */
 function argumentsOf(text: string, from: number): { args: string[]; end: number } {
@@ -230,7 +230,9 @@ export function pgtapTests(text: string, file: string): Declared[] {
     if (!isAssertion(fn) || bodies.some(([a, b]) => m.index! > a && m.index! < b)) continue
     const { args } = argumentsOf(code, m.index! + m[0].length)
     n++
-    out.push({ file, titles: [descriptionOf(fn, args) ?? `#${n}`], line: lineAt(m.index!), skipped: false, framework: 'pgtap' })
+    // (skip('why') reports a test skipped, its reason the title: a pending test's.)
+    const why = fn === 'skip' ? args.map(literal).find((a) => a !== undefined && !/^\d+$/.test(a)) : undefined
+    out.push({ file, titles: [why ?? descriptionOf(fn, args) ?? `#${n}`], line: lineAt(m.index!), skipped: fn === 'skip', framework: 'pgtap' })
   }
   return out
 }
@@ -274,8 +276,14 @@ export function readDatabaseTests(files: RepoFiles, repo: string, units: Unit[],
       const text = files.read(d.file).toLowerCase()
       const score = (u: Unit): number => routines.filter((r) => r.unit === u.id && text.includes(r.name.split('.')[0])).length
         + tables.filter((t) => t.unit === u.id && text.includes(t.table.toLowerCase())).length
-      const best = [...units].sort((a, b) => score(b) - score(a))[0]
-      unit = best && score(best) > 0 ? best : sqlUnits.length === 1 ? sqlUnits[0] : unit
+      // (A database's units first: a database test is no test of an application's code.)
+      const candidates = sqlUnits.length ? sqlUnits : units
+      const best = [...candidates].sort((a, b) => score(b) - score(a))[0]
+      // With nothing named (a view it tests), the database unit nearest it, else the one holding the most routines.
+      const shared = (u: Unit): number => { const a = d.file.split('/'); const b = u.path.split('/'); let n = 0; while (n < b.length && a[n] === b[n]) n++; return n }
+      const routinesOf = (u: Unit): number => routines.filter((r) => r.unit === u.id).length
+      const nearest = [...sqlUnits].sort((a, b) => shared(b) - shared(a) || routinesOf(b) - routinesOf(a))[0]
+      unit = best && score(best) > 0 ? best : nearest ?? unit
     }
     const test = `${d.file} › ${d.titles.join(' › ')}`
     const id = `${repo}:test:${test}`

@@ -48,8 +48,28 @@ const unique = (names: string[]): string[] => names.map((n, i) => (names.indexOf
 const sentence = (s: SkeletonScenario): string => `Given ${s.given}, when ${s.when}, then ${s.then}.${s.from ? ` (From ${s.from}.)` : ''}`
 const REASON = 'Written by Radical Assay from the code: write the test'
 
-/** A pending test of each scenario of `requirement`, for `framework`, in `unit`'s folder. */
-export function testSkeleton(unit: Unit, framework: TestFramework, requirement: string, scenarios: SkeletonScenario[], date: string): Skeleton {
+/** Where a database unit's tests are, as its pending test is to be: their folder, the lines every one of them starts
+ *  with (\i tests/_prelude.sql), whether their names start with a number (010_registration.sql), their extension. */
+export interface TestPlace { folder: string; header: string[]; numbered: boolean; ext: string }
+
+/** The place of `unit`'s database tests in `facts`, read through `read`; undefined when it has none. */
+export function databaseTestPlace(unit: Unit, facts: RepositoryFacts, read: (file: string) => string): TestPlace | undefined {
+  const files = [...new Set(facts.tests.filter((t) => t.unit === unit.id && t.status !== 'passed' && t.status !== 'failed').map((t) => t.evidence.file))]
+  if (!files.length) return undefined
+  const dirOf = (f: string): string => (f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : '.')
+  const count = <T>(xs: T[]): T => [...xs.reduce((m, x) => m.set(x, (m.get(x) ?? 0) + 1), new Map<T, number>())].sort((a, b) => b[1] - a[1])[0][0]
+  const folder = count(files.map(dirOf))
+  const mine = files.filter((f) => dirOf(f) === folder)
+  // The lines before the first plan or BEGIN that every test script has.
+  const heads = mine.map((f) => read(f).split('\n').slice(0, 20).filter((l, i, all) => all.slice(0, i + 1).every((x) => !/^\s*(select\s+plan|begin\b|create\s)/i.test(x)))).map((ls) => ls.map((l) => l.trim()).filter(Boolean))
+  const header = heads[0].filter((l) => heads.every((h) => h.includes(l)) && !/^--/.test(l))
+  const base = (f: string): string => f.slice(f.lastIndexOf('/') + 1)
+  return { folder, header, numbered: mine.every((f) => /^\d/.test(base(f))), ext: count(mine.map((f) => base(f).slice(base(f).lastIndexOf('.')))) }
+}
+
+/** A pending test of each scenario of `requirement`, for `framework`, in `unit`'s folder, or where its database tests
+ *  are (`place`). */
+export function testSkeleton(unit: Unit, framework: TestFramework, requirement: string, scenarios: SkeletonScenario[], date: string, place?: TestPlace): Skeleton {
   const prefix = unit.path === '.' ? '' : `${unit.path}/`
   const header = (comment: string): string => [
     `Written by Radical Assay on ${date}: the scenarios of the requirement "${requirement}",`,
@@ -119,7 +139,7 @@ export function testSkeleton(unit: Unit, framework: TestFramework, requirement: 
   // A database's tests: a utPLSQL suite package of disabled tests, a pgTAP script of TODO failures.
   if (framework === 'utplsql') {
     const name = `test_${snake(requirement)}`.slice(0, 30)
-    const file = `${prefix}tests/assay/${name}.sql`
+    const file = place ? `${place.folder === '.' ? '' : `${place.folder}/`}${name}.sql` : `${prefix}tests/assay/${name}.sql`
     const procedures = unique(scenarios.map((s) => snake(s.label).slice(0, 30)))
     const quoted = (text: string): string => text.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim()
     const content = [
@@ -142,16 +162,19 @@ export function testSkeleton(unit: Unit, framework: TestFramework, requirement: 
     return { file, content, tests: scenarios.map((s) => `${file} › ${quoted(requirement)} › ${quoted(s.label)}`) }
   }
   if (framework === 'pgtap') {
-    const file = `${prefix}tests/assay/${kebab(requirement)}.sql`
+    // Beside the unit's tests, named and headed as they are (tests/990_assay_x.sql after \i tests/_prelude.sql); each
+    // scenario a skipped test, which every runner passes, titled by the scenario.
+    const file = place
+      ? `${place.folder === '.' ? '' : `${place.folder}/`}${place.numbered ? `990_assay_${snake(requirement)}` : `assay-${kebab(requirement)}`}${place.ext}`
+      : `${prefix}tests/assay/${kebab(requirement)}.sql`
     const sq = (text: string): string => `'${text.replace(/'/g, "''")}'`
     const content = [
       header('--'),
-      'BEGIN;',
+      ...(place?.header ?? []),
       `SELECT plan(${scenarios.length});`,
       '',
-      ...scenarios.flatMap((s) => [`-- ${sentence(s)}`, `SELECT todo(${sq(REASON)}, 1);`, `SELECT fail(${sq(s.label)});`, '']),
+      ...scenarios.flatMap((s) => [`-- ${sentence(s)}`, `-- ${REASON}.`, `SELECT skip(${sq(s.label)});`, '']),
       'SELECT * FROM finish();',
-      'ROLLBACK;',
       '',
     ].join('\n')
     return { file, content, tests: scenarios.map((s) => `${file} › ${s.label}`) }

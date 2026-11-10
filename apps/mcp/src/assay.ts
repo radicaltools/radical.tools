@@ -30,7 +30,7 @@ import { basename, dirname, extname, join, relative } from 'node:path'
 import {
   FACTS_FILE, FACT_LISTS, FOLDER_FACTS_DIR, SOURCES_DIR, UNPACKED_DIR, checkPlan, prepareSyntax, cleanPath, decodeText, factsFileOf, describeFacts, describeSources, extractRepository, factIndex, ignored, inside,
   GIT, isRepository, linkRepositories, parsePlan, SKIPPED, within, repositoriesIn, serializeFacts, sourceOrigin, takeSources,
-  accessReaderOf, emptyFacts, formWireframe, pageOf, pathTest, pathTestFile, pathTestId, stateName, stepLabel, tableName, testSkeleton, testUnitFor,
+  accessReaderOf, emptyFacts, formWireframe, pageOf, pathTest, pathTestFile, pathTestId, stateName, stepLabel, tableName, databaseTestPlace, testSkeleton, testUnitFor,
   type Citation, type FactIndex, type Link, type PathFact, type Skeleton, type PlanDecision, type PlanNeed, type Plan, type PlanRequirement, type PlanStep, type RepositoryFacts, type RoutineFact, type ScreenFact, type StateFact, type TableFact, type TestFact, type Unit,
 } from '@radical/assay'
 import MDBReader from 'mdb-reader'
@@ -1553,7 +1553,9 @@ export class Assay {
     const tester = testUnitFor(unit, repository)
     if (!tester?.testFramework) return none(`${unit.name} (${unit.stack}) has no test framework Assay writes tests for`)
     const from = (c: Citation) => `${c.file}:${c.lines[0]}${c.lines[1] !== c.lines[0] ? `-${c.lines[1]}` : ''}`
-    const skeleton = testSkeleton(tester, tester.testFramework, requirement, scenarios.map((sc) => ({ label: sc.label, given: sc.given, when: sc.when, then: sc.then, ...(sc.citations?.length ? { from: sc.citations.map(from).join(', ') } : {}) })), new Date().toISOString().slice(0, 10))
+    // A database's pending test goes where its tests are, as they are written.
+    const place = tester.testFramework === 'pgtap' || tester.testFramework === 'utplsql' ? databaseTestPlace(tester, repository, (f) => { try { return readFileSync(join(repository.dir, f), 'utf8') } catch { return '' } }) : undefined
+    const skeleton = testSkeleton(tester, tester.testFramework, requirement, scenarios.map((sc) => ({ label: sc.label, given: sc.given, when: sc.when, then: sc.then, ...(sc.citations?.length ? { from: sc.citations.map(from).join(', ') } : {}) })), new Date().toISOString().slice(0, 10), place)
     return { repository: repository.repository, scenarios: scenarios.map((sc) => sc.id), ...skeleton }
   }
 

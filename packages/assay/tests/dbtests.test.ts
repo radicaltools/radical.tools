@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { checkPlan, extractRepository, factIndex, linkRepositories, parsePlan } from '../src/index'
 import { pgtapTests } from '../src/dbtests'
-import { testSkeleton } from '../src/skeleton'
+import { databaseTestPlace, testSkeleton } from '../src/skeleton'
 
 /** A git repository of `files` (path → text) in a fresh folder. */
 function repo(name: string, files: Record<string, string>): string {
@@ -121,7 +121,9 @@ describe('radical assay: the tests a database declares', () => {
     const dir = repo('game', {
       'schema/sqitch.plan': '%project=game\n\nfunction-register 2026-01-01T00:00:00Z dev <d@x> # players\n',
       'schema/deploy/function-register.sql': "CREATE OR REPLACE FUNCTION register_player(name text) RETURNS integer AS $$ BEGIN RETURN 1; END $$ LANGUAGE plpgsql;\n",
-      'tests/010_registration.sql': "SELECT plan(1);\nSELECT lives_ok($$SELECT register_player('a')$$, 'register_player creates a player');\nSELECT * FROM finish();\n",
+      'tests/_prelude.sql': "SET search_path = public;\n",
+      'tests/010_registration.sql': "\\i tests/_prelude.sql\nSELECT plan(1);\nSELECT lives_ok($$SELECT register_player('a')$$, 'register_player creates a player');\nSELECT * FROM finish();\n",
+      'tests/020_ships.sql': "\\i tests/_prelude.sql\nBEGIN;\nSELECT plan(1);\nSELECT pass('ships');\nSELECT * FROM finish();\n",
     })
     const facts = extractRepository(dir)
     const { plan } = parsePlan({
@@ -133,10 +135,15 @@ describe('radical assay: the tests a database declares', () => {
 
     const unit = facts.units.find((u) => u.path === 'schema')!
     const scenarios = [{ label: "A name with SQL in it is refused", given: 'a name holding a quote', when: 'it registers', then: 'it is refused', from: 'schema/deploy/function-register.sql:1' }]
-    const pg = testSkeleton(unit, 'pgtap', 'Register players', scenarios, '2026-11-10')
-    expect(pg.file).toBe('schema/tests/assay/register-players.sql')
-    expect(pgtapTests(pg.content, pg.file).map((t) => `${t.file} › ${t.titles.join(' › ')}`)).toEqual(pg.tests)
-    expect(pg.content).toContain("SELECT todo('Written by Radical Assay from the code: write the test', 1);\nSELECT fail('A name with SQL in it is refused');")
+    // Beside the unit's tests, named and headed as they are, each scenario a test skipped, which every runner passes.
+    const place = databaseTestPlace(unit, facts, (f) => readFileSync(join(dir, f), 'utf8'))
+    expect(place).toEqual({ folder: 'tests', header: ['\\i tests/_prelude.sql'], numbered: true, ext: '.sql' })
+    const pg = testSkeleton(unit, 'pgtap', 'Register players', scenarios, '2026-11-10', place)
+    expect(pg.file).toBe('tests/990_assay_register_players.sql')
+    expect(pgtapTests(pg.content, pg.file).map((t) => [`${t.file} › ${t.titles.join(' › ')}`, t.skipped])).toEqual(pg.tests.map((t) => [t, true]))
+    expect(pg.content).toContain("\\i tests/_prelude.sql\nSELECT plan(1);")
+    expect(pg.content).toContain("SELECT skip('A name with SQL in it is refused');")
+    expect(testSkeleton(unit, 'pgtap', 'Register players', scenarios, '2026-11-10').file).toBe('schema/tests/assay/register-players.sql')
     const ut = testSkeleton(unit, 'utplsql', 'Register players', scenarios, '2026-11-10')
     expect(ut.file).toBe('schema/tests/assay/test_register_players.sql')
     expect(ut.tests).toEqual(['schema/tests/assay/test_register_players.sql › Register players › A name with SQL in it is refused'])
