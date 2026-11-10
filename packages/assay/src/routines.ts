@@ -119,7 +119,8 @@ const CREATE = new RegExp(String.raw`\bcreate\s+(?:or\s+(?:replace|alter)\s+)?(?
 export function readRoutines(sql: string, file: string): ReadRoutine[] {
   const dialect = dialectOf(sql)
   const out: ReadRoutine[] = []
-  const starts = [...sql.matchAll(CREATE)]
+  // (A privilege a GRANT or REVOKE names, grant create trigger to app_user, creates nothing.)
+  const starts = [...sql.matchAll(CREATE)].filter((m) => !/\b(grant|revoke)\b[^;]*$/i.test(sql.slice(Math.max(0, m.index! - 300), m.index!)))
   // Each statement runs to the next CREATE of any kind (a table, a view, another routine), or to the end.
   const next = [...sql.matchAll(/\bcreate\s+(?:or\s+(?:replace|alter)\s+)?/gi)].map((m) => m.index!)
   for (const m of starts) {
@@ -283,7 +284,7 @@ export function routineCallsIn(text: string, constants: Map<string, string> = ne
 export function readRoutineCalls(files: RepoFiles, repo: string, units: Unit[]): RoutineCallFact[] {
   const out: RoutineCallFact[] = []
   // (A MyBatis mapper's XML holds its CALLABLE statements: {call pkg.proc(#{id})}.)
-  const sources = files.list.filter((f) => /\.(java|kt|cs|vb|bas|cls|frm|py|[cm]?[jt]sx?|svelte|vue|go|php|rb|xml)$/i.test(f) && !TEST_FILE.test(f) && !GENERATED.test(f))
+  const sources = files.list.filter((f) => /\.(java|kt|cs|vb|bas|cls|frm|py|[cm]?[jt]sx?|svelte|vue|go|php|rb|pm|pl|psgi|xml)$/i.test(f) && !TEST_FILE.test(f) && !GENERATED.test(f))
   // The repository's string constants in Java, Kotlin and C# (a name used twice with two values names neither).
   const constants = new Map<string, string>()
   const twice = new Set<string>()
@@ -333,7 +334,8 @@ export function readRoutineCalls(files: RepoFiles, repo: string, units: Unit[]):
     // (A Svelte or Vue component's markup only shows SQL, sql="SELECT attack(…)": its script runs it, and so do a
     // Svelte component's expressions in braces, onclick={() => quick(`SELECT refuel_ship(${id})`)}.)
     const raw = files.read(file)
-    const code = /\.(svelte|vue)$/i.test(file) ? scriptOf(raw, /\.svelte$/i.test(file)) : raw
+    // (Perl quotes SQL with q{…} and qq{…} over lines: one string each, its lines kept after it.)
+    const code = /\.(svelte|vue)$/i.test(file) ? scriptOf(raw, /\.svelte$/i.test(file)) : /\.(pm|pl|psgi)$/i.test(file) ? raw.replace(/\bqq?\{([^{}]*)\}/g, (_, sql: string) => `"${sql.replace(/\s*\n\s*/g, ' ')}"${'\n'.repeat(sql.split('\n').length - 1)}`) : raw
     const text = /\.(vb|bas|cls|frm)$/i.test(file) ? withoutVbComments(code) : /\.(java|kt|cs|[cm]?[jt]sx?|svelte|vue|go|php)$/i.test(file) ? withoutComments(code) : code
     if (!/call|exec|begin|select|Procedure|StoredProc|callproc|callfunc/i.test(text) || (/\.xml$/i.test(file) && !/\{\s*(?:\?\s*=\s*)?call\s/i.test(text))) continue
     for (const c of routineCallsIn(text, constants, file)) {

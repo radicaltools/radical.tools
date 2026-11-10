@@ -24,7 +24,7 @@ export interface Evidence {
 }
 
 /** The stack a unit is read from. */
-export type Stack = 'npm' | 'maven' | 'gradle' | 'ant' | 'go' | 'dotnet' | 'python' | 'php' | 'ruby' | 'elixir' | 'rust' | 'vb6' | 'sql' | 'docker'
+export type Stack = 'npm' | 'maven' | 'gradle' | 'ant' | 'go' | 'dotnet' | 'python' | 'php' | 'ruby' | 'perl' | 'elixir' | 'rust' | 'vb6' | 'sql' | 'docker'
 
 /** A unit of the repository: a project with a manifest of its own (or a folder with a Dockerfile). */
 export interface Unit {
@@ -56,7 +56,7 @@ export interface Unit {
 }
 
 /** The test frameworks Assay writes a pending test for. */
-export type TestFramework = 'vitest' | 'jest' | 'mocha' | 'junit5' | 'junit4' | 'pytest' | 'xunit' | 'nunit' | 'mstest'
+export type TestFramework = 'vitest' | 'jest' | 'mocha' | 'junit5' | 'junit4' | 'pytest' | 'xunit' | 'nunit' | 'mstest' | 'utplsql' | 'pgtap'
 
 /** A unit depends on a package, or on another unit by path (a project reference). */
 export interface DependencyFact {
@@ -263,7 +263,8 @@ export interface TestFact {
   unit?: string
   /** `<file> › <title>`, the id .radical/radical.json verifies binds. */
   test: string
-  status: 'passed' | 'failed' | 'skipped'
+  /** not run: a database's test its code declares, which no report names (ADR Database tests declared in code are facts not run). */
+  status: 'passed' | 'failed' | 'skipped' | 'not run'
   /** Its body is empty or asserts nothing (a JavaScript test): it passes whatever the code does. */
   checksNothing?: boolean
   evidence: Evidence

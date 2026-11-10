@@ -447,7 +447,8 @@ export function checkPlan(plan: Plan, facts: FactIndex, known: (id: string) => b
       else for (const t of strings(s.tests) ? s.tests : []) {
         const f = facts.get(t)
         if (f?.kind !== 'test') problems.push(`${at}: ${t} is no test of the run`)
-        else if ((f.fact as TestFact).status !== 'passed') problems.push(`${at}: ${t} ${(f.fact as TestFact).status} in the reports; a scenario rests on tests that pass: leave the test out of it, or the scenario, and propose the requirement with the code it is drawn from (citations) and no scenarios`)
+        // (A database's test its code declares rests a scenario before it is run: its report then says.)
+        else if ((f.fact as TestFact).status !== 'passed' && (f.fact as TestFact).status !== 'not run') problems.push(`${at}: ${t} ${(f.fact as TestFact).status} in the reports; a scenario rests on tests that pass: leave the test out of it, or the scenario, and propose the requirement with the code it is drawn from (citations) and no scenarios`)
         else if ((f.fact as TestFact).checksNothing) problems.push(`${at}: ${t} checks nothing (its body is empty or asserts nothing), so it passes whatever the code does: leave it out of the scenario; rest the scenario on explored paths or on the code it is drawn from (citations), whose pending test the team then writes`)
       }
     })

@@ -23,6 +23,7 @@ import { GIT, RepoFiles, lineOf, owner, posix } from './files'
 import { CONVENTIONS } from './link'
 import { readMessages } from './messages'
 import { readRoutineCalls } from './routines'
+import { databaseTestCode, readDatabaseTests } from './dbtests'
 import { readRuntime } from './runtime'
 import { readDocuments } from './sources'
 import { readStacks } from './stacks'
@@ -145,7 +146,11 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
     if (dep) facts.services.push({ id: `${repo}:service:${c.broker}`, name: c.broker!, role: 'queue', dependsOn: [], assumed: true, evidence: dep.evidence })
   }
   // The stored routines its scripts create, the code's calls of them, and a routine only called, which the database holds.
-  facts.routines = domain.routines
+  // (A database's test code tests the code rather than being it: utPLSQL's suites, pgTAP's scripts and test functions.)
+  const testCode = databaseTestCode(files)
+  const testing = (r: { name: string; evidence: { file: string } }): boolean => testCode.files.has(r.evidence.file) || testCode.packages.has(r.name.split('.')[0])
+  facts.routines = domain.routines.filter((r) => !testing(r))
+  facts.tables = facts.tables.filter((t) => !t.declared || !testCode.files.has(t.evidence.file))
   const declared = (name: string): boolean => facts.routines.some((r) => r.name === name || r.name.endsWith(`.${name}`) || name.endsWith(`.${r.name}`))
   // A script's call by the routine's own name, of one its unit creates not: a package body's add_font( is its own.
   const elsewhere = (c: { unit: string; routine: string }): boolean => {
@@ -154,7 +159,8 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
     const named = facts.routines.filter((r) => r.name === c.routine && !!r.unit && (!dialect || !r.dialect || r.dialect === dialect))
     return named.some((r) => r.unit !== c.unit) && !named.some((r) => r.unit === c.unit) && !facts.routines.some((r) => r.unit === c.unit && r.name.endsWith(`.${c.routine}`))
   }
-  facts.routineCalls = readRoutineCalls(files, repo, facts.units).filter((c) => c.via === 'SQL script' ? elsewhere(c) : c.via !== 'SQL function' || declared(c.routine))
+  // (A test calling a routine checks it, no part of the system calls it.)
+  facts.routineCalls = readRoutineCalls(files, repo, facts.units).filter((c) => !testCode.files.has(c.evidence.file) && !testCode.packages.has(c.unit.split(':unit:')[1] ?? '') && (c.via === 'SQL script' ? elsewhere(c) : c.via !== 'SQL function' || declared(c.routine)))
   for (const c of facts.routineCalls) {
     if (declared(c.routine)) continue
     const id = `${repo}:routine::${c.routine}`
@@ -166,6 +172,10 @@ export function extractRepository(dir: string, options: ExtractOptions = {}): Re
   facts.screens = readForms(files, repo, facts.units)
 
   facts.tests = readTests(root, repo, files, facts.units, options.reports, facts.notes)
+  // The tests a database's code declares, not run until a report names them; their units test with utPLSQL or pgTAP.
+  const database = readDatabaseTests(files, repo, facts.units, facts.routines, facts.tables)
+  for (const t of database.tests) if (!facts.tests.some((x) => x.id === t.id)) facts.tests.push(t)
+  for (const u of facts.units) if (!u.testFramework && database.frameworks.has(u.id)) u.testFramework = database.frameworks.get(u.id)
   facts.documents = readDocuments(files, repo)
   return facts
 }
