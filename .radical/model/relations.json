@@ -357,6 +357,12 @@
     "targetId": "0eed4dcc-7547-430d-abb5-3ddf2e18c5ab"
   },
   {
+    "id": "04914b00-0ad2-49a9-ad04-b0db1f4d7faf",
+    "relationType": "satisfies",
+    "sourceId": "156f4473-a44b-424f-b5c1-62e044522faf",
+    "targetId": "f5f7cd11-2115-4632-8785-5bdf4e67cb80"
+  },
+  {
     "id": "04950f57-e8fb-4615-9f71-94c6c27c3018",
     "relationType": "traces-to",
     "sourceId": "16bc8b99-b4a1-4ae3-ab8d-e72d01ae3475",
@@ -1334,6 +1340,12 @@
     "targetId": "5a11c385-b16b-47c2-b6e2-0ec281e86dbe"
   },
   {
+    "id": "102a4dbc-56b9-445d-aac7-1d47b730c6cb",
+    "relationType": "satisfies",
+    "sourceId": "f53d7ad3-d926-404d-9341-9cb61722979d",
+    "targetId": "5417eacf-7bca-415f-aeaf-02fd4cddf50e"
+  },
+  {
     "id": "104a6c0c-5420-4623-9b80-773ed433306b",
     "relationType": "satisfies",
     "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
@@ -2170,6 +2182,12 @@
     "relationType": "derives",
     "sourceId": "c533f4b8-2cd3-45cb-aff1-a0659d7a406f",
     "targetId": "d7f6d795-976a-40f0-b237-a12ac985c37c"
+  },
+  {
+    "id": "1a2937e6-96df-4804-9887-df70c1e4d7de",
+    "relationType": "constrains",
+    "sourceId": "59f8cefd-bca3-4022-9e3d-8083edbb10e7",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "1a348b7b-2457-4eaf-bc91-9bc69e7a960b",
@@ -3712,6 +3730,12 @@
     "relationType": "verifies",
     "sourceId": "89971eec-eb95-41fb-9891-69d9c5a16590",
     "targetId": "3e840f74-df4d-4117-8394-3b41823fd768"
+  },
+  {
+    "id": "2ce86d82-0343-48c5-b2d5-92a29f958e95",
+    "relationType": "traces-to",
+    "sourceId": "5417eacf-7bca-415f-aeaf-02fd4cddf50e",
+    "targetId": "59f8cefd-bca3-4022-9e3d-8083edbb10e7"
   },
   {
     "id": "2cf7c90a-f6a5-4e7d-ad43-24b065f96730",
@@ -5285,6 +5309,12 @@
     "relationType": "derives",
     "sourceId": "4d80ae8c-7d44-44f4-a547-14c023a8c0e0",
     "targetId": "ccd1ab26-ff07-4a21-bb68-1d62c38fbdc3"
+  },
+  {
+    "id": "3ecad9bc-0691-424a-9c8e-a42def8952e0",
+    "relationType": "verifies",
+    "sourceId": "482dadb5-2870-478f-8ca9-dad42e0e797f",
+    "targetId": "f5f7cd11-2115-4632-8785-5bdf4e67cb80"
   },
   {
     "id": "3ed5407d-d49c-4a07-b2fa-ee0c02aba210",
@@ -8883,6 +8913,12 @@
     "targetId": "49103558-00bb-4898-90bd-aaf0bc34ecbc"
   },
   {
+    "id": "687a0bd8-3a67-43e6-811a-df8da82fd3b3",
+    "relationType": "traces-to",
+    "sourceId": "f5f7cd11-2115-4632-8785-5bdf4e67cb80",
+    "targetId": "59f8cefd-bca3-4022-9e3d-8083edbb10e7"
+  },
+  {
     "description": "Records its version in .radical/agent-activity.json with each write.",
     "id": "68c950a6-5584-4c90-aef9-3a644985052a",
     "relationType": "satisfies",
@@ -9225,6 +9261,12 @@
     "relationType": "satisfies",
     "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
     "targetId": "2649ea79-d87c-4212-bd36-e9bb7a8082e8"
+  },
+  {
+    "id": "6c84099c-c510-4749-89a5-b2387353a3cd",
+    "relationType": "derives",
+    "sourceId": "f5f7cd11-2115-4632-8785-5bdf4e67cb80",
+    "targetId": "ca5df7a0-e350-472b-8d99-1d411c885e73"
   },
   {
     "id": "6c904159-40ee-46d7-ae9d-6c537c07449a",
@@ -10615,6 +10657,12 @@
     "relationType": "satisfies",
     "sourceId": "45c95a3b-968d-4b77-8fc3-94af06de5087",
     "targetId": "37611a1b-233c-4094-882a-0a52d65ef667"
+  },
+  {
+    "id": "7b140214-60db-4cde-978c-f5f03ba15c88",
+    "relationType": "constrains",
+    "sourceId": "59f8cefd-bca3-4022-9e3d-8083edbb10e7",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
     "description": "placement in src/metamodel/lookup.ts, src/model.ts and src/metamodel/validate.ts",
@@ -13381,6 +13429,12 @@
     "targetId": "2046ca00-594a-4946-a08c-d39ad64559b6"
   },
   {
+    "id": "9c18826e-9963-456b-859a-441a49a81ca0",
+    "relationType": "implements",
+    "sourceId": "726c8ae2-ec8e-44ad-915f-df503b2b0bf1",
+    "targetId": "59f8cefd-bca3-4022-9e3d-8083edbb10e7"
+  },
+  {
     "id": "9c3f8e35-6f02-437f-99cc-2db640b3dc32",
     "relationType": "verifies",
     "sourceId": "683429ce-65c5-416f-9490-eea5e0c6098f",
@@ -14765,6 +14819,12 @@
     "relationType": "satisfies",
     "sourceId": "03d6d7e6-d633-43bb-a5bb-b1583813ece6",
     "targetId": "659989c9-3253-4f6e-8d02-8dc51ee101fc"
+  },
+  {
+    "id": "abf2fad8-4c2a-4cf7-a2ad-6f3f81d0a278",
+    "relationType": "derives",
+    "sourceId": "5417eacf-7bca-415f-aeaf-02fd4cddf50e",
+    "targetId": "ca5df7a0-e350-472b-8d99-1d411c885e73"
   },
   {
     "id": "ac107015-fca8-4599-ab26-9b91127266d8",
@@ -18630,6 +18690,12 @@
     "targetId": "7e24900b-73a9-4c57-9a4f-143fcb4eb8e1"
   },
   {
+    "id": "d715dd1b-7d68-43dc-89f4-5efc37b146e6",
+    "relationType": "verifies",
+    "sourceId": "34a4fbad-7623-409d-b74c-cd2143253754",
+    "targetId": "5417eacf-7bca-415f-aeaf-02fd4cddf50e"
+  },
+  {
     "id": "d7338d0a-8b41-47ca-8764-1f3e9a2a9c89",
     "relationType": "derives",
     "sourceId": "c3de05c5-18cd-428d-86f3-7537a0ffed56",
@@ -21039,6 +21105,12 @@
     "relationType": "constrains",
     "sourceId": "20ed3ed2-94d2-4a4e-bf76-7fbfcd6931bf",
     "targetId": "eff2f9a4-1743-4db0-937d-2d94e6d7f68a"
+  },
+  {
+    "id": "f5a712a7-5da5-4cad-b736-92c52c1ca198",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "5417eacf-7bca-415f-aeaf-02fd4cddf50e"
   },
   {
     "id": "f5c42a38-1d1e-4018-b010-bbc14e2d6363",

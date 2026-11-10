@@ -36,6 +36,7 @@
     "./formats/modelCache": "./src/formats/modelCache.ts",
     "./formats/canvasSelection": "./src/formats/canvasSelection.ts",
     "./formats/forgeRunStatus": "./src/formats/forgeRunStatus.ts",
+    "./formats/assayRunStatus": "./src/formats/assayRunStatus.ts",
     "./formats/agentActivity": "./src/formats/agentActivity.ts",
     "./formats/modelBase": "./src/formats/modelBase.ts",
     "./formats/exportGherkin": "./src/formats/exportGherkin.ts",

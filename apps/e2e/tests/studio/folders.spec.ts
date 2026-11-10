@@ -503,6 +503,69 @@ test('an agent\'s Forge run on the folder makes the Forge button pulse and opens
   await expect(panel).toHaveCount(0)
 })
 
+test('an agent\'s Assay run on the folder shows an Assay button that pulses and opens read only', async ({ page }) => {
+  await saveAsFolder(page)
+  const stages = ['c4', 'explore', 'documents', 'domain', 'processes', 'states', 'scenarios']
+  const write = (state: string, statuses: Record<string, string>, waiting = 0): Promise<void> => folder.write('.state/assay-run.json', JSON.stringify({
+    version: 1,
+    client: 'claude-code',
+    repositories: [{ name: 'RS2', units: 3, facts: 1520 }, { name: 'UcsFiscalPrinters', units: 5, facts: 410 }],
+    sources: 1,
+    startedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    state,
+    stages: stages.map((id) => ({
+      id, status: statuses[id] ?? 'pending',
+      ...(id === 'c4' ? { plans: 2, refused: 1, added: { nodes: 14, relations: 9 } } : {}),
+      ...(id === 'domain' && statuses[id] === 'done' ? { plans: 1, added: { nodes: 6, relations: 4 } } : {}),
+    })),
+    proposals: { waiting, accepted: 0, rejected: 0 },
+  }))
+  // No run: no Assay button (Studio cannot run Assay itself).
+  await expect(page.locator('.qs-forge-toggle')).toHaveCount(1)
+  const button = page.locator('.qs-assay-toggle')
+  await expect(button).toHaveCount(0)
+
+  // Working on the domain: blue pulse, stage 4 of 7.
+  await write('active', { c4: 'done', explore: 'skipped', documents: 'skipped', domain: 'working' })
+  await expect(button).toHaveAttribute('data-agent-phase', 'working', { timeout: 10_000 })
+  await expect(button.locator('.qs-forge-badge')).toHaveText('4/7')
+  await expect(button).toHaveAttribute('title', 'Claude Code is running Radical Assay on this model (Domain) — click to see where it stands')
+  // The Forge button is Studio's own Forge still.
+  await expect(page.locator('.qs-forge-toggle').first()).not.toHaveAttribute('data-agent-phase')
+
+  await button.click()
+  const panel = page.getByRole('dialog', { name: 'Radical Assay — agent run' })
+  await expect(panel).toContainText('Radical Assay — run by Claude Code')
+  await expect(panel.getByTestId('assay-run-repositories')).toHaveText('2 repositories: RS2 (3 units), UcsFiscalPrinters (5 units) · 1 source of documents')
+  await expect(panel.locator('.forge-step')).toHaveCount(7)
+  await expect(panel.locator('.forge-step.active')).toHaveText('Domain')
+  await expect(panel.locator('.forge-step.skipped')).toHaveCount(2)
+  await expect(panel.locator('.forge-step', { hasText: 'C4' })).toHaveAttribute('title', 'C4 model: done (2 plans written, 1 refused, +14 elements, +9 relations)')
+  await expect(panel.locator('.forge-step', { hasText: 'C4' }).getByTestId('assay-step-refused')).toHaveText('↺1')
+  await expect(panel.locator('.forge-agent-line')).toHaveText('Claude Code is working on the Domain stage…')
+  await expect(panel.getByTestId('assay-run-counts')).toHaveText('2 plans written, 1 refused · +14 elements, +9 relations · Proposals: 0 waiting, 0 accepted, 0 left out')
+  // Nothing acts on the run: Close, and following it on the canvas.
+  await expect(panel.getByRole('button')).toHaveCount(2)
+  await expect(panel.getByRole('button', { name: 'Follow on the canvas' })).toBeVisible()
+
+  // Requirements handed to the user: amber, waiting for the answers.
+  await write('active', { c4: 'done', explore: 'skipped', documents: 'skipped', domain: 'done', processes: 'skipped', states: 'skipped', scenarios: 'working' }, 3)
+  await expect(button).toHaveAttribute('data-agent-phase', 'waiting', { timeout: 10_000 })
+  await expect(button.locator('.qs-forge-badge')).toHaveText('7/7')
+  await expect(panel.locator('.forge-agent-line')).toHaveText('Claude Code waits for your answer to 3 proposals of the Scenarios stage; answer there.')
+  await expect(panel.locator('.forge-step.active.waiting')).toHaveText('Scenarios')
+
+  // The client closed early: no pulse, shown as stopped, nothing to follow.
+  await write('closed', { c4: 'done', domain: 'done', scenarios: 'working' }, 3)
+  await expect(button).toHaveAttribute('data-agent-phase', 'paused', { timeout: 10_000 })
+  await expect(button.locator('.qs-forge-badge')).toHaveText('‖')
+  await expect(panel.locator('.forge-agent-line')).toHaveText('Stopped: Claude Code closed before the run finished.')
+  await expect(panel.getByRole('button')).toHaveCount(1)
+  await page.keyboard.press('Escape')
+  await expect(panel).toHaveCount(0)
+})
+
 // Item 189: an agent's write closed the card of a selected relation while it
 // was typed in (the focus went, the next keys were lost); an element's card
 // stayed open. The reload took the document opened at boot for another, and

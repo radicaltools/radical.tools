@@ -7,6 +7,7 @@ import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdF
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { readCheckFiles, readEditorStateFile, readFederationFiles, writeCheckConfig, writeEditorStateFile, writeRepositoryFile, writeSelectionFile } from '@radical/node-files/selectionFile'
 import { FORGE_RUN_FILE } from '@radical/common/formats/forgeRunStatus'
+import { ASSAY_RUN_FILE } from '@radical/common/formats/assayRunStatus'
 import { AGENT_ACTIVITY_FILE } from '@radical/common/formats/agentActivity'
 import { MODEL_BASE_FILE } from '@radical/common/formats/modelBase'
 import { DiskDiscussions } from '@radical/node-files/discussions'
@@ -250,6 +251,15 @@ app.whenReady().then(() => {
   ipcMain.handle('folder:read-forge-run', async (_event, folderPath: string) => {
     try {
       return { success: true, content: await readEditorStateFile(folderPath, FORGE_RUN_FILE) }
+    } catch (e) {
+      return { success: false, error: (e as Error).message }
+    }
+  })
+
+  // Where an agent's Assay run with this folder as its central model stands.
+  ipcMain.handle('folder:read-assay-run', async (_event, folderPath: string) => {
+    try {
+      return { success: true, content: await readEditorStateFile(folderPath, ASSAY_RUN_FILE) }
     } catch (e) {
       return { success: false, error: (e as Error).message }
     }

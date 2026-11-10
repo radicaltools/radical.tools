@@ -20,6 +20,7 @@ import { HubImportModal } from './HubImportModal'
 import { OPEN_HUB_EVENT } from '../persistence/inspector'
 import { RadicalForgeModal } from './RadicalForgeModal'
 import { AgentForgeModal } from './AgentForgeModal'
+import { AgentAssayModal } from './AgentAssayModal'
 import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { useExport } from '../hooks/useExport'
 import { keysTakenByDialog } from './dialogKeys'
@@ -919,6 +920,16 @@ export function Toolbar(): React.ReactElement {
     return () => window.removeEventListener('radical:open-agent-forge', onOpen as EventListener)
   }, [])
 
+  // The Assay button, shown only while an agent runs Assay with this folder
+  // as its central model, opens a read-only view of that run (persistence/agentAssay).
+  const [agentAssayOpen, setAgentAssayOpen] = useState(false)
+  const closeAgentAssay = useCallback(() => setAgentAssayOpen(false), [])
+  useEffect(() => {
+    const onOpen = () => setAgentAssayOpen(true)
+    window.addEventListener('radical:open-agent-assay', onOpen as EventListener)
+    return () => window.removeEventListener('radical:open-agent-assay', onOpen as EventListener)
+  }, [])
+
   const bar = useRef<HTMLDivElement>(null)
   const compact = useMiddleRoom(bar, appMode !== 'inspector', appMode)
 
@@ -960,6 +971,7 @@ export function Toolbar(): React.ReactElement {
       <HubImportModal open={hubOpen} onClose={handleCloseHub} preselectedIds={hubPreselectedIds} bindTo={hubBindTo} />
       <RadicalForgeModal open={forgeOpen} onClose={handleCloseForge} />
       <AgentForgeModal open={agentForgeOpen && !forgeOpen} onClose={closeAgentForge} />
+      <AgentAssayModal open={agentAssayOpen && !forgeOpen && !agentForgeOpen} onClose={closeAgentAssay} />
       <AppMenu
         onManage={handleManage}
         activeDocLabel={activeDoc?.name ?? null}

@@ -11,10 +11,11 @@ import { mergeNotices } from '@radical/common/modelMerge'
 import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { modelChangesSince } from '@radical/node-files/gitModel'
-import { readEditorStateFile, writeEditorStateFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
+import { readEditorStateFile, writeAssayRunFile, writeEditorStateFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
 import { SELECTION_FILE, parseSelection } from '@radical/common/formats/canvasSelection'
 import { MODEL_BASE_FILE, forgeModelBase, mayReplaceWithForgeBase } from '@radical/common/formats/modelBase'
 import { serializeForgeRun } from '@radical/common/formats/forgeRunStatus'
+import { serializeAssayRun } from '@radical/common/formats/assayRunStatus'
 import { AGENT_ACTIVITY_FILE, serializeAgentActivity } from '@radical/common/formats/agentActivity'
 import { displayVersion } from '@radical/common/version'
 import { runModelQuery } from '@radical/common/ai/queryLanguage'
@@ -432,6 +433,18 @@ export class FolderModel {
     }
   }
 
+  /** Writes where the agent's Assay run stands for Studio to show (ADR Agent
+   *  Assay runs show in Studio). A failed write never fails the call. */
+  private async writeAssayStatus(closing = false): Promise<void> {
+    const status = this.assay.status(closing)
+    if (!status) return
+    try {
+      await writeAssayRunFile(this.folder, serializeAssayRun({ ...status, ...(this.clientName() ? { client: this.clientName() } : {}) }))
+    } catch {
+      // Read-only folder or a symlinked .radical: Studio just shows nothing.
+    }
+  }
+
   /** Saves `content` (the model before a Forge run) as the folder's base
    *  unless git saved one; a line for the answer when it did. A failed write
    *  never fails the call. */
@@ -451,6 +464,7 @@ export class FolderModel {
     await this.idle()
     const status = this.forge.status()
     if (status?.state === 'active') await this.writeForgeStatus(true)
+    if (this.assay.status()?.state === 'active') await this.writeAssayStatus(true)
   }
 
   /** Resolves once every queued call has finished. */
@@ -751,6 +765,7 @@ export class FolderModel {
       // Assay reads the facade's refusals itself and answers with all of them.
       if (ASSAY_TOOLS.has(name) ? !result.ok : !result.ok || facade.lastError) {
         this.restoreTempIds(priorTempIds)
+        if (ASSAY_TOOLS.has(name)) await this.writeAssayStatus()
         return { ok: false, text: ASSAY_TOOLS.has(name) ? result.resultText : facade.lastError ?? result.resultText }
       }
       // A run starting on a folder git saved no base for: the model before it.
@@ -758,6 +773,7 @@ export class FolderModel {
       if (READ_ONLY.has(name) || result.readOnly) {
         result.commit?.()
         if (FORGE_TOOLS.has(name)) await this.writeForgeStatus()
+        if (ASSAY_TOOLS.has(name)) await this.writeAssayStatus()
         return { ok: true, text: result.resultText + (forgeBase ? await this.saveForgeBase(forgeBase) : '') + (result.afterWrite ? await result.afterWrite() : '') }
       }
 
@@ -783,6 +799,7 @@ export class FolderModel {
       // Assay's files beside the model, once the model is on disk.
       if (result.afterWrite) outcome.text += await result.afterWrite()
       if (FORGE_TOOLS.has(name)) await this.writeForgeStatus()
+      if (ASSAY_TOOLS.has(name)) await this.writeAssayStatus()
       if (forgeBase) outcome.text += await this.saveForgeBase(forgeBase)
       // A metamodel tool changed the types: re-advertise the schemas.
       if (this.refreshTools(metamodel)) return { ...outcome, toolsChanged: true }

@@ -308,6 +308,12 @@ export async function readForgeRunFromHandle(root: FsDirHandle): Promise<string 
   return readStateFromHandle(root, 'forge-run.json')
 }
 
+/** The Assay run status file (see assayRunStatus) of the model folder's
+ *  state, or null when there is none. */
+export async function readAssayRunFromHandle(root: FsDirHandle): Promise<string | null> {
+  return readStateFromHandle(root, 'assay-run.json')
+}
+
 /** The agent activity file (see agentActivity) of the model folder's
  *  state, or null when there is none. */
 export async function readAgentActivityFromHandle(root: FsDirHandle): Promise<string | null> {

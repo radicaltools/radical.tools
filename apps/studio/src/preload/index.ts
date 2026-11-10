@@ -21,6 +21,7 @@ const api = {
   },
   writeSelection: (folderPath, content) => ipcRenderer.invoke('folder:write-selection', folderPath, content),
   readForgeRun: (folderPath) => ipcRenderer.invoke('folder:read-forge-run', folderPath),
+  readAssayRun: (folderPath) => ipcRenderer.invoke('folder:read-assay-run', folderPath),
   readAgentActivity: (folderPath) => ipcRenderer.invoke('folder:read-agent-activity', folderPath),
   readModelBase: (folderPath) => ipcRenderer.invoke('folder:read-model-base', folderPath),
   writeModelBase: (folderPath, content) => ipcRenderer.invoke('folder:write-model-base', folderPath, content),

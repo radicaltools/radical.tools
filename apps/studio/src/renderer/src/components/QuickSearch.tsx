@@ -11,6 +11,9 @@ import type { AISettings, ChatMessage, TokenUsage } from '../ai/types'
 import type { ApplyReport } from '@radical/common/ai/diagramFacade'
 import { forgeRunClientName, forgeRunCurrentStage } from '@radical/common/formats/forgeRunStatus'
 import { agentForgePhase, useAgentForgeStore } from '../persistence/agentForge'
+import { agentAssayPhase, useAgentAssayStore } from '../persistence/agentAssay'
+import { ASSAY_STAGES, assayRunCurrentStage } from '@radical/common/formats/assayRunStatus'
+import { AssayIcon } from './AgentAssayModal'
 import { useFollowAgentStore } from '../persistence/followAgent'
 import { pickViewFor, showOnPage, viewNodeSets as viewNodeSetsOf } from '../navigation'
 import { keysTakenByDialog } from './dialogKeys'
@@ -81,6 +84,29 @@ export function QuickSearch(): React.ReactElement | null {
     : agentPhase === 'done' ? `${agentClient} finished a Radical Forge run — click to see it`
     : `${agentClient}'s Radical Forge run stopped — click to see where it stands`
   const agentTitle = followingAgent ? `${agentForgeTitle}. Following it on the canvas.` : agentForgeTitle
+
+  // An agent's Assay run with this folder as its central model: an Assay
+  // button beside Forge's, only while there is one (Studio cannot run Assay).
+  const assayStatus = useAgentAssayStore((s) => s.status)
+  const [assayNow, setAssayNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!assayStatus) return
+    setAssayNow(Date.now())
+    const timer = setInterval(() => setAssayNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
+  }, [assayStatus])
+  const assayPhase = agentAssayPhase(assayStatus, assayNow)
+  const assayCurrent = assayStatus ? assayRunCurrentStage(assayStatus) : undefined
+  const assayBadge = assayPhase === 'done' ? '✓'
+    : assayPhase === 'paused' ? '‖'
+    : assayStatus && assayCurrent ? `${assayStatus.stages.indexOf(assayCurrent) + 1}/${assayStatus.stages.length}`
+    : null
+  const assayClient = forgeRunClientName(assayStatus?.client)
+  const assayStage = assayCurrent ? ASSAY_STAGES.find((s) => s.id === assayCurrent.id)?.title : undefined
+  const assayTitle = (assayPhase === 'working' ? `${assayClient} is running Radical Assay on this model${assayStage ? ` (${assayStage})` : ''} — click to see where it stands`
+    : assayPhase === 'waiting' ? `${assayClient}'s Radical Assay run is waiting for your answer — click to see where it stands`
+    : assayPhase === 'done' ? `${assayClient} finished a Radical Assay run — click to see it`
+    : `${assayClient}'s Radical Assay run stopped — click to see where it stands`) + (followingAgent ? '. Following it on the canvas.' : '')
 
   const [q, setQ] = useState('')
   const [hover, setHover] = useState(0)
@@ -661,6 +687,24 @@ export function QuickSearch(): React.ReactElement | null {
           </svg>
           {agentBadge && <span className="qs-forge-badge" aria-hidden>{agentBadge}</span>}
         </button>
+        {assayPhase && (
+          <button
+            type="button"
+            className={`qs-forge-toggle qs-assay-toggle qs-forge-agent qs-forge-${assayPhase}`}
+            title={assayTitle}
+            aria-label="Show the agent's Radical Assay run"
+            data-agent-phase={assayPhase}
+            data-following={followingAgent || undefined}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              closeDropdown()
+              window.dispatchEvent(new CustomEvent('radical:open-agent-assay'))
+            }}
+          >
+            <AssayIcon size={13} />
+            {assayBadge && <span className="qs-forge-badge" aria-hidden>{assayBadge}</span>}
+          </button>
+        )}
         {aiBusy && (
           <button
             type="button"

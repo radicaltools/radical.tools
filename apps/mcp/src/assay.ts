@@ -38,6 +38,7 @@ import { Explorer, type ExploreAction } from './explore'
 import { runTool, type ToolDef, type ToolResult, type ToolRunContext } from '@radical/common/ai/tools'
 import type { ModelFacade } from '@radical/common/ai/modelFacade'
 import { REPOSITORY_FILE, parseRepositoryFile, serializeRepositoryFile, type RepositoryFile } from '@radical/common/repositoryMapping'
+import { ASSAY_STAGES, type AssayRunStageInfo, type AssayRunStatus, type AssayStageId } from '@radical/common/formats/assayRunStatus'
 
 /** Stored routines with each package's members folded into the package's row: a member by its id, name in the
  *  package, kind and line (with its file where the package's is another), and the tables and routines it uses. */
@@ -723,7 +724,34 @@ interface Run {
   testsWritten: string[]
   /** The pending tests written for scenarios drawn from the code. */
   skeletons: string[]
+  /** Where the run stands, for Studio (ADR Agent Assay runs show in Studio). */
+  progress: Progress
 }
+
+/** Where a run stands: its stages as the server infers them from the calls. */
+interface Progress {
+  startedAt: string
+  state: 'active' | 'finished'
+  stages: AssayRunStageInfo[]
+  /** The stage of the plan that handed each proposal to the user. */
+  proposalStage: Map<string, AssayStageId>
+}
+
+/** The stage a plan is of: the latest stage its contents name. */
+export function planStage(plan: unknown): AssayStageId {
+  const p = (plan && typeof plan === 'object' ? plan : {}) as Record<string, unknown>
+  const has = (key: string): boolean => Array.isArray(p[key]) && (p[key] as unknown[]).length > 0
+  if (has('requirements')) return 'scenarios'
+  if (has('stateMachines')) return 'states'
+  if (has('processes')) return 'processes'
+  if (has('entities') || (Array.isArray(p.elements) && p.elements.some((e) => (e as { type?: unknown } | null)?.type === 'domain'))) return 'domain'
+  if (has('needs') || has('decisions')) return 'documents'
+  if (has('mockups')) return 'explore'
+  return 'c4'
+}
+
+/** The calls that go on with a run assay_finish finished. */
+const GOES_ON = new Set(['assay_add_sources', 'assay_explore', 'assay_explore_act', 'assay_apply', 'assay_answer'])
 
 /** What a call writes beside the model: the elements' folders, the scenarios' tests, the explored paths' and pending tests. */
 interface FileChanges {
@@ -763,6 +791,41 @@ async function attempt(tool: string, args: Record<string, unknown>, ctx: ToolRun
   return result.ok ? said : said ?? result.resultText
 }
 
+/** A run's stages as it starts: C4 first. */
+function newProgress(): Progress {
+  return {
+    startedAt: new Date().toISOString(),
+    state: 'active',
+    stages: ASSAY_STAGES.map((s, i) => ({ id: s.id, status: i === 0 ? 'working' : 'pending' })),
+    proposalStage: new Map(),
+  }
+}
+
+/** The run reaches `stage`: the stages before it that it moves past are done after a plan, skipped with none. A stage
+ *  before the one it is at (or, finished, the last it reached) moves it nowhere: that stage's plan counts there. */
+function reach(progress: Progress, stage: AssayStageId): void {
+  const { stages } = progress
+  const working = stages.findIndex((s) => s.status === 'working')
+  const at = working >= 0 ? working : stages.map((s) => s.status !== 'pending').lastIndexOf(true)
+  const to = stages.findIndex((s) => s.id === stage)
+  if (to <= at) return
+  for (const s of stages.slice(0, to)) if (s.status === 'working' || s.status === 'pending') s.status = s.plans ? 'done' : 'skipped'
+  stages[to].status = 'working'
+}
+
+/** assay_finish: the stage the run is at is done (or skipped, with no plan), and so is every stage it never reached. */
+function finish(progress: Progress): void {
+  progress.state = 'finished'
+  for (const s of progress.stages) if (s.status === 'working' || s.status === 'pending') s.status = s.plans ? 'done' : 'skipped'
+}
+
+/** Counts what a call wrote into its stage: elements (every node) and relations. */
+function added(info: AssayRunStageInfo, written: Written[]): void {
+  if (!written.length) return
+  const relations = written.filter((w) => w.kind === 'relation').length
+  info.added = { nodes: (info.added?.nodes ?? 0) + written.length - relations, relations: (info.added?.relations ?? 0) + relations }
+}
+
 export class Assay {
   private run: Run | null = null
   /** The labels of the entities the last plan wrote that no element realises. */
@@ -772,6 +835,82 @@ export class Assay {
   constructor(private readonly folder: string, private readonly root: () => Promise<string>) {}
 
   async call(name: string, input: unknown, ctx: ToolRunContext, facade: ModelFacade): Promise<AssayResult> {
+    const result = await this.callTool(name, input, ctx, facade)
+    const run = this.run
+    if (!run || name === 'assay_start') return result
+    return this.track(run, name, input, result)
+  }
+
+  /** Where the run stands after a call: the stage it reached, a plan written or refused, a proposal answered, the run
+   *  finished. What a call writes counts once it is on disk (its commit); a refusal counts at once. */
+  private track(run: Run, name: string, input: unknown, result: AssayResult): AssayResult {
+    const progress = run.progress
+    if (GOES_ON.has(name) && progress.state === 'finished') progress.state = 'active'
+    if (name === 'assay_explore' || name === 'assay_explore_act') reach(progress, 'explore')
+    if (name === 'assay_finish') finish(progress)
+    if (name === 'assay_apply') {
+      const stage = planStage((input as { plan?: unknown } | undefined)?.plan)
+      reach(progress, stage)
+      const info = progress.stages.find((s) => s.id === stage)!
+      if (!result.ok) {
+        info.refused = (info.refused ?? 0) + 1
+        return result
+      }
+      const commit = result.commit
+      return {
+        ...result,
+        commit: () => {
+          const written = run.written.length
+          const proposals = run.proposals.length
+          commit?.()
+          info.plans = (info.plans ?? 0) + 1
+          if (info.status === 'skipped') info.status = 'done'
+          added(info, run.written.slice(written))
+          for (const p of run.proposals.slice(proposals)) progress.proposalStage.set(p.id, stage)
+        },
+      }
+    }
+    if (name === 'assay_answer' && result.ok) {
+      const id = (input as { proposal?: unknown } | undefined)?.proposal
+      const stage = (typeof id === 'string' ? progress.proposalStage.get(id) : undefined) ?? 'scenarios'
+      const commit = result.commit
+      return {
+        ...result,
+        commit: () => {
+          const written = run.written.length
+          commit?.()
+          added(progress.stages.find((s) => s.id === stage)!, run.written.slice(written))
+        },
+      }
+    }
+    return result
+  }
+
+  /** Where the run stands, for Studio (see assayRunStatus); null without a run. `closing`: the server shuts down, so an
+   *  unfinished run is closed. */
+  status(closing = false): Omit<AssayRunStatus, 'version' | 'updatedAt'> | null {
+    const run = this.run
+    if (!run) return null
+    const { progress } = run
+    return {
+      repositories: run.repositories.map((r) => ({
+        name: r.repository,
+        units: r.units.length,
+        facts: FACT_LISTS.reduce((n, list) => n + ((r as unknown as Record<string, unknown[] | undefined>)[list]?.length ?? 0), 0),
+      })),
+      sources: run.sources.length,
+      startedAt: progress.startedAt,
+      state: closing && progress.state === 'active' ? 'closed' : progress.state,
+      stages: progress.stages.map((s) => ({ ...s, ...(s.added ? { added: { ...s.added } } : {}) })),
+      proposals: {
+        waiting: run.proposals.filter((p) => p.status === 'waiting').length,
+        accepted: run.proposals.filter((p) => p.status === 'accepted').length,
+        rejected: run.proposals.filter((p) => p.status === 'rejected').length,
+      },
+    }
+  }
+
+  private async callTool(name: string, input: unknown, ctx: ToolRunContext, facade: ModelFacade): Promise<AssayResult> {
     if (name === 'assay_start') return this.start(input)
     if (name === 'assay_procedure') return ok(ASSAY_PROCEDURE, { readOnly: true })
     const run = this.run
@@ -859,7 +998,7 @@ export class Assay {
     }
     const links = linkRepositories(repositories)
     const taken = await takeSources((sources ?? []) as string[], root, new Set(repositories.map((r) => r.repository)), SOURCE_OPTIONS)
-    this.run = { root, modelPath: posix(relative(root, this.folder)) || '.', repositories, sources: taken.sources, links, facts: factIndex([...repositories, ...taken.sources], links), written: [], proposals: [], mockupOf: new Map(), navigated: new Set(), testsWritten: [], skeletons: [] }
+    this.run = { root, modelPath: posix(relative(root, this.folder)) || '.', repositories, sources: taken.sources, links, facts: factIndex([...repositories, ...taken.sources], links), written: [], proposals: [], mockupOf: new Map(), navigated: new Set(), testsWritten: [], skeletons: [], progress: newProgress() }
     const lines = [
       `Assay run on ${repositories.length} repositor${repositories.length === 1 ? 'y' : 'ies'}${taken.sources.length ? ` and ${taken.sources.length} source${taken.sources.length === 1 ? '' : 's'} of documents` : ''}; the central model is ${this.run.modelPath} in ${root}.`,
       ...(found.empty.length ? [`Nothing in: ${found.empty.join(', ')}.`] : []),

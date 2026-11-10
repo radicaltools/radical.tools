@@ -2345,6 +2345,11 @@ div.milestone-option { cursor: default; }
 /* The agent run's step bar: a stage that is asking the user questions. */
 .forge-step.waiting { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 60%, transparent); }
 .forge-agent-line { margin: 4px 0 0; }
+/* An agent's Assay run (persistence/agentAssay): its button beside Forge's,
+   clear of the Forge badge. A stage it moved past with no plan is drawn as
+   the wizard draws a skipped stage (.forge-step.skipped in @radical/ui). */
+.qs-assay-toggle { margin-left: 6px; }
+.assay-agent-counts { margin: 4px 0 0; font-size: 11px; color: var(--text-secondary); }
 .forge-agent-follow { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 .forge-agent-follow .forge-btn { flex: none; }
 .forge-agent-follow-hint { font-size: 11px; line-height: 1.4; color: var(--text-secondary); }
