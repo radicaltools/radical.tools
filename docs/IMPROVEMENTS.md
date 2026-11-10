@@ -376,8 +376,16 @@ routines 752/971, missed where a Perl distribution, a Supabase project, a 34 MB 
 were. Now tests 1 690/1 691, units 13/15, calls 17/20, tables 301/303, routines 965/971; the other benches as before.
 Open:
 
-- **A library of SQL beside other units** (plscope-utils' database/utils and database/demo beside its SQL Developer
-  extension) is the database's, no unit, by the rule of round 8; the person writing it down made them units.
+- ~~**A library of SQL beside other units**~~: done (user's choice, 2026-11-10). A top folder of scripts no other
+  unit's code uses (its tests aside) is a unit of its own; a schema an app's code uses stays that app's database, and
+  beside a Sqitch or Supabase project the project is the database. plscope-utils: units 3/3, calls 1/1.
+- **An agent's run on Schemaverse and plscope-utils** (run 28, `/Volumes/data/Dev/assay-runs/28-dbtests`, 12 minutes,
+  $6.9): all 186 database tests rest scenarios. Fixed after it: plscope-utils' PL/SQL went to its Java unit (the rule
+  above), a database test is never in another stack's unit, a pending pgTAP test goes where the unit's tests are,
+  named and headed as they are, as skip('scenario'), which no runner fails (todo + fail failed Schemaverse's
+  test.sh). Open from it: utPLSQL reports name tests by suite path (plscope.test.test_dd_util.x), not file;
+  get_verification reads the central repository's radical.json, not the code repositories'; a fleet's flag read as
+  shared_at; a member's line given as file:line.
 - **Routines a demo script creates and drops at its end** (sith-demo-db's talks) are gone by the final-state rule;
   the person writing it down kept them.
 - **Reports of database tests**: utPLSQL's JUnit names no file, pg_prove writes TAP; radical check reads neither,
