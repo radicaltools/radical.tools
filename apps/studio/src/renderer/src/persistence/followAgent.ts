@@ -1,6 +1,7 @@
 // ─── Follow the agent ────────────────────────────────────────────────────────
 //
-// Switched on in the view of an agent's Forge run (AgentForgeModal). Each
+// Switched on in the view of an agent's Forge or Assay run (AgentForgeModal,
+// AgentAssayModal). Each
 // change made outside Studio opens a view that shows what the agent added or
 // changed, and frames what its turn has done there. Only views that show some
 // elements count, never All elements or a view of every element, where an
@@ -20,6 +21,7 @@ import { computeSnapDiff, useDiagramStore } from '@radical/ui/store/diagramStore
 import { onUserCamera } from '@radical/ui/store/userCamera'
 import { loadingDocumentId, onOutsideEditLoaded } from './autosave'
 import { agentForgePhase, useAgentForgeStore } from './agentForge'
+import { agentAssayPhase, useAgentAssayStore } from './agentAssay'
 
 interface FollowAgentState {
   on: boolean
@@ -154,9 +156,11 @@ useDiagramStore.subscribe((s, prev) => {
   if (s.activeViewId !== prev.activeViewId && !switching && loadingDocumentId() === null) pause()
 })
 
-// Nothing more to follow once the run finishes or stops.
-useAgentForgeStore.subscribe((s) => {
+// Nothing more to follow once the agent's runs (Forge, Assay) finish or stop.
+const going = (phase: string | null): boolean => phase === 'working' || phase === 'waiting'
+const stopWhenEnded = (): void => {
   if (!useFollowAgentStore.getState().on) return
-  const phase = agentForgePhase(s.status)
-  if (phase !== 'working' && phase !== 'waiting') setFollowAgent(false)
-})
+  if (!going(agentForgePhase(useAgentForgeStore.getState().status)) && !going(agentAssayPhase(useAgentAssayStore.getState().status))) setFollowAgent(false)
+}
+useAgentForgeStore.subscribe(stopWhenEnded)
+useAgentAssayStore.subscribe(stopWhenEnded)

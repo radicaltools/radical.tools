@@ -10,6 +10,8 @@ import type { ForgeRunStatus } from '@radical/common/formats/forgeRunStatus'
 import { setChangeFlashDuration } from '../src/renderer/src/persistence/changeFlash'
 import { setFollowAgent, setFollowAgentQuiet, useFollowAgentStore } from '../src/renderer/src/persistence/followAgent'
 import { useAgentForgeStore } from '../src/renderer/src/persistence/agentForge'
+import { useAgentAssayStore } from '../src/renderer/src/persistence/agentAssay'
+import type { AssayRunStatus } from '@radical/common/formats/assayRunStatus'
 import type { FolderChange } from '@radical/host-bridge'
 import type { C4Node, DiagramData, DiagramView } from '@radical/common/c4'
 
@@ -35,6 +37,11 @@ const view = (id: string, name: string, nodeIds: string[]): DiagramView => ({ id
 const run = (state: ForgeRunStatus['state']): ForgeRunStatus => ({
   version: 1, client: 'claude-code', startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), state,
   stages: [{ id: 'requirements', status: 'generating' }],
+})
+
+const assay = (state: AssayRunStatus['state']): AssayRunStatus => ({
+  version: 1, client: 'claude-code', startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), state,
+  repositories: [{ name: 'RS2', units: 3, facts: 100 }], sources: 0, stages: [{ id: 'c4', status: 'working' }], proposals: { waiting: 0, accepted: 0, rejected: 0 },
 })
 
 /** A folder document whose content `edit` replaces, as an agent over MCP would. */
@@ -151,5 +158,17 @@ describe('follow the agent', () => {
     expect(useDiagramStore.getState().activeViewId).toBe('b')
     expect(focus).toHaveBeenLastCalledWith(['sys3'], { duration: 600 })
     useAgentForgeStore.setState({ status: run('finished') })
+  })
+
+  it('follows an agent\'s Assay run as its Forge run, and stops once neither goes on', () => {
+    useAgentForgeStore.setState({ status: null })
+    useAgentAssayStore.setState({ status: assay('active') })
+    setFollowAgent(true)
+    // A Forge run ending leaves the Assay run to follow.
+    useAgentForgeStore.setState({ status: run('finished') })
+    expect(useFollowAgentStore.getState().on).toBe(true)
+    useAgentAssayStore.setState({ status: assay('closed') })
+    expect(useFollowAgentStore.getState().on).toBe(false)
+    useAgentAssayStore.setState({ status: null })
   })
 })

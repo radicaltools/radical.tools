@@ -86,6 +86,9 @@ export interface HostCapabilities {
   /** Read the status of an agent's Forge run (`.state/forge-run.json`) in an
    *  md-folder, written by the MCP server; content is null when there is none. */
   readForgeRun?(folderPath: string): Promise<HostResult & { content?: string | null }>
+  /** Read the status of an agent's Assay run (`.state/assay-run.json`) in an
+   *  md-folder, written by the MCP server; content is null when there is none. */
+  readAssayRun?(folderPath: string): Promise<HostResult & { content?: string | null }>
   /** Read the agent activity file (`.state/agent-activity.json`) in an
    *  md-folder, written by the MCP server after each write; content is null
    *  when there is none. */

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { parseAssayRun } from '@radical/common/formats/assayRunStatus'
 import { FolderModel } from './folderModel'
 
 /** Two code repositories, a TypeScript service with its schema and a VB6 point of sale, beside an empty central model. */
@@ -49,7 +50,7 @@ async function central() {
   const relations = async () => JSON.parse((await call('search_model', { query: 'LIST RELATIONS' })).text).rows as Array<{ relationType: string; sourceLabel: string; targetLabel: string } & Record<string, unknown>>
   const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'))
   await call('assay_start', { directories: ['../code'] })
-  return { code, root, call, nodes, relations, json }
+  return { code, root, model, call, nodes, relations, json }
 }
 
 const ORDERS = 'orders:unit:.'
@@ -225,5 +226,56 @@ describe('Radical Assay over MCP: the domain, processes and lifecycles', () => {
     expect((await nodes()).some((n) => n.type === 'scenario' && n.label === 'Sale closed')).toBe(true)
     expect(existsSync(join(code, 'pos/tests'))).toBe(false)
     expect(json(join(code, 'pos/.radical/radical.json')).verifies).toBeUndefined()
+  })
+
+  it('tells Studio where the run stands, its stages inferred from the calls', async () => {
+    const { root, model, call, nodes } = await central()
+    const status = () => parseAssayRun(readFileSync(join(root, '.radical/model/.state/assay-run.json'), 'utf8'))!
+    const stages = () => status().stages.map((s) => `${s.id}:${s.status}`).join(' ')
+    const stage = (id: string) => status().stages.find((s) => s.id === id)
+    expect(status()).toMatchObject({ state: 'active', sources: 0, proposals: { waiting: 0, accepted: 0, rejected: 0 } })
+    expect(status().repositories.map((r) => [r.name, r.units])).toEqual([['orders', 1], ['pos', 1]])
+    expect(status().repositories.every((r) => r.facts > 2)).toBe(true)
+    expect(stages()).toBe('c4:working explore:pending documents:pending domain:pending processes:pending states:pending scenarios:pending')
+
+    expect((await call('assay_apply', { plan: C4 })).ok).toBe(true)
+    expect(stage('c4')).toEqual({ id: 'c4', status: 'working', plans: 1, added: { nodes: 3, relations: 0 } })
+    // A refused plan counts in the stage it is of, which the run has reached.
+    expect((await call('assay_apply', { plan: { ...DOMAIN, entities: [{ key: 'ghost', label: 'Ghost', tables: [] }] } })).ok).toBe(false)
+    expect(stages()).toBe('c4:done explore:skipped documents:skipped domain:working processes:pending states:pending scenarios:pending')
+    expect(stage('domain')).toEqual({ id: 'domain', status: 'working', refused: 1 })
+    expect((await call('assay_apply', { plan: DOMAIN })).ok).toBe(true)
+    expect(stage('domain')).toMatchObject({ status: 'working', plans: 1, refused: 1 })
+    expect(stage('domain')!.added!.nodes).toBe(3)
+
+    // Requirements: the Scenarios stage, its proposals waiting for the user.
+    const close = (key: string, label: string) => ({
+      key, label, satisfiedBy: 'pos',
+      properties: { ears_type: 'event-driven', trigger: 'the clerk closes a sale', action: 'the point of sale shall mark it closed' },
+      scenarios: [{ key: `s-${key}`, label: `${label}, its scenario`, given: 'an open sale', when: 'the clerk presses Close the sale', then: 'the sale is closed', citations: [{ repository: 'pos', file: 'frmSale.frm', lines: [9, 10], text: 'UPDATE sales SET closed = 1' }] }],
+    })
+    expect((await call('assay_apply', { plan: { requirements: [close('r-close', 'Close a sale'), close('r-shut', 'Shut a sale')] } })).ok).toBe(true)
+    expect(stages()).toBe('c4:done explore:skipped documents:skipped domain:done processes:skipped states:skipped scenarios:working')
+    expect(status().proposals).toEqual({ waiting: 2, accepted: 0, rejected: 0 })
+    expect(stage('scenarios')).toEqual({ id: 'scenarios', status: 'working', plans: 1 })
+    expect((await call('assay_answer', { proposal: 'P1', accept: true })).ok).toBe(true)
+    expect(status().proposals).toEqual({ waiting: 1, accepted: 1, rejected: 0 })
+    // The requirement, its scenario and the run's need Found in the code.
+    expect(stage('scenarios')!.added!.nodes).toBe(3)
+
+    // A later plan of an earlier stage counts there; the run stays where it is.
+    const orders = (await nodes()).find((n) => n.label === 'Orders service')!.id
+    expect((await call('assay_apply', { plan: { elements: [{ key: 'api', type: 'component', label: 'Order API', parent: orders, facts: [ORDERS], confidence: 'inferred' }] } })).ok).toBe(true)
+    expect(stage('c4')).toMatchObject({ status: 'done', plans: 2, added: { nodes: 4, relations: 0 } })
+    expect(stage('scenarios')!.status).toBe('working')
+
+    await call('assay_finish')
+    expect(status().state).toBe('finished')
+    expect(stages()).toBe('c4:done explore:skipped documents:skipped domain:done processes:skipped states:skipped scenarios:done')
+    // A new run, its client gone before it finished: closed.
+    await call('assay_start', { directories: ['../code'] })
+    expect([status().state, stages()]).toEqual(['active', 'c4:working explore:pending documents:pending domain:pending processes:pending states:pending scenarios:pending'])
+    await model.close()
+    expect(status().state).toBe('closed')
   })
 })

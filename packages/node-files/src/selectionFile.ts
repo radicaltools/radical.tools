@@ -5,6 +5,7 @@ import {
   oldStatePath, parseSelection, type CanvasSelection,
 } from '@radical/common/formats/canvasSelection'
 import { FORGE_RUN_FILE, parseForgeRun, type ForgeRunStatus } from '@radical/common/formats/forgeRunStatus'
+import { ASSAY_RUN_FILE } from '@radical/common/formats/assayRunStatus'
 import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE } from '@radical/common/check'
 import { DEPS_FILE, FEDERATION_FILE } from '@radical/common/federation'
 import { REPOSITORY_FILE } from '@radical/common/repositoryMapping'
@@ -74,6 +75,11 @@ export async function readSelectionFile(root: string): Promise<CanvasSelection |
 /** Writes the status of an agent's Forge run (see forgeRunStatus). */
 export async function writeForgeRunFile(root: string, content: string): Promise<void> {
   await writeEditorStateFile(root, FORGE_RUN_FILE, content)
+}
+
+/** Writes the status of an agent's Assay run (see assayRunStatus). */
+export async function writeAssayRunFile(root: string, content: string): Promise<void> {
+  await writeEditorStateFile(root, ASSAY_RUN_FILE, content)
 }
 
 /** The Forge run status in a model folder, or null when there is none. */
