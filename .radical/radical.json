@@ -3504,6 +3504,21 @@
     ] },
     { "element": "d178e30c-9f5b-407f-a681-dd534e2a7e56", "name": "Database test reading tests", "tests": [
       "packages/assay/tests/dbtests.test.ts"
+    ] },
+    { "element": "482dadb5-2870-478f-8ca9-dad42e0e797f", "name": "Assay stages from the agent's calls", "tests": [
+      "apps/mcp/src/assayDomain.test.ts › Radical Assay over MCP: the domain, processes and lifecycles › tells Studio where the run stands, its stages inferred from the calls",
+      "packages/common/tests/assayRunStatus.test.ts › agent Assay run status file"
+    ] },
+    { "element": "34a4fbad-7623-409d-b74c-cd2143253754", "name": "Agent Assay run shown", "tests": [
+      "apps/e2e/tests/studio/folders.spec.ts › an agent's Assay run on the folder shows an Assay button that pulses and opens read only",
+      "packages/common/tests/assayRunStatus.test.ts › agent Assay run status file",
+      "apps/studio/tests/followAgent.test.ts › follow the agent › follows an agent's Assay run as its Forge run, and stops once neither goes on"
+    ] },
+    { "element": "726c8ae2-ec8e-44ad-915f-df503b2b0bf1", "name": "Agent Assay status tests", "tests": [
+      "packages/common/tests/assayRunStatus.test.ts",
+      "apps/mcp/src/assayDomain.test.ts › Radical Assay over MCP: the domain, processes and lifecycles › tells Studio where the run stands, its stages inferred from the calls",
+      "apps/studio/tests/followAgent.test.ts › follow the agent › follows an agent's Assay run as its Forge run, and stops once neither goes on",
+      "apps/e2e/tests/studio/folders.spec.ts › an agent's Assay run on the folder shows an Assay button that pulses and opens read only"
     ] }
   ]
 }
