@@ -1,6 +1,6 @@
 {
   "name": "@radicaltools/crucible",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "Radical Crucible's engine: write fuzz files that radical fuzz runs, with rules checked after every step of random sequences of actions.",
   "license": "MIT",
   "homepage": "https://radical.tools",
