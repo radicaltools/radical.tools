@@ -6,11 +6,11 @@
   <title>Use cases — Radical.Tools</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <meta name="description" content="Six ways teams use Radical.Tools: a modelling tool instead of a drawing tool, requirements that stay attached to the architecture, one language across the organisation, a model from a brief or from the code you have, the architecture the code follows, and a harness for vibe coding." />
+  <meta name="description" content="Seven ways teams use Radical.Tools: a modelling tool instead of a drawing tool, requirements that stay attached to the architecture, one language across the organisation, a model from a brief, the architecture the code follows, a harness for vibe coding, and the model of a system found in its code." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://radical.tools/usecases.html" />
   <meta property="og:title" content="Use cases — Radical.Tools" />
-  <meta property="og:description" content="From replacing draw.io to a harness for AI-written code: six ways to use one architecture model, and what each one gives you." />
+  <meta property="og:description" content="From replacing draw.io to a harness for AI-written code: seven ways to use one architecture model, and what each one gives you." />
   <meta property="og:image" content="https://radical.tools/social-preview.png" />
   <meta property="og:image:width" content="1280" />
   <meta property="og:image:height" content="640" />
@@ -47,9 +47,9 @@
     <section class="hero uc-hero">
       <div class="eyebrow">
         <span class="eyebrow-tag">Use cases</span>
-        <span class="sep">/</span><span>one model, six ways to use it</span>
+        <span class="sep">/</span><span>one model, seven ways to use it</span>
       </div>
-      <h1>Six ways teams use it,<br /><span class="accent">from a better drawing to a harness for the code.</span></h1>
+      <h1>Seven ways teams use it,<br /><span class="accent">from a better drawing to a harness for the code.</span></h1>
       <p class="lead">
         Start with the lightest one and grow into the next when you need it. <em>It is the same model all the way.</em>
       </p>
@@ -61,6 +61,7 @@
         <li style="--c:var(--c-forge)"><a href="#no-blank-page"><span class="uc-step">4</span>No blank page</a></li>
         <li style="--c:var(--c-cli)"><a href="#code-follows"><span class="uc-step">5</span>The architecture the code follows</a></li>
         <li style="--c:var(--c-mcp)"><a href="#vibe-coding"><span class="uc-step">6</span>A harness for vibe coding</a></li>
+        <li style="--c:var(--c-assay)"><a href="#existing-code"><span class="uc-step">7</span>A system found in its code</a></li>
       </ol>
     </section>
 
@@ -195,7 +196,7 @@
           <h3>When</h3>
           <p>A new system to design for a proposal, an RFP or a discovery workshop, with a deck due next week. Or an old system nobody documented, and the people who knew it are gone.</p>
           <h3>How</h3>
-          <p>For a new system, Radical Forge turns the brief into requirements, a domain model, scenarios, states, processes, mockups and a C4 model, one stage at a time, with the Hub's concern packs settled on the way. For an existing one, a coding agent connected through MCP reads the repository and writes the model; the Inspector says what is still missing, and the Hub's critic which concerns nobody has decided.</p>
+          <p>For a new system, Radical Forge turns the brief into requirements, a domain model, scenarios, states, processes, mockups and a C4 model, one stage at a time, with the Hub's concern packs settled on the way. For an existing one, Radical Assay reads the repositories through your coding agent and writes the model they hold (see <a href="#existing-code">7</a>); the Inspector says what is still missing, and the Hub's critic which concerns nobody has decided.</p>
           <p class="uc-parts"><span class="uc-part">Radical Forge</span><span class="uc-part">Radical MCP</span><span class="uc-part">Radical Hub</span><span class="uc-part">Radical Studio</span></p>
         </div>
         <div class="uc-benefits">
@@ -212,7 +213,7 @@
       </div>
       <p class="uc-links">
         <a href="manual.html#forge">Radical Forge →</a>
-        <a href="manual.html#mcp">An agent on your repository →</a>
+        <a href="manual.html#assay">Radical Assay →</a>
         <a href="manual.html#inspector">The Inspector →</a>
         <a href="manual.html#presenting">Presenter →</a>
       </p>
@@ -288,6 +289,43 @@
       <p class="uc-links">
         <a href="manual.html#forge">Radical Forge →</a>
         <a href="https://hub.radical.tools" target="_blank" rel="noopener">Concern packs →</a>
+        <a href="manual.html#mcp">Connect your agent →</a>
+        <a href="manual.html#cli">Gate it in CI →</a>
+      </p>
+    </section>
+
+
+    <!-- ── 7 ── -->
+    <section class="uc" id="existing-code" style="--c:var(--c-assay)" aria-labelledby="uc7-title">
+      <div class="uc-head">
+        <span class="uc-num">7</span>
+        <div>
+          <h2 id="uc7-title">A system found in its code</h2>
+          <p class="uc-tagline">The model of what is built, read from the repositories, every element citing the lines it rests on.</p>
+        </div>
+      </div>
+      <div class="uc-body">
+        <div class="uc-context">
+          <h3>When</h3>
+          <p>A system that grew for years: microservices nobody drew, a VB6 or Oracle application whose logic lives in forms and stored procedures, a takeover, an audit, a migration to plan. The documentation is old or missing, and the people who knew are gone.</p>
+          <h3>How</h3>
+          <p>Your coding agent starts Radical Assay over MCP on the repositories you have cloned. Assay reads their facts, the same way every time, in more than twenty stacks: units, deployments, APIs, addresses, messages, databases, tables, stored routines, statuses, entry points and tests, the tests a database's utPLSQL or pgTAP code declares included. The agent writes the model stage by stage, systems and containers, the domain, processes, lifecycles, requirements and scenarios, and the server refuses whatever no fact or quoted line backs. A running web application can be explored too, its screens becoming mockups and its paths Playwright tests.</p>
+          <p class="uc-parts"><span class="uc-part">Radical Assay</span><span class="uc-part">Radical MCP</span><span class="uc-part">Radical Studio</span><span class="uc-part">Radical CLI</span></p>
+        </div>
+        <div class="uc-benefits">
+          <h3>What you get</h3>
+          <ul>
+            <li><b>The model of what is built,</b> not of what someone remembers: one central model across all the repositories.</li>
+            <li><b>Evidence you can check.</b> Every element and relation cites its files and lines; what is only inferred is marked so, and documents never make anything observed.</li>
+            <li><b>The logic in the database, too.</b> Oracle packages become components of their database, with the code that calls them, the services they call and the tables they write.</li>
+            <li><b>Requirements with their tests.</b> Behaviour the tests check becomes requirements with scenarios bound to those tests; behaviour no test checks gets a pending test in the repository.</li>
+            <li><b>Measured, not claimed.</b> Held-out repositories written down by hand before Assay read them, and microSecEnD's hand-drawn diagrams (calls F1 0.87).</li>
+            <li><b>A start for what comes next:</b> the same model then gates the code in CI, as in <a href="#code-follows">5</a>.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="uc-links">
+        <a href="manual.html#assay">Radical Assay →</a>
         <a href="manual.html#mcp">Connect your agent →</a>
         <a href="manual.html#cli">Gate it in CI →</a>
       </p>

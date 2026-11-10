@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- radical.tools shows Radical Assay: a card on the home page's map (finds the model in code), a section below the hero (what it reads, how it is measured, what to ask your agent), a seventh use case, A system found in its code, and the manual's list of the stacks and tests it reads brought up to date.
+
 ## [0.4.0] - 2026-11-10
 
 ### Added
