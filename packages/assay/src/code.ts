@@ -9,7 +9,7 @@
 import { extname } from 'node:path'
 import { addressesIn } from './runtime'
 import type { AddressFact, ApiFact, ClientFact, DatabaseFact, TableFact, Unit, UrlFact } from './facts'
-import { GENERATED, RepoFiles, TEST_FILE, escapeRe, lineAt, owner } from './files'
+import { GENERATED, RepoFiles, TEST_FILE, escapeRe, lineAt, owner, shownOnly } from './files'
 import { settingsFor, springConfigOwners } from './spring'
 import { inlineValues, vbValues, type VbValues } from './values'
 
@@ -475,7 +475,8 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       // JPQL (a Spring Data @Query, createQuery) names entities, not tables; a migration's SQL names the tables of its
       // time, which the replayed migrations or the schema already hold.
       const jpql = /\.(java|kt)$/.test(file) && /@Query\s*\(|\bcreateQuery\s*\(/.test(lineText) && !/nativeQuery\s*=\s*true/.test(lineText)
-      for (const table of jpql || MIGRATION.test(file) ? [] : tablesOf(literal)) {
+      // (A query a page only shows, an example a player runs, names no table of the unit's.)
+      for (const table of jpql || MIGRATION.test(file) || (!vb && shownOnly(text, m.index!, file)) ? [] : tablesOf(literal)) {
         const id = `${repo}:table:${unit.path}:${table.toLowerCase()}`
         if (once(id)) out.tables.push({ id, unit: unit.id, table, evidence: at(m.index!) })
       }

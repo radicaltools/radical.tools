@@ -353,10 +353,11 @@ export interface Link {
   /** package: a manifest or project reference; http: a path an OpenAPI description declares; grpc: a client of a service
    *  another unit registers; address: a host naming another unit or service; runtime: depends_on in a deployment;
    *  data: a database the unit connects to; message: a topic, queue or message type one unit publishes and another
-   *  consumes; routine: a stored routine the unit's code calls. */
+   *  consumes; routine: a stored routine the unit's code calls, or a stored package another one's members call. */
   kind: 'package' | 'http' | 'grpc' | 'address' | 'runtime' | 'data' | 'message' | 'routine'
+  /** A unit, or a stored package's routine fact. */
   from: string
-  /** A unit, or a service or database fact. */
+  /** A unit, a service, database or routine fact. */
   to: string
   /** observed: a manifest, a project reference, a deployment or a connection string states it; inferred: concluded. */
   confidence: 'observed' | 'inferred'

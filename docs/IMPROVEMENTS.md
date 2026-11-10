@@ -367,6 +367,28 @@ feat/assay-syntax (2026-11-09, which does not touch Studio) and once in 4
 runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main.
 
+### Dogfooding (2026-11-10): an agent on two databases again, with a database that runs code
+
+An agent ran Assay over MCP on Schemaverse and Alexandria again after ADR A database can hold and run code (run 27,
+`/Volumes/data/Dev/assay-runs/27-databases`, 16 minutes, $9.2): 53 packages became components of their database,
+the Game Database realises 17 entities and implements three state machines, every plan was accepted first time.
+Fixed from its report: a Sqitch change's reworked script runs where the plan first has it (five triggers were lost),
+the last script of a function is its own; a query a page only shows (a list of starters, a replay's text, a sql
+attribute) is no call and names no table, while a Svelte component's `{…}` expressions are code; one package calling
+another is a routine link; the element holding routines that write a table realises its entity beside the code naming
+it; a flag compared in SQL or named in a sentence is not set; a named dollar quote is PostgreSQL's; the start counts a
+package's members apart; a package's scenario goes to its scripts' unit; the procedure says how to relate packages and
+when a proxy or backup job is a container. The benches read as before, Schemaverse's calls without the shown `attack`.
+Open:
+
+- **Views, rules and RLS as the game's API** (`my_ships`, `my_fleets`, `player_stats`, a `fleet_update` rule taking
+  `new.enabled`), object types (`t_soap_envelope` reads as a package file), and functions created by dynamic SQL
+  (`fleet_script_<id>`) are no facts; `trophies/*.sql` gives nothing and `items/*.sql` routines in no unit.
+- **One database, two facts**: the ticker connects over a socket (no server, no `via`), the web app to `db`.
+- **pgTAP tests** still give no test facts, and the start does not say a `tests/` folder of them exists.
+- **Address noise**: `schema.org`, `github.com` and `svelte.dev` as hosts, `sqitch-sample.conf`.
+- **A demos unit's links** are 149 of Alexandria's 154; the procedure leaves demos out, so most links go unused.
+
 ### Dogfooding (2026-11-09): seven more held out on routines, and an agent on two databases
 
 Seven repositories were held out on stored routines (HRUtils-SB, springboot-oracle-stored-proc,

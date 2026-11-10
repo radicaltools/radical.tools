@@ -91,7 +91,8 @@ for (const repo of (microsecend ? external : heldOut ? bench.heldOut : bench.rep
   const observability = new Set(repo.undirected ? [] : facts.services.filter((s) => s.role === 'observability').map((s) => s.id))
   // A message between units is judged neither way where the bench writes messaging as calls of the broker only; an
   // entry with messages: required writes the publisher's call of each consumer too.
-  for (const l of links.filter((x) => (repo.judge !== 'runtime' || x.kind !== 'package') && (x.kind !== 'message' || repo.messages === 'required') && !observability.has(x.to))) {
+  // (One stored package calling another is no call between units: the bench writes down units' calls.)
+  for (const l of links.filter((x) => (repo.judge !== 'runtime' || x.kind !== 'package') && (x.kind !== 'message' || repo.messages === 'required') && !observability.has(x.to) && !x.from.includes(':routine:'))) {
     const pairs = ends(l.from, undefined, l.facts).flatMap((a) => ends(l.to, l.via, l.facts).map((b) => [a, b] as const)).filter(([a, b]) => a !== b)
     const names = (repo.undirected ? pairs.filter(([a, b]) => nodes.has(a.toLowerCase()) && nodes.has(b.toLowerCase())) : pairs).map(([a, b]) => call(a, b))
     if (!names.length) continue

@@ -137,6 +137,49 @@ describe('Radical Assay over MCP', () => {
     expect(relations.map((r) => [r.relationType, r.sourceLabel, r.targetLabel]).sort()).toEqual([['interacts', 'App', 'pdf'], ['realises', 'pdf', 'Page']])
   })
 
+  it("makes the component whose stored routines write a table realise its entity beside the container whose code names it, and takes the package's unit for its scenarios", async () => {
+    const { call, nodes } = await central(() => {
+      const dir = join(realpathSync(mkdtempSync(join(tmpdir(), 'assay-writer-'))), 'code')
+      const files: Record<string, string> = {
+        'lib/ora/pdf.pks': 'CREATE OR REPLACE PACKAGE pdf AS\n  PROCEDURE add_page;\nEND pdf;\n/\n',
+        'lib/ora/pdf.pkb': 'CREATE OR REPLACE PACKAGE BODY pdf AS\n  PROCEDURE add_page IS\n  BEGIN\n    INSERT INTO pages (id) VALUES (1);\n  END add_page;\nEND pdf;\n/\n',
+        'lib/ora/tables.sql': 'CREATE TABLE pages (id NUMBER(6));\n',
+        'app/pom.xml': '<project><groupId>a</groupId><artifactId>app</artifactId></project>\n',
+        'app/src/main/java/a/Pages.java': 'package a;\nclass Pages {\n  void add() { conn.prepareCall("{call pdf.add_page}"); }\n  int count() { return jdbc.queryForObject("SELECT count(*) FROM pages", Integer.class); }\n}\n',
+      }
+      for (const [path, text] of Object.entries(files)) {
+        mkdirSync(dirname(join(dir, path)), { recursive: true })
+        writeFileSync(join(dir, path), text)
+      }
+      for (const r of ['lib', 'app']) execFileSync('git', ['init', '-q'], { cwd: join(dir, r) })
+      return dir
+    })
+    expect((await call('assay_start', { directories: ['../code'] })).text).toContain('1 stored routine (with 1 package member in their packages\' rows)')
+    expect((await call('assay_apply', { plan: {
+      elements: [
+        { key: 'docs', type: 'system', label: 'Documents', facts: ['lib:unit:ora', 'app:unit:.'], confidence: 'inferred' },
+        { key: 'db', type: 'database', label: 'PDF library', parent: 'docs', units: ['lib:unit:ora'], facts: ['lib:unit:ora'], confidence: 'observed' },
+        { key: 'pdf', type: 'component', label: 'pdf', parent: 'db', technology: 'PL/SQL package', facts: ['lib:routine:ora:pdf'], confidence: 'observed' },
+        { key: 'app', type: 'container', label: 'App', parent: 'docs', units: ['app:unit:.'], facts: ['app:unit:.'], confidence: 'observed' },
+      ],
+    } })).ok).toBe(true)
+    expect((await call('assay_apply', { plan: {
+      elements: [{ key: 'printing', type: 'domain', label: 'Printing', facts: ['lib:table:ora:pages'], confidence: 'inferred' }],
+      entities: [{ key: 'page', label: 'Page', tables: ['lib:table:ora:pages'], parent: 'printing' }],
+    } })).ok).toBe(true)
+    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS' })).text).rows as Array<{ relationType: string; sourceLabel: string; targetLabel: string }>
+    expect(relations.filter((r) => r.relationType === 'realises').map((r) => r.sourceLabel).sort()).toEqual(['App', 'pdf'])
+    // A scenario of the package's code goes to the unit its scripts are in, which has no test framework.
+    const pdf = (await nodes()).find((n) => n.label === 'pdf')!.id
+    const proposed = await call('assay_apply', { plan: { requirements: [{
+      key: 'r-page', label: 'Add a page', satisfiedBy: pdf,
+      properties: { ears_type: 'event-driven', trigger: 'a page is added', action: 'the library shall store it' },
+      scenarios: [{ key: 's-page', label: 'Page stored', given: 'a document', when: 'a page is added', then: 'it is stored', citations: [{ repository: 'lib', file: 'ora/pdf.pkb', lines: [4, 4], text: 'INSERT INTO pages (id) VALUES (1);' }] }],
+    }] } })
+    expect(proposed.text).toContain('has no test framework Assay writes tests for: accepted, the scenario only')
+    expect(proposed.text).not.toContain('built from no unit')
+  })
+
   it('answers assay_start in brief, gives the procedure apart, and pages the links by size', async () => {
     const { call } = await central(many)
     const started = await call('assay_start', { directories: ['../code'] })

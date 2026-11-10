@@ -100,19 +100,31 @@ const NOT_COLUMNS = /^(constraint|primary|unique|key|index|fulltext|spatial|excl
 
 export interface SchemaState { name: string; values: string[]; initial?: string; table?: string; column?: string; file: string; line: number }
 
-/** The files in the order their scripts run: a Sqitch project's deploy/ scripts in its plan's order (a reworked change
- *  where it last appears), the rest as listed. */
+/** The files in the order their scripts run: a Sqitch project's deploy/ scripts in its plan's order, each appearance of
+ *  a reworked change by the script it ran then (x@v1.0.sql, kept at the tag that froze it; x.sql the last), the rest as
+ *  listed. Reworked scripts no plan runs are left out. */
 function sqitchOrder(files: RepoFiles, list: string[]): string[] {
   const out = [...list]
+  const reworked = new Set<string>()
   for (const plan of files.named(/^sqitch\.plan$/)) {
     const deploy = `${dirOf(plan) === '.' ? '' : `${dirOf(plan)}/`}deploy/`
-    const changes = files.read(plan).split('\n').map((l) => /^([A-Za-z_][\w-]*)\s/.exec(l)?.[1]).filter((c): c is string => !!c)
-    const rank = (f: string): number => { const i = changes.lastIndexOf(f.slice(deploy.length).replace(/\.sql$/i, '')); return i < 0 ? changes.length : i }
+    const lines = files.read(plan).split('\n')
+    const steps: string[] = []
+    lines.forEach((l, i) => {
+      const name = /^([A-Za-z_][\w-]*)\s/.exec(l)?.[1]
+      if (!name) return
+      // A change appearing again later ran, here, the script as the last tag before that appearance froze it.
+      const next = lines.findIndex((x, j) => j > i && /^([A-Za-z_][\w-]*)\s/.exec(x)?.[1] === name)
+      const tag = next < 0 ? undefined : lines.slice(i + 1, next).map((x) => /^@([\w.-]+)\s/.exec(x)?.[1]).filter((t): t is string => !!t).pop()
+      const file = `${deploy}${name}${tag ? `@${tag}` : ''}.sql`
+      if (list.includes(file)) { steps.push(file); if (tag) reworked.add(file) }
+    })
     const slots = out.map((f, i) => (f.startsWith(deploy) && !f.slice(deploy.length).includes('/') ? i : -1)).filter((i) => i >= 0)
-    const ordered = slots.map((i) => out[i]).sort((a, b) => rank(a) - rank(b))
+    const rest = slots.map((i) => out[i]).filter((f) => !steps.includes(f))
+    const ordered = [...steps, ...rest]
     slots.forEach((slot, k) => { out[slot] = ordered[k] })
   }
-  return out
+  return out.filter((f) => !/@[^/]*\.sql$/i.test(f) || reworked.has(f))
 }
 
 /** A column an ALTER TABLE adds to a table or drops from it. */
@@ -731,8 +743,9 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
   // (A script named for dropping that an installing script runs, @@drop_demo.sql at a runner's end, is that runner's.)
   const scripts = files.list.filter((f) => SQL_SCRIPT.test(f))
   const runByInstall = new Set(scripts.filter((f) => !TEARDOWN.test(f)).flatMap((f) => [...files.read(f).matchAll(/^\s*@@?\s*([^\s;]+)/gm)].map((m) => resolveFrom(dirOf(f), m[1].replace(/^\$\{?\w+\}?\//, '')))).filter((f): f is string => !!f))
-  // (Sqitch's reworked scripts, deploy/procedure-tic@v1.1.sql, are earlier versions of the one without @.)
-  for (const file of sqitchOrder(files, files.list).filter((f) => SQL_SCRIPT.test(f) && !/@[^/]*\.sql$/i.test(f) && !DEV_TOOLING.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata|revert|verify)\//i.test(f) && !dumped(f) && !/\.down\.sql$|(^|\/)U\d+__[^/]*\.sql$/i.test(f))) {
+  // (Sqitch's reworked scripts, deploy/procedure-tic@v1.1.sql, are earlier versions of the one without @: they run where
+  // the plan first has the change, and a trigger only an earlier version creates stays.)
+  for (const file of sqitchOrder(files, files.list).filter((f) => SQL_SCRIPT.test(f) && !DEV_TOOLING.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata|revert|verify)\//i.test(f) && !dumped(f) && !/\.down\.sql$|(^|\/)U\d+__[^/]*\.sql$/i.test(f))) {
     const schema = readSchema(files.read(file), file)
     const clean = withoutSqlCommentsOrStrings(files.read(file))
     const created = readRoutines(clean, file)
@@ -972,7 +985,20 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
       const raw = files.read(file)
       const vb = /\.(bas|cls|frm|ctl|vb)$/i.test(file)
       // (A comment sets nothing: -- approves them with UPDATE trophy SET approved = true.)
-      const lines = (vb ? withoutVbComments(raw) : /\.sql$/i.test(file) ? withoutSqlComments(raw) : /\.(java|kt|cs|[cm]?[jt]sx?|go|php|rs|scala)$/i.test(file) ? withoutComments(raw) : raw).split('\n')
+      const sqlFile = /\.sql$/i.test(file)
+      // (Nor does a sentence a string holds: a mission's hint, 'UPDATE my_fleets SET enabled = true; …'.)
+      const lines = (vb ? withoutVbComments(raw) : sqlFile ? withoutSqlComments(raw).replace(/^.*=.*$/gm, (line) => line.replace(/'(?:[^']|'')*'/g, (m) => (/\s/.test(m) ? ' '.repeat(m.length) : m))) : /\.(java|kt|cs|[cm]?[jt]sx?|go|php|rs|scala)$/i.test(file) ? withoutComments(raw) : raw).split('\n')
+      // In SQL a flag is set by := or in an UPDATE's SET, before its WHERE; elsewhere it is compared (AND S.destroyed='f').
+      const statementBefore = (i: number): string => {
+        const text = lines.slice(Math.max(0, i - 30), i + 1).join('\n')
+        return text.slice(text.lastIndexOf(';') + 1)
+      }
+      const compared = new Map<number, boolean>()
+      const comparesOnly = (i: number): boolean => {
+        if (!sqlFile) return false
+        if (!compared.has(i)) compared.set(i, !/:=/.test(lines[i]) && !/\bset\b(?![\s\S]*\bwhere\b)/i.test(statementBefore(i)))
+        return compared.get(i)!
+      }
       lines.forEach((line, i) => {
         const sql = SQL_SET.exec(line)
         // An UPDATE's assignments, before its WHERE; elsewhere a line that sets rather than compares.
@@ -983,7 +1009,7 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
           if (state.sets.length >= SETS) continue
           if (state.evidence.file === file && state.evidence.line === i + 1) continue
           const flags = flagsOf.has(state.id)
-          if (flags ? !assigned && !setting : !sql && (!SETTER.test(line) || !setting)) continue
+          if (flags ? (!assigned && !setting) || (!assigned && comparesOnly(i)) : !sql && (!SETTER.test(line) || !setting)) continue
           for (const { value, re } of values) {
             if (!re.test(flags ? assigned ?? line : sql ? `'${sql[2] ?? sql[3]}'` : line)) continue
             if (state.sets.filter((x) => x.value === value).length >= SETS_PER_VALUE) continue
@@ -1015,11 +1041,16 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
   for (const r of routines) {
     // A PostgreSQL trigger may share its function's name.
     const id = `${repo}:routine:${r.folder}:${r.kind === 'trigger' ? 'trigger:' : ''}${r.name}`
-    if (routineFacts.some((x) => x.id === id)) continue
+    // A procedure, function or trigger created again (CREATE OR REPLACE, a reworked Sqitch change) is its last
+    // script's, where it stood first; a package and its members are their spec's and body's together, the first kept.
+    const at = routineFacts.findIndex((x) => x.id === id)
+    if (at >= 0 && (r.kind === 'package' || r.name.includes('.'))) continue
     const reads = (r.reads ?? []).filter((t) => tableNames.has(t))
     const writes = (r.writes ?? []).filter((t) => tableNames.has(t))
     const calls = [...new Set((r.calls ?? []).map((c) => known(c, r.name)).filter((c): c is string => !!c && (r.kind === 'trigger' || c !== r.name)))]
-    routineFacts.push({ id, ...(r.unit ? { unit: r.unit.id } : {}), name: r.name, kind: r.kind, ...(r.dialect ? { dialect: r.dialect } : {}), ...(r.table ? { table: r.table } : {}), ...(reads.length ? { reads } : {}), ...(writes.length ? { writes } : {}), ...(calls.length ? { calls } : {}), evidence: r.evidence })
+    const fact: RoutineFact = { id, ...(r.unit ? { unit: r.unit.id } : {}), name: r.name, kind: r.kind, ...(r.dialect ? { dialect: r.dialect } : {}), ...(r.table ? { table: r.table } : {}), ...(reads.length ? { reads } : {}), ...(writes.length ? { writes } : {}), ...(calls.length ? { calls } : {}), evidence: r.evidence }
+    if (at >= 0) routineFacts[at] = fact
+    else routineFacts.push(fact)
   }
   return { tables: [...tables.values()], states, databases, routines: routineFacts, notes }
 }

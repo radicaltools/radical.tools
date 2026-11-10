@@ -7,7 +7,7 @@
 // registers, an address whose host names another unit or service. Every link
 // cites the facts of both sides.
 
-import type { AddressFact, ApiFact, Link, RepositoryFacts, ServiceFact, Unit, UrlFact } from './facts'
+import type { AddressFact, ApiFact, Link, RepositoryFacts, RoutineFact, ServiceFact, Unit, UrlFact } from './facts'
 import { NOT_SERVICE_HOST } from './code'
 
 /** Ports many programs listen on: a remote address on one of them names no unit by its port. */
@@ -180,6 +180,21 @@ export function linkRepositories(repositories: RepositoryFacts[]): Link[] {
   for (const call of repositories.flatMap((r) => r.routineCalls ?? []).filter((c) => sqlUnits.has(c.unit))) {
     const callee = [...new Set(routines.filter((r) => !r.called && r.unit && r.unit !== call.unit && r.name === call.routine).map((r) => r.unit!))]
     for (const u of callee) add('routine', call.unit, u, 'observed', [call.id], `calls ${call.routine}`)
+  }
+  // A package whose members call another package's members calls that package: one link per pair, from the routine
+  // facts of the packages (Alexandria's amazon_aws_s3_pkg.get_object calls http_util_pkg.get_blob_from_url).
+  const packageOf = (r: RoutineFact): string | undefined => (r.name.includes('.') ? `${r.id.slice(0, r.id.length - r.name.length)}${r.name.split('.')[0]}` : undefined)
+  const packages = new Set(routines.filter((r) => r.kind === 'package' && !r.called).map((r) => r.id))
+  const declaredBy = new Map<string, RoutineFact[]>()
+  for (const r of routines) if (!r.called && r.name.includes('.')) declaredBy.set(r.name, [...(declaredBy.get(r.name) ?? []), r])
+  for (const r of routines.filter((x) => !x.called && x.calls?.length)) {
+    const from = packageOf(r)
+    if (!from || !packages.has(from)) continue
+    for (const call of r.calls!) {
+      const callee = declaredBy.get(call)?.find((x) => repoOf(x.id.replace(':routine:', ':unit:')) === repoOf(r.id.replace(':routine:', ':unit:')))
+      const to = callee && packageOf(callee)
+      if (to && to !== from && packages.has(to)) add('routine', from, to, 'observed', [r.id, callee.id], `calls ${call}`)
+    }
   }
   const bare = (table: string): string => table.split('.').pop()!.toLowerCase()
   for (const r of repositories) {

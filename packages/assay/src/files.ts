@@ -9,15 +9,36 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import type { Unit } from './facts'
 
-/** Folders that hold no source of the repository's own. */
 /** Code without its comments (// and /* … *\/), its lines kept. */
 export const withoutComments = (code: string): string =>
   code.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:"'])\/\/[^\n]*/g, (m, lead: string) => lead + ' '.repeat(m.length - lead.length))
+
+/** A string of code that shows a query rather than runs it: an item of a list of strings, as a page's examples are
+ *  (['Prices', 'SELECT * FROM price_list;']), or, in a Svelte or Vue component, the text a function returns or an
+ *  attribute holds (return `SELECT attack(${id})`, sql="SELECT …"). A query runs as a call's argument or a variable's
+ *  value. `at` is the index of the string's opening quote in `text`. */
+export function shownOnly(text: string, at: number, file: string): boolean {
+  if (!/\.(svelte|vue|[cm]?[jt]sx?)$/i.test(file)) return false
+  const before = text.slice(Math.max(0, at - 400), at)
+  if (/\.(svelte|vue)$/i.test(file) && /(?:\breturn|[\w-]=)\s*$/.test(before)) return true
+  // The innermost bracket open before it: a list's.
+  let depth = 0
+  for (let i = before.length - 1; i >= 0; i--) {
+    const c = before[i]
+    if (c === ')' || c === ']' || c === '}') depth++
+    else if (c === '(' || c === '[' || c === '{') {
+      if (depth === 0) return c === '['
+      depth--
+    }
+  }
+  return false
+}
 
 /** A repository's own developer tooling at its top (development/, dev-tools/, tooling/): a database's helper scripts
  *  there (a third party's profiling package) are no part of the system. */
 export const DEV_TOOLING = /^(development|dev-tools|tooling)\//i
 
+/** Folders that hold no source of the repository's own. */
 export const SKIPPED = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.nuxt', '.turbo', '.cache', '.radical', 'vendor', 'target', '.venv', 'venv', '__pycache__', 'bin', 'obj', '.gradle', '.idea', '.vs', '.svelte-kit', 'storybook-static'])
 /** Libraries copied into a web application's folder (ASP.NET's wwwroot/lib, Bower's components): not its own source. */
 const VENDORED = /(^|\/)(wwwroot\/lib|bower_components)\//i
