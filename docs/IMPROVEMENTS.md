@@ -367,6 +367,25 @@ feat/assay-syntax (2026-11-09, which does not touch Studio) and once in 4
 runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main.
 
+### Dogfooding (2026-11-10): the tests a database declares, six repositories held out
+
+Six repositories were written down before Assay read them, their tests too (file › titles): plscope-utils,
+sith-demo-db and sbsdb_k2_renovation on utPLSQL, basejump, pgxn-manager and timesheet-backend on pgTAP. Read first
+with the test reader written on Schemaverse and utPLSQL: tests 1 633/1 691, units 11/15, calls 3/20, tables 51/303,
+routines 752/971, missed where a Perl distribution, a Supabase project, a 34 MB DDL export and an installer's cleanup
+were. Now tests 1 690/1 691, units 13/15, calls 17/20, tables 301/303, routines 965/971; the other benches as before.
+Open:
+
+- **A library of SQL beside other units** (plscope-utils' database/utils and database/demo beside its SQL Developer
+  extension) is the database's, no unit, by the rule of round 8; the person writing it down made them units.
+- **Routines a demo script creates and drops at its end** (sith-demo-db's talks) are gone by the final-state rule;
+  the person writing it down kept them.
+- **Reports of database tests**: utPLSQL's JUnit names no file, pg_prove writes TAP; radical check reads neither,
+  so a database test stays not run until they are read.
+- **A Deno edge function's Stripe** (imported by URL) is no call; an aggregate (`CREATE AGGREGATE`) is no routine;
+  `is_strict(f, 'stable')` reads as no description; sith-demo-db's tools/, install/ and sqlcl/ are extra units and its
+  scripts' calls of their own routines are links.
+
 ### Dogfooding (2026-11-10): an agent on two databases again, with a database that runs code
 
 An agent ran Assay over MCP on Schemaverse and Alexandria again after ADR A database can hold and run code (run 27,
