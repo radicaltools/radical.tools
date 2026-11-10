@@ -44,6 +44,9 @@ export const SKIPPED = new Set(['node_modules', '.git', 'dist', 'build', 'out', 
 const VENDORED = /(^|\/)(wwwroot\/lib|bower_components)\//i
 /** Files bigger than this are not read. */
 const MAX_FILE = 1_000_000
+/** A schema's DDL exported whole (Toad's, SQL Developer's) is one file of tens of megabytes: read up to this. */
+const MAX_SQL_FILE = 50_000_000
+const SQL_DUMP = /\.(sql|ddl)$/i
 
 export const posix = (path: string): string => path.split(sep).join('/')
 
@@ -51,7 +54,7 @@ export const posix = (path: string): string => path.split(sep).join('/')
 export const GENERATED = /(\.pb\.go|_pb2(_grpc)?\.py|_grpc\.pb\.go|Grpc\.java|\.g\.cs|\.designer\.cs|\.min\.js|\.bundle\.js)$|(^|\/)(genproto|generated)\//i
 
 /** A test's or a fixture's source file: its strings are not calls of the unit. */
-export const TEST_FILE = /(^|\/)(tests?|__tests__|e2e|fixtures?|testdata)\/|\.(test|spec)\.[cm]?[jt]sx?$|(^|\/)test_[^/]+\.py$|_test\.(go|py)$|Tests?\.(cs|java|cls)$/i
+export const TEST_FILE = /(^|\/)(tests?|__tests__|e2e|fixtures?|testdata)\/|\.(test|spec)\.[cm]?[jt]sx?$|(^|\/)test_[^/]+\.py$|_test\.(go|py)$|Tests?\.(cs|java|cls)$|(^|\/)x?t\/[^/]+\.(t|pm|pl)$|(^|\/)x?t\/lib\//i
 
 /** Windows-1252's characters at 0x80–0x9F, where Latin-1 has control characters (undefined ones kept). */
 const CP1252 = '\u20AC\u0081\u201A\u0192\u201E\u2026\u2020\u2021\u02C6\u2030\u0160\u2039\u0152\u008D\u017D\u008F\u0090\u2018\u2019\u201C\u201D\u2022\u2013\u2014\u02DC\u2122\u0161\u203A\u0153\u009D\u017E\u0178'
@@ -141,7 +144,10 @@ export class RepoFiles {
     const report = (f: string): boolean => /\.(html?|css|js|json|xml|info|lcov|png|svg|gif|txt|gz)$/i.test(f)
     const kept = (seg: string, f: string, at: string): boolean => (seg === 'build' && (listing.git || builds.has(at))) || (seg === 'coverage' && !!listing.git && !report(f))
     const skipped = (f: string): boolean => VENDORED.test(f) || (!deployment(f) && f.split('/').slice(0, -1).some((seg, i, segs) => SKIPPED.has(seg) && !kept(seg, f, segs.slice(0, i + 1).join('/'))))
-    this.list = listing.files.filter((f) => !skipped(f)).sort()
+    // A database test framework a repository ships below its root (sbs1/test/utPLSQL-3.1.7/, its own source and tests) is
+    // a copy of another project, as a vendor folder is; at the root it is the repository (utPLSQL's own).
+    const frameworks = listing.files.map((f) => /^(.+\/)(?:source\/core\/ut_utils\.pks|pgtap\.control)$/i.exec(f)?.[1]).filter((d): d is string => !!d)
+    this.list = listing.files.filter((f) => !skipped(f) && !frameworks.some((d) => f.startsWith(d))).sort()
     this.set = new Set(this.list)
     this.nested = listing.nested.sort()
     this.more = listing.more
@@ -154,7 +160,7 @@ export class RepoFiles {
     let text = ''
     try {
       const full = join(this.root, file)
-      if (statSync(full).size <= MAX_FILE) text = decodeText(readFileSync(full))
+      if (statSync(full).size <= (SQL_DUMP.test(file) ? MAX_SQL_FILE : MAX_FILE)) text = decodeText(readFileSync(full))
     } catch {
       // Unreadable: nothing.
     }

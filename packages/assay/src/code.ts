@@ -13,7 +13,7 @@ import { GENERATED, RepoFiles, TEST_FILE, escapeRe, lineAt, owner, shownOnly } f
 import { settingsFor, springConfigOwners } from './spring'
 import { inlineValues, vbValues, type VbValues } from './values'
 
-const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.go', '.py', '.java', '.kt', '.cs', '.vb', '.bas', '.cls', '.frm', '.ctl', '.dsr', '.dob', '.pag', '.php', '.rb', '.ex', '.exs', '.rs', '.scala', '.fs'])
+const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.vue', '.svelte', '.go', '.py', '.java', '.kt', '.cs', '.vb', '.bas', '.cls', '.frm', '.ctl', '.dsr', '.dob', '.pag', '.php', '.rb', '.pm', '.pl', '.psgi', '.ex', '.exs', '.rs', '.scala', '.fs'])
 const CONFIG = /\.(json|ya?ml|properties|config|xml|ini|udl|env|toml|conf|template|tmpl|ora)$|(^|\/)\.env(\.[\w-]+)?$/i
 /** Paths that name a file, not an endpoint. */
 const FILE_PATH = /\.(js|mjs|cjs|ts|tsx|jsx|css|scss|map|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|html?|json|md|txt|xml|ya?ml|pdf|zip|wasm|exe|dll|so|sh)$/i
@@ -150,6 +150,14 @@ export function connectionOf(text: string): { engine: string; server?: string; n
   // Go's MySQL driver: user:password@tcp(db:3306)/shop.
   const go = /@tcp\(([\w.-]+)(?::\d+)?\)\/([\w-]+)/.exec(text)
   if (go) return { engine: 'MySQL', server: go[1], name: go[2] }
+  // Perl's DBI: dbi:Pg:dbname=pgxn_manager;host=db.
+  const dbi = /\bdbi:(Pg|mysql|MariaDB|Oracle|SQLite|ODBC|Sybase):([^'"\s]*)/i.exec(text)
+  if (dbi) {
+    const engine = { pg: 'PostgreSQL', mysql: 'MySQL', mariadb: 'MySQL', oracle: 'Oracle', sqlite: 'SQLite', odbc: 'ODBC', sybase: 'SQL Server' }[dbi[1].toLowerCase()]!
+    const name = /(?:^|;)(?:dbname|database|db|sid)=([^;]+)/i.exec(dbi[2])?.[1] ?? (/[=;]/.test(dbi[2]) ? undefined : dbi[2] || undefined)
+    const server = /(?:^|;)(?:host|hostname)=([^;]+)/i.exec(dbi[2])?.[1]
+    if (name) return { engine, ...(server ? { server } : {}), name }
+  }
   // PHP's PDO: mysql:host=db;dbname=shop.
   const pdo = /\b(mysql|pgsql|sqlsrv|oci|sqlite|odbc):(?:[^'"\s]*?host=([^;'"\s]+))?[^'"\s]*?(?:dbname|database)=([^;'"\s]+)/i.exec(text)
   if (pdo) {
@@ -318,7 +326,7 @@ export function readCode(files: RepoFiles, repo: string, units: Unit[]): CodeFac
       const id = `${repo}:db:${unit.path}:Oracle/${db.name ?? db.server ?? ''}`
       if (once(id)) out.databases.push({ id, unit: unit.id, engine: 'Oracle', ...(db.server ? { server: db.server } : {}), ...(db.name ? { name: db.name } : {}), evidence: at(m.index!) })
     }
-    for (const m of deployment || CI.test(file) ? [] : text.matchAll(/\bclickhouse:\/\/[^\s"'<]+|\bhttps?:\/\/[\w.-]+:8123\/[\w-]+|\bsqlite:\/\/\/?[^\s"'<]+|[\w-]*(?::[^@\s"']*)?@tcp\([\w.:-]+\)\/[\w-]+|\b(?:mysql|pgsql|sqlsrv|oci|sqlite):[^"'\s]*?dbname=[^"'\s]+|\bDRIVER\s*=\s*\{[^}\n]*\}[^"'\n]*|(?:Provider|DSN|Data Source|Server|Host)\s*=[^"'\n]*(?:;[^"'\n]*)+|jdbc:[^\s"'<]+|\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/[^\s"'<]+/gi)) {
+    for (const m of deployment || CI.test(file) ? [] : text.matchAll(/\bclickhouse:\/\/[^\s"'<]+|\bhttps?:\/\/[\w.-]+:8123\/[\w-]+|\bsqlite:\/\/\/?[^\s"'<]+|[\w-]*(?::[^@\s"']*)?@tcp\([\w.:-]+\)\/[\w-]+|\b(?:mysql|pgsql|sqlsrv|oci|sqlite):[^"'\s]*?dbname=[^"'\s]+|\bdbi:\w+:[^"'\s]+|\bDRIVER\s*=\s*\{[^}\n]*\}[^"'\n]*|(?:Provider|DSN|Data Source|Server|Host)\s*=[^"'\n]*(?:;[^"'\n]*)+|jdbc:[^\s"'<]+|\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|sqlserver|mssql):\/\/[^\s"'<]+/gi)) {
       const db = connectionOf(m[0])
       if (!db) continue
       // A name filled in at run time ($dsn, {db}, %DB%) names nothing.

@@ -519,6 +519,37 @@ function php(files: RepoFiles, notes: string[]): Draft[] {
   return out
 }
 
+// ── Perl ─────────────────────────────────────────────────────────────────────
+
+/** A Perl distribution: Build.PL (Module::Build), Makefile.PL, a cpanfile or dist.ini, its modules' requirements its
+ *  dependencies; an application when it is a web application, has a PSGI app or installs scripts. */
+function perl(files: RepoFiles): Draft[] {
+  const out: Draft[] = []
+  const markers = files.named(/^(Build\.PL|Makefile\.PL|cpanfile|dist\.ini)$/).filter((f) => !inTests(f))
+  for (const path of [...new Set(markers.map(dirOf))]) {
+    const prefix = path === '.' ? '' : `${path}/`
+    const mine = markers.filter((m) => dirOf(m) === path)
+    const build = mine.map((m) => files.read(m)).join('\n')
+    const name = /\b(?:module_name|dist_name|NAME|name)\s*(?:=>|=)\s*['"]?([\w:.-]+)['"]?/.exec(build)?.[1]
+    const d = draft('perl', path, mine[0], name, 1)
+    d.aliases.push(basename(path === '.' ? '' : path))
+    if (name) d.aliases.push(name.replace(/::/g, '-').toLowerCase())
+    if (files.list.some((f) => f.startsWith(prefix) && /\.psgi$/.test(f)) || /\b(script_files|EXE_FILES)\b/.test(build)) d.reasons.push('it has a PSGI app or scripts it installs')
+    for (const file of mine) {
+      const text = files.read(file)
+      // requires => { 'Plack' => '0.9' }, requires 'Plack';, PREREQ_PM => { ... }
+      for (const block of text.matchAll(/\b(?:requires|build_requires|test_requires|configure_requires|PREREQ_PM)\s*=>\s*\{([^}]*)\}/g)) {
+        for (const m of block[1].matchAll(/['"]?([A-Za-z][\w:]*)['"]?\s*=>/g)) if (!d.deps.includes(m[1])) { d.deps.push(m[1]); d.depLines.set(m[1], { file, line: lineAt(text, block.index! + block[0].indexOf(m[0])) }) }
+      }
+      for (const m of text.matchAll(/^\s*requires\s+['"]([A-Za-z][\w:]*)['"]/gm)) if (!d.deps.includes(m[1])) { d.deps.push(m[1]); d.depLines.set(m[1], { file, line: lineAt(text, m.index!) }) }
+    }
+    if (d.deps.some((x) => /^(Plack|Mojolicious|Dancer2?|Catalyst|CGI::Application)$/.test(x))) d.reasons.push('it is a web application (Plack, Mojolicious, Dancer, Catalyst)')
+    d.tests = !d.reasons.length && TESTS.test(`${d.name} ${path}`)
+    out.push(d)
+  }
+  return out
+}
+
 // ── Ruby, Elixir, Rust ───────────────────────────────────────────────────────
 
 /** A Gemfile's (or a gemspec's) project: a Rails or Rack application, else a library; gems by path are references. */
@@ -610,14 +641,17 @@ function rust(files: RepoFiles): Draft[] {
 const DDL = /\bcreate\s+(?:or\s+(?:replace|alter)\s+)?(?:(?:non)?editionable\s+|global\s+temporary\s+)?(?:table|view|procedure|proc|function|package|trigger)\b/i
 const SCRIPT = /\.(sql|pks|pkb|pls|plb|pck|spc|bdy|prc|fnc|trg|tps|tpb|ddl)$/i
 
-/** A database's projects: a Sqitch project (sqitch.plan) beside any units, and in a repository made of a database's
+/** A database's projects: a Sqitch project (sqitch.plan) or a Supabase project (config.toml with its migrations/) beside any units, and in a repository made of a database's
  *  scripts alone, each highest folder holding them (one schema's or one library's), a folder of migrations or seed data
  *  alone being none. Where the repository has units, its other scripts are the schema and the routines of the database
  *  those units use (domain.ts). */
 function sqlFolders(files: RepoFiles, claimed: string[]): Draft[] {
-  const sqitch = files.named(/^sqitch\.plan$/).map(dirOf).filter((path) => !claimed.includes(path) && !inTests(`${path}/`))
+  const supabase = files.named(/^config\.toml$/).filter((f) => /^\s*project_id\s*=/m.test(files.read(f)) && files.list.some((x) => x.startsWith(`${dirOf(f) === '.' ? '' : `${dirOf(f)}/`}migrations/`))).map(dirOf)
+  const sqitch = [...files.named(/^sqitch\.plan$/).map(dirOf), ...supabase].filter((path) => !claimed.includes(path) && !inTests(`${path}/`))
   const projects = sqitch.map((path) => {
-    const d = draft('sql', path, path === '.' ? 'sqitch.plan' : `${path}/sqitch.plan`, undefined, 1)
+    const marker = supabase.includes(path) ? 'config.toml' : 'sqitch.plan'
+    const name = supabase.includes(path) ? /^\s*project_id\s*=\s*"([^"]+)"/m.exec(files.read(path === '.' ? marker : `${path}/${marker}`))?.[1] : undefined
+    const d = draft('sql', path, path === '.' ? marker : `${path}/${marker}`, name, 1)
     d.aliases.push(basename(path === '.' ? files.root : path))
     return d
   })
@@ -832,7 +866,7 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
   const notes: string[] = []
   const groups: GroupFact[] = []
   // A Composer, .NET, Ruby, Elixir or Rust project claims its folder before the package.json that builds its front end.
-  const drafts = [...php(files, notes), ...dotnet(files, groups, repo), ...ruby(files), ...elixir(files), ...rust(files), ...npm(files, notes), ...maven(files), ...gradle(files), ...ant(files), ...go(files), ...goWithoutModules(files), ...python(files), ...vb6(files, groups, repo)]
+  const drafts = [...php(files, notes), ...dotnet(files, groups, repo), ...ruby(files), ...perl(files), ...elixir(files), ...rust(files), ...npm(files, notes), ...maven(files), ...gradle(files), ...ant(files), ...go(files), ...goWithoutModules(files), ...python(files), ...vb6(files, groups, repo)]
   // Tooling's folders hold no unit; a folder of tests builds for tests.
   for (let i = drafts.length - 1; i >= 0; i--) if (inTooling(`${drafts[i].path}/`)) drafts.splice(i, 1)
   for (const d of drafts) if (underTests(d.path)) d.tests = true
@@ -875,7 +909,7 @@ export function readStacks(files: RepoFiles, repo: string): StackUnits {
     if (files.has(`${prefix}Dockerfile`) && !d.reasons.includes('it has a Dockerfile')) d.reasons.push('it has a Dockerfile')
     const technology = new Set(technologyOf(d.deps))
     if (d.stack === 'docker') for (const img of d.deps) for (const [re, t] of BASE_IMAGES) if (re.test(img)) technology.add(t)
-    technology.add({ npm: 'Node.js', maven: 'Java', gradle: 'Java', ant: 'Java', go: 'Go', dotnet: '.NET', python: 'Python', php: 'PHP', ruby: 'Ruby', elixir: 'Elixir', rust: 'Rust', vb6: 'VB6', sql: 'SQL', docker: '' }[d.stack])
+    technology.add({ npm: 'Node.js', maven: 'Java', gradle: 'Java', ant: 'Java', go: 'Go', dotnet: '.NET', python: 'Python', php: 'PHP', ruby: 'Ruby', perl: 'Perl', elixir: 'Elixir', rust: 'Rust', vb6: 'VB6', sql: 'SQL', docker: '' }[d.stack])
     technology.delete('')
     const id = `${repo}:unit:${d.path}`
     units.push({

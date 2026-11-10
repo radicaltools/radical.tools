@@ -92,7 +92,7 @@ function topLevel(body: string, separator = ','): Array<{ text: string; at: numb
 /** A database's scripts: SQL, and Oracle's files of PL/SQL (package specs and bodies, procedures, functions, triggers). */
 const SQL_SCRIPT = /\.(sql|pks|pkb|pls|plb|pck|spc|bdy|prc|fnc|trg|tps|tpb|ddl)$/i
 /** A script named for undoing an install: drop_x.sql, hr_drop.sql, x-drop-objects.sql, uninstall.sql. */
-const TEARDOWN = /(^|\/)(drop|uninstall|cleanup|clean|teardown|remove)([_.-][^/]*)?$|[_-](drop|uninstall|cleanup|clean|teardown|remove)([_-][a-z]+)?\.\w+$/i
+const TEARDOWN = /(^|\/)(drop|uninstall|cleanup|clean|teardown|remove|reset)([_.-][^/]*)?$|[_-](drop|uninstall|cleanup|clean|teardown|remove|reset)([_-][a-z]+)?\.\w+$/i
 const withoutSqlComments = (sql: string): string => sql.replace(/--[^\n]*|(^|[ \t,(])#[^\n'"]*$/gm, (m) => ' '.repeat(m.length)).replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
 
 const SQL_NAME = '[`"[]?(?:\\w+[`"\\]]?\\.)?[`"[]?([A-Za-z_][\\w$]*(?:-[\\w$]+)*)[`"\\]]?'
@@ -742,7 +742,17 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
   const dropped = new Map<string, Set<string>>()
   // (A script named for dropping that an installing script runs, @@drop_demo.sql at a runner's end, is that runner's.)
   const scripts = files.list.filter((f) => SQL_SCRIPT.test(f))
-  const runByInstall = new Set(scripts.filter((f) => !TEARDOWN.test(f)).flatMap((f) => [...files.read(f).matchAll(/^\s*@@?\s*([^\s;]+)/gm)].map((m) => resolveFrom(dirOf(f), m[1].replace(/^\$\{?\w+\}?\//, '')))).filter((f): f is string => !!f))
+  const runOf = (f: string): string[] => [...files.read(f).matchAll(/^\s*@@?\s*([^\s;]+)/gm)].map((m) => resolveFrom(dirOf(f), m[1].replace(/^\$\{?\w+\}?\//, ''))).filter((x): x is string => !!x)
+  const runByInstall = new Set(scripts.filter((f) => !TEARDOWN.test(f)).flatMap(runOf))
+  // A script of drops alone an installer runs before what creates (install.sql's @cleanup.sql first) resets a schema to
+  // install it again: it drops nothing that stays. (One run at the end, a runner's drops, does.)
+  // (A runner, which creates what it drops through the scripts it runs, is none.)
+  const dropsOnly = (f: string): boolean => ((t) => /\bdrop\s+\w/i.test(t) && !/\bcreate\b/i.test(t) && !/^\s*(?:@@?|start\s+)\S/im.test(t))(withoutSqlComments(files.read(f)))
+  const resets = new Set(scripts.flatMap((runner) => {
+    const run = runOf(runner)
+    const first = run.findIndex((f) => !dropsOnly(f))
+    return run.filter((f, i) => dropsOnly(f) && first >= 0 && i < first)
+  }))
   // (Sqitch's reworked scripts, deploy/procedure-tic@v1.1.sql, are earlier versions of the one without @: they run where
   // the plan first has the change, and a trigger only an earlier version creates stays.)
   for (const file of sqitchOrder(files, files.list).filter((f) => SQL_SCRIPT.test(f) && !DEV_TOOLING.test(f) && !/(^|\/)(tests?|__tests__|e2e|testdata|revert|verify)\//i.test(f) && !dumped(f) && !/\.down\.sql$|(^|\/)U\d+__[^/]*\.sql$/i.test(f))) {
@@ -750,8 +760,8 @@ export function readDomain(files: RepoFiles, repo: string, units: Unit[], named:
     const clean = withoutSqlCommentsOrStrings(files.read(file))
     const created = readRoutines(clean, file)
     // (A migration or a Sqitch change is named for what it does: player-drop_password.sql drops a column, not the schema.)
-    const teardown = !runByInstall.has(file) && ((TEARDOWN.test(file) && !/(^|\/)(deploy|migrations?|migrate|changelog)\//i.test(file))
-      || (/\bdrop\s+(table|package|procedure|function|trigger)\b/i.test(clean) && !/\bcreate\b/i.test(clean) && !/^\s*(?:@@?|start\s+)\S/im.test(clean) && !/(^|\/)(migrations?|migrate|changelog|db\/changes)\/|(^|\/)(V\d+|\d+)[^/]*$/i.test(file)))
+    const teardown = resets.has(file) || (!runByInstall.has(file) && ((TEARDOWN.test(file) && !/(^|\/)(deploy|migrations?|migrate|changelog)\//i.test(file))
+      || (/\bdrop\s+(table|package|procedure|function|trigger)\b/i.test(clean) && !/\bcreate\b/i.test(clean) && !/^\s*(?:@@?|start\s+)\S/im.test(clean) && !/(^|\/)(migrations?|migrate|changelog|db\/changes)\/|(^|\/)(V\d+|\d+)[^/]*$/i.test(file))))
     if (!teardown) {
       for (const m of clean.matchAll(/\bdrop\s+(package|procedure|proc|function|trigger)\s+(?:if\s+exists\s+)?(?:[`"[]?\w+[`"\]]?\s*\.\s*)?[`"[]?([A-Za-z_][\w$#]*)/gi)) {
         const name = m[2].toLowerCase()

@@ -116,6 +116,46 @@ export function testSkeleton(unit: Unit, framework: TestFramework, requirement: 
     ].join('\n')
     return { file, content, tests: scenarios.map(() => `tests.assay.${module}`) }
   }
+  // A database's tests: a utPLSQL suite package of disabled tests, a pgTAP script of TODO failures.
+  if (framework === 'utplsql') {
+    const name = `test_${snake(requirement)}`.slice(0, 30)
+    const file = `${prefix}tests/assay/${name}.sql`
+    const procedures = unique(scenarios.map((s) => snake(s.label).slice(0, 30)))
+    const quoted = (text: string): string => text.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim()
+    const content = [
+      header('--'),
+      `create or replace package ${name} as`,
+      '',
+      `  --%suite(${quoted(requirement)})`,
+      '',
+      ...scenarios.flatMap((s, i) => [`  -- ${sentence(s)}`, `  --%test(${quoted(s.label)})`, `  --%disabled(${REASON})`, `  procedure ${procedures[i]};`, '']),
+      `end ${name};`,
+      '/',
+      '',
+      `create or replace package body ${name} as`,
+      '',
+      ...scenarios.flatMap((s, i) => [`  procedure ${procedures[i]} is`, '  begin', '    null;', `  end ${procedures[i]};`, '']),
+      `end ${name};`,
+      '/',
+      '',
+    ].join('\n')
+    return { file, content, tests: scenarios.map((s) => `${file} › ${quoted(requirement)} › ${quoted(s.label)}`) }
+  }
+  if (framework === 'pgtap') {
+    const file = `${prefix}tests/assay/${kebab(requirement)}.sql`
+    const sq = (text: string): string => `'${text.replace(/'/g, "''")}'`
+    const content = [
+      header('--'),
+      'BEGIN;',
+      `SELECT plan(${scenarios.length});`,
+      '',
+      ...scenarios.flatMap((s) => [`-- ${sentence(s)}`, `SELECT todo(${sq(REASON)}, 1);`, `SELECT fail(${sq(s.label)});`, '']),
+      'SELECT * FROM finish();',
+      'ROLLBACK;',
+      '',
+    ].join('\n')
+    return { file, content, tests: scenarios.map((s) => `${file} › ${s.label}`) }
+  }
   // .NET: xUnit, NUnit, MSTest, in the test project.
   const cls = `${pascal(requirement)}Tests`
   const file = `${prefix}Assay/${cls}.cs`

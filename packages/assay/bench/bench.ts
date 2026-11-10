@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import MDBReader from 'mdb-reader'
 import { accessReaderOf, extractRepository, linkRepositories, prepareSyntax, type Link, type RepositoryFacts } from '../src/index'
 
-interface Expected { name: string; url?: string; commit?: string; repositories?: Array<{ name: string; url: string; commit: string }>; stacks: string; units: string[]; calls: Array<[string, string]>; optional: Array<[string, string]>; tables?: string[]; routines?: string[]; judge?: 'runtime'; undirected?: boolean; messages?: 'required' }
+interface Expected { name: string; url?: string; commit?: string; repositories?: Array<{ name: string; url: string; commit: string }>; stacks: string; units: string[]; calls: Array<[string, string]>; optional: Array<[string, string]>; tables?: string[]; routines?: string[]; tests?: string[]; judge?: 'runtime'; undirected?: boolean; messages?: 'required' }
 const bench = JSON.parse(readFileSync(fileURLToPath(new URL('./bench.json', import.meta.url)), 'utf8')) as { repositories: Expected[]; heldOut: Expected[] }
 // --held-out: the repositories no rule was tuned on. --microsecend: microSecEnD's hand-drawn dataflow diagrams
 // (microsecend.json, by microsecend.ts), cloned into <cache>/microsecend.
@@ -45,6 +45,7 @@ let totals = { units: [0, 0, 0], calls: [0, 0, 0] }
 const filter = process.argv.slice(2).find((a) => !a.startsWith('--'))
 let f1 = { pairs: [0, 0, 0] }
 let routineTotals = [0, 0, 0]
+let testTotals = [0, 0, 0]
 for (const repo of (microsecend ? external : heldOut ? bench.heldOut : bench.repositories).filter((r) => !filter || r.name === filter)) {
   // One repository, or several read and linked together (their units named <repository> or <repository>/<folder>).
   const parts = repo.repositories ?? [{ name: repo.name, url: repo.url!, commit: repo.commit! }]
@@ -58,7 +59,7 @@ for (const repo of (microsecend ? external : heldOut ? bench.heldOut : bench.rep
   const all = dirs.map((d) => extractRepository(d, { access: accessReaderOf(MDBReader) }))
   const links: Link[] = linkRepositories(all)
   const ms = Date.now() - started
-  const facts: RepositoryFacts = { ...all[0], units: [], services: [], databases: [], tables: [], routines: [], notes: [] }
+  const facts: RepositoryFacts = { ...all[0], units: [], services: [], databases: [], tables: [], routines: [], tests: [], notes: [] }
   const multi = !!repo.repositories
   for (const f of all) {
     facts.units.push(...f.units.map((u) => ({ ...u, path: multi ? (u.path === '.' ? f.repository : `${f.repository}/${u.path}`) : u.path })))
@@ -66,6 +67,7 @@ for (const repo of (microsecend ? external : heldOut ? bench.heldOut : bench.rep
     facts.databases.push(...f.databases)
     facts.tables.push(...f.tables)
     facts.routines.push(...(f.routines ?? []))
+    facts.tests.push(...f.tests.map((t) => ({ ...t, test: multi ? `${f.repository}/${t.test}` : t.test })))
     facts.notes.push(...f.notes.map((n) => (multi ? `${f.repository}: ${n}` : n)))
   }
 
@@ -124,10 +126,21 @@ for (const repo of (microsecend ? external : heldOut ? bench.heldOut : bench.rep
     console.log(`  routines: ${found}/${repo.routines.length}${extra.length ? `, ${extra.length} extra: ${extra.slice(0, 12).join(', ')}` : ''}`)
     for (const r of repo.routines.filter((x) => !routines.has(x)).slice(0, 15)) console.log(`    missed routine ${r}`)
   }
+  if (repo.tests) {
+    // A database's tests its code declares, by their ids: file › titles.
+    const tests = new Set(facts.tests.map((t) => t.test))
+    const found = repo.tests.filter((t) => tests.has(t)).length
+    const extra = [...tests].filter((t) => !repo.tests!.includes(t))
+    testTotals = [testTotals[0] + found, testTotals[1] + repo.tests.length, testTotals[2] + tests.size]
+    console.log(`  tests: ${found}/${repo.tests.length}${extra.length ? `, ${extra.length} extra` : ''}`)
+    for (const t of repo.tests.filter((x) => !tests.has(x)).slice(0, 10)) console.log(`    missed test ${t}`)
+    for (const t of extra.slice(0, 10)) console.log(`    extra test ${t}`)
+  }
   if (facts.notes.length) console.log(`  notes: ${facts.notes.slice(0, 3).join(' | ')}`)
 }
 console.log(`\nAll: units recall ${pct(totals.units[0], totals.units[1])}, precision ${pct(totals.units[0], totals.units[2])}; calls recall ${pct(totals.calls[0], totals.calls[1])}, precision ${pct(totals.calls[0], totals.calls[2])}`)
 if (routineTotals[1]) console.log(`Routines: recall ${pct(routineTotals[0], routineTotals[1])}, precision ${pct(routineTotals[0], routineTotals[2])}`)
+if (testTotals[1]) console.log(`Tests: recall ${pct(testTotals[0], testTotals[1])}, precision ${pct(testTotals[0], testTotals[2])}`)
 // F1 of the calls, as the comparison of architecture recovery tools on microSecEnD reports its edges.
 if (microsecend) {
   const [r, p] = [f1.pairs[0] / f1.pairs[1], f1.pairs[0] / f1.pairs[2]]
