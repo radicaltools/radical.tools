@@ -3493,6 +3493,17 @@
     { "element": "f400da87-609d-4e18-b9c1-13850fae959a", "name": "Packages calling packages", "tests": [
       "packages/assay/tests/routines.test.ts › radical assay: stored routines and the code calling them › links a stored package to the packages its members call, and counts the members in their packages' rows",
       "apps/mcp/src/assay.test.ts › Radical Assay over MCP › makes the component whose stored routines write a table realise its entity beside the container whose code names it, and takes the package's unit for its scenarios"
+    ] },
+    { "element": "1f67638a-48ac-4586-b106-25a772577b4c", "name": "Tests a database declares", "tests": [
+      "packages/assay/tests/dbtests.test.ts › radical assay: the tests a database declares › reads a utPLSQL suite's tests by their suite, contexts and descriptions, not run, a disabled one skipped, and keeps its packages out of the routines",
+      "packages/assay/tests/dbtests.test.ts › radical assay: the tests a database declares › reads a pgTAP script's assertions by their descriptions, else their numbers, and its test functions by name, in the unit whose routines they test",
+      "packages/assay/tests/dbtests.test.ts › radical assay: the tests a database declares › takes a not-run database test for a scenario, and writes a pending test of a scenario drawn from the code for utPLSQL and pgTAP"
+    ] },
+    { "element": "3a439694-bb1f-4194-8507-5e4fb3d4ee4f", "name": "Perl, Supabase and a shipped framework", "tests": [
+      "packages/assay/tests/dbtests.test.ts › radical assay: the tests a database declares › reads a Perl distribution on PostgreSQL, a Supabase project, a framework a repository ships, and a schema its installer resets first"
+    ] },
+    { "element": "d178e30c-9f5b-407f-a681-dd534e2a7e56", "name": "Database test reading tests", "tests": [
+      "packages/assay/tests/dbtests.test.ts"
     ] }
   ]
 }
