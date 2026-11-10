@@ -61,7 +61,7 @@
       <!-- The product as a map: the model in the middle, a branch to each part, and
            at the edges what is yours, using the parts. Every box is a link. -->
       <div class="map-wrap">
-      <svg class="map" viewBox="-4 0 1108 620" role="img" aria-label="radical.tools as a map: one model in the middle, the Radical Model; Radical Studio reads and writes it, Radical Hub packs concerns in, Radical CLI checks it, Radical Forge generates it, Radical MCP reads and writes it, and it harnesses your code. Your agent uses Radical MCP, which uses Radical Forge, and writes your code; your CI runs Radical CLI and tests your code">
+      <svg class="map" viewBox="-4 0 1108 620" role="img" aria-label="radical.tools as a map: one model in the middle, the Radical Model; Radical Assay finds it in your code, Radical Studio reads and writes it, Radical Hub packs concerns in, Radical CLI checks it, Radical Forge generates it, Radical MCP reads and writes it, and it harnesses your code. Your agent uses Radical MCP, which uses Radical Forge, and writes your code; your CI runs Radical CLI and tests your code">
         <defs>
           <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5 0 10z" style="fill:var(--border-strong)"/></marker>
         
@@ -70,6 +70,7 @@
           <marker id="m-cli" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M0 0L10 5 0 10z" style="fill:var(--c-cli)"/></marker>
           <marker id="m-forge" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M0 0L10 5 0 10z" style="fill:var(--c-forge)"/></marker>
           <marker id="m-mcp" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M0 0L10 5 0 10z" style="fill:var(--c-mcp)"/></marker>
+          <marker id="m-assay" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M0 0L10 5 0 10z" style="fill:var(--c-assay)"/></marker>
           <marker id="m-code" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto-start-reverse"><path d="M0 0L10 5 0 10z" style="fill:var(--c-code)"/></marker>
         </defs>
         <!-- the branches: from the model to each card, in the card's colour -->
@@ -85,6 +86,8 @@
         <g style="--c:var(--c-mcp)"><rect class="pill tint" x="739.5" y="289" width="99" height="18" rx="9"/><text class="lbl tint" x="789" y="302" text-anchor="middle">reads · writes</text></g>
         <path class="branch" style="--c:var(--c-code)" marker-end="url(#m-code)" d="M 710 374 C 789 374, 789 534, 868 534"/>
         <g style="--c:var(--c-code)"><rect class="pill tint" x="754" y="445" width="70" height="18" rx="9"/><text class="lbl tint" x="789" y="458" text-anchor="middle">harnesses</text></g>
+        <path class="branch" style="--c:var(--c-assay)" marker-end="url(#m-assay)" d="M 550 128 L 550 196"/>
+        <g style="--c:var(--c-assay)"><rect class="pill tint" x="498" y="153" width="104" height="18" rx="9"/><text class="lbl tint" x="550" y="166" text-anchor="middle">finds it in code</text></g>
         <!-- what uses what, at the edges -->
         <path class="edge" d="M 985 248 L 985 140"/>
         <text class="lbl" x="994" y="198">uses Forge</text>
@@ -151,6 +154,16 @@
             <text class="why" x="54" y="72">no blank page to start from</text>
           </g>
         </a>
+        <a href="manual.html#assay" style="--c:var(--c-assay)">
+          <g transform="translate(435 30)">
+            <rect class="box" width="230" height="96" rx="12"/>
+            <rect class="icon-bg" x="14" y="34" width="28" height="28" rx="7"/>
+            <svg class="icon" x="21" y="41" width="14" height="14" viewBox="0 0 16 16"><path d="M6.5 1a5.5 5.5 0 0 1 4.38 8.83l3.9 3.9-1.06 1.06-3.9-3.9A5.5 5.5 0 1 1 6.5 1Zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM5.1 4.3 3.4 6.5l1.7 2.2.8-.6-1.25-1.6L5.9 4.9l-.8-.6Zm2.8 0-.8.6 1.25 1.6L7.1 8.1l.8.6 1.7-2.2-1.7-2.2Z"/></svg>
+            <text class="name" x="54" y="31">Radical Assay</text>
+            <text class="sub" x="54" y="49">reads the code you have</text>
+            <text class="why" x="54" y="72">the model of what is built</text>
+          </g>
+        </a>
         <a href="manual.html#mcp" style="--c:var(--c-mcp)">
           <g transform="translate(870 250)">
             <rect class="box" width="230" height="96" rx="12"/>
@@ -190,12 +203,12 @@
           </g>
         </a>
       </svg>
-      <svg class="map map-tall" viewBox="0 0 420 1160" role="img" aria-label="radical.tools as a map: Radical Studio reads and writes one model and Radical Hub packs concerns in; Radical Forge generates it, Radical MCP reads and writes it and uses Forge, your agent uses MCP and writes your code, which the model harnesses; your CI tests the code and runs Radical CLI, which checks the model">
+      <svg class="map map-tall" viewBox="0 0 420 1280" role="img" aria-label="radical.tools as a map: Radical Studio reads and writes one model and Radical Hub packs concerns in; Radical Assay finds the model in code that exists; Radical Forge generates it, Radical MCP reads and writes it and uses Forge, your agent uses MCP and writes your code, which the model harnesses; your CI tests the code and runs Radical CLI, which checks the model">
         <defs>
           <marker id="art" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5 0 10z" style="fill:var(--border-strong)"/></marker>
         </defs>
         <line class="edge" x1="32" y1="54" x2="32" y2="238"/>
-        <line class="bus" x1="32" y1="442" x2="32" y2="1100"/>
+        <line class="bus" x1="32" y1="442" x2="32" y2="1220"/>
         <path class="edge both" d="M 128 54 L 36 54"/>
         <text class="lbl" x="82" y="44" text-anchor="middle">reads · writes</text>
         <a href="https://studio.radical.tools" target="_blank" rel="noopener" style="--c:var(--c-studio)">
@@ -311,6 +324,18 @@
             <text class="why" x="54" y="72">tested, not just trusted</text>
           </g>
         </a>
+        <path class="edge" d="M 128 1220 L 36 1220"/>
+        <rect class="pill" x="54" y="1211" width="56" height="18" rx="9"/><text class="lbl" x="82" y="1224" text-anchor="middle">finds it</text>
+        <a href="manual.html#assay" style="--c:var(--c-assay)">
+          <g transform="translate(132 1172)">
+            <rect class="box" width="272" height="96" rx="12"/>
+            <rect class="icon-bg" x="14" y="34" width="28" height="28" rx="7"/>
+            <svg class="icon" x="21" y="41" width="14" height="14" viewBox="0 0 16 16"><path d="M6.5 1a5.5 5.5 0 0 1 4.38 8.83l3.9 3.9-1.06 1.06-3.9-3.9A5.5 5.5 0 1 1 6.5 1Zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM5.1 4.3 3.4 6.5l1.7 2.2.8-.6-1.25-1.6L5.9 4.9l-.8-.6Zm2.8 0-.8.6 1.25 1.6L7.1 8.1l.8.6 1.7-2.2-1.7-2.2Z"/></svg>
+            <text class="name" x="54" y="31">Radical Assay</text>
+            <text class="sub" x="54" y="49">reads the code you have</text>
+            <text class="why" x="54" y="72">the model of what is built</text>
+          </g>
+        </a>
       </svg>
       </div>
       <hr class="hero-rule" />
@@ -334,6 +359,26 @@
       </div>
     </section>
 
+
+    <!-- Radical Assay: the model of code that already exists (manual.html#assay). -->
+    <section class="assay" id="assay" aria-labelledby="assay-title">
+      <div class="assay-head">
+        <span class="assay-icon" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M6.5 1a5.5 5.5 0 0 1 4.38 8.83l3.9 3.9-1.06 1.06-3.9-3.9A5.5 5.5 0 1 1 6.5 1Zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM5.1 4.3 3.4 6.5l1.7 2.2.8-.6-1.25-1.6L5.9 4.9l-.8-.6Zm2.8 0-.8.6 1.25 1.6L7.1 8.1l.8.6 1.7-2.2-1.7-2.2Z"/></svg></span>
+        <h2 id="assay-title">Have code already? <span class="accent">Radical Assay finds the model in it.</span></h2>
+      </div>
+      <p>Point your coding agent at the repositories you have. Assay reads them the same way every time: units and their dependencies, what the deployment runs, APIs, addresses and messages, databases, tables, stored routines and the code's calls of them, statuses, entry points and tests. The agent turns those facts into the model they hold, <b>systems and containers, the domain, processes, lifecycles, requirements and scenarios</b>, and the server refuses anything no fact or quoted line backs.</p>
+      <div class="assay-facts">
+        <div class="assay-fact"><span class="n">20+ stacks</span><span class="t">Java, .NET, Node, Python, Go, PHP, Ruby, Elixir, Rust, Perl, VB6; Oracle, SQL Server and PostgreSQL code</span></div>
+        <div class="assay-fact"><span class="n">0.87 F1</span><span class="t">on the calls of microSecEnD's hand-drawn diagrams, a ground truth it never saw</span></div>
+        <div class="assay-fact"><span class="n">Every element cites</span><span class="t">the files and lines it rests on; what it only infers is marked so</span></div>
+      </div>
+      <div class="get-started">
+        <div class="get-started-label">With Radical MCP connected, ask your agent:</div>
+        <div class="get-started-cmd"><code>Run Radical Assay on ../my-repositories and write the model.</code><button type="button" class="copy">Copy</button></div>
+      </div>
+      <p class="assay-links"><a href="manual.html#assay">How Assay works →</a><a href="usecases.html#existing-code">The use case →</a></p>
+    </section>
+
   </main>
 
   <footer class="footer">
@@ -355,7 +400,7 @@
     const tabs = document.querySelectorAll('.get-started-tabs [data-os]')
     const show = (os) => {
       for (const tab of tabs) tab.setAttribute('aria-selected', String(tab.dataset.os === os))
-      for (const cmd of document.querySelectorAll('.get-started-cmd')) cmd.hidden = cmd.dataset.os !== os
+      for (const cmd of document.querySelectorAll('.get-started-cmd[data-os]')) cmd.hidden = cmd.dataset.os !== os
     }
     for (const tab of tabs) tab.addEventListener('click', () => show(tab.dataset.os))
     if (/Windows/.test(navigator.userAgent)) show('win')

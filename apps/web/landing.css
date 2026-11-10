@@ -25,7 +25,7 @@
   --w: min(1080px, 92vw);
 
   /* the parts of the product, in the hero diagram and the Made for cards */
-  --c-studio: #5aa0f0; --c-forge: #b794f6; --c-hub: #2dd4bf; --c-mcp: #22d3ee; --c-cli: #fbbf24; --c-code: #4ade80;
+  --c-studio: #5aa0f0; --c-forge: #b794f6; --c-hub: #2dd4bf; --c-mcp: #22d3ee; --c-cli: #fbbf24; --c-code: #4ade80; --c-assay: #fb7185;
 
   /* aliases used by style.css (manual.html) */
   --text-muted: var(--muted);
@@ -49,7 +49,7 @@
   --hover-faint:   rgba(0,0,0,0.022);
   --shadow-sm: 0 1px 2px rgba(20,30,60,0.06);
   --shadow-md: 0 4px 12px rgba(20,30,60,0.10), 0 1px 3px rgba(20,30,60,0.06);
-  --c-studio: #1168bd; --c-forge: #6d28d9; --c-hub: #0f766e; --c-mcp: #0e7490; --c-cli: #b45309; --c-code: #15803d;
+  --c-studio: #1168bd; --c-forge: #6d28d9; --c-hub: #0f766e; --c-mcp: #0e7490; --c-cli: #b45309; --c-code: #15803d; --c-assay: #be123c;
 }
 
 /* Until theme.js has run, follow the OS preference to avoid a flash. */
@@ -59,7 +59,7 @@
     --text: #1a1a2e; --text-2: #44485a; --muted: #6b6b80;
     --accent: #3b6fe6; --accent-rgb: 59,111,230;
     --hover: rgba(0,0,0,0.05); --hover-faint: rgba(0,0,0,0.022);
-    --c-studio: #1168bd; --c-forge: #6d28d9; --c-hub: #0f766e; --c-mcp: #0e7490; --c-cli: #b45309; --c-code: #15803d;
+    --c-studio: #1168bd; --c-forge: #6d28d9; --c-hub: #0f766e; --c-mcp: #0e7490; --c-cli: #b45309; --c-code: #15803d; --c-assay: #be123c;
   }
 }
 
@@ -196,6 +196,25 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .hero-note { margin-top: 16px; font-size: 12.5px; color: var(--muted); }
 .hero-note a { color: var(--accent); }
 .hero-note a:hover { text-decoration: underline; }
+
+/* Radical Assay, below the hero: the model of code that already exists. */
+.assay { max-width: 760px; margin: 0 auto; padding: 8px 0 64px; }
+.assay-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.assay-icon { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: color-mix(in srgb, var(--c-assay) 14%, transparent); }
+.assay-icon svg { width: 17px; height: 17px; fill: var(--c-assay); }
+.assay h2 { font-size: clamp(22px, 3vw, 28px); font-weight: 750; letter-spacing: -0.02em; line-height: 1.2; text-wrap: balance; }
+.assay p { font-size: 15px; line-height: 1.65; color: var(--text-2); margin-bottom: 14px; }
+.assay p b { color: var(--text); font-weight: 600; }
+.assay-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0 20px; }
+.assay-fact { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: color-mix(in srgb, var(--bg-panel) 85%, transparent); }
+.assay-fact .n { display: block; font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.assay-fact .t { display: block; font-size: 12.5px; line-height: 1.5; color: var(--muted); margin-top: 2px; }
+.assay .get-started { margin: 0; max-width: none; }
+.assay .get-started-label { text-align: left; }
+.assay-links { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; font-size: 13.5px; font-weight: 600; }
+.assay-links a { color: var(--c-assay); }
+.assay-links a:hover { text-decoration: underline; }
+@media (max-width: 640px) { .assay-facts { grid-template-columns: 1fr; } }
 
 /* Get started: one command, dark in both themes as the code blocks. */
 .get-started { max-width: 640px; margin: 0 auto; }
