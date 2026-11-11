@@ -640,9 +640,10 @@ export function siblingsNear(l: Layout, parent: string | undefined, b: { x: numb
 
 /** Which of `items` may touch a box, by a coarse grid over their boxes. */
 class Grid<T> {
-  private cells = new Map<string, T[]>()
+  private cells = new Map<number, T[]>()
   constructor(private readonly size: number) {}
-  private key(cx: number, cy: number): string { return `${cx},${cy}` }
+  /** One number per cell (a string key was a tenth of a run's time): cells up to 2^20 either way of the origin. */
+  private key(cx: number, cy: number): number { return (cx + 1048576) * 2097152 + (cy + 1048576) }
   add(item: T, x0: number, y0: number, x1: number, y1: number): void {
     for (let cx = Math.floor(x0 / this.size); cx <= Math.floor(x1 / this.size); cx++) {
       for (let cy = Math.floor(y0 / this.size); cy <= Math.floor(y1 / this.size); cy++) {
@@ -779,17 +780,21 @@ export function pathsCross(p: Pt[], q: Pt[]): boolean {
   return false
 }
 
+/** Which side of the line from p to q the point r lies on: 1, -1, or 0 on it. */
+function sideOf(px: number, py: number, qx: number, qy: number, rx: number, ry: number): number {
+  return Math.sign((qx - px) * (ry - py) - (qy - py) * (rx - px))
+}
+
 export function segmentsCross(ax: number, ay: number, bx: number, by: number, cx: number, cy: number, dx: number, dy: number): boolean {
-  const side = (px: number, py: number, qx: number, qy: number, rx: number, ry: number) => Math.sign((qx - px) * (ry - py) - (qy - py) * (rx - px))
-  return side(ax, ay, bx, by, cx, cy) * side(ax, ay, bx, by, dx, dy) < 0
-    && side(cx, cy, dx, dy, ax, ay) * side(cx, cy, dx, dy, bx, by) < 0
+  return sideOf(ax, ay, bx, by, cx, cy) * sideOf(ax, ay, bx, by, dx, dy) < 0
+    && sideOf(cx, cy, dx, dy, ax, ay) * sideOf(cx, cy, dx, dy, bx, by) < 0
 }
 
 export function segmentHitsRect(ax: number, ay: number, bx: number, by: number, x0: number, y0: number, x1: number, y1: number): boolean {
   if (x1 <= x0 || y1 <= y0) return false
   if (Math.max(ax, bx) < x0 || Math.min(ax, bx) > x1 || Math.max(ay, by) < y0 || Math.min(ay, by) > y1) return false
-  const inside = (x: number, y: number) => x > x0 && x < x1 && y > y0 && y < y1
-  if (inside(ax, ay) || inside(bx, by)) return true
-  const sides: [number, number, number, number][] = [[x0, y0, x1, y0], [x1, y0, x1, y1], [x1, y1, x0, y1], [x0, y1, x0, y0]]
-  return sides.some(([cx, cy, dx, dy]) => segmentsCross(ax, ay, bx, by, cx, cy, dx, dy))
+  if ((ax > x0 && ax < x1 && ay > y0 && ay < y1) || (bx > x0 && bx < x1 && by > y0 && by < y1)) return true
+  // Its four sides, one by one: called for every line near every box of every move tried, so nothing is allocated here.
+  return segmentsCross(ax, ay, bx, by, x0, y0, x1, y0) || segmentsCross(ax, ay, bx, by, x1, y0, x1, y1)
+    || segmentsCross(ax, ay, bx, by, x1, y1, x0, y1) || segmentsCross(ax, ay, bx, by, x0, y1, x0, y0)
 }
