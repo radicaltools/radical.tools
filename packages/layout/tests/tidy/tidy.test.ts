@@ -270,12 +270,16 @@ describe('Tidy', () => {
     const again = runTidyLayout(first.laidOut, first.visible.relations)
     expect(again.tidy.steps.length).toBe(0)
     expect(again.keptCurrent).toBe(true)
-    // 300 elements piled up in a few seconds.
+    // 300 elements piled up with no budget: held by the work the run counts
+    // (the same on every machine; 19.5M today), and by the clock only loosely,
+    // as a shared CI runner's time is noise.
     const big = bigModel(300)
     const t = Date.now()
-    runTidyLayout(big.nodes, big.relations)
-    expect(Date.now() - t).toBeLessThan(15_000)
-  }, 30_000)
+    const run = runTidyLayout(big.nodes, big.relations)
+    expect(run.tidy.budgetOut).toBe(false)
+    expect(run.tidy.work).toBeLessThan(20_000_000)
+    expect(Date.now() - t).toBeLessThan(30_000)
+  }, 60_000)
 })
 
 function node(id: string, type: string, parentId: string | undefined, x: number, y: number): C4Node {
