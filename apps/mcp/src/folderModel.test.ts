@@ -827,14 +827,15 @@ describe('long Smart Layout runs', () => {
     const saved = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
     const input = viewLayoutInput(undefined, Object.fromEntries(saved.nodes.map((n) => [n.id, n])), Object.fromEntries(saved.relations.map((r) => [r.id, r])), saved.defaultLayoutConstraints)
     const { tidy } = runTidyLayout(input.nodes, input.relations, { alignments: input.alignments, edgeStyle: 'curved', metamodel: documentMetamodel(saved.metamodel, saved.nodes), pinned: [], frames: [...input.frames] })
-    const crossings = costRows(tidy.before, tidy.after).find((p) => p.key === 'crossings')!
+    // The crossings as the canvas draws the lines: what Why this layout? shows first.
+    const crossings = costRows(tidy.before, tidy.after, tidy.drawn).find((p) => p.key === 'drawnCrossings')!
     expect(crossings.before).toBeGreaterThan(crossings.after)
 
     const model = await FolderModel.open(folder)
     const outcome = await model.call('smart_layout', {})
     expect(outcome.ok, outcome.text).toBe(true)
     expect(outcome.text).toContain(`${tidy.steps.length} move${tidy.steps.length === 1 ? '' : 's'}`)
-    expect(outcome.text).toContain(`crossings ${formatPart(crossings.before)}\u2009→\u2009${formatPart(crossings.after)}`)
+    expect(outcome.text).toContain(`crossings as drawn ${formatPart(crossings.before)}\u2009→\u2009${formatPart(crossings.after)}`)
   }, 60_000)
 
   it('opens and folds a container on a view round its middle, making room as Studio does (item 172)', async () => {

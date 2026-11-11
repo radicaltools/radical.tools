@@ -643,7 +643,7 @@ export function tidySummary(tidy: TidyReport): string {
   const seen = tidy.drawn.before.crossings !== tidy.drawn.after.crossings ? [`crossings as drawn ${tidy.drawn.before.crossings}${arrow}${tidy.drawn.after.crossings}`] : []
   const gained = costRows(tidy.before, tidy.after)
     .sort((p, q) => (q.before - q.after) * q.weight - (p.before - p.after) * p.weight)
-    .filter((p) => p.before - p.after > 0.05).slice(0, 3 - seen.length)
+    .filter((p) => p.before - p.after > 0.05 && !(seen.length && p.key === 'crossings')).slice(0, 3 - seen.length)
     .map((p) => `${p.label.toLowerCase()} ${formatPart(p.before)}${arrow}${formatPart(p.after)}`)
   gained.unshift(...seen)
   const n = tidy.steps.length

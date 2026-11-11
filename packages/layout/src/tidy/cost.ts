@@ -89,7 +89,7 @@ export const WEIGHTS = {
 }
 /** What each part is called where a person reads the report (Why this layout?). */
 export const PART_LABELS: Record<keyof typeof WEIGHTS, string> = {
-  crossings: 'Crossings, lines straight', overdraws: 'Lines with an element in the way', slanted: 'Slanted lines', length: 'Line length', loose: 'Empty room',
+  crossings: 'Crossings of straight lines', overdraws: 'Lines with an element in the way', slanted: 'Slanted lines', length: 'Line length', loose: 'Empty room',
   nearMisses: 'Almost in line', kinApart: 'Apart from their kind', offGrid: 'In no row or column', uneven: 'Uneven spacing',
   spread: 'Too far or too near', imbalance: 'Off-centre', misplaced: 'Out of place', againstFlow: 'Against the flow',
   flat: 'Across the reading way', fans: 'Bunched lines', brushes: 'Lines brushing elements', offConvention: 'Off convention',
