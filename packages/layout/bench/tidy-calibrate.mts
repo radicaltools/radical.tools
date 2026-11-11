@@ -6,8 +6,11 @@
  *     For every bench model (and the fixtures), two layouts of each view:
  *     A = Tidy with the current weights, B = Tidy with one weight doubled
  *     or halved (a different trade-off), drawn side by side as SVG in <dir>
- *     with the cost parts of each in <dir>/pairs.json. Look at them and
- *     write your choice into <dir>/answers.json: { "<pair id>": "A" | "B" }.
+ *     with the cost parts of each in <dir>/pairs.json, lines as the canvas
+ *     draws them. Open <dir>/index.html, click the layout that reads better
+ *     in each pair (or Same), and save the answers.json it downloads into
+ *     <dir>: { "<pair id>": "A" | "B" }. A pair whose two layouts came out
+ *     the same is left out.
  *
  *   npx tsx bench/tidy-calibrate.mts fit <dir>
  *     Fits weights to the answers: a perceptron over the difference of the
@@ -22,6 +25,7 @@ import { Layout } from '../src/tidy/layout'
 import { type CostParts, linesOf, totalCost, WEIGHTS } from '../src/tidy/cost'
 import { viewLayoutInput } from '../src/viewInput'
 import { projectToVisibleGraph } from '../src/geometry'
+import { renderedEdges } from '../src/smartLayout'
 import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
 
 type Weights = typeof WEIGHTS
@@ -76,11 +80,12 @@ function svg(nodes: Record<string, C4Node>, relations: Record<string, C4Relation
     const p = of(n)
     s += `<rect x="${p.x}" y="${p.y}" width="${n.width}" height="${n.height}" fill="${n.type === 'adr' || n.type === 'requirement' ? '#d9b89c' : '#a9c8e8'}" fill-opacity="0.85" stroke="#333"/><text x="${p.x + 8}" y="${p.y + 20}" font-size="16" font-family="sans-serif">${(n.label || n.id).replace(/[<&]/g, '')}</text>`
   }
-  for (const r of Object.values(relations)) {
-    const a = nodes[r.sourceId], b = nodes[r.targetId]
-    if (!a || !b) continue
-    const pa = of(a), pb = of(b)
-    s += `<line x1="${pa.x + a.width / 2}" y1="${pa.y + a.height / 2}" x2="${pb.x + b.width / 2}" y2="${pb.y + b.height / 2}" stroke="#222" stroke-width="2"/>`
+  // The lines as the canvas draws them: from their ports, curved, led round the elements in their way.
+  const shown = Object.fromEntries(Object.entries(relations).filter(([, r]) => nodes[r.sourceId] && nodes[r.targetId]))
+  for (const e of renderedEdges(nodes, shown)) {
+    s += `<polyline points="${e.samples.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}" fill="none" stroke="#222" stroke-width="2"/>`
+    const end = e.samples[e.samples.length - 1]
+    s += `<circle cx="${end.x.toFixed(1)}" cy="${end.y.toFixed(1)}" r="5" fill="#222"/>`
   }
   return s + '</svg>'
 }
@@ -98,13 +103,44 @@ if (command === 'pairs') {
     const changed = PARTS[i % PARTS.length], factor = i % 2 ? 0.5 : 2
     const b = tidyWith({ ...WEIGHTS, [changed]: WEIGHTS[changed] * factor }, m.nodes, m.relations)
     const id = `${String(i + 1).padStart(2, '0')}-${m.name}`
-    writeFileSync(join(dir, `${id}-A.svg`), svg(a.positions, m.relations, `${id} A`))
-    writeFileSync(join(dir, `${id}-B.svg`), svg(b.positions, m.relations, `${id} B (${changed} ×${factor})`))
-    pairs.push({ id, model: m.name, changed, factor, a: a.parts, b: b.parts })
     i++
+    // The same layout either way: nothing to choose.
+    if (JSON.stringify(a.positions) === JSON.stringify(b.positions)) continue
+    writeFileSync(join(dir, `${id}-A.svg`), svg(a.positions, m.relations, `${id} A`))
+    writeFileSync(join(dir, `${id}-B.svg`), svg(b.positions, m.relations, `${id} B`))
+    pairs.push({ id, model: m.name, changed, factor, a: a.parts, b: b.parts })
   }
   writeFileSync(join(dir, 'pairs.json'), JSON.stringify({ weights: WEIGHTS, pairs }, null, 1))
-  console.log(`${pairs.length} pairs in ${dir}; answer in ${join(dir, 'answers.json')} as {"<id>": "A"|"B"}`)
+  // One page to answer on: the two layouts of each pair side by side, a click chooses, the
+  // choices are kept in the browser and downloaded as answers.json. Which weight differs is
+  // not shown: the choice is by how the diagram reads.
+  writeFileSync(join(dir, 'index.html'), `<!doctype html><meta charset="utf-8"><title>Tidy calibration</title>
+<style>body{font:15px sans-serif;margin:16px;background:#f4f4f4}h1{font-size:18px}.pair{background:#fff;border:1px solid #ccc;margin:0 0 24px;padding:12px}.two{display:flex;gap:12px}.side{flex:1;min-width:0;border:3px solid transparent;cursor:pointer;padding:4px}.side img{width:100%;height:auto;display:block}.side.chosen{border-color:#2a7}.bar{display:flex;gap:12px;align-items:center;margin-top:8px}button{font:inherit;padding:4px 12px}#top{position:sticky;top:0;background:#f4f4f4;padding:8px 0;z-index:1}</style>
+<div id="top"><h1>Which layout reads better? <span id="count"></span> <button id="save">Download answers.json</button></h1></div>
+${pairs.map((p) => `<div class="pair" data-id="${p.id}"><div class="two"><div class="side" data-v="A"><img src="${p.id}-A.svg"></div><div class="side" data-v="B"><img src="${p.id}-B.svg"></div></div><div class="bar"><strong>${p.id}</strong><button data-v="">Same / cannot say</button></div></div>`).join('\n')}
+<script>
+const key = 'tidy-calibration:' + location.pathname
+let answers = {}
+try { answers = JSON.parse(localStorage.getItem(key) || '{}') } catch {}
+const show = () => {
+  for (const el of document.querySelectorAll('.pair')) for (const s of el.querySelectorAll('.side')) s.classList.toggle('chosen', answers[el.dataset.id] === s.dataset.v)
+  document.getElementById('count').textContent = Object.keys(answers).length + ' of ' + document.querySelectorAll('.pair').length + ' answered'
+  try { localStorage.setItem(key, JSON.stringify(answers)) } catch {}
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-v]'); if (!t) return
+  const id = t.closest('.pair').dataset.id
+  if (t.dataset.v) answers[id] = t.dataset.v; else delete answers[id]
+  show()
+})
+document.getElementById('save').onclick = () => {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(answers, null, 1)], { type: 'application/json' }))
+  a.download = 'answers.json'; a.click()
+}
+show()
+</script>`)
+  console.log(`${pairs.length} pairs in ${dir}: open ${join(dir, 'index.html')}, choose, and save the answers.json it downloads into ${dir}`)
 } else if (command === 'fit') {
   const { pairs } = JSON.parse(readFileSync(join(dir, 'pairs.json'), 'utf8')) as { pairs: { id: string; a: CostParts; b: CostParts }[] }
   const answersFile = join(dir, 'answers.json')
