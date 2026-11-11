@@ -7,6 +7,15 @@ import { YARDSTICK_FILE, YARDSTICK_KEYS, baseline, benchModels, measure, total, 
 const tidy = process.env.OLD ? (await import('../src/tidy-old/index')).runTidyLayout : undefined
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'))
 const write = process.argv.includes('--write')
+// SHAKES=n: every model from n shaken starts instead of its canvas, the totals averaged
+// (to compare two versions of Tidy: one start is one sample).
+const shakes = Number(process.env.SHAKES ?? 0)
+if (shakes) {
+  const sums = Array.from({ length: shakes }, (_, i) => total((args.length ? args : benchModels()).map((f) => measure(f, tidy, i + 1))))
+  for (const s of sums) console.log(`shake ${YARDSTICK_KEYS.map((k) => `${k} ${s[k]}`).join('  ')}`)
+  console.log(`MEAN  ${YARDSTICK_KEYS.map((k) => `${k} ${(sums.reduce((n, s) => n + s[k], 0) / shakes).toFixed(1)}`).join('  ')}`)
+  process.exit(0)
+}
 const rows: YardRow[] = []
 for (const f of args.length ? args : benchModels()) {
   const r = measure(f, tidy)

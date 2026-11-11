@@ -3525,6 +3525,20 @@
     ] },
     { "element": "8954dbaf-1f3a-4e94-a60b-36293538d48d", "name": "Tidy yardstick", "tests": [
       "packages/layout/tests/tidy/yardstick.test.ts"
+    ] },
+    { "element": "725605fd-3093-40c5-893a-fa211aa3cebb", "name": "Room made in a row", "tests": [
+      "packages/layout/tests/tidy/room.test.ts › Tidy makes room › an element slid into a taken spot shifts the siblings in its way along the row",
+      "packages/layout/tests/tidy/room.test.ts › Tidy makes room › or along the column",
+      "packages/layout/tests/tidy/room.test.ts › Tidy makes room › no room is made where the spot is free"
+    ] },
+    { "element": "88415997-aa71-489e-93c9-1e95de66115d", "name": "Room not made past its limits", "tests": [
+      "packages/layout/tests/tidy/room.test.ts › Tidy makes room › a pinned element does not give way",
+      "packages/layout/tests/tidy/room.test.ts › Tidy makes room › at most six siblings give way to one move"
+    ] },
+    { "element": "078fa0d4-e579-494a-aa16-ca2ffdfae4fd", "name": "Frame turned toward its line", "tests": [
+      "packages/layout/tests/tidy/room.test.ts › Tidy turns a frame over › left to right: its children mirrored, the frame where and as large as it was",
+      "packages/layout/tests/tidy/room.test.ts › Tidy turns a frame over › tidying turns the frame so the line out of it leaves by the near side",
+      "packages/layout/tests/tidy/room.test.ts › Tidy turns a frame over › a frame with no line out of it, or holding a pinned element, is not turned"
     ] }
   ]
 }

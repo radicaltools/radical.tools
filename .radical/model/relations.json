@@ -12,6 +12,12 @@
     "targetId": "b852859c-e339-4c2f-8334-d276a6a50365"
   },
   {
+    "id": "00645d48-bc3a-41df-86d8-51fb8ea7bf1f",
+    "relationType": "verifies",
+    "sourceId": "078fa0d4-e579-494a-aa16-ca2ffdfae4fd",
+    "targetId": "9e47125f-f78b-49b8-96a9-f8755d118243"
+  },
+  {
     "id": "009b75b7-14c0-4b5c-a5e3-e4bbf550c523",
     "relationType": "constrains",
     "sourceId": "427cb7f5-d53b-4791-98e6-d2d753ae810f",
@@ -2538,6 +2544,12 @@
     "targetId": "83cc122a-c0cf-4e92-ba26-7efea2fde95f"
   },
   {
+    "id": "1eae547a-78b5-4f7e-b620-5ee92ede5c7b",
+    "relationType": "satisfies",
+    "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+    "targetId": "9e47125f-f78b-49b8-96a9-f8755d118243"
+  },
+  {
     "id": "1ec50d15-9c32-4f0c-a030-7ae858256d11",
     "relationType": "satisfies",
     "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
@@ -4095,6 +4107,12 @@
     "relationType": "constrains",
     "sourceId": "8833743d-283a-4407-92ea-462788b37c8b",
     "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
+  },
+  {
+    "id": "3118c8e9-b6cc-4e5e-862a-1da2447b9891",
+    "relationType": "derives",
+    "sourceId": "9e47125f-f78b-49b8-96a9-f8755d118243",
+    "targetId": "a9394a73-6e11-43a8-a8af-1fa1e42ba31f"
   },
   {
     "id": "31379183-99ae-40cf-93c1-008a64b593cf",
@@ -6806,6 +6824,12 @@
     "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
   },
   {
+    "id": "4f8f67fc-d65b-4d09-a16f-3e3f9660a5d4",
+    "relationType": "verifies",
+    "sourceId": "725605fd-3093-40c5-893a-fa211aa3cebb",
+    "targetId": "3b91d99f-fc9f-4947-b1a6-bfd68c6cbed5"
+  },
+  {
     "id": "4fb0b566-687b-4afd-b5cb-8641d3b0e78e",
     "relationType": "verifies",
     "sourceId": "8019ac4c-df3a-491c-8c24-e2f91f41b29d",
@@ -8134,6 +8158,12 @@
     "sourceId": "f2d51835-1d89-4283-a8b9-6f3b3e060f05",
     "targetId": "7f0b17a3-f89a-4ace-b540-3ad12e1d6f33",
     "technology": "GitHub Actions, vsce"
+  },
+  {
+    "id": "5edf8192-56b9-48f2-84a4-4f4c23cb478f",
+    "relationType": "verifies",
+    "sourceId": "88415997-aa71-489e-93c9-1e95de66115d",
+    "targetId": "3b91d99f-fc9f-4947-b1a6-bfd68c6cbed5"
   },
   {
     "id": "5f07600c-ef6e-4797-b2cc-e522f42b65fb",
@@ -10846,6 +10876,12 @@
     "targetId": "0e22a42c-9810-419c-9936-98816ee7a7d0"
   },
   {
+    "id": "7d27578d-44ee-4e9a-97eb-14e803857b19",
+    "relationType": "satisfies",
+    "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
+    "targetId": "3b91d99f-fc9f-4947-b1a6-bfd68c6cbed5"
+  },
+  {
     "id": "7d2b706a-c1eb-493b-89b6-9150026067d0",
     "relationType": "verifies",
     "sourceId": "f3ee03cf-eff7-492b-99a8-d4b2c7bf56f7",
@@ -11426,6 +11462,12 @@
     "relationType": "verifies",
     "sourceId": "3c6863e0-5aac-486a-a114-2f55266c996f",
     "targetId": "1404f086-d7d1-4ec5-b078-58f6f74d740b"
+  },
+  {
+    "id": "84fa95c1-98c9-499e-bfb2-73a369a2cbdd",
+    "relationType": "derives",
+    "sourceId": "3b91d99f-fc9f-4947-b1a6-bfd68c6cbed5",
+    "targetId": "a9394a73-6e11-43a8-a8af-1fa1e42ba31f"
   },
   {
     "id": "85388aaf-3e43-4b55-8eb0-da6b52faaa31",

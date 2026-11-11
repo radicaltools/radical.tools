@@ -13,14 +13,20 @@ import { COMFORT, type Line, STRAIGHT_TOLERANCE, againstFlow, anchorOf, kinApart
 import type { Layout } from './layout'
 
 export interface Move {
-  kind: 'rough' | 'untangle' | 'gather' | 'pull-out' | 'actor-up' | 'end-down' | 'external-out' | 'between' | 'swap' | 'align' | 'balance' | 'closer' | 'row' | 'flow' | 'follow' | 'even' | 'order' | 'snap' | 'kin' | 'clear' | 'room'
+  kind: 'rough' | 'untangle' | 'gather' | 'pull-out' | 'actor-up' | 'end-down' | 'external-out' | 'between' | 'swap' | 'align' | 'balance' | 'closer' | 'row' | 'flow' | 'follow' | 'even' | 'order' | 'snap' | 'kin' | 'clear' | 'room' | 'flip'
   ids: string[]
   description: string
   /** Tells apart moves of one kind on the same elements with the same description (the two axes of a slide). */
   variant?: string
+  /** The move shifts elements besides its own (it makes room among the siblings in its way):
+   *  every box it changed is judged as moved, with its lines and the room round it. */
+  wide?: boolean
   /** Does it; false when it cannot be done (no room). */
   apply(l: Layout): boolean
 }
+
+/** Making room shifts at most this many siblings: more is no longer one move a reader can follow. */
+const MAX_PUSHED = 6
 
 /** The lines `id` is an end of, as the elements at the other end (indexed once per set of lines). */
 const neighbourIndex = new WeakMap<Line[], Map<string, string[]>>()
@@ -136,6 +142,47 @@ function slideInto(l: Layout, id: string, axis: 'x' | 'y', delta: number, lines:
   }
   by(-at)
   return false
+}
+
+/** `id` with its satellites slid by `delta` along `axis` into a spot that is
+ *  taken, the siblings in the way shifted along `along` to make room, each
+ *  away from the element that came, and what they then stand too close to
+ *  shifted on the same way: a slot opened in a row or a column, as a person
+ *  opens one. False when a pinned element is in the way, when more than
+ *  MAX_PUSHED would have to give way, or when a frame grown by it lies on
+ *  its neighbour. */
+function pushInto(l: Layout, id: string, axis: 'x' | 'y', delta: number, lines: Line[], along: 'x' | 'y'): boolean {
+  return makeRoom(l, axis === 'x' ? slide(l, id, delta, 0, lines) : slide(l, id, 0, delta, lines), along)
+}
+
+/** Room made round `group` (siblings just put where others stand): see pushInto. */
+function makeRoom(l: Layout, group: string[], along: 'x' | 'y'): boolean {
+  if (l.allClear(group)) return true
+  const parent = l.parentOf(group[0])
+  const gap = l.gapOf(parent)
+  const came = new Set(group)
+  /** The way each shifted sibling went: it is never shifted back. */
+  const went = new Map<string, 1 | -1>()
+  const frontier = [...group]
+  while (frontier.length) {
+    const m = frontier.shift()!
+    for (const o of l.childrenOf(parent)) {
+      if (o === m || came.has(o)) continue
+      const b = l.box(m)!, r = l.box(o)!
+      if (!(b.x < r.x + r.w + gap && r.x < b.x + b.w + gap && b.y < r.y + r.h + gap && r.y < b.y + b.h + gap)) continue
+      if (l.fixed(o)) return false
+      const dir: 1 | -1 = went.get(o) ?? went.get(m) ?? ((along === 'x' ? r.cx >= b.cx : r.cy >= b.cy) ? 1 : -1)
+      const d = along === 'x'
+        ? (dir > 0 ? b.x + b.w + gap - r.x : b.x - gap - r.w - r.x)
+        : (dir > 0 ? b.y + b.h + gap - r.y : b.y - gap - r.h - r.y)
+      if (d * dir <= 0) return false
+      if (!went.has(o) && went.size >= MAX_PUSHED) return false
+      if (along === 'x') l.moveBy(o, d, 0); else l.moveBy(o, 0, d)
+      went.set(o, dir)
+      frontier.push(o)
+    }
+  }
+  return l.allClear([...group, ...went.keys()])
 }
 
 /** How far `id` slides along `axis` to stand in line with `o`: middle to
@@ -382,6 +429,18 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
             return lay.allClear([id]) || placeNear(lay, id, x + b.w / 2, a.cy)
           },
         })
+        // Or what is in the way gives way: a store stands beside its user.
+        for (const along of ['x', 'y'] as const) {
+          moves.push({
+            kind: 'pull-out', ids: [id], variant: `room-${along}`, wide: true,
+            description: `${label(id)} beside ${label(anchor)}, on its ${side}, room made for it`,
+            apply: (lay) => {
+              const a = lay.box(anchor)!, b = lay.box(id)!, gap = lay.lineGapOf(lay.parentOf(id))
+              lay.moveTo(id, side === 'right' ? a.x + a.w + gap : a.x - gap - b.w, a.cy - b.h / 2)
+              return !lay.allClear([id]) && makeRoom(lay, [id], along)
+            },
+          })
+        }
       }
     }
 
@@ -486,6 +545,20 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
             return slideInto(lay, id, axis, axis === 'x' ? other.cx - me.cx : other.cy - me.cy, lines, n)
           },
         })
+        // The spot taken: room made for it, the siblings in the way shifted along the row or the column.
+        if (!spotFree(l, id, axis, axis === 'x' ? b.cx - a.cx : b.cy - a.cy, lines)) {
+          for (const along of ['x', 'y'] as const) {
+            moves.push({
+              kind: 'align', ids: [id], variant: `${axis}:room-${along}`, wide: true,
+              description: `${label(id)} ${axis === 'x' ? 'under' : 'level with'} ${label(n)}: a straight line, room made for it`,
+              apply: (lay) => {
+                const me = lay.box(id)!, other = lay.box(n)!
+                // Room is not made for a line to run against its flow (a part above its whole).
+                return pushInto(lay, id, axis, axis === 'x' ? other.cx - me.cx : other.cy - me.cy, lines, along) && !againstFlow(lay, x)
+              },
+            })
+          }
+        }
       }
     }
 
@@ -591,6 +664,15 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
           kind: 'clear', ids: [mover], variant: `${x.id}:${shift > 0 ? '+' : '-'}`,
           description: `${label(mover)} off the line from ${label(x.a)} to ${label(x.b)}`,
           apply: (lay) => lay.allClear(slide(lay, mover, nx * shift, ny * shift, lines)),
+        })
+        // No room beside the line: the siblings there give way.
+        moves.push({
+          kind: 'clear', ids: [mover], variant: `${x.id}:${shift > 0 ? '+' : '-'}:room`, wide: true,
+          description: `${label(mover)} off the line from ${label(x.a)} to ${label(x.b)}, room made for it`,
+          apply: (lay) => {
+            const group = slide(lay, mover, nx * shift, ny * shift, lines)
+            return !lay.allClear(group) && makeRoom(lay, group, Math.abs(nx) >= Math.abs(ny) ? 'x' : 'y')
+          },
         })
       }
     }
@@ -724,6 +806,35 @@ export function candidateMoves(l: Layout, nodes: Record<string, C4Node>, relatio
         return lay.allClear([x.a, x.b])
       },
     })
+  }
+
+  // A frame turned over: what it holds mirrored left to right, or top to
+  // bottom, so the elements with lines out of it stand on the side those
+  // lines leave by. The frame keeps its place and its size, its children
+  // their rows and columns.
+  for (const f of l.ids()) {
+    const kids = l.childrenOf(f)
+    if (kids.length < 2 || l.fixed(f) || kids.some((k) => l.fixed(k)) || !concerns([f, ...kids])) continue
+    if (!lines.some((x) => l.holds(f, x.a) !== l.holds(f, x.b))) continue
+    for (const axis of ['x', 'y'] as const) {
+      moves.push({
+        kind: 'flip', ids: [f], variant: axis,
+        description: `${label(f)} turned over, ${axis === 'x' ? 'left to right' : 'top to bottom'}`,
+        apply: (lay) => {
+          const boxes = kids.map((k) => lay.box(k)!)
+          const lo = Math.min(...boxes.map((b) => (axis === 'x' ? b.x : b.y))), hi = Math.max(...boxes.map((b) => (axis === 'x' ? b.x + b.w : b.y + b.h)))
+          let changed = false
+          kids.forEach((k, i) => {
+            const b = boxes[i]
+            const d = axis === 'x' ? lo + hi - (b.x + b.w) - b.x : lo + hi - (b.y + b.h) - b.y
+            if (Math.abs(d) < 0.01) return
+            changed = true
+            if (axis === 'x') lay.moveBy(k, d, 0); else lay.moveBy(k, 0, d)
+          })
+          return changed && lay.allClear(kids)
+        },
+      })
+    }
   }
 
   const byParent = new Map<string | undefined, string[]>()

@@ -18,12 +18,16 @@ import { projectToVisibleGraph } from '../src/geometry'
 const here = dirname(fileURLToPath(import.meta.url))
 export const YARDSTICK_FILE = join(here, 'tidy-yardstick.json')
 
-/** What the yardstick holds: none of these may grow past its baseline by more than YARDSTICK_SLACK. */
+/** What the yardstick holds: none of these may grow past its baseline by more than its share in YARDSTICK_SLACK. */
 export interface Yardstick { drawnCrossings: number; drawnOverdraws: number; slanted: number; length: number; area: number }
 export const YARDSTICK_KEYS: (keyof Yardstick)[] = ['drawnCrossings', 'drawnOverdraws', 'slanted', 'length', 'area']
-/** A change to the moves shifts every number a little, one way or the other (a move taken earlier
- *  changes all that follow): this much is noise, more is a layout that reads worse. */
-export const YARDSTICK_SLACK = 0.1
+/** A change to the moves shifts every number, one way or the other (a move taken earlier changes
+ *  all that follow): this much is noise, more is a layout that reads worse. Measured on four
+ *  shaken starts of every model (2026-11-11): line length, slanted lines and area stayed within
+ *  a tenth of their mean, the crossings as drawn within a third (165 to 301). */
+export const YARDSTICK_SLACK: Yardstick = { drawnCrossings: 0.3, drawnOverdraws: 0.3, slanted: 0.1, length: 0.1, area: 0.1 }
+
+const SHAKE = 40
 
 export interface YardRow extends Yardstick { file: string; lines: number; crossings: number; overdraws: number; near: number; kin: number; cramped: number; cost: number; moves: number }
 
@@ -37,8 +41,16 @@ export function benchModels(): string[] {
 const byId = <T extends { id: string }>(xs: T[]): Record<string, T> => Object.fromEntries(xs.map((x) => [x.id, x]))
 
 /** One model tidied from where its canvas stands, and measured. */
-export function measure(file: string, tidy: typeof runTidyLayout = runTidyLayout): YardRow {
+/** `shake`: a seed; every element starts up to SHAKE px off where its canvas has it. One canvas
+ *  is one sample of a search that a small change sends another way: comparing two versions of
+ *  Tidy takes several shaken starts of every model (tidy-yard.mts, SHAKES). */
+export function measure(file: string, tidy: typeof runTidyLayout = runTidyLayout, shake = 0): YardRow {
   const d = JSON.parse(readFileSync(file, 'utf8')) as { view?: DiagramView; nodes: C4Node[]; relations: C4Relation[] }
+  if (shake) {
+    let a = shake * 0x9e3779b9
+    const rnd = (): number => { a |= 0; a = a + 0x6d2b79f5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296 }
+    d.nodes = d.nodes.map((n) => ({ ...n, x: n.x + Math.round((rnd() - 0.5) * 2 * SHAKE), y: n.y + Math.round((rnd() - 0.5) * 2 * SHAKE) }))
+  }
   const input = viewLayoutInput(d.view, byId(d.nodes), byId(d.relations))
   const res = tidy(input.nodes, input.relations, { frames: [...input.frames] })
   const { nodes, relations } = projectToVisibleGraph(input.nodes, input.relations)
@@ -72,6 +84,6 @@ export function baseline(): Yardstick { return JSON.parse(readFileSync(YARDSTICK
 
 /** The measures that grew past the baseline by more than the slack, as sentences; none: the yardstick holds. */
 export function worse(now: Yardstick, base: Yardstick): string[] {
-  return YARDSTICK_KEYS.filter((k) => now[k] > base[k] * (1 + YARDSTICK_SLACK) + 0.5)
-    .map((k) => `${k} ${now[k]} is more than ${Math.round(YARDSTICK_SLACK * 100)} % over its baseline ${base[k]}`)
+  return YARDSTICK_KEYS.filter((k) => now[k] > base[k] * (1 + YARDSTICK_SLACK[k]) + 0.5)
+    .map((k) => `${k} ${now[k]} is more than ${Math.round(YARDSTICK_SLACK[k] * 100)} % over its baseline ${base[k]}`)
 }

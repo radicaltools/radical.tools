@@ -422,6 +422,8 @@ function tidyOnce(
     const touched = l.changed()
     // A member put back on its line moved too: its lines are judged with the move.
     for (const id of touched) if (lined?.has(id)) moved.add(id)
+    // A move that made room shifted siblings: they moved as much as its own element did.
+    if (move.wide) for (const id of touched) moved.add(id)
     const after = l.snapshot(touched)
     const was = l.journalBoxes()
     const roomy = new Set<string>()
@@ -558,7 +560,8 @@ function tidyOnce(
           gains.set(key, gain)
           if (++judged % 64 === 0 && outOfTime()) break
         }
-        if (gain <= MIN_GAIN) { if (gain > -LOOKAHEAD_REACH) rejected.push({ move, gain }); continue }
+        // A move that made room is several moves already: it is not tried as the first of two.
+        if (gain <= MIN_GAIN) { if (gain > -LOOKAHEAD_REACH && !move.wide) rejected.push({ move, gain }); continue }
         if (!best || gain > best.gain) best = { move, gain }
       }
       if (outOfTime()) break
