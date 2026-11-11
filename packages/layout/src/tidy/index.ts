@@ -17,9 +17,9 @@ import { type Alignment, alignmentError, alongAxis, enforceAlignments } from '..
 import { computeCompositeScore, computePlanarityScore, projectPositions, type SmartLayoutResult } from '../smartLayout'
 import { type Box, Layout } from './layout'
 import { applyRadicalLayout } from '../radicalLayout'
-import { type CostIndex, type CostParts, STRAIGHT_TOLERANCE, buildIndex, costRows, formatPart, linesOf, localCost, siblingsNear, totalCost, updateIndex } from './cost'
+import { type CostIndex, type CostParts, type DrawnLines, STRAIGHT_TOLERANCE, buildIndex, costRows, formatPart, linesOf, localCost, siblingsNear, totalCost, updateIndex } from './cost'
 import { candidateMoves, compactMoves, gatherMoves, untangleMoves, type Move } from './moves'
-export { type CostParts, PART_LABELS, costRows, formatPart } from './cost'
+export { type CostParts, type CostRow, type DrawnLines, DRAWN_LABELS, PART_LABELS, costRows, formatPart } from './cost'
 
 export interface TidyStep {
   kind: Move['kind']
@@ -40,6 +40,8 @@ export interface TidyReport {
   budgetOut: boolean
   /** The work done, as a budget counts it. */
   work: number
+  /** Crossings and lines over elements as the canvas draws the lines, before and after. */
+  drawn: { before: DrawnLines; after: DrawnLines }
 }
 
 export interface TidyLayoutResult extends SmartLayoutResult {
@@ -148,6 +150,12 @@ export function runTidyLayout(
   afterLayout.edgeStyle = style
   const after = totalCost(afterLayout, lines)
   const score = computeCompositeScore(projected, relations, style)
+  // The lines as drawn, where the run started and where it ended (the composite score routes them as the canvas does).
+  const startScore = steps.length ? computeCompositeScore(nodes, relations, style) : score
+  const drawn = {
+    before: { crossings: startScore.renderedCrossings, overdraws: startScore.renderedOverdraws },
+    after: { crossings: score.renderedCrossings, overdraws: score.renderedOverdraws },
+  }
   const winner = { name: TIDY_NAME, positions, metrics: computeLayoutMetrics(projected, relations), score }
   return {
     baseline,
@@ -156,7 +164,7 @@ export function runTidyLayout(
     planarity: computePlanarityScore(projected, relations),
     refinement: { before: before.total, after: after.total, iterations: steps.length },
     keptCurrent: steps.length === 0,
-    tidy: { steps, before, after, unchanged: steps.length === 0, budgetOut, work },
+    tidy: { steps, before, after, unchanged: steps.length === 0, budgetOut, work, drawn },
   }
 }
 
@@ -631,10 +639,13 @@ function tidyOnce(
  *  moves, and the three parts of the reader's cost that gained most. */
 export function tidySummary(tidy: TidyReport): string {
   const arrow = '\u2009\u2192\u2009'
+  // What the reader sees first: the crossings as drawn, when the run changed them.
+  const seen = tidy.drawn.before.crossings !== tidy.drawn.after.crossings ? [`crossings as drawn ${tidy.drawn.before.crossings}${arrow}${tidy.drawn.after.crossings}`] : []
   const gained = costRows(tidy.before, tidy.after)
     .sort((p, q) => (q.before - q.after) * q.weight - (p.before - p.after) * p.weight)
-    .filter((p) => p.before - p.after > 0.05).slice(0, 3)
+    .filter((p) => p.before - p.after > 0.05).slice(0, 3 - seen.length)
     .map((p) => `${p.label.toLowerCase()} ${formatPart(p.before)}${arrow}${formatPart(p.after)}`)
+  gained.unshift(...seen)
   const n = tidy.steps.length
   return `${n} move${n === 1 ? '' : 's'}${tidy.budgetOut ? ' (run it again for more)' : ''}${gained.length ? ` — ${gained.join(', ')}` : ''}`
 }

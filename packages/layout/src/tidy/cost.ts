@@ -89,20 +89,35 @@ export const WEIGHTS = {
 }
 /** What each part is called where a person reads the report (Why this layout?). */
 export const PART_LABELS: Record<keyof typeof WEIGHTS, string> = {
-  crossings: 'Crossings', overdraws: 'Lines over elements', slanted: 'Slanted lines', length: 'Line length', loose: 'Empty room',
+  crossings: 'Crossings, lines straight', overdraws: 'Lines with an element in the way', slanted: 'Slanted lines', length: 'Line length', loose: 'Empty room',
   nearMisses: 'Almost in line', kinApart: 'Apart from their kind', offGrid: 'In no row or column', uneven: 'Uneven spacing',
   spread: 'Too far or too near', imbalance: 'Off-centre', misplaced: 'Out of place', againstFlow: 'Against the flow',
   flat: 'Across the reading way', fans: 'Bunched lines', brushes: 'Lines brushing elements', offConvention: 'Off convention',
   labels: 'Labels over things', bends: 'Bends', cramped: 'Lines too short for their labels',
 }
 
+/** The lines as the canvas draws them (curved, led round the elements in their way): how many
+ *  cross and how many are still drawn over an element. The moves are judged on straight lines,
+ *  port to port; a line led round an element crosses others on its way round, which only the
+ *  drawing shows, so the report gives both. */
+export interface DrawnLines { crossings: number; overdraws: number }
+export const DRAWN_LABELS = { drawnCrossings: 'Crossings as drawn', drawnOverdraws: 'Lines drawn over elements' }
+export type CostRow = { key: keyof typeof WEIGHTS | keyof typeof DRAWN_LABELS; label: string; before: number; after: number; weight: number }
+
 /** The parts as a person reads them: each with its value before and after and its share of the
- *  cost before, the weightiest first; parts that are nothing either side left out. */
-export function costRows(before: CostParts, after: CostParts): { key: keyof typeof WEIGHTS; label: string; before: number; after: number; weight: number }[] {
-  return (Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[])
+ *  cost before, the weightiest first; parts that are nothing either side left out. `drawn`: the
+ *  lines as drawn, before and after, come first (they weigh nothing in the cost: weight 0). */
+export function costRows(before: CostParts, after: CostParts, drawn?: { before: DrawnLines; after: DrawnLines }): CostRow[] {
+  const rows: CostRow[] = (Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[])
     .filter((k) => before[k] > 0.005 || after[k] > 0.005)
     .map((k) => ({ key: k, label: PART_LABELS[k], before: before[k], after: after[k], weight: WEIGHTS[k] }))
     .sort((p, q) => Math.max(q.before, q.after) * q.weight - Math.max(p.before, p.after) * p.weight)
+  if (!drawn) return rows
+  const seen: CostRow[] = [
+    { key: 'drawnCrossings', label: DRAWN_LABELS.drawnCrossings, before: drawn.before.crossings, after: drawn.after.crossings, weight: 0 },
+    { key: 'drawnOverdraws', label: DRAWN_LABELS.drawnOverdraws, before: drawn.before.overdraws, after: drawn.after.overdraws, weight: 0 },
+  ]
+  return [...seen.filter((r) => r.before > 0 || r.after > 0), ...rows]
 }
 
 /** A part's value as the report shows it: a count whole, a length or a room to one decimal. */

@@ -105,7 +105,7 @@ function SmartLayoutReportButton({ report, held = false }: { report: SmartLayout
                 <tbody>
                   {report.tidy.parts.map((p) => (
                     <tr key={p.key} className={p.after < p.before - 0.005 ? 'better' : p.after > p.before + 0.005 ? 'worse' : undefined}>
-                      <td title={`Weighs ${p.weight} in the reader's cost`}>{p.label}</td><td>{formatPart(p.before)}</td><td>{formatPart(p.after)}</td>
+                      <td title={p.weight ? `Weighs ${p.weight} in the reader's cost` : 'Counted on the lines as the canvas draws them, led round elements; not part of the reader\'s cost, which judges moves on straight lines'}>{p.label}</td><td>{formatPart(p.before)}</td><td>{formatPart(p.after)}</td>
                     </tr>
                   ))}
                 </tbody>

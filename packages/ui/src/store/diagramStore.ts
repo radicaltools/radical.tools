@@ -7556,7 +7556,7 @@ export const useDiagramStore = create<DiagramStore>()(
             : `${Math.round((1 - result.planarity.ratio) * 100)}% planar`
           const arrow = '\u2009\u2192\u2009'
           const tidied = (result as { tidy?: TidyReport }).tidy
-          const parts = tidied ? costRows(tidied.before, tidied.after) : []
+          const parts = tidied ? costRows(tidied.before, tidied.after, tidied.drawn) : []
           // The moves and the parts that gained most, as smart_layout tells an agent.
           const msg = tidied
             ? `Smart layout${around ? ' around the selection' : ''}: ${tidySummary(tidied)}.`

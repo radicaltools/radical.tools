@@ -3519,6 +3519,12 @@
       "apps/mcp/src/assayDomain.test.ts › Radical Assay over MCP: the domain, processes and lifecycles › tells Studio where the run stands, its stages inferred from the calls",
       "apps/studio/tests/followAgent.test.ts › follow the agent › follows an agent's Assay run as its Forge run, and stops once neither goes on",
       "apps/e2e/tests/studio/folders.spec.ts › an agent's Assay run on the folder shows an Assay button that pulses and opens read only"
+    ] },
+    { "element": "f161ce85-e753-40e2-a206-71b02733dcd4", "name": "Report counts lines as drawn", "tests": [
+      "packages/layout/tests/tidy/tidy.test.ts › Tidy › reports crossings and lines over elements as the canvas draws the lines, before and after"
+    ] },
+    { "element": "8954dbaf-1f3a-4e94-a60b-36293538d48d", "name": "Tidy yardstick", "tests": [
+      "packages/layout/tests/tidy/yardstick.test.ts"
     ] }
   ]
 }

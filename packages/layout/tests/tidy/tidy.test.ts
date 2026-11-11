@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { TIDY_BUDGET, runTidyLayout } from '../../src/tidy'
+import { TIDY_BUDGET, costRows, runTidyLayout, tidySummary } from '../../src/tidy'
 import { Layout } from '../../src/tidy/layout'
 import { buildIndex, linesOf, localCostParts, totalCost, updateIndex } from '../../src/tidy/cost'
 import { candidateMoves } from '../../src/tidy/moves'
@@ -247,6 +247,21 @@ describe('Tidy', () => {
     const again = runTidyLayout(laidOut, relations, { budget: 300_000 })
     expect(again.tidy.steps[0]?.kind).not.toBe('rough')
     expect(again.tidy.after.total).toBeLessThan(first.tidy.after.total - 1)
+  })
+
+  it('reports crossings and lines over elements as the canvas draws the lines, before and after', { timeout: 120_000 }, () => {
+    const f = load(join(benchDir, 'blueprint', 'bp-ecommerce-platform.radical'))
+    const { visible, result, laidOut } = tidy(f)
+    const before = computeCompositeScore(visible.nodes, visible.relations)
+    const after = computeCompositeScore(laidOut, visible.relations)
+    expect(result.tidy.drawn.before).toEqual({ crossings: before.renderedCrossings, overdraws: before.renderedOverdraws })
+    expect(result.tidy.drawn.after).toEqual({ crossings: after.renderedCrossings, overdraws: after.renderedOverdraws })
+    // Lines led round elements cross others on the way: more than the straight lines the moves are judged on.
+    expect(result.tidy.drawn.after.crossings).toBeGreaterThan(result.tidy.after.crossings)
+    expect(result.tidy.drawn.after.crossings).toBeLessThan(result.tidy.drawn.before.crossings)
+    const rows = costRows(result.tidy.before, result.tidy.after, result.tidy.drawn)
+    expect(rows[0]).toMatchObject({ key: 'drawnCrossings', label: 'Crossings as drawn', before: before.renderedCrossings, after: after.renderedCrossings, weight: 0 })
+    expect(tidySummary(result.tidy)).toContain(`crossings as drawn ${before.renderedCrossings}\u2009\u2192\u2009${after.renderedCrossings}`)
   })
 
   it('stops when nothing is left to do', () => {
