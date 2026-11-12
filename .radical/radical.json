@@ -3545,6 +3545,17 @@
     ] },
     { "element": "7b39fbc4-6620-4f1a-85da-c242151fe321", "name": "Brief agent answers tests", "tests": [
       "apps/mcp/src/folderModel.test.ts › brief answers for agents"
+    ] },
+    { "element": "1480bdf5-1800-4854-8000-8ad63200a29c", "name": "Agent skips the stages a back end does not need", "tests": [
+      "apps/mcp/src/forge.test.ts › concern packs in a Forge run › leaves out the stages a back end does not need, in one call, with the reason (Agent skips the stages a back end does not need)",
+      "apps/e2e/tests/studio/folders.spec.ts › an agent's Forge run shows the stages it left out, with why"
+    ] },
+    { "element": "243370ec-7638-4690-b801-7487a70388cf", "name": "Agent told to model as it works", "tests": [
+      "apps/mcp/src/folderModel.test.ts › folder-backed MCP model › lists and calls tools over stdio, persisting a real node ID"
+    ] },
+    { "element": "ebf65f91-08b0-4c56-ad88-1fe8a44eb416", "name": "Forge on request tests", "tests": [
+      "apps/mcp/src/forge.test.ts › concern packs in a Forge run › leaves out the stages a back end does not need, in one call, with the reason (Agent skips the stages a back end does not need)",
+      "apps/mcp/src/folderModel.test.ts › folder-backed MCP model › lists and calls tools over stdio, persisting a real node ID"
     ] }
   ]
 }
