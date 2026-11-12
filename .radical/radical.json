@@ -3519,6 +3519,22 @@
       "apps/mcp/src/assayDomain.test.ts › Radical Assay over MCP: the domain, processes and lifecycles › tells Studio where the run stands, its stages inferred from the calls",
       "apps/studio/tests/followAgent.test.ts › follow the agent › follows an agent's Assay run as its Forge run, and stops once neither goes on",
       "apps/e2e/tests/studio/folders.spec.ts › an agent's Assay run on the folder shows an Assay button that pulses and opens read only"
+    ] },
+    { "element": "b2feb337-2d58-46da-af18-8e7281d8d52b", "name": "Unapplied standard is an error", "tests": [
+      "packages/common/tests/inheritedStandards.test.ts › inherited standards › reports a standard applied to none of the model's elements and waived by none, as an error (Unapplied standard is an error)",
+      "packages/common/tests/inheritedStandards.test.ts › inherited standards › says nothing in a model that depends on no other model",
+      "packages/common/tests/inheritedStandards.test.ts › inherited standards › lowers to a warning in check.json"
+    ] },
+    { "element": "71708640-50db-4990-9820-c7828c1ae919", "name": "Waived standard passes", "tests": [
+      "packages/common/tests/inheritedStandards.test.ts › inherited standards › passes a standard an accepted ADR of the model waives, and asks that waiver for no fitness function (Waived standard passes)",
+      "packages/common/tests/relationEndpoints.test.ts › moving a relation end › leaves the type out when several fit the new pair (an ADR supersedes or waives an ADR)"
+    ] },
+    { "element": "0f9b61c2-2663-478e-9407-d93680e452dc", "name": "Applied standard without a check is an error", "tests": [
+      "packages/common/tests/inheritedStandards.test.ts › inherited standards › reports an applied standard no fitness function checks on each element it constrains (Applied standard without a check is an error)",
+      "packages/common/tests/inheritedStandards.test.ts › inherited standards › takes a fitness function fetched with the standard, and tests the repository binds to the model's own"
+    ] },
+    { "element": "aef8d454-6592-4913-8de5-557b1b3a222b", "name": "Inherited standards tests", "tests": [
+      "packages/common/tests/inheritedStandards.test.ts"
     ] }
   ]
 }
