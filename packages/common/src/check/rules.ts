@@ -17,7 +17,7 @@ import { SENSOR_NAMES, isSensorName, parseMeasure } from './sensors'
 import { findTests, globMatch, type TestCase } from './reports'
 import type { CheckDimension } from './goals'
 import { concernStatuses, holdsConcerns, questionLine, unboundDecisions, type ConcernPack } from '../concerns'
-import { REFUSAL, exampleSentences, fragmentWords, needAnswers, needParts, oppositeOrder, plainWords, quoteFound, quoteFragments, readLimits, readOrders, readRoundings, readValues, saysValueOf, wordsAt, type Limit, type Op, type ValueReading } from './words'
+import { REFUSAL, SUPERSEDED, answerBlocks, answerKey, currentNeedText, exampleSentences, fragmentWords, needAnswers, needParts, oppositeOrder, plainWords, quoteFound, quoteFragments, readLimits, readOrders, readRoundings, readValues, saysValueOf, wordsAt, type Limit, type Op, type ValueReading } from './words'
 
 export { hardValues, needAnswers, needParts, quoteFragments, readValues } from './words'
 
@@ -85,6 +85,9 @@ export interface CheckModel {
   /** The Hub's concern packs, for concern-unaddressed; without them it
    *  finds nothing. */
   concerns?: ConcernPack[]
+  /** The model's elements at the base (the merge base with the default
+   *  branch), for need-answer-changed; not given, the rule does not run. */
+  baseNodes?: Record<string, C4Node>
   /** By test id as .radical/radical.json binds it, the text of the test's
    *  file, for scenario-value-untested; not given, the rule does not run. */
   testSources?: Record<string, string>
@@ -477,6 +480,27 @@ export function quoteSenseGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, r
 
 const quoteLabel = (n: C4Node): string => `"${n.label}"`
 
+/** The paragraphs and list items of an answer no quoted piece falls in (a
+ *  piece across two of them counts for both); the whole answer when it has
+ *  no such part and nothing quotes it. */
+function unquotedBlocks(answer: string, fragments: string[][]): string[] {
+  const blocks = answerBlocks(answer)
+  const parts = blocks.length ? blocks : [answer]
+  const plain = parts.map((b) => plainWords(b))
+  const text = plain.join(' ')
+  const ranges: Array<[number, number]> = []
+  let at = 0
+  for (const p of plain) { ranges.push([at, at + p.length]); at += p.length + 1 }
+  const covered = new Set<number>()
+  for (const piece of fragments.flat()) {
+    for (let end = wordsAt(text, piece); end >= 0; end = wordsAt(text, piece, end - piece.length + 1)) {
+      const start = end - piece.length
+      ranges.forEach(([from, to], i) => { if (start < to && end > from) covered.add(i) })
+    }
+  }
+  return parts.filter((_, i) => !covered.has(i))
+}
+
 /** The requirements a need leads to: those that derive from it, and those
  *  that derive from them. */
 function requirementsOfNeed(model: CheckModel, needId: string): C4Node[] {
@@ -576,7 +600,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'derives-quote-not-in-need',
-    description: 'Every fragment a derives relation quotes is in the need\'s text, as whole words (case, white space, Markdown marks, dashes and quotation marks aside; an ellipsis joins pieces that must be there in that order, within one question, answer or the text before the questions), and holds at least two words; only a relation to a need quotes.',
+    description: 'Every fragment a derives relation quotes is in the need\'s text outside its superseded answers, as whole words (case, white space, Markdown marks, dashes and quotation marks aside; an ellipsis joins pieces that must be there in that order, within one question, answer or the text before the questions), and holds at least two words; only a relation to a need quotes.',
     severity: 'error',
     dimension: 'traceability',
     run: (model) => Object.values(model.relations).filter((r) => r.relationType === 'derives' && relationQuote(r).trim()
@@ -588,7 +612,8 @@ export const CHECK_RULES: CheckRule[] = [
       const text = target.description ?? ''
       return quoteFragments(relationQuote(r)).flatMap((pieces) => fragmentWords(pieces) < 2
         ? [{ relationId: r.id, message: `Requirement ${quote(req)} quotes "${pieces.join(' … ')}", too short to say which words of need ${quote(target)} it rests on: quote the words around it.` }]
-        : quoteFound(text, pieces) ? []
+        : quoteFound(currentNeedText(text), pieces) ? []
+        : quoteFound(text, pieces) ? [{ relationId: r.id, message: `Requirement ${quote(req)} quotes "${pieces.join(' … ')}" from an answer of need ${quote(target)} marked (superseded): quote the answer that replaces it.` }]
         : [{ relationId: r.id, message: `Requirement ${quote(req)} quotes "${pieces.join(' … ')}", which need ${quote(target)} does not say${pieces.length > 1 ? ' in that order within one answer' : ''}.` }])
     }),
   },
@@ -646,7 +671,7 @@ export const CHECK_RULES: CheckRule[] = [
       const scenarios = [...new Map(requirementsOfNeed(model, need.id).flatMap((req) => scenariosOf(model, req.id)).map((sc) => [sc.id, sc])).values()]
       if (!scenarios.length) return []
       const readings = scenarios.map((sc) => ({ sc, reading: reading(scenarioText(sc)) }))
-      return needParts(need.description ?? '').filter((part) => part.kind !== 'question' && !/\(no requirement\)/i.test(part.text))
+      return needParts(need.description ?? '').filter((part) => part.kind !== 'question' && !/\(no requirement\)/i.test(part.text) && !SUPERSEDED.test(part.text))
         .flatMap((part) => exampleSentences(part.text)).flatMap((example) => {
           const ex = reading(example)
           const closest = readings.map(({ sc, reading: r }) => ({ sc, missing: [...ex.values].filter((v) => !saysValueOf(ex, v, r)) }))
@@ -680,16 +705,37 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'need-answer-unquoted',
-    description: 'Every answer of a person in a need (from a line that starts with A:, Answer: or A1:, or an answer on its question\'s line) is quoted by a requirement that derives from the need, or marked (no requirement).',
+    description: 'Every paragraph and list item of an answer of a person in a need (from a line that starts with A:, Answer: or A1:, or an answer on its question\'s line; lead-ins and lines of fewer than four words aside) is quoted by a requirement that derives from the need, or the answer is marked (no requirement) or (superseded).',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => {
       const quotes = new Map<string, string[][]>()
       for (const r of requirementToNeed(model)) quotes.set(r.targetId, [...quotes.get(r.targetId) ?? [], ...quoteFragments(relationQuote(r))])
       return nodesOf(model, 'need').filter((n) => !originOf(n)).flatMap((need) => needAnswers(need.description ?? '')
-        .filter((answer) => !/\(no requirement\)/i.test(answer))
-        .filter((answer) => { const text = plainWords(answer); return !(quotes.get(need.id) ?? []).some((pieces) => pieces.some((piece) => wordsAt(text, piece) >= 0)) })
-        .map((answer) => ({ nodeId: need.id, message: `No requirement quotes this answer in need ${quote(need)}: "${answer.replace(/\s+/g, ' ').slice(0, 90)}${answer.length > 90 ? '…' : ''}" Quote it on a requirement's derives relation, or mark it (no requirement).` })))
+        .filter((answer) => !/\(no requirement\)/i.test(answer) && !SUPERSEDED.test(answer))
+        .flatMap((answer) => {
+          const open = unquotedBlocks(answer, quotes.get(need.id) ?? [])
+          if (!open.length) return []
+          const blocks = answerBlocks(answer)
+          const start = (t: string) => `"${t.replace(/\s+/g, ' ').slice(0, 90)}${t.length > 90 ? '…' : ''}"`
+          if (open.length === Math.max(1, blocks.length)) return [{ nodeId: need.id, message: `No requirement quotes this answer in need ${quote(need)}: ${start(answer)} Quote it on a requirement's derives relation, or mark it (no requirement).` }]
+          return [{ nodeId: need.id, details: open.map(start), message: `No requirement quotes ${open.length} of the ${blocks.length} parts of this answer in need ${quote(need)}: ${open.map(start).join(', ')}. Quote each on a requirement's derives relation, or mark the answer (no requirement).` }]
+        }))
+    },
+  },
+  {
+    id: 'need-answer-changed',
+    description: 'With the model at the base (radical check in git, the Inspector with the branch\'s base): every answer of a person a need held there it still holds, word for word; a person\'s words are only added to, and an answer a later one replaces is marked (superseded).',
+    severity: 'error',
+    dimension: 'traceability',
+    run: (model) => {
+      const base = model.baseNodes
+      if (!base) return []
+      return nodesOf(model, 'need').filter((n) => !originOf(n) && base[n.id]?.type === 'need').flatMap((need) => {
+        const now = new Set(needAnswers(need.description ?? '').map(answerKey))
+        return needAnswers(base[need.id].description ?? '').filter((answer) => !now.has(answerKey(answer)))
+          .map((answer) => ({ nodeId: need.id, message: `Need ${quote(need)} no longer holds the answer "${answer.replace(/\s+/g, ' ').slice(0, 90)}${answer.length > 90 ? '…' : ''}" it held at the base: a person's words are only added to. Restore it as it was, and mark it (superseded) if a later answer replaces it.` }))
+      })
     },
   },
   {

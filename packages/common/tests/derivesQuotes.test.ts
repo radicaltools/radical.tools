@@ -199,3 +199,36 @@ describe("reading the person's words", () => {
     expect(result.findings.filter((f) => f.rule.startsWith('quote-') || f.rule.startsWith('derives-quote') || f.rule.endsWith('-value-missing'))).toEqual([])
   })
 })
+
+describe('every part of an answer, and answers kept', () => {
+  const ANSWER = 'Q: How is the average worked out?\nA: A moving weighted average over what is on hand:\n\n- **Formula:** the new average is worked out at every receipt at a cost.\n- **Nothing on hand:** the new average is simply the cost of that receipt.\n- **Never received at a cost:** the system shows null, not zero.'
+  const model = (description: string, quotes: string[]): DiagramData => ({
+    metamodel: builtInGovernanceMetamodel(),
+    nodes: [node('n', 'need', 'Cost of goods', { description }), ...quotes.map((_, i) => req(`r${i}`, `rule ${i}`))],
+    relations: quotes.map((q, i) => derives(`d${i}`, `r${i}`, 'n', q)),
+  })
+  const unquoted = (data: DiagramData) => checkModel(data).findings.filter((f) => f.rule === 'need-answer-unquoted').map((f) => f.message)
+
+  it('asks for a quote of each paragraph and list item of an answer (Every part of an answer quoted)', () => {
+    const one = unquoted(model(ANSWER, ['the new average is worked out at every receipt at a cost']))
+    expect(one).toEqual(['No requirement quotes 2 of the 3 parts of this answer in need "Cost of goods": "- **Nothing on hand:** the new average is simply the cost of that receipt.", "- **Never received at a cost:** the system shows null, not zero.". Quote each on a requirement\'s derives relation, or mark the answer (no requirement).'])
+    // A quote across two items covers both; the lead-in needs none.
+    expect(unquoted(model(ANSWER, ['the new average is worked out at every receipt at a cost.', 'Nothing on hand: the new average is simply the cost of that receipt. Never received at a cost: the system']))).toEqual([])
+    expect(unquoted(model(ANSWER, []))[0]).toMatch(/^No requirement quotes this answer in need "Cost of goods": "A moving weighted average/)
+  })
+
+  it('keeps the answers the need held at the base, and quotes none marked superseded (Answers only added to)', () => {
+    const base = model(ANSWER, ['the new average is worked out at every receipt at a cost'])
+    const changed = (description: string, quotes: string[]) => checkModel(model(description, quotes), {}, { baseNodes: base.nodes })
+    const errors = (r: ReturnType<typeof checkModel>) => r.findings.filter((f) => f.rule === 'need-answer-changed' || f.rule === 'derives-quote-not-in-need').map((f) => [f.rule, f.message])
+    // An answer rewritten to fit a requirement is an error.
+    const rewritten = errors(changed(ANSWER.replace('null, not zero', 'zero'), []))
+    expect(rewritten).toEqual([['need-answer-changed', 'Need "Cost of goods" no longer holds the answer "A moving weighted average over what is on hand: - **Formula:** the new average is worked o…" it held at the base: a person\'s words are only added to. Restore it as it was, and mark it (superseded) if a later answer replaces it.']])
+    // Marked superseded and answered again: fine, and a quote of the old answer is an error.
+    const replaced = `${ANSWER} (superseded by the answer below)\n\nQ: And now?\nA: A plain average of all purchases, worked out each month.`
+    expect(errors(changed(replaced, ['A plain average of all purchases']))).toEqual([])
+    expect(errors(changed(replaced, ['the new average is worked out at every receipt']))).toEqual([['derives-quote-not-in-need', 'Requirement "rule 0" quotes "the new average is worked out at every receipt" from an answer of need "Cost of goods" marked (superseded): quote the answer that replaces it.']])
+    // Without the base the rule says nothing.
+    expect(checkModel(model(ANSWER.replace('null, not zero', 'zero'), [])).findings.some((f) => f.rule === 'need-answer-changed')).toBe(false)
+  })
+})

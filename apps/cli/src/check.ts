@@ -16,6 +16,7 @@ import { repositorySensors } from './repositorySensors'
 import { REVIEWS_FILE as REPOSITORY_REVIEWS, mappingRoot, missingCodePaths, readRepositoryMapping } from '@radical/node-files/repositoryLayout'
 import { modelFolderArg } from './modelFolder'
 import { deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
+import { readModelAtCommit, resolveGitBase } from '@radical/node-files/gitModel'
 
 export const CHECK_USAGE = `Usage: radical check [folder] [options]
 
@@ -334,7 +335,9 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   try { missingPaths = await missingCodePaths(await mappingRoot(root), deserializeFromMdFolder(files).data.nodes) } catch { /* the folder's own rules say what is wrong */ }
   // The sources of the tests .radical/radical.json binds, for scenario-value-untested.
   const testSources = repository?.verifies?.length ? await boundTestSources(mappedFrom, repository.verifies) : undefined
-  const result = runCheck(files, config, { sensors, repository, missingPaths, ...(testSources ? { testSources } : {}), ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
+  // The model at the base (where the branch left the default branch), for need-answer-changed.
+  const baseNodes = await baseModelNodes(root)
+  const result = runCheck(files, config, { sensors, repository, missingPaths, ...(testSources ? { testSources } : {}), ...(baseNodes ? { baseNodes } : {}), ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
   if (tests && (keep || !fromCi)) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited; with the commit they were read at, so
@@ -419,4 +422,15 @@ async function boundTestSources(root: string, verifies: Array<{ tests: string[] 
     if (text != null) sources[id] = text
   }
   return sources
+}
+
+/** The model's elements at its git base (the merge base with the default
+ *  branch); undefined out of git, or when the folder held no model then. */
+async function baseModelNodes(folder: string): Promise<ReturnType<typeof deserializeFromMdFolder>['data']['nodes'] | undefined> {
+  try {
+    const files = await readModelAtCommit(folder, (await resolveGitBase(folder)).commit)
+    return Object.keys(files).length ? deserializeFromMdFolder(files).data.nodes : undefined
+  } catch {
+    return undefined
+  }
 }

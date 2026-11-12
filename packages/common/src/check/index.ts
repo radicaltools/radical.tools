@@ -147,6 +147,10 @@ export interface CheckOptions {
   missingPaths?: Record<string, string[]>
   /** By bound test id, the test's source, for scenario-value-untested (the
    *  CLI reads the files of the tests .radical/radical.json binds). */
+  /** The model's elements at the base (the merge base with the default
+   *  branch), for need-answer-changed: radical check reads them from git,
+   *  the Inspector from the branch's base. */
+  baseNodes?: C4Node[]
   testSources?: Record<string, string>
   /** Earlier measurements a condition against a baseline compares with. */
   baseline?: Measurement[]
@@ -318,6 +322,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     ...(options.repository !== undefined ? { repository: options.repository } : {}),
     ...(options.missingPaths ? { missingPaths: options.missingPaths } : {}),
     ...(options.testSources ? { testSources: options.testSources } : {}),
+    ...(options.baseNodes ? { baseNodes: byId(options.baseNodes) } : {}),
   }
   const model = { nodes, relations, ...settings }
   const theirs = new Set([...data.nodes, ...data.relations].filter((item) => originOf(item)).map((item) => item.id))

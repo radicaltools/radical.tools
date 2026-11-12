@@ -319,3 +319,29 @@ export function exampleSentences(text: string): string[] {
   }
   return out
 }
+
+// ─── Parts of an answer, and answers replaced ──────────────────────────────
+
+/** An answer a later one replaces, marked "(superseded)" or "(superseded by
+ *  …)": it stays, as the person said it, and no requirement quotes it. */
+export const SUPERSEDED = /\(superseded\b[^)]*\)/i
+
+/** The parts of an answer a requirement must quote each of: its paragraphs
+ *  and list items, without a lead-in ("An account holds:") or a line of
+ *  fewer than four words. */
+export function answerBlocks(answer: string): string[] {
+  return answer.split(/\n\s*\n|\n(?=[ \t]*(?:[-*+]|\d+[.)])[ \t]+)/)
+    .map((block) => block.trim())
+    .filter((block) => block && !/:\s*$/.test(plainWords(block)) && plainWords(block).split(' ').filter((w) => WORD.test(w)).length >= 4)
+}
+
+/** A need's text without its superseded answers: what a quote may rest on. */
+export function currentNeedText(text: string): string {
+  const parts = needParts(text)
+  if (!parts.some((p) => p.kind === 'answer' && SUPERSEDED.test(p.text))) return text
+  return parts.filter((p) => !(p.kind === 'answer' && SUPERSEDED.test(p.text)))
+    .map((p) => (p.kind === 'question' ? `Q: ${p.text}` : p.kind === 'answer' ? `A: ${p.text}` : p.text)).join('\n')
+}
+
+/** The key an answer keeps through a later "(superseded)" mark. */
+export const answerKey = (answer: string): string => plainWords(answer.replace(SUPERSEDED, ' '))
