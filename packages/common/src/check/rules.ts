@@ -108,6 +108,9 @@ export interface CheckRule {
   /** What the rule wants, in one sentence, for `--list-rules` and docs. */
   description: string
   severity: CheckSeverity
+  /** Off unless check.json gives it a severity: a rule most models would
+   *  break everywhere at first, better followed as a goal in percent. */
+  off?: true
   /** What it is about, for the Inspector's grouping. */
   dimension: CheckDimension
   /** It reads the outcomes in test reports: without them it does not run. */
@@ -360,7 +363,8 @@ export function hardValues(text: string): Set<string> {
   const t = text.replace(/[“”]/g, '"')
   for (const m of t.matchAll(/`([^`\n]{1,40})`|"([^"\n]{1,40})"/g)) {
     const id = (m[1] ?? m[2]).trim().toLowerCase()
-    if (id && !/\s/.test(id)) values.add(id)
+    // A name or a code, not a path, a template or punctuation.
+    if (/^[a-z0-9][a-z0-9_-]*$/.test(id)) values.add(id)
   }
   for (const m of t.matchAll(/(?<![\w.])(\d{1,3}(?:,\d{3})+|\d+(?:[.,]\d+)?)(\s?%)?(?![\w])/g)) {
     let n = /^\d{1,3}(,\d{3})+$/.test(m[1]) ? m[1].replace(/,/g, '') : m[1].replace(',', '.')
@@ -368,7 +372,7 @@ export function hardValues(text: string): Set<string> {
     values.add(m[2] ? `${n}%` : n)
   }
   for (const m of t.toLowerCase().matchAll(/\b([a-z]+)\b/g)) {
-    if (NUMBER_WORDS[m[1]]) values.add(NUMBER_WORDS[m[1]])
+    if (Object.prototype.hasOwnProperty.call(NUMBER_WORDS, m[1])) values.add(NUMBER_WORDS[m[1]])
     else if (LITERALS.has(m[1])) values.add(m[1])
   }
   return values
@@ -381,7 +385,7 @@ const requirementText = (n: C4Node): string => ['trigger', 'precondition', 'unwa
  *  the derives relation that quotes them; and the values it says that none
  *  of its quotes, those of the requirements it derives from, or its
  *  rationale hold. Empty when nothing of it is quoted. */
-export function quoteValueGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, req: C4Node): { missing: Array<{ value: string; relationId: string }>; unsupported: string[] } {
+export function quoteValueGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, req: C4Node): { missing: Array<{ value: string; relationId: string }>; unsupported: string[]; carried: string[] } {
   const rels = Object.values(model.relations).filter((r) => r.relationType === 'derives' && r.sourceId === req.id)
   // A quote of a whole need that holds no answer of a person (a brief, a
   // concern pack's paragraph) points at nothing in particular: its values
@@ -395,7 +399,9 @@ export function quoteValueGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, r
   }
   const own = hardValues(requirementText(req))
   const missing: Array<{ value: string; relationId: string }> = []
-  for (const r of rels) for (const value of hardValues(quoteOf(r))) if (!own.has(value)) missing.push({ value, relationId: r.id })
+  // The values the person said that the requirement says too: what its scenarios must name.
+  const carried = new Set<string>()
+  for (const r of rels) for (const value of hardValues(quoteOf(r))) { if (own.has(value)) carried.add(value); else missing.push({ value, relationId: r.id }) }
   // The words this requirement may rest on: its quotes, and those up its chain of requirements.
   const allowed = new Set<string>()
   const seen = new Set<string>([req.id]); const queue = [req.id]; let quoted = false
@@ -407,9 +413,9 @@ export function quoteValueGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, r
       if (!seen.has(r.targetId) && model.nodes[r.targetId]?.type === 'requirement') { seen.add(r.targetId); queue.push(r.targetId) }
     }
   }
-  if (!quoted) return { missing, unsupported: [] }
+  if (!quoted) return { missing, unsupported: [], carried: [...carried] }
   hardValues(prop(req, 'rationale')).forEach((v) => allowed.add(v))
-  return { missing, unsupported: [...own].filter((v) => !allowed.has(v)) }
+  return { missing, unsupported: [...own].filter((v) => !allowed.has(v)), carried: [...carried] }
 }
 
 export const CHECK_RULES: CheckRule[] = [
@@ -471,11 +477,12 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'derives-quote-missing',
-    description: 'A requirement\'s derives relation to a need quotes the words of the need it rests on (property quote, one verbatim fragment per line).',
+    description: 'A requirement\'s derives relation to a need quotes the words of the need it rests on (property quote, one verbatim fragment per line). Off unless check.json turns it on; the goal requirements-quoting-need follows it in percent.',
     severity: 'warning',
+    off: true,
     dimension: 'traceability',
     run: (model) => requirementToNeed(model).filter((r) => !quoteFragments((r as unknown as Props).quote).length)
-      .map((r) => ({ relationId: r.id, message: `Requirement ${quote(model.nodes[r.sourceId])} derives from need ${quote(model.nodes[r.targetId])} without quoting the words it rests on.` })),
+      .map((r) => ({ nodeId: r.sourceId, message: `Requirement ${quote(model.nodes[r.sourceId])} derives from need ${quote(model.nodes[r.targetId])} without quoting the words it rests on.` })),
   },
   {
     id: 'derives-quote-not-in-need',
@@ -507,6 +514,19 @@ export const CHECK_RULES: CheckRule[] = [
     run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => {
       const { unsupported } = quoteValueGaps(model, req)
       return unsupported.length ? [{ nodeId: req.id, message: `Requirement ${quote(req)} says ${unsupported.map((v) => `"${v}"`).join(', ')}, which none of the words it quotes say: correct it to what the person said, or say in its rationale that ${unsupported.length === 1 ? 'it is' : 'they are'} the model's decision.` }] : []
+    }),
+  },
+  {
+    id: 'scenario-value-missing',
+    description: 'Every hard value a requirement takes from the words it quotes is in a scenario that verifies it (its given, when, then or Gherkin text): what the person said reaches a check.',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => {
+      const scenarios = linkedNodes(model, req.id, 'verifies', 'source', 'scenario')
+      if (!scenarios.length) return []
+      const said = new Set(scenarios.flatMap((sc) => [...hardValues(['given', 'when', 'then', 'gherkin'].map((k) => prop(sc, k)).join(' \n '))]))
+      const missing = quoteValueGaps(model, req).carried.filter((v) => !said.has(v))
+      return missing.length ? [{ nodeId: req.id, relatedIds: scenarios.map((sc) => sc.id), message: `Requirement ${quote(req)} takes ${missing.map((v) => `"${v}"`).join(', ')} from the words it quotes, which ${scenarios.length === 1 ? `its scenario ${quote(scenarios[0])} does not say` : `none of its ${scenarios.length} scenarios says`}: a scenario that checks the requirement names the values the person gave.` }] : []
     }),
   },
   {

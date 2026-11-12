@@ -144,7 +144,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   const { values, positionals } = parsed
   if (values.help) { io.out(CHECK_USAGE); return 0 }
   if (values['list-rules']) {
-    for (const rule of [...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE]) io.out(`${rule.id.padEnd(30)} ${rule.severity.padEnd(8)} ${rule.description}`)
+    for (const rule of [...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE]) io.out(`${rule.id.padEnd(30)} ${((rule as { off?: true }).off ? 'off' : rule.severity).padEnd(8)} ${rule.description}`)
     io.out('\nMetrics for goals (in percent):')
     for (const metric of CHECK_METRICS) io.out(`${metric.id.padEnd(30)} ${(metric.tests ? 'evidence' : '').padEnd(8)} ${metric.description}`)
     return 0

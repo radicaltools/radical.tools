@@ -104,6 +104,13 @@ export const CHECK_METRICS: CheckMetric[] = [
   byRule('adrs-complete', 'Complete accepted ADRs', 'Accepted ADRs with a date, context, decision and consequences.', 'completeness', 'adr-incomplete', acceptedAdrs),
   byRule('needs-with-requirement', 'Needs with a requirement', 'Needs at least one requirement derives from.', 'traceability', 'need-without-requirement', (m) => nodesOf(m, 'need')),
   byRule('requirements-with-origin', 'Requirements with an origin', 'Requirements that derive from a need or another requirement.', 'traceability', 'requirement-without-origin', (m) => nodesOf(m, 'requirement')),
+  byRule('requirements-quoting-need', 'Requirements that quote their need', 'Requirements derived from a need whose Derives from relation quotes the words they rest on; measured once a relation of the model quotes.', 'traceability', 'derives-quote-missing', (m) => {
+    const toNeed = Object.values(m.relations).filter((r) => r.relationType === 'derives' && m.nodes[r.targetId]?.type === 'need')
+    // Measured once the model has begun to quote: before that it is no weakness of its traceability.
+    if (!toNeed.some((r) => typeof (r as unknown as { quote?: unknown }).quote === 'string' && (r as unknown as { quote: string }).quote.trim())) return null
+    const derived = new Set(toNeed.map((r) => r.sourceId))
+    return nodesOf(m, 'requirement').filter((n) => derived.has(n.id))
+  }),
   byRule('requirements-satisfied', 'Requirements satisfied', 'Requirements an element of the architecture satisfies.', 'traceability', 'requirement-unsatisfied', (m) => nodesOf(m, 'requirement')),
   byRule('requirements-with-scenario', 'Requirements with a scenario', 'Requirements at least one scenario verifies.', 'traceability', 'requirement-without-scenario', (m) => hasType(m, 'scenario') ? nodesOf(m, 'requirement') : null),
   byRule('scenarios-verifying', 'Scenarios that verify something', 'Scenarios that verify a requirement or a state machine.', 'traceability', 'scenario-verifies-nothing', (m) => nodesOf(m, 'scenario')),

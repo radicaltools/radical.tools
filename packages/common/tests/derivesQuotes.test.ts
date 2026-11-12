@@ -29,14 +29,18 @@ const found = (data: DiagramData) => checkModel(data).findings.filter((f) => f.r
 describe('quotes on derives', () => {
   it('checks each quote against its need and names the answers no requirement quotes (Quotes of a need checked)', () => {
     const result = found(model())
+    // A relation without a quote is no finding by default: the goal follows it in percent.
     expect(result.map((f) => [f[0], f[1]])).toEqual([
-      ['derives-quote-missing', 'd3'],
       ['derives-quote-not-in-need', 'd2'],
       ['need-answer-unquoted', 'cost'],
     ])
-    expect(result[1][3]).toBe('Requirement "Stock worth nothing" quotes "stock is worth nothing", which need "Cost of goods" does not say.')
-    expect(result[2][3]).toContain('"Returns come back at the current average."')
+    expect(result[0][3]).toBe('Requirement "Stock worth nothing" quotes "stock is worth nothing", which need "Cost of goods" does not say.')
+    expect(result[1][3]).toContain('"Returns come back at the current average."')
     const check = checkModel(model())
+    expect(check.metrics.find((m) => m.id === 'requirements-quoting-need')).toMatchObject({ count: 2, total: 3, percent: 66 })
+    const on = checkModel(model(), { rules: { 'derives-quote-missing': 'warning' } }).findings.filter((f) => f.rule === 'derives-quote-missing')
+    expect(on.map((f) => [f.nodeId, f.severity])).toEqual([['bare', 'warning']])
+    expect(checkModel(model(), { goals: { 'requirements-quoting-need': { min: 90 } } }).findings.some((f) => f.rule === 'goal-unmet' && /quote their need/.test(f.message))).toBe(true)
     expect(check.findings.find((f) => f.rule === 'derives-quote-not-in-need')!.severity ?? 'error').toBe('error')
     expect(check.ok).toBe(false)
 
@@ -74,6 +78,19 @@ describe('hard values of a quote and its requirement', () => {
     const own = valueModel('show the average (null without one) and the stock value, 0 without an average; refuse a bad value with `409`')
     expect(values(own)).toEqual([['requirement-value-unquoted', 'Requirement "Show stock value" says "409", which none of the words it quotes say: correct it to what the person said, or say in its rationale that it is the model\'s decision.']])
     expect(values(valueModel('show the average (null without one) and the stock value, 0 without an average; refuse a bad value with `409`', { rationale: 'Refusing with 409 is our decision.' }))).toEqual([])
+  })
+
+  it('asks a scenario for the values a requirement takes from its quote (Quoted values reach a scenario)', () => {
+    const data = valueModel('show the average (null without one) and the stock value, 0 without an average')
+    data.nodes.push(node('sc', 'scenario', 'Stock without cost', { given: 'a product never received at a cost', when: 'its stock level is read', then: 'the average is null' }))
+    data.relations.push({ id: 'v', relationType: 'verifies', sourceId: 'sc', targetId: 'value' })
+    const found = () => checkModel(data).findings.filter((f) => f.rule === 'scenario-value-missing').map((f) => [f.nodeId, f.message])
+    expect(found()).toEqual([['value', 'Requirement "Show stock value" takes "0" from the words it quotes, which its scenario "Stock without cost" does not say: a scenario that checks the requirement names the values the person gave.']])
+    Object.assign(data.nodes.find((n) => n.id === 'sc')!, { then: 'the average is null and the stock value is 0' })
+    expect(found()).toEqual([])
+    // A value of the requirement's own, or a requirement with no scenario, is another rule's.
+    Object.assign(data.nodes.find((n) => n.id === 'value')!, { action: 'show the average (null without one) and the stock value, 0 without an average, within 300 ms' })
+    expect(found()).toEqual([])
   })
 
   it('checks no values of a quote of a whole need that holds no answer, and those of a whole need with answers', () => {

@@ -194,6 +194,7 @@ export function upgradeCheckConfig(config: CheckConfig): CheckConfig {
 }
 const RULE_IDS = new Set(ALL_RULES.map((r) => r.id))
 const DEFAULT_SEVERITY = new Map(ALL_RULES.map((r) => [r.id, r.severity]))
+const DEFAULT_OFF = new Set(ALL_RULES.filter((r) => (r as { off?: true }).off).map((r) => r.id))
 
 /** Checks the model in `files` (paths relative to the model folder). */
 export function runCheck(files: FolderFiles, given: CheckConfig = {}, options: CheckOptions = {}): CheckResult {
@@ -412,7 +413,8 @@ function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfi
   const results: CheckRuleResult[] = []
   for (const key of keys) {
     const list = groups.get(key) ?? []
-    const { severity: set, max } = settingOf(rules[key])
+    const { severity: given, max } = settingOf(rules[key])
+    const set = given ?? (DEFAULT_OFF.has(key.split('/')[0]) ? 'off' as const : undefined)
     const ruleSeverity = DEFAULT_SEVERITY.get(key.split('/')[0]) ?? 'error'
     const why = notRun.get(key.split('/')[0])
     if (why) {
@@ -474,4 +476,5 @@ export { formatCheckText, formatCheckGithub, type FormatOptions } from './format
 export { compareCheckConfig, type CheckConfigChange } from './configChanges'
 
 /** A rule's severity when the config does not set it. */
-export const defaultSeverity = (rule: string): CheckSeverity => DEFAULT_SEVERITY.get(rule) ?? 'error'
+/** What a rule is with no setting in check.json: its severity, or off. */
+export const defaultSeverity = (rule: string): CheckSeverity | 'off' => DEFAULT_OFF.has(rule) ? 'off' : DEFAULT_SEVERITY.get(rule) ?? 'error'
