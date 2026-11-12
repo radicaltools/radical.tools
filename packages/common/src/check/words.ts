@@ -8,10 +8,25 @@
 // gives them. Presence and form only: whether a sentence means what another
 // one means is the agent's review (review_requirements), not this.
 
+/** A reading of a text, kept: a check reads the same need and quote once
+ *  for every requirement that rests on it. Results are shared; callers do
+ *  not change them. */
+function kept<R>(read: (text: string) => R): (text: string) => R {
+  const found = new Map<string, R>()
+  return (text: string) => {
+    let r = found.get(text)
+    if (r === undefined) {
+      if (found.size > 20000) found.clear()
+      r = read(text); found.set(text, r)
+    }
+    return r
+  }
+}
+
 /** Text as it is compared word for word: Markdown emphasis, code marks,
  *  headings and list and quotation markers out; dashes, quotation marks and
  *  spaces of one kind; lower case; white space single. */
-export const plainWords = (text: string): string => text
+export const plainWords = kept((text: string): string => text
   .replace(/\r/g, '')
   .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
   .replace(/^[ \t]*(?:[-*+>]|\d+[.)])[ \t]+/gm, '')
@@ -21,7 +36,7 @@ export const plainWords = (text: string): string => text
   .replace(/[‐-―−]/g, '-')
   .replace(/[‘’‚]/g, "'").replace(/[“”„]/g, '"')
   .replace(/[   ]/g, ' ')
-  .toLowerCase().replace(/\s+/g, ' ').trim()
+  .toLowerCase().replace(/\s+/g, ' ').trim())
 
 const WORD = /[\p{L}\p{N}]/u
 const DIGIT = /\d/
@@ -63,7 +78,8 @@ const unwrap = (text: string): string => {
  *  each question and each answer of a person, as the lines that start them
  *  ("Q:", "A:", "Answer:", "Q1:", with list or bold marks, or an answer on
  *  its question's line) divide it. */
-export function needParts(text: string): NeedPart[] {
+export const needParts = kept(readNeedParts)
+function readNeedParts(text: string): NeedPart[] {
   const parts: Array<{ kind: NeedPart['kind']; lines: string[] }> = [{ kind: 'intro', lines: [] }]
   for (const line of text.split('\n')) {
     const m = QA_START.exec(line)
@@ -88,12 +104,12 @@ export const needAnswers = (text: string): string[] => needParts(text).filter((p
  *  quotation marks around it, as plain words; an ellipsis inside splits a
  *  fragment into pieces that must be in the need in that order, within one
  *  question, answer or the text before the questions. */
-export function quoteFragments(quote: unknown): string[][] {
-  if (typeof quote !== 'string') return []
+export const quoteFragments = (quote: unknown): string[][] => (typeof quote === 'string' ? fragmentsOf(quote) : [])
+const fragmentsOf = kept((quote: string): string[][] => {
   return quote.split('\n').map((line) => line.trim().replace(/^["'“‘„>]+|["'”’]+$/g, '').trim()).filter(Boolean)
     .map((line) => line.split(/…|\.\.\./).map((piece) => plainWords(piece).replace(/^["']+|["']+$/g, '').trim()).filter(Boolean))
     .filter((pieces) => pieces.length)
-}
+})
 
 /** Whether a need's text holds a quoted fragment. */
 export function quoteFound(needText: string, pieces: string[]): boolean {
@@ -174,7 +190,8 @@ export interface ValueReading {
 }
 
 /** The hard values of a text, with their aliases and units. */
-export function readValues(text: string): ValueReading {
+export const readValues = kept(valuesOf)
+function valuesOf(text: string): ValueReading {
   const values = new Set<string>(); const aliases = new Map<string, string[]>(); const also = new Set<string>(); const quantities: Quantity[] = []
   const alias = (value: string, ...more: string[]) => { aliases.set(value, [...new Set([...aliases.get(value) ?? [], ...more])]); more.forEach((m) => also.add(m)) }
   let t = text.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[  ]/g, ' ')
@@ -248,7 +265,10 @@ export const REFUSAL = /\b(?:refus\w*|reject\w*|declin\w*|den(?:y|ies|ied)|inval
  *  most 20" and "refuses more than 20" both allow `<= 20`. A clause that
  *  refuses, rejects or declines, or a condition ("if", "when") followed by
  *  one, speaks of what is not allowed; `refusing` says the whole text does. */
-export function readLimits(text: string, refusing = false): Limit[] {
+export const readLimits = (text: string, refusing = false): Limit[] => (refusing ? refusedLimits : allowedLimits)(text)
+const allowedLimits = kept((text: string) => limitsOf(text, false))
+const refusedLimits = kept((text: string) => limitsOf(text, true))
+function limitsOf(text: string, refusing: boolean): Limit[] {
   const limits: Limit[] = []
   const plain = numerals(plainWords(text)).replace(/\b\d{4}-\d{2}-\d{2}\S*|\b\d{1,2}:\d{2}\b/g, ' ')
   for (const sentence of plain.split(/(?<=[.;!?])\s+(?=\D)/)) {
@@ -285,14 +305,16 @@ const OPPOSITE: Record<Order, Order> = { 'oldest-first': 'newest-first', 'newest
 export const oppositeOrder = (o: Order): Order => OPPOSITE[o]
 
 /** The orders a text gives lists. */
-export function readOrders(text: string): Set<Order> {
+export const readOrders = kept(ordersOf)
+function ordersOf(text: string): Set<Order> {
   const t = plainWords(text)
   return new Set(ORDERS.filter(([re]) => re.test(t)).map(([, o]) => o))
 }
 
 export type Rounding = 'half up' | 'half down' | 'half even' | 'down' | 'up'
 /** The roundings a text names: "rounded half up", "half even", "rounded down". */
-export function readRoundings(text: string): Set<Rounding> {
+export const readRoundings = kept(roundingsOf)
+function roundingsOf(text: string): Set<Rounding> {
   let t = plainWords(text)
   const found = new Set<Rounding>()
   t = t.replace(/\b(?:round(?:ed|s|ing)? )?half(?:[ -]way)?[ -](up|down|even)\b|\bbanker'?s rounding\b/g, (m, kind?: string) => { found.add(`half ${kind ?? 'even'}` as Rounding); return ' ' })
