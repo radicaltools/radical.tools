@@ -349,10 +349,11 @@ const NUMBER_WORDS: Record<string, string> = {
   zero: '0', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10',
   eleven: '11', twelve: '12', fifteen: '15', twenty: '20', thirty: '30', forty: '40', fifty: '50', sixty: '60', ninety: '90', hundred: '100', thousand: '1000',
 }
-const LITERALS = new Set(['null', 'none', 'true', 'false'])
+// Not "none": in prose it is a pronoun ("null when none"), as "one" is.
+const LITERALS = new Set(['null', 'true', 'false'])
 
 /** The hard values of a text, normalised: numbers (written in digits or as a
- *  word, with a percent sign kept), null, none, true and false, and short
+ *  word, with a percent sign kept), null, true and false, and short
  *  identifiers in backticks or quotation marks. */
 export function hardValues(text: string): Set<string> {
   const values = new Set<string>()
@@ -489,7 +490,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'quote-value-missing',
-    description: 'Every hard value a derives relation quotes (a number, null or zero, true or false, an identifier in backticks or quotation marks) is in the requirement\'s sentence.',
+    description: 'Every hard value a derives relation quotes (a number, null, true or false, an identifier in backticks or quotation marks) is in the requirement\'s sentence.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => {

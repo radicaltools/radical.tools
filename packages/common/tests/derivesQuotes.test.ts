@@ -90,7 +90,7 @@ describe('hard values of a quote and its requirement', () => {
   })
 
   it('reads numbers in digits and words, percentages, null and identifiers', () => {
-    expect([...hardValues('worth 0, fifteen minutes, 70 %, 12.30 €, 1,000 units, `MAIN`, "expired", null')].sort())
+    expect([...hardValues('worth 0, fifteen minutes, 70 %, 12.30 €, 1,000 units, `MAIN`, "expired", null when none, without one')].sort())
       .toEqual(['0', '1000', '12.3', '15', '70%', 'expired', 'main', 'null'].sort())
   })
 })
