@@ -987,79 +987,92 @@
       "id": "req-samm-current--derives--need",
       "sourceId": "req-samm-current",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built by a team, and its security rests on what that team does every week: who answers the security questions of a change, whether an attacker's view is ever taken, whether the people writing the code know today's attacks, and whether anyone measures how far the practice is from where it should be. Buyers, auditors and standards ask for that evidence. The snippets assume a GitHub repository with the records under security/ (samm/assessment.yaml, ssdf/evidence.yaml or sdl/checklist.yaml, champions.yaml, pentests.yaml), Node scripts under scripts/security/ run by a scheduled workflow with js-yaml installed and the GitHub CLI signed in with a token that can read the organisation's teams, CODEOWNERS (where used) naming teams as @org/team, and the learning platform's completions downloaded by the same job to training.csv (email,course,completed_on), never committed."
     },
     {
       "id": "req-samm-targets--derives--need",
       "sourceId": "req-samm-targets",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built by a team, and its security rests on what that team does every week: who answers the security questions of a change, whether an attacker's view is ever taken, whether the people writing the code know today's attacks, and whether anyone measures how far the practice is from where it should be. Buyers, auditors and standards ask for that evidence. The snippets assume a GitHub repository with the records under security/ (samm/assessment.yaml, ssdf/evidence.yaml or sdl/checklist.yaml, champions.yaml, pentests.yaml), Node scripts under scripts/security/ run by a scheduled workflow with js-yaml installed and the GitHub CLI signed in with a token that can read the organisation's teams, CODEOWNERS (where used) naming teams as @org/team, and the learning platform's completions downloaded by the same job to training.csv (email,course,completed_on), never committed."
     },
     {
       "id": "req-ssdf-evidence--derives--need",
       "sourceId": "req-ssdf-evidence",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built by a team, and its security rests on what that team does every week: who answers the security questions of a change, whether an attacker's view is ever taken, whether the people writing the code know today's attacks, and whether anyone measures how far the practice is from where it should be. Buyers, auditors and standards ask for that evidence. The snippets assume a GitHub repository with the records under security/ (samm/assessment.yaml, ssdf/evidence.yaml or sdl/checklist.yaml, champions.yaml, pentests.yaml), Node scripts under scripts/security/ run by a scheduled workflow with js-yaml installed and the GitHub CLI signed in with a token that can read the organisation's teams, CODEOWNERS (where used) naming teams as @org/team, and the learning platform's completions downloaded by the same job to training.csv (email,course,completed_on), never committed."
     },
     {
       "id": "req-sdl-checklist--derives--need",
       "sourceId": "req-sdl-checklist",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built by a team, and its security rests on what that team does every week: who answers the security questions of a change, whether an attacker's view is ever taken, whether the people writing the code know today's attacks, and whether anyone measures how far the practice is from where it should be. Buyers, auditors and standards ask for that evidence. The snippets assume a GitHub repository with the records under security/ (samm/assessment.yaml, ssdf/evidence.yaml or sdl/checklist.yaml, champions.yaml, pentests.yaml), Node scripts under scripts/security/ run by a scheduled workflow with js-yaml installed and the GitHub CLI signed in with a token that can read the organisation's teams, CODEOWNERS (where used) naming teams as @org/team, and the learning platform's completions downloaded by the same job to training.csv (email,course,completed_on), never committed."
     },
     {
       "id": "req-champion--derives--need",
       "sourceId": "req-champion",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built by a team, and its security rests on what that team does every week: who answers the security questions of a change, whether an attacker's view is ever taken, whether the people writing the code know today's attacks, and whether anyone measures how far the practice is from where it should be. Buyers, auditors and standards ask for that evidence. The snippets assume a GitHub repository with the records under security/ (samm/assessment.yaml, ssdf/evidence.yaml or sdl/checklist.yaml, champions.yaml, pentests.yaml), Node scripts under scripts/security/ run by a scheduled workflow with js-yaml installed and the GitHub CLI signed in with a token that can read the organisation's teams, CODEOWNERS (where used) naming teams as @org/team, and the learning platform's completions downloaded by the same job to training.csv (email,course,completed_on), never committed."
     },
     {
       "id": "req-champion-review--derives--need",
       "sourceId": "req-champion-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built by a team, and its security rests on what that team does every week: who answers the security questions of a change, whether an attacker's view is ever taken, whether the people writing the code know today's attacks, and whether anyone measures how far the practice is from where it should be. Buyers, auditors and standards ask for that evidence. The snippets assume a GitHub repository with the records under security/ (samm/assessment.yaml, ssdf/evidence.yaml or sdl/checklist.yaml, champions.yaml, pentests.yaml), Node scripts under scripts/security/ run by a scheduled workflow with js-yaml installed and the GitHub CLI signed in with a token that can read the organisation's teams, CODEOWNERS (where used) naming teams as @org/team, and the learning platform's completions downloaded by the same job to training.csv (email,course,completed_on), never committed."
     },
     {
       "id": "req-appsec-review--derives--need",
       "sourceId": "req-appsec-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built by a team, and its security rests on what that team does every week: who answers the security questions of a change, whether an attacker's view is ever taken, whether the people writing the code know today's attacks, and whether anyone measures how far the practice is from where it should be. Buyers, auditors and standards ask for that evidence. The snippets assume a GitHub repository with the records under security/ (samm/assessment.yaml, ssdf/evidence.yaml or sdl/checklist.yaml, champions.yaml, pentests.yaml), Node scripts under scripts/security/ run by a scheduled workflow with js-yaml installed and the GitHub CLI signed in with a token that can read the organisation's teams, CODEOWNERS (where used) naming teams as @org/team, and the learning platform's completions downloaded by the same job to training.csv (email,course,completed_on), never committed."
     },
     {
       "id": "req-one-team--derives--need",
       "sourceId": "req-one-team",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built by a team, and its security rests on what that team does every week: who answers the security questions of a change, whether an attacker's view is ever taken, whether the people writing the code know today's attacks, and whether anyone measures how far the practice is from where it should be. Buyers, auditors and standards ask for that evidence. The snippets assume a GitHub repository with the records under security/ (samm/assessment.yaml, ssdf/evidence.yaml or sdl/checklist.yaml, champions.yaml, pentests.yaml), Node scripts under scripts/security/ run by a scheduled workflow with js-yaml installed and the GitHub CLI signed in with a token that can read the organisation's teams, CODEOWNERS (where used) naming teams as @org/team, and the learning platform's completions downloaded by the same job to training.csv (email,course,completed_on), never committed."
     },
     {
       "id": "req-pentest-yearly--derives--need",
       "sourceId": "req-pentest-yearly",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built by a team, and its security rests on what that team does every week: who answers the security questions of a change, whether an attacker's view is ever taken, whether the people writing the code know today's attacks, and whether anyone measures how far the practice is from where it should be. Buyers, auditors and standards ask for that evidence. The snippets assume a GitHub repository with the records under security/ (samm/assessment.yaml, ssdf/evidence.yaml or sdl/checklist.yaml, champions.yaml, pentests.yaml), Node scripts under scripts/security/ run by a scheduled workflow with js-yaml installed and the GitHub CLI signed in with a token that can read the organisation's teams, CODEOWNERS (where used) naming teams as @org/team, and the learning platform's completions downloaded by the same job to training.csv (email,course,completed_on), never committed."
     },
     {
       "id": "req-pentest-major--derives--need",
       "sourceId": "req-pentest-major",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built by a team, and its security rests on what that team does every week: who answers the security questions of a change, whether an attacker's view is ever taken, whether the people writing the code know today's attacks, and whether anyone measures how far the practice is from where it should be. Buyers, auditors and standards ask for that evidence. The snippets assume a GitHub repository with the records under security/ (samm/assessment.yaml, ssdf/evidence.yaml or sdl/checklist.yaml, champions.yaml, pentests.yaml), Node scripts under scripts/security/ run by a scheduled workflow with js-yaml installed and the GitHub CLI signed in with a token that can read the organisation's teams, CODEOWNERS (where used) naming teams as @org/team, and the learning platform's completions downloaded by the same job to training.csv (email,course,completed_on), never committed."
     },
     {
       "id": "req-pentest-none--derives--need",
       "sourceId": "req-pentest-none",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built by a team, and its security rests on what that team does every week: who answers the security questions of a change, whether an attacker's view is ever taken, whether the people writing the code know today's attacks, and whether anyone measures how far the practice is from where it should be. Buyers, auditors and standards ask for that evidence. The snippets assume a GitHub repository with the records under security/ (samm/assessment.yaml, ssdf/evidence.yaml or sdl/checklist.yaml, champions.yaml, pentests.yaml), Node scripts under scripts/security/ run by a scheduled workflow with js-yaml installed and the GitHub CLI signed in with a token that can read the organisation's teams, CODEOWNERS (where used) naming teams as @org/team, and the learning platform's completions downloaded by the same job to training.csv (email,course,completed_on), never committed."
     },
     {
       "id": "req-training-onboarding--derives--need",
       "sourceId": "req-training-onboarding",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built by a team, and its security rests on what that team does every week: who answers the security questions of a change, whether an attacker's view is ever taken, whether the people writing the code know today's attacks, and whether anyone measures how far the practice is from where it should be. Buyers, auditors and standards ask for that evidence. The snippets assume a GitHub repository with the records under security/ (samm/assessment.yaml, ssdf/evidence.yaml or sdl/checklist.yaml, champions.yaml, pentests.yaml), Node scripts under scripts/security/ run by a scheduled workflow with js-yaml installed and the GitHub CLI signed in with a token that can read the organisation's teams, CODEOWNERS (where used) naming teams as @org/team, and the learning platform's completions downloaded by the same job to training.csv (email,course,completed_on), never committed."
     },
     {
       "id": "req-training-yearly--derives--need",
       "sourceId": "req-training-yearly",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built by a team, and its security rests on what that team does every week: who answers the security questions of a change, whether an attacker's view is ever taken, whether the people writing the code know today's attacks, and whether anyone measures how far the practice is from where it should be. Buyers, auditors and standards ask for that evidence. The snippets assume a GitHub repository with the records under security/ (samm/assessment.yaml, ssdf/evidence.yaml or sdl/checklist.yaml, champions.yaml, pentests.yaml), Node scripts under scripts/security/ run by a scheduled workflow with js-yaml installed and the GitHub CLI signed in with a token that can read the organisation's teams, CODEOWNERS (where used) naming teams as @org/team, and the learning platform's completions downloaded by the same job to training.csv (email,course,completed_on), never committed."
     },
     {
       "id": "sc-samm-current--verifies--req-samm-current",

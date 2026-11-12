@@ -965,85 +965,99 @@
       "id": "req-param-queries--derives--need",
       "sourceId": "req-param-queries",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "req-output-encoding--derives--need",
       "sourceId": "req-output-encoding",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "req-input-boundary--derives--need",
       "sourceId": "req-input-boundary",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "req-input-everywhere--derives--need",
       "sourceId": "req-input-everywhere",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "req-no-dynamic-code--derives--need",
       "sourceId": "req-no-dynamic-code",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "req-framework-defaults--derives--need",
       "sourceId": "req-framework-defaults",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "req-sast-pr--derives--need",
       "sourceId": "req-sast-pr",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "req-sast-scheduled--derives--need",
       "sourceId": "req-sast-scheduled",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "req-dast-pipeline--derives--need",
       "sourceId": "req-dast-pipeline",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "req-dast-periodic--derives--need",
       "sourceId": "req-dast-periodic",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "req-findings-sla--derives--need",
       "sourceId": "req-findings-sla",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "req-risk-accepted--derives--need",
       "sourceId": "req-risk-accepted",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "req-authz-tests--derives--need",
       "sourceId": "req-authz-tests",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "req-memory-safety--derives--need",
       "sourceId": "req-memory-safety",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element's own code must not let an attacker inject a query or a command, run their script in another user's browser, read or change data they may not, deserialise their objects or overrun a buffer. Developers must know which standard a change is held to, where input is checked and output encoded, and a tool must tell them on the pull request when they slipped, before a reviewer and long before an attacker. A finding, from a scanner, a test or a report, must be fixed by a deadline or accepted in writing by someone who may accept it, for a limited time."
     },
     {
       "id": "sc-param-queries--verifies--req-param-queries",

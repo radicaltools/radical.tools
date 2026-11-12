@@ -24,11 +24,11 @@ async function workspace(data: Partial<DiagramData> = {}): Promise<string> {
     metamodel: builtInGovernanceMetamodel(),
     nodes: [
       node('sys', 'system', 'Shop', { external: true }),
-      node('need', 'need', 'Brief'),
+      node('need', 'need', 'Brief', { description: 'Shoppers pay by card.' }),
       node('req', 'requirement', 'Pay', { action: 'take the payment' }),
     ],
     relations: [
-      { id: 'r1', relationType: 'derives', sourceId: 'req', targetId: 'need' },
+      { id: 'r1', relationType: 'derives', sourceId: 'req', targetId: 'need', quote: 'pay by card' } as DiagramData['relations'][number],
       { id: 'r2', relationType: 'satisfies', sourceId: 'sys', targetId: 'req' },
     ],
     ...data,

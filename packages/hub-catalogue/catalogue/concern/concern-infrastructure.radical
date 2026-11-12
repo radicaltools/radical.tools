@@ -1643,103 +1643,120 @@
       "id": "req-iac--derives--need",
       "sourceId": "req-iac",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-policy--derives--need",
       "sourceId": "req-policy",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-parity--derives--need",
       "sourceId": "req-parity",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-drift--derives--need",
       "sourceId": "req-drift",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-budget--derives--need",
       "sourceId": "req-budget",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-cost-review--derives--need",
       "sourceId": "req-cost-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-cost-review-fallback--derives--need",
       "sourceId": "req-cost-review-fallback",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-cost-estimate--derives--need",
       "sourceId": "req-cost-estimate",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-cost-estimate-native--derives--need",
       "sourceId": "req-cost-estimate-native",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-paas--derives--need",
       "sourceId": "req-paas",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-k8s--derives--need",
       "sourceId": "req-k8s",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-k8s-onprem--derives--need",
       "sourceId": "req-k8s-onprem",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-functions--derives--need",
       "sourceId": "req-functions",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-images--derives--need",
       "sourceId": "req-images",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-cdn--derives--need",
       "sourceId": "req-cdn",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-ephemeral--derives--need",
       "sourceId": "req-ephemeral",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "req-staging--derives--need",
       "sourceId": "req-staging",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element has to run somewhere that suits its load and the team's skills, and that somewhere has to be built from reviewed code, so it can be rebuilt after a disaster and repeated for every environment. Test environments must behave like production, nothing may change outside the code unnoticed, and the bill must stay within a known budget, with warnings before it is exceeded rather than after. The checks assume one infrastructure repository with envs/<environment>/ holding each environment's root (staging, production, test), policies/ holding the policy files, charts/<name> holding a Helm chart, infra/ holding CloudFormation or Bicep templates, and ephemeral environments named pr-<number>."
     },
     {
       "id": "sc-iac--verifies--req-iac",

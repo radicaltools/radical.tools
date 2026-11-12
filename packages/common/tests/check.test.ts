@@ -18,14 +18,14 @@ function complete(): DiagramData {
     metamodel: builtInGovernanceMetamodel(),
     nodes: [
       node('sys', 'system', 'Shop'),
-      node('need', 'need', 'Brief'),
+      node('need', 'need', 'Brief', { description: 'Shoppers pay by card.' }),
       node('req', 'requirement', 'Pay', { ears_type: 'event-driven', trigger: 'the user pays', action: 'take the payment' }),
       node('sc', 'scenario', 'Paying', { given: 'a cart', when: 'paying', then: 'paid' }),
       node('adr', 'adr', 'Use cards', ACCEPTED_ADR),
       node('ff', 'fitness-fn', 'Card check', { characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated' }),
     ],
     relations: [
-      rel('r1', 'derives', 'req', 'need'),
+      { ...rel('r1', 'derives', 'req', 'need'), quote: 'pay by card' } as C4Relation,
       rel('r2', 'verifies', 'sc', 'req'),
       rel('r3', 'satisfies', 'sys', 'req'),
       rel('r4', 'implements', 'ff', 'adr'),
@@ -229,7 +229,7 @@ describe('radical check: config', () => {
       node('a', 'requirement', 'A', { action: 'a' }),
       node('b', 'requirement', 'B', { action: 'b' }),
     )
-    data.relations.push(rel('ra', 'derives', 'a', 'need'), rel('rb', 'derives', 'b', 'need'), rel('sa', 'satisfies', 'sys', 'a'), rel('sb', 'satisfies', 'sys', 'b'))
+    data.relations.push({ ...rel('ra', 'derives', 'a', 'need'), quote: 'pay' } as C4Relation, { ...rel('rb', 'derives', 'b', 'need'), quote: 'card' } as C4Relation, rel('sa', 'satisfies', 'sys', 'a'), rel('sb', 'satisfies', 'sys', 'b'))
     return data
   }
 
@@ -310,7 +310,7 @@ describe('radical check: output', () => {
     const data = complete()
     for (let i = 0; i < 7; i++) {
       data.nodes.push(node(`n${i}`, 'requirement', `R${i}`, { action: 'x' }))
-      data.relations.push(rel(`d${i}`, 'derives', `n${i}`, 'need'), rel(`s${i}`, 'satisfies', 'sys', `n${i}`))
+      data.relations.push({ ...rel(`d${i}`, 'derives', `n${i}`, 'need'), quote: 'shoppers' } as C4Relation, rel(`s${i}`, 'satisfies', 'sys', `n${i}`))
     }
     return data
   }

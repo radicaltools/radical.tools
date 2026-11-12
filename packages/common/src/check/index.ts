@@ -21,7 +21,7 @@ import type { TestCase } from './reports'
 import type { Measurement } from './metrics'
 import type { ConcernPack } from '../concerns'
 
-export { CHECK_RULES, verifiedHere, type CheckRule, type CheckSeverity, type CheckModel, type RepositoryMapping, type RuleFinding } from './rules'
+export { CHECK_RULES, hardValues, needAnswers, quoteFragments, quoteValueGaps, verifiedHere, type CheckRule, type CheckSeverity, type CheckModel, type RepositoryMapping, type RuleFinding } from './rules'
 export { parseTestReport, parseTestIds, type TestCase, type TestId, type TestStatus } from './reports'
 export { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, testsRanAt, type CiRun, type CiSource, type TestResults } from './files'
 export { BOUND_TESTS, ELEMENT_LABEL, TESTED_TYPES, appliedElements, computeEvidence, conditionResults, conditionsOf, measuredElements, withBoundTests, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome, type ConditionOutcome, type ConditionResult } from './evidence'

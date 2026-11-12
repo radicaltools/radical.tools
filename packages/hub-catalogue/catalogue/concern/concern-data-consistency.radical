@@ -860,61 +860,71 @@
       "id": "req-atomic--derives--need",
       "sourceId": "req-atomic",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "A business operation (placing an order, booking a slot, moving money) changes several records, often in more than one store or service. Whatever fails, and however many requests run at once, it must happen entirely or not at all, the rules that span records must hold, nothing may be told to others that did not happen (or be left untold), and people must see what they have just done. The snippets assume the application under src/ (src/orders the operations, src/db the transaction helper and data sources, src/outbox the relay, src/workflows the sagas) and the tests under tests/ with their fixtures beside them."
     },
     {
       "id": "req-outbox--derives--need",
       "sourceId": "req-outbox",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "A business operation (placing an order, booking a slot, moving money) changes several records, often in more than one store or service. Whatever fails, and however many requests run at once, it must happen entirely or not at all, the rules that span records must hold, nothing may be told to others that did not happen (or be left untold), and people must see what they have just done. The snippets assume the application under src/ (src/orders the operations, src/db the transaction helper and data sources, src/outbox the relay, src/workflows the sagas) and the tests under tests/ with their fixtures beside them."
     },
     {
       "id": "req-saga--derives--need",
       "sourceId": "req-saga",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "A business operation (placing an order, booking a slot, moving money) changes several records, often in more than one store or service. Whatever fails, and however many requests run at once, it must happen entirely or not at all, the rules that span records must hold, nothing may be told to others that did not happen (or be left untold), and people must see what they have just done. The snippets assume the application under src/ (src/orders the operations, src/db the transaction helper and data sources, src/outbox the relay, src/workflows the sagas) and the tests under tests/ with their fixtures beside them."
     },
     {
       "id": "req-saga-state--derives--need",
       "sourceId": "req-saga-state",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "A business operation (placing an order, booking a slot, moving money) changes several records, often in more than one store or service. Whatever fails, and however many requests run at once, it must happen entirely or not at all, the rules that span records must hold, nothing may be told to others that did not happen (or be left untold), and people must see what they have just done. The snippets assume the application under src/ (src/orders the operations, src/db the transaction helper and data sources, src/outbox the relay, src/workflows the sagas) and the tests under tests/ with their fixtures beside them."
     },
     {
       "id": "req-lost-update--derives--need",
       "sourceId": "req-lost-update",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "A business operation (placing an order, booking a slot, moving money) changes several records, often in more than one store or service. Whatever fails, and however many requests run at once, it must happen entirely or not at all, the rules that span records must hold, nothing may be told to others that did not happen (or be left untold), and people must see what they have just done. The snippets assume the application under src/ (src/orders the operations, src/db the transaction helper and data sources, src/outbox the relay, src/workflows the sagas) and the tests under tests/ with their fixtures beside them."
     },
     {
       "id": "req-write-skew--derives--need",
       "sourceId": "req-write-skew",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "A business operation (placing an order, booking a slot, moving money) changes several records, often in more than one store or service. Whatever fails, and however many requests run at once, it must happen entirely or not at all, the rules that span records must hold, nothing may be told to others that did not happen (or be left untold), and people must see what they have just done. The snippets assume the application under src/ (src/orders the operations, src/db the transaction helper and data sources, src/outbox the relay, src/workflows the sagas) and the tests under tests/ with their fixtures beside them."
     },
     {
       "id": "req-serializable--derives--need",
       "sourceId": "req-serializable",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "A business operation (placing an order, booking a slot, moving money) changes several records, often in more than one store or service. Whatever fails, and however many requests run at once, it must happen entirely or not at all, the rules that span records must hold, nothing may be told to others that did not happen (or be left untold), and people must see what they have just done. The snippets assume the application under src/ (src/orders the operations, src/db the transaction helper and data sources, src/outbox the relay, src/workflows the sagas) and the tests under tests/ with their fixtures beside them."
     },
     {
       "id": "req-read-primary--derives--need",
       "sourceId": "req-read-primary",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "A business operation (placing an order, booking a slot, moving money) changes several records, often in more than one store or service. Whatever fails, and however many requests run at once, it must happen entirely or not at all, the rules that span records must hold, nothing may be told to others that did not happen (or be left untold), and people must see what they have just done. The snippets assume the application under src/ (src/orders the operations, src/db the transaction helper and data sources, src/outbox the relay, src/workflows the sagas) and the tests under tests/ with their fixtures beside them."
     },
     {
       "id": "req-ryw--derives--need",
       "sourceId": "req-ryw",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "A business operation (placing an order, booking a slot, moving money) changes several records, often in more than one store or service. Whatever fails, and however many requests run at once, it must happen entirely or not at all, the rules that span records must hold, nothing may be told to others that did not happen (or be left untold), and people must see what they have just done. The snippets assume the application under src/ (src/orders the operations, src/db the transaction helper and data sources, src/outbox the relay, src/workflows the sagas) and the tests under tests/ with their fixtures beside them."
     },
     {
       "id": "req-bounded--derives--need",
       "sourceId": "req-bounded",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "A business operation (placing an order, booking a slot, moving money) changes several records, often in more than one store or service. Whatever fails, and however many requests run at once, it must happen entirely or not at all, the rules that span records must hold, nothing may be told to others that did not happen (or be left untold), and people must see what they have just done. The snippets assume the application under src/ (src/orders the operations, src/db the transaction helper and data sources, src/outbox the relay, src/workflows the sagas) and the tests under tests/ with their fixtures beside them."
     },
     {
       "id": "sc-atomic--verifies--req-atomic",

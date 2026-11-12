@@ -989,97 +989,113 @@
       "id": "req-adr-recorded--derives--need",
       "sourceId": "req-adr-recorded",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-adr-supersede--derives--need",
       "sourceId": "req-adr-supersede",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-adr-with-code--derives--need",
       "sourceId": "req-adr-with-code",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-adr-linked--derives--need",
       "sourceId": "req-adr-linked",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-adr-wiki-index--derives--need",
       "sourceId": "req-adr-wiki-index",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-api-regenerated--derives--need",
       "sourceId": "req-api-regenerated",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-reference-built--derives--need",
       "sourceId": "req-reference-built",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-doc-comments--derives--need",
       "sourceId": "req-doc-comments",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-examples-run--derives--need",
       "sourceId": "req-examples-run",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-readme-per-module--derives--need",
       "sourceId": "req-readme-per-module",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-readme-root--derives--need",
       "sourceId": "req-readme-root",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-links--derives--need",
       "sourceId": "req-links",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-external-versioned--derives--need",
       "sourceId": "req-external-versioned",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-doc-owner--derives--need",
       "sourceId": "req-doc-owner",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-diagram-same-pr--derives--need",
       "sourceId": "req-diagram-same-pr",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "req-diagram-dated--derives--need",
       "sourceId": "req-diagram-dated",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People who did not write the element have to change it, run it and reason about it: a new team member, an on-call engineer at night, a reviewer in another team, the author a year later. They need to find why it is built the way it is, what it offers to its callers, how to run and test each part, and how its parts fit together, and what they find has to be true today, not when it was written. ISO 25010 calls this analysability; in practice it is the difference between a change that takes an afternoon and one that takes a week of archaeology."
     },
     {
       "id": "sc-adr-recorded--verifies--req-adr-recorded",

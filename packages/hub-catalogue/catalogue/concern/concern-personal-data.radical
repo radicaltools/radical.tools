@@ -1505,127 +1505,148 @@
       "id": "req-record--derives--need",
       "sourceId": "req-record",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-retain--derives--need",
       "sourceId": "req-retain",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-access--derives--need",
       "sourceId": "req-access",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-erase--derives--need",
       "sourceId": "req-erase",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-backups--derives--need",
       "sourceId": "req-backups",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-anonymise--derives--need",
       "sourceId": "req-anonymise",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-shred--derives--need",
       "sourceId": "req-shred",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-protect--derives--need",
       "sourceId": "req-protect",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-breach--derives--need",
       "sourceId": "req-breach",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-breach-register--derives--need",
       "sourceId": "req-breach-register",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-breach-people--derives--need",
       "sourceId": "req-breach-people",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-breach-processor--derives--need",
       "sourceId": "req-breach-processor",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-region-eu--derives--need",
       "sourceId": "req-region-eu",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-region-adequate--derives--need",
       "sourceId": "req-region-adequate",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-region-scc--derives--need",
       "sourceId": "req-region-scc",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-special--derives--need",
       "sourceId": "req-special",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-dpia--derives--need",
       "sourceId": "req-dpia",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-purpose--derives--need",
       "sourceId": "req-purpose",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-consent--derives--need",
       "sourceId": "req-consent",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-objection--derives--need",
       "sourceId": "req-objection",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "req-none--derives--need",
       "sourceId": "req-none",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data about people. Data protection law and the people themselves expect it to be processed only for a stated purpose on a lawful basis, kept no longer than needed, kept where the law allows, protected against leaks, handed over when a person asks and erased when they ask, every copy included. The organisation also has to be able to show, at any time, what it keeps, why, where and for how long. The snippets assume the application under src/ (src/privacy the erasure, consents and exclusions, src/crypto the envelope layer), the tests under tests/ with their fixtures in tests/privacy, and the records under docs/ (record-of-processing.json, dpia/, and breaches/ with runbook.md and register.json) and processors.yaml."
     },
     {
       "id": "sc-record--verifies--req-record",

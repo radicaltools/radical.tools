@@ -842,73 +842,85 @@
       "id": "req-paged--derives--need",
       "sourceId": "req-paged",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers read collections from this element over HTTP, and the collections grow. Every list has to come back in bounded time and size however large its collection gets, show each item once to a caller who reads it page by page, apply exactly the filters and order the caller asked for or refuse the request, and hand out nothing callers could come to depend on by accident, such as ids or offsets inside a page token. The snippets assume the OpenAPI document at api/openapi.yaml, the application exported from src/app with requests validated against that document, page tokens sealed by src/collections/pageToken, and the tests under tests/ with their fixtures in tests/collections (a seeded /orders collection and a walk helper that reads every page of a list). Names are written in snake_case as Google AIP-158 writes them (page_size, page_token, next_page_token, order_by); where the Resource design pack chose camelCase, read pageSize, pageToken, nextPageToken and orderBy."
     },
     {
       "id": "req-token-opaque--derives--need",
       "sourceId": "req-token-opaque",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers read collections from this element over HTTP, and the collections grow. Every list has to come back in bounded time and size however large its collection gets, show each item once to a caller who reads it page by page, apply exactly the filters and order the caller asked for or refuse the request, and hand out nothing callers could come to depend on by accident, such as ids or offsets inside a page token. The snippets assume the OpenAPI document at api/openapi.yaml, the application exported from src/app with requests validated against that document, page tokens sealed by src/collections/pageToken, and the tests under tests/ with their fixtures in tests/collections (a seeded /orders collection and a walk helper that reads every page of a list). Names are written in snake_case as Google AIP-158 writes them (page_size, page_token, next_page_token, order_by); where the Resource design pack chose camelCase, read pageSize, pageToken, nextPageToken and orderBy."
     },
     {
       "id": "req-token-refused--derives--need",
       "sourceId": "req-token-refused",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers read collections from this element over HTTP, and the collections grow. Every list has to come back in bounded time and size however large its collection gets, show each item once to a caller who reads it page by page, apply exactly the filters and order the caller asked for or refuse the request, and hand out nothing callers could come to depend on by accident, such as ids or offsets inside a page token. The snippets assume the OpenAPI document at api/openapi.yaml, the application exported from src/app with requests validated against that document, page tokens sealed by src/collections/pageToken, and the tests under tests/ with their fixtures in tests/collections (a seeded /orders collection and a walk helper that reads every page of a list). Names are written in snake_case as Google AIP-158 writes them (page_size, page_token, next_page_token, order_by); where the Resource design pack chose camelCase, read pageSize, pageToken, nextPageToken and orderBy."
     },
     {
       "id": "req-cursor-consistent--derives--need",
       "sourceId": "req-cursor-consistent",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers read collections from this element over HTTP, and the collections grow. Every list has to come back in bounded time and size however large its collection gets, show each item once to a caller who reads it page by page, apply exactly the filters and order the caller asked for or refuse the request, and hand out nothing callers could come to depend on by accident, such as ids or offsets inside a page token. The snippets assume the OpenAPI document at api/openapi.yaml, the application exported from src/app with requests validated against that document, page tokens sealed by src/collections/pageToken, and the tests under tests/ with their fixtures in tests/collections (a seeded /orders collection and a walk helper that reads every page of a list). Names are written in snake_case as Google AIP-158 writes them (page_size, page_token, next_page_token, order_by); where the Resource design pack chose camelCase, read pageSize, pageToken, nextPageToken and orderBy."
     },
     {
       "id": "req-offset-cap--derives--need",
       "sourceId": "req-offset-cap",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers read collections from this element over HTTP, and the collections grow. Every list has to come back in bounded time and size however large its collection gets, show each item once to a caller who reads it page by page, apply exactly the filters and order the caller asked for or refuse the request, and hand out nothing callers could come to depend on by accident, such as ids or offsets inside a page token. The snippets assume the OpenAPI document at api/openapi.yaml, the application exported from src/app with requests validated against that document, page tokens sealed by src/collections/pageToken, and the tests under tests/ with their fixtures in tests/collections (a seeded /orders collection and a walk helper that reads every page of a list). Names are written in snake_case as Google AIP-158 writes them (page_size, page_token, next_page_token, order_by); where the Resource design pack chose camelCase, read pageSize, pageToken, nextPageToken and orderBy."
     },
     {
       "id": "req-bounded--derives--need",
       "sourceId": "req-bounded",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers read collections from this element over HTTP, and the collections grow. Every list has to come back in bounded time and size however large its collection gets, show each item once to a caller who reads it page by page, apply exactly the filters and order the caller asked for or refuse the request, and hand out nothing callers could come to depend on by accident, such as ids or offsets inside a page token. The snippets assume the OpenAPI document at api/openapi.yaml, the application exported from src/app with requests validated against that document, page tokens sealed by src/collections/pageToken, and the tests under tests/ with their fixtures in tests/collections (a seeded /orders collection and a walk helper that reads every page of a list). Names are written in snake_case as Google AIP-158 writes them (page_size, page_token, next_page_token, order_by); where the Resource design pack chose camelCase, read pageSize, pageToken, nextPageToken and orderBy."
     },
     {
       "id": "req-order--derives--need",
       "sourceId": "req-order",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers read collections from this element over HTTP, and the collections grow. Every list has to come back in bounded time and size however large its collection gets, show each item once to a caller who reads it page by page, apply exactly the filters and order the caller asked for or refuse the request, and hand out nothing callers could come to depend on by accident, such as ids or offsets inside a page token. The snippets assume the OpenAPI document at api/openapi.yaml, the application exported from src/app with requests validated against that document, page tokens sealed by src/collections/pageToken, and the tests under tests/ with their fixtures in tests/collections (a seeded /orders collection and a walk helper that reads every page of a list). Names are written in snake_case as Google AIP-158 writes them (page_size, page_token, next_page_token, order_by); where the Resource design pack chose camelCase, read pageSize, pageToken, nextPageToken and orderBy."
     },
     {
       "id": "req-unknown--derives--need",
       "sourceId": "req-unknown",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers read collections from this element over HTTP, and the collections grow. Every list has to come back in bounded time and size however large its collection gets, show each item once to a caller who reads it page by page, apply exactly the filters and order the caller asked for or refuse the request, and hand out nothing callers could come to depend on by accident, such as ids or offsets inside a page token. The snippets assume the OpenAPI document at api/openapi.yaml, the application exported from src/app with requests validated against that document, page tokens sealed by src/collections/pageToken, and the tests under tests/ with their fixtures in tests/collections (a seeded /orders collection and a walk helper that reads every page of a list). Names are written in snake_case as Google AIP-158 writes them (page_size, page_token, next_page_token, order_by); where the Resource design pack chose camelCase, read pageSize, pageToken, nextPageToken and orderBy."
     },
     {
       "id": "req-filter--derives--need",
       "sourceId": "req-filter",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers read collections from this element over HTTP, and the collections grow. Every list has to come back in bounded time and size however large its collection gets, show each item once to a caller who reads it page by page, apply exactly the filters and order the caller asked for or refuse the request, and hand out nothing callers could come to depend on by accident, such as ids or offsets inside a page token. The snippets assume the OpenAPI document at api/openapi.yaml, the application exported from src/app with requests validated against that document, page tokens sealed by src/collections/pageToken, and the tests under tests/ with their fixtures in tests/collections (a seeded /orders collection and a walk helper that reads every page of a list). Names are written in snake_case as Google AIP-158 writes them (page_size, page_token, next_page_token, order_by); where the Resource design pack chose camelCase, read pageSize, pageToken, nextPageToken and orderBy."
     },
     {
       "id": "req-sort--derives--need",
       "sourceId": "req-sort",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers read collections from this element over HTTP, and the collections grow. Every list has to come back in bounded time and size however large its collection gets, show each item once to a caller who reads it page by page, apply exactly the filters and order the caller asked for or refuse the request, and hand out nothing callers could come to depend on by accident, such as ids or offsets inside a page token. The snippets assume the OpenAPI document at api/openapi.yaml, the application exported from src/app with requests validated against that document, page tokens sealed by src/collections/pageToken, and the tests under tests/ with their fixtures in tests/collections (a seeded /orders collection and a walk helper that reads every page of a list). Names are written in snake_case as Google AIP-158 writes them (page_size, page_token, next_page_token, order_by); where the Resource design pack chose camelCase, read pageSize, pageToken, nextPageToken and orderBy."
     },
     {
       "id": "req-fields--derives--need",
       "sourceId": "req-fields",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers read collections from this element over HTTP, and the collections grow. Every list has to come back in bounded time and size however large its collection gets, show each item once to a caller who reads it page by page, apply exactly the filters and order the caller asked for or refuse the request, and hand out nothing callers could come to depend on by accident, such as ids or offsets inside a page token. The snippets assume the OpenAPI document at api/openapi.yaml, the application exported from src/app with requests validated against that document, page tokens sealed by src/collections/pageToken, and the tests under tests/ with their fixtures in tests/collections (a seeded /orders collection and a walk helper that reads every page of a list). Names are written in snake_case as Google AIP-158 writes them (page_size, page_token, next_page_token, order_by); where the Resource design pack chose camelCase, read pageSize, pageToken, nextPageToken and orderBy."
     },
     {
       "id": "req-latency--derives--need",
       "sourceId": "req-latency",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers read collections from this element over HTTP, and the collections grow. Every list has to come back in bounded time and size however large its collection gets, show each item once to a caller who reads it page by page, apply exactly the filters and order the caller asked for or refuse the request, and hand out nothing callers could come to depend on by accident, such as ids or offsets inside a page token. The snippets assume the OpenAPI document at api/openapi.yaml, the application exported from src/app with requests validated against that document, page tokens sealed by src/collections/pageToken, and the tests under tests/ with their fixtures in tests/collections (a seeded /orders collection and a walk helper that reads every page of a list). Names are written in snake_case as Google AIP-158 writes them (page_size, page_token, next_page_token, order_by); where the Resource design pack chose camelCase, read pageSize, pageToken, nextPageToken and orderBy."
     },
     {
       "id": "sc-paged--verifies--req-paged",

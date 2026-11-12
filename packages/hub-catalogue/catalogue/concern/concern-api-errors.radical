@@ -832,79 +832,92 @@
       "id": "req-problem-details--derives--need",
       "sourceId": "req-problem-details",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
     },
     {
       "id": "req-microsoft-error--derives--need",
       "sourceId": "req-microsoft-error",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
     },
     {
       "id": "req-google-status--derives--need",
       "sourceId": "req-google-status",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
     },
     {
       "id": "req-minimal--derives--need",
       "sourceId": "req-minimal",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
     },
     {
       "id": "req-correlation--derives--need",
       "sourceId": "req-correlation",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
     },
     {
       "id": "req-caller-text--derives--need",
       "sourceId": "req-caller-text",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
     },
     {
       "id": "req-documented--derives--need",
       "sourceId": "req-documented",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
     },
     {
       "id": "req-codes--derives--need",
       "sourceId": "req-codes",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
     },
     {
       "id": "req-status-only--derives--need",
       "sourceId": "req-status-only",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
     },
     {
       "id": "req-validation-all--derives--need",
       "sourceId": "req-validation-all",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
     },
     {
       "id": "req-validation-first--derives--need",
       "sourceId": "req-validation-first",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
     },
     {
       "id": "req-docs-page--derives--need",
       "sourceId": "req-docs-page",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
     },
     {
       "id": "req-docs-identifiers--derives--need",
       "sourceId": "req-docs-identifiers",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every client of this API has to handle its errors in code: tell one failure from another without parsing prose, mark every wrong field for its user, and quote one id to support. That only works if every operation answers errors in one documented shape, with codes that keep their meaning and text written for the caller rather than copied from an exception. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the error code catalogue at api/errors/codes.yaml, the error rules in api/style/errors.yaml beside the style ruleset the API style guide pack keeps, the app exported from src/app (an Express app, with test-only routes: GET /__boom throws an unexpected error and GET /__expected an expected one, both with the text in the ERROR_MARK variable), POST /orders validating email, items[].quantity and currency, and the tests under test/ run with NODE_ENV=production."
     },
     {
       "id": "sc-problem-details--verifies--req-problem-details",

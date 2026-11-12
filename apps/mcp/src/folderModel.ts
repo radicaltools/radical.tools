@@ -28,7 +28,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel, originOf, ownModel } from '@radical/common/model'
 import { REPOSITORY_FILE, builtIn, parseRepositoryFile, serializeRepositoryFile, testsBoundTo, type RepositoryFile } from '@radical/common/repositoryMapping'
-import { conditionsOf, verifiedHere, withBoundTests, type CheckModel } from '@radical/common/check'
+import { conditionsOf, quoteValueGaps, verifiedHere, withBoundTests, type CheckModel } from '@radical/common/check'
 import { mappingRoot } from '@radical/node-files/repositoryLayout'
 import { FEDERATION_FILE, parseFederationFile, withOtherModels } from '@radical/common/federation'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
@@ -706,6 +706,12 @@ export class FolderModel {
     const nodes = new Map(own.nodes.map((n) => [n.id, n]))
     const relations = Object.fromEntries(own.relations.map((r) => [r.id, r]))
     const derivesFrom = (id: string) => own.relations.filter((r) => r.relationType === 'derives' && r.sourceId === id).map((r) => nodes.get(r.targetId)).filter((n): n is C4Node => !!n)
+    // The words a requirement's derives relation quotes from a need, if any.
+    const quoted = (reqId: string, needId: string): string => {
+      const r = own.relations.find((rel) => rel.relationType === 'derives' && rel.sourceId === reqId && rel.targetId === needId)
+      const q = (r as unknown as Record<string, unknown> | undefined)?.quote
+      return typeof q === 'string' ? q.trim() : ''
+    }
     // The needs a requirement derives from, directly or through other requirements.
     const needsOf = (id: string): C4Node[] => {
       const seen = new Set<string>([id]); const needs: C4Node[] = []; const queue = [id]
@@ -750,11 +756,17 @@ export class FolderModel {
       const sentence = composeEarsSentence(props(req), undefined, requirementStatePhrase(req, Object.fromEntries(nodes), relations)).sentence
       lines.push('', `## Requirement "${req.label}" (${req.id})`, sentence || '(no sentence: it misses its action)')
       if (typeof props(req).rationale === 'string' && props(req).rationale) lines.push(`Rationale: ${props(req).rationale}`)
+      // What radical check finds by the values alone: the place to start.
+      const gaps = quoteValueGaps({ nodes: Object.fromEntries(nodes), relations }, req)
+      if (gaps.missing.length) lines.push(`Values its quotes say and it does not: ${[...new Set(gaps.missing.map((g) => g.value))].map((v) => `"${v}"`).join(', ')}.`)
+      if (gaps.unsupported.length) lines.push(`Values it says and no quote says: ${gaps.unsupported.map((v) => `"${v}"`).join(', ')}.`)
       for (const need of needs) {
-        if (shown.has(need.id)) { lines.push(`Derives from need "${need.label}" (${need.id}), shown above.`); continue }
+        const words = quoted(req.id, need.id)
+        if (words) { lines.push(`### Rests on need "${need.label}" (${need.id}), quoting:`, words); continue }
+        if (shown.has(need.id)) { lines.push(`Derives from need "${need.label}" (${need.id}), shown above; its derives relation quotes nothing: set quote to the words it rests on.`); continue }
         shown.add(need.id)
         const text = (need.description ?? '').trim()
-        lines.push(`### Need "${need.label}" (${need.id})${text.includes('?') ? '' : ' — holds no question asked of a person: if you asked anything about it, add the questions and answers word for word'}`, text || '(empty)')
+        lines.push(`### Need "${need.label}" (${need.id}), quoted by no word: set quote on the derives relation to the words it rests on${text.includes('?') ? '' : '; it holds no question asked of a person: if you asked anything about it, add the questions and answers word for word'}`, text || '(empty)')
       }
     }
     if (without.length) lines.push('', `Derive from no need: ${without.map((r) => `"${r.label}" (${r.id})`).join(', ')}. Derive each from the need that holds the person's words, or say why it has none.`)

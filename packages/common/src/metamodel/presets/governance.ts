@@ -372,7 +372,11 @@ export function builtInGovernanceMetamodel(): Metamodel {
       { from: 'requirement', to: 'need' },
       { from: 'need', to: 'need' },
     ],
-    properties: [],
+    properties: [
+      // The words of the need the requirement rests on, verbatim, one fragment
+      // per line (ADR Agents check requirements against the person's words).
+      { key: 'quote', label: 'Quote', type: 'textarea' },
+    ],
     color: '#0d9488',
     governance: true,
     builtin: true,

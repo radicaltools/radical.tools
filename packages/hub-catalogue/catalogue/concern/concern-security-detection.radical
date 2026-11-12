@@ -865,67 +865,78 @@
       "id": "req-catalogue--derives--need",
       "sourceId": "req-catalogue",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element, and some of them are hostile. When someone guesses passwords, probes for records they may not read or changes privileges, the element has to say so in a form a SIEM can count, the SIEM has to turn the pattern into an alert within minutes, and someone has to answer that alert at any hour, so that an attack is stopped while it is still an attempt. The snippets assume the event catalogue in security/events.yaml, Sigma rules under rules/ or the SIEM's own rules mapped in security/detections.yaml, the tests under test/security, the shipper's configuration in vector.yaml and the daily drill in security/drill.sh."
     },
     {
       "id": "req-event-shape--derives--need",
       "sourceId": "req-event-shape",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element, and some of them are hostile. When someone guesses passwords, probes for records they may not read or changes privileges, the element has to say so in a form a SIEM can count, the SIEM has to turn the pattern into an alert within minutes, and someone has to answer that alert at any hour, so that an attack is stopped while it is still an attempt. The snippets assume the event catalogue in security/events.yaml, Sigma rules under rules/ or the SIEM's own rules mapped in security/detections.yaml, the tests under test/security, the shipper's configuration in vector.yaml and the daily drill in security/drill.sh."
     },
     {
       "id": "req-forward--derives--need",
       "sourceId": "req-forward",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element, and some of them are hostile. When someone guesses passwords, probes for records they may not read or changes privileges, the element has to say so in a form a SIEM can count, the SIEM has to turn the pattern into an alert within minutes, and someone has to answer that alert at any hour, so that an attack is stopped while it is still an attempt. The snippets assume the event catalogue in security/events.yaml, Sigma rules under rules/ or the SIEM's own rules mapped in security/detections.yaml, the tests under test/security, the shipper's configuration in vector.yaml and the daily drill in security/drill.sh."
     },
     {
       "id": "req-retention--derives--need",
       "sourceId": "req-retention",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element, and some of them are hostile. When someone guesses passwords, probes for records they may not read or changes privileges, the element has to say so in a form a SIEM can count, the SIEM has to turn the pattern into an alert within minutes, and someone has to answer that alert at any hour, so that an attack is stopped while it is still an attempt. The snippets assume the event catalogue in security/events.yaml, Sigma rules under rules/ or the SIEM's own rules mapped in security/detections.yaml, the tests under test/security, the shipper's configuration in vector.yaml and the daily drill in security/drill.sh."
     },
     {
       "id": "req-brute-force--derives--need",
       "sourceId": "req-brute-force",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element, and some of them are hostile. When someone guesses passwords, probes for records they may not read or changes privileges, the element has to say so in a form a SIEM can count, the SIEM has to turn the pattern into an alert within minutes, and someone has to answer that alert at any hour, so that an attack is stopped while it is still an attempt. The snippets assume the event catalogue in security/events.yaml, Sigma rules under rules/ or the SIEM's own rules mapped in security/detections.yaml, the tests under test/security, the shipper's configuration in vector.yaml and the daily drill in security/drill.sh."
     },
     {
       "id": "req-coverage--derives--need",
       "sourceId": "req-coverage",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element, and some of them are hostile. When someone guesses passwords, probes for records they may not read or changes privileges, the element has to say so in a form a SIEM can count, the SIEM has to turn the pattern into an alert within minutes, and someone has to answer that alert at any hour, so that an attack is stopped while it is still an attempt. The snippets assume the event catalogue in security/events.yaml, Sigma rules under rules/ or the SIEM's own rules mapped in security/detections.yaml, the tests under test/security, the shipper's configuration in vector.yaml and the daily drill in security/drill.sh."
     },
     {
       "id": "req-sigma--derives--need",
       "sourceId": "req-sigma",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element, and some of them are hostile. When someone guesses passwords, probes for records they may not read or changes privileges, the element has to say so in a form a SIEM can count, the SIEM has to turn the pattern into an alert within minutes, and someone has to answer that alert at any hour, so that an attack is stopped while it is still an attempt. The snippets assume the event catalogue in security/events.yaml, Sigma rules under rules/ or the SIEM's own rules mapped in security/detections.yaml, the tests under test/security, the shipper's configuration in vector.yaml and the daily drill in security/drill.sh."
     },
     {
       "id": "req-drill--derives--need",
       "sourceId": "req-drill",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element, and some of them are hostile. When someone guesses passwords, probes for records they may not read or changes privileges, the element has to say so in a form a SIEM can count, the SIEM has to turn the pattern into an alert within minutes, and someone has to answer that alert at any hour, so that an attack is stopped while it is still an attempt. The snippets assume the event catalogue in security/events.yaml, Sigma rules under rules/ or the SIEM's own rules mapped in security/detections.yaml, the tests under test/security, the shipper's configuration in vector.yaml and the daily drill in security/drill.sh."
     },
     {
       "id": "req-page--derives--need",
       "sourceId": "req-page",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element, and some of them are hostile. When someone guesses passwords, probes for records they may not read or changes privileges, the element has to say so in a form a SIEM can count, the SIEM has to turn the pattern into an alert within minutes, and someone has to answer that alert at any hour, so that an attack is stopped while it is still an attempt. The snippets assume the event catalogue in security/events.yaml, Sigma rules under rules/ or the SIEM's own rules mapped in security/detections.yaml, the tests under test/security, the shipper's configuration in vector.yaml and the daily drill in security/drill.sh."
     },
     {
       "id": "req-mdr-escalation--derives--need",
       "sourceId": "req-mdr-escalation",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element, and some of them are hostile. When someone guesses passwords, probes for records they may not read or changes privileges, the element has to say so in a form a SIEM can count, the SIEM has to turn the pattern into an alert within minutes, and someone has to answer that alert at any hour, so that an attack is stopped while it is still an attempt. The snippets assume the event catalogue in security/events.yaml, Sigma rules under rules/ or the SIEM's own rules mapped in security/detections.yaml, the tests under test/security, the shipper's configuration in vector.yaml and the daily drill in security/drill.sh."
     },
     {
       "id": "req-mdr-triage--derives--need",
       "sourceId": "req-mdr-triage",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element, and some of them are hostile. When someone guesses passwords, probes for records they may not read or changes privileges, the element has to say so in a form a SIEM can count, the SIEM has to turn the pattern into an alert within minutes, and someone has to answer that alert at any hour, so that an attack is stopped while it is still an attempt. The snippets assume the event catalogue in security/events.yaml, Sigma rules under rules/ or the SIEM's own rules mapped in security/detections.yaml, the tests under test/security, the shipper's configuration in vector.yaml and the daily drill in security/drill.sh."
     },
     {
       "id": "sc-catalogue--verifies--req-catalogue",

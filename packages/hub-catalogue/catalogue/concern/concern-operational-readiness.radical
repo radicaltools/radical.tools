@@ -943,85 +943,99 @@
       "id": "req-prr-gate--derives--need",
       "sourceId": "req-prr-gate",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "req-prr-gaps--derives--need",
       "sourceId": "req-prr-gaps",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "req-prr-signoff--derives--need",
       "sourceId": "req-prr-signoff",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "req-prr-checklist--derives--need",
       "sourceId": "req-prr-checklist",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "req-prr-major--derives--need",
       "sourceId": "req-prr-major",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "req-prr-none--derives--need",
       "sourceId": "req-prr-none",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "req-runbook-alert--derives--need",
       "sourceId": "req-runbook-alert",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "req-runbook-element--derives--need",
       "sourceId": "req-runbook-element",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "req-runbook-review--derives--need",
       "sourceId": "req-runbook-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "req-gameday--derives--need",
       "sourceId": "req-gameday",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "req-chaos--derives--need",
       "sourceId": "req-chaos",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "req-chaos-abort--derives--need",
       "sourceId": "req-chaos-abort",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "req-owner-catalog--derives--need",
       "sourceId": "req-owner-catalog",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "req-owner-readme--derives--need",
       "sourceId": "req-owner-readme",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Before this element takes its first production traffic, the people who will run it must know that it can be run: who owns it, what pages and who answers, where the next step is written, and that its targets, alerts, load tests, restores and rollback have been decided and tried. After launch the team has to keep practising, or the runbooks and the response decay until the night they are needed. The snippets assume one repository per element (order-api, labelled Order API in the architecture model) with the review checklist at docs/operations/prr-checklist.md and the signed reviews as docs/operations/prr/YYYY-MM-DD.md, the runbooks under docs/runbooks, the Prometheus alerting rules under monitoring/rules, the game-day records as docs/gamedays/YYYY-MM-DD.md, catalog-info.yaml or README.md at the root, the architecture model as a Radical Markdown folder under architecture/, and js-yaml among the development dependencies."
     },
     {
       "id": "sc-prr-gate--verifies--req-prr-gate",

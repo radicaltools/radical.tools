@@ -1019,91 +1019,106 @@
       "id": "req-gate-on-pr--derives--need",
       "sourceId": "req-gate-on-pr",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-formatted--derives--need",
       "sourceId": "req-formatted",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-lint-rules--derives--need",
       "sourceId": "req-lint-rules",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-sonar-gate--derives--need",
       "sourceId": "req-sonar-gate",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-format-only-revisit--derives--need",
       "sourceId": "req-format-only-revisit",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-strict-types--derives--need",
       "sourceId": "req-strict-types",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-type-ratchet--derives--need",
       "sourceId": "req-type-ratchet",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-boundary-types--derives--need",
       "sourceId": "req-boundary-types",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-complexity-limits--derives--need",
       "sourceId": "req-complexity-limits",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-complexity-shown--derives--need",
       "sourceId": "req-complexity-shown",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-zero-new--derives--need",
       "sourceId": "req-zero-new",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-ratchet--derives--need",
       "sourceId": "req-ratchet",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-fix-all--derives--need",
       "sourceId": "req-fix-all",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-duplication--derives--need",
       "sourceId": "req-duplication",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "req-duplication-reported--derives--need",
       "sourceId": "req-duplication-reported",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is changed by several people and will be maintained by people who did not write it. Every change must leave the code at least as readable, typed and small as it found it, and the obvious mistakes (an unused variable, a wrong null check, a 300-line function, a copied block) must be found by a machine in minutes, so that review time goes to design and correctness. A rule that is not enforced is not a rule; one that blocks on code nobody is touching gets switched off."
     },
     {
       "id": "sc-gate-on-pr--verifies--req-gate-on-pr",

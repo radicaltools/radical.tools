@@ -306,6 +306,111 @@ function invalidChecks(model: CheckModel): RuleFinding[] {
     })
 }
 
+
+// ─── Quotes on derives: a requirement and the words of its need ────────────
+// (ADR Agents check requirements against the person's words)
+
+const normalizeWords = (text: string): string => text.toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/\s+/g, ' ').trim()
+
+/** The fragments a derives relation quotes: one per line, without the
+ *  quotation marks around it; an ellipsis inside joins pieces that must each
+ *  be in the need. */
+export function quoteFragments(quote: unknown): string[][] {
+  if (typeof quote !== 'string') return []
+  return quote.split('\n').map((line) => line.trim().replace(/^["'\u201c\u2018>]+|["'\u201d\u2019]+$/g, '').trim()).filter(Boolean)
+    .map((line) => line.split(/\u2026|\.\.\./).map((piece) => normalizeWords(piece)).filter(Boolean))
+    .filter((pieces) => pieces.length)
+}
+
+/** The derives relations from a requirement to a need of this model. */
+const requirementToNeed = (model: CheckModel): C4Relation[] => Object.values(model.relations).filter((r) => r.relationType === 'derives'
+  && model.nodes[r.sourceId]?.type === 'requirement' && model.nodes[r.targetId]?.type === 'need' && !originOf(model.nodes[r.targetId]))
+
+/** The answers of a person in a need's text: from a line that starts with
+ *  "A:" to the next "Q:" or "A:" line. */
+export function needAnswers(text: string): string[] {
+  const answers: string[] = []
+  let current: string[] | null = null
+  for (const line of text.split('\n')) {
+    if (/^\s*(?:\*\*)?A(?:\*\*)?\s*:/.test(line)) { if (current) answers.push(current.join('\n')); current = [line.replace(/^\s*(?:\*\*)?A(?:\*\*)?\s*:(?:\*\*)?\s*/, '')] }
+    else if (/^\s*(?:\*\*)?Q(?:\*\*)?\s*:/.test(line)) { if (current) answers.push(current.join('\n')); current = null }
+    else if (current) current.push(line)
+  }
+  if (current) answers.push(current.join('\n'))
+  return answers.map((a) => a.trim()).filter(Boolean)
+}
+
+
+// ─── Hard values: what a quote and its requirement must agree on ────────────
+// Numbers, null, true and false, and identifiers in backticks or quotation
+// marks: what cannot be paraphrased without changing the meaning.
+
+const NUMBER_WORDS: Record<string, string> = {
+  zero: '0', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10',
+  eleven: '11', twelve: '12', fifteen: '15', twenty: '20', thirty: '30', forty: '40', fifty: '50', sixty: '60', ninety: '90', hundred: '100', thousand: '1000',
+}
+const LITERALS = new Set(['null', 'none', 'true', 'false'])
+
+/** The hard values of a text, normalised: numbers (written in digits or as a
+ *  word, with a percent sign kept), null, none, true and false, and short
+ *  identifiers in backticks or quotation marks. */
+export function hardValues(text: string): Set<string> {
+  const values = new Set<string>()
+  const t = text.replace(/[“”]/g, '"')
+  for (const m of t.matchAll(/`([^`\n]{1,40})`|"([^"\n]{1,40})"/g)) {
+    const id = (m[1] ?? m[2]).trim().toLowerCase()
+    if (id && !/\s/.test(id)) values.add(id)
+  }
+  for (const m of t.matchAll(/(?<![\w.])(\d{1,3}(?:,\d{3})+|\d+(?:[.,]\d+)?)(\s?%)?(?![\w])/g)) {
+    let n = /^\d{1,3}(,\d{3})+$/.test(m[1]) ? m[1].replace(/,/g, '') : m[1].replace(',', '.')
+    if (/^\d+\.\d+$/.test(n)) n = n.replace(/0+$/, '').replace(/\.$/, '')
+    values.add(m[2] ? `${n}%` : n)
+  }
+  for (const m of t.toLowerCase().matchAll(/\b([a-z]+)\b/g)) {
+    if (NUMBER_WORDS[m[1]]) values.add(NUMBER_WORDS[m[1]])
+    else if (LITERALS.has(m[1])) values.add(m[1])
+  }
+  return values
+}
+
+/** What a requirement says, field by field as its EARS sentence reads them. */
+const requirementText = (n: C4Node): string => ['trigger', 'precondition', 'unwanted_condition', 'feature', 'action'].map((k) => prop(n, k)).join(' \n ')
+
+/** For a requirement: the values its quotes hold that it does not say, by
+ *  the derives relation that quotes them; and the values it says that none
+ *  of its quotes, those of the requirements it derives from, or its
+ *  rationale hold. Empty when nothing of it is quoted. */
+export function quoteValueGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, req: C4Node): { missing: Array<{ value: string; relationId: string }>; unsupported: string[] } {
+  const rels = Object.values(model.relations).filter((r) => r.relationType === 'derives' && r.sourceId === req.id)
+  // A quote of a whole need that holds no answer of a person (a brief, a
+  // concern pack's paragraph) points at nothing in particular: its values
+  // are not checked. On a need with answers the whole text is still checked.
+  const quoteOf = (r: C4Relation): string => {
+    const q = typeof (r as unknown as Props).quote === 'string' ? ((r as unknown as Props).quote as string) : ''
+    const need = model.nodes[r.targetId]
+    if (!q || need?.type !== 'need') return q
+    const text = need.description ?? ''
+    return normalizeWords(q) === normalizeWords(text) && !needAnswers(text).length ? '' : q
+  }
+  const own = hardValues(requirementText(req))
+  const missing: Array<{ value: string; relationId: string }> = []
+  for (const r of rels) for (const value of hardValues(quoteOf(r))) if (!own.has(value)) missing.push({ value, relationId: r.id })
+  // The words this requirement may rest on: its quotes, and those up its chain of requirements.
+  const allowed = new Set<string>()
+  const seen = new Set<string>([req.id]); const queue = [req.id]; let quoted = false
+  while (queue.length) {
+    const id = queue.shift()!
+    for (const r of Object.values(model.relations).filter((x) => x.relationType === 'derives' && x.sourceId === id)) {
+      const q = quoteOf(r)
+      if (q) { quoted = true; hardValues(q).forEach((v) => allowed.add(v)) }
+      if (!seen.has(r.targetId) && model.nodes[r.targetId]?.type === 'requirement') { seen.add(r.targetId); queue.push(r.targetId) }
+    }
+  }
+  if (!quoted) return { missing, unsupported: [] }
+  hardValues(prop(req, 'rationale')).forEach((v) => allowed.add(v))
+  return { missing, unsupported: [...own].filter((v) => !allowed.has(v)) }
+}
+
 export const CHECK_RULES: CheckRule[] = [
   {
     id: 'metamodel',
@@ -362,6 +467,60 @@ export const CHECK_RULES: CheckRule[] = [
     dimension: 'traceability',
     run: (model) => unlinked(model, 'need', 'derives', 'in', ['requirement'])
       .map((n) => ({ nodeId: n.id, message: `No requirement derives from need ${quote(n)}.` })),
+  },
+  {
+    id: 'derives-quote-missing',
+    description: 'A requirement\'s derives relation to a need quotes the words of the need it rests on (property quote, one verbatim fragment per line).',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: (model) => requirementToNeed(model).filter((r) => !quoteFragments((r as unknown as Props).quote).length)
+      .map((r) => ({ relationId: r.id, message: `Requirement ${quote(model.nodes[r.sourceId])} derives from need ${quote(model.nodes[r.targetId])} without quoting the words it rests on.` })),
+  },
+  {
+    id: 'derives-quote-not-in-need',
+    description: 'Every fragment a derives relation quotes is in the need\'s text, word for word (case, white space and quotation marks aside; an ellipsis joins pieces that must each be there).',
+    severity: 'error',
+    dimension: 'traceability',
+    run: (model) => requirementToNeed(model).flatMap((r) => {
+      const need = normalizeWords(model.nodes[r.targetId].description ?? '')
+      return quoteFragments((r as unknown as Props).quote).filter((pieces) => pieces.some((piece) => !need.includes(piece)))
+        .map((pieces) => ({ relationId: r.id, message: `Requirement ${quote(model.nodes[r.sourceId])} quotes "${pieces.join(' … ')}", which need ${quote(model.nodes[r.targetId])} does not say.` }))
+    }),
+  },
+  {
+    id: 'quote-value-missing',
+    description: 'Every hard value a derives relation quotes (a number, null or zero, true or false, an identifier in backticks or quotation marks) is in the requirement\'s sentence.',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => {
+      const byRelation = new Map<string, string[]>()
+      for (const g of quoteValueGaps(model, req).missing) byRelation.set(g.relationId, [...byRelation.get(g.relationId) ?? [], g.value])
+      return [...byRelation].map(([relationId, values]) => ({ relationId, message: `Requirement ${quote(req)} does not say ${values.map((v) => `"${v}"`).join(', ')}, which the words it quotes from ${quote(model.nodes[model.relations[relationId].targetId])} say.` }))
+    }),
+  },
+  {
+    id: 'requirement-value-unquoted',
+    description: 'Every hard value a requirement states that quotes its need is in those quotes (or in those of the requirements it derives from), or its rationale names it as a decision of the model.',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => {
+      const { unsupported } = quoteValueGaps(model, req)
+      return unsupported.length ? [{ nodeId: req.id, message: `Requirement ${quote(req)} says ${unsupported.map((v) => `"${v}"`).join(', ')}, which none of the words it quotes say: correct it to what the person said, or say in its rationale that ${unsupported.length === 1 ? 'it is' : 'they are'} the model's decision.` }] : []
+    }),
+  },
+  {
+    id: 'need-answer-unquoted',
+    description: 'Every answer of a person in a need (a line that starts with A:) is quoted by a requirement that derives from the need, or marked (no requirement).',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: (model) => {
+      const quotes = new Map<string, string[][]>()
+      for (const r of requirementToNeed(model)) quotes.set(r.targetId, [...quotes.get(r.targetId) ?? [], ...quoteFragments((r as unknown as Props).quote)])
+      return nodesOf(model, 'need').filter((n) => !originOf(n)).flatMap((need) => needAnswers(need.description ?? '')
+        .filter((answer) => !/\(no requirement\)/i.test(answer))
+        .filter((answer) => !(quotes.get(need.id) ?? []).some((pieces) => pieces.some((piece) => normalizeWords(answer).includes(piece))))
+        .map((answer) => ({ nodeId: need.id, message: `No requirement quotes this answer in need ${quote(need)}: "${answer.replace(/\s+/g, ' ').slice(0, 90)}${answer.length > 90 ? '…' : ''}" Quote it on a requirement's derives relation, or mark it (no requirement).` })))
+    },
   },
   {
     id: 'scenario-verifies-nothing',

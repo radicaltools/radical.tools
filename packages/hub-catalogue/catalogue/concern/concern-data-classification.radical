@@ -706,61 +706,71 @@
       "id": "req-classified--derives--need",
       "sourceId": "req-classified",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data in databases and queues, and not all of it is equally sensitive. Each store needs a level from one scheme the organisation shares, an owner who answers for it, and rules for where data of each level may go, so that the most sensitive data is not copied to a partner or a tool because nobody knew what it was. What counts as personal, special-category, health or cardholder data is a legal reading the organisation makes (its DPO or compliance officer); the pack decides how the answer is recorded and enforced. The snippets assume the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), the inventory as data-inventory.json at the repository root, naming each database and queue by its label in the model, the scripts under scripts/ run by Node 20 with js-yaml, and GitHub as the code host."
     },
     {
       "id": "req-handling--derives--need",
       "sourceId": "req-handling",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data in databases and queues, and not all of it is equally sensitive. Each store needs a level from one scheme the organisation shares, an owner who answers for it, and rules for where data of each level may go, so that the most sensitive data is not copied to a partner or a tool because nobody knew what it was. What counts as personal, special-category, health or cardholder data is a legal reading the organisation makes (its DPO or compliance officer); the pack decides how the answer is recorded and enforced. The snippets assume the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), the inventory as data-inventory.json at the repository root, naming each database and queue by its label in the model, the scripts under scripts/ run by Node 20 with js-yaml, and GitHub as the code host."
     },
     {
       "id": "req-approval--derives--need",
       "sourceId": "req-approval",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data in databases and queues, and not all of it is equally sensitive. Each store needs a level from one scheme the organisation shares, an owner who answers for it, and rules for where data of each level may go, so that the most sensitive data is not copied to a partner or a tool because nobody knew what it was. What counts as personal, special-category, health or cardholder data is a legal reading the organisation makes (its DPO or compliance officer); the pack decides how the answer is recorded and enforced. The snippets assume the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), the inventory as data-inventory.json at the repository root, naming each database and queue by its label in the model, the scripts under scripts/ run by Node 20 with js-yaml, and GitHub as the code host."
     },
     {
       "id": "req-review--derives--need",
       "sourceId": "req-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data in databases and queues, and not all of it is equally sensitive. Each store needs a level from one scheme the organisation shares, an owner who answers for it, and rules for where data of each level may go, so that the most sensitive data is not copied to a partner or a tool because nobody knew what it was. What counts as personal, special-category, health or cardholder data is a legal reading the organisation makes (its DPO or compliance officer); the pack decides how the answer is recorded and enforced. The snippets assume the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), the inventory as data-inventory.json at the repository root, naming each database and queue by its label in the model, the scripts under scripts/ run by Node 20 with js-yaml, and GitHub as the code host."
     },
     {
       "id": "req-flow-never--derives--need",
       "sourceId": "req-flow-never",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data in databases and queues, and not all of it is equally sensitive. Each store needs a level from one scheme the organisation shares, an owner who answers for it, and rules for where data of each level may go, so that the most sensitive data is not copied to a partner or a tool because nobody knew what it was. What counts as personal, special-category, health or cardholder data is a legal reading the organisation makes (its DPO or compliance officer); the pack decides how the answer is recorded and enforced. The snippets assume the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), the inventory as data-inventory.json at the repository root, naming each database and queue by its label in the model, the scripts under scripts/ run by Node 20 with js-yaml, and GitHub as the code host."
     },
     {
       "id": "req-flow-agreement--derives--need",
       "sourceId": "req-flow-agreement",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data in databases and queues, and not all of it is equally sensitive. Each store needs a level from one scheme the organisation shares, an owner who answers for it, and rules for where data of each level may go, so that the most sensitive data is not copied to a partner or a tool because nobody knew what it was. What counts as personal, special-category, health or cardholder data is a legal reading the organisation makes (its DPO or compliance officer); the pack decides how the answer is recorded and enforced. The snippets assume the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), the inventory as data-inventory.json at the repository root, naming each database and queue by its label in the model, the scripts under scripts/ run by Node 20 with js-yaml, and GitHub as the code host."
     },
     {
       "id": "req-categories--derives--need",
       "sourceId": "req-categories",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data in databases and queues, and not all of it is equally sensitive. Each store needs a level from one scheme the organisation shares, an owner who answers for it, and rules for where data of each level may go, so that the most sensitive data is not copied to a partner or a tool because nobody knew what it was. What counts as personal, special-category, health or cardholder data is a legal reading the organisation makes (its DPO or compliance officer); the pack decides how the answer is recorded and enforced. The snippets assume the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), the inventory as data-inventory.json at the repository root, naming each database and queue by its label in the model, the scripts under scripts/ run by Node 20 with js-yaml, and GitHub as the code host."
     },
     {
       "id": "req-catalogue--derives--need",
       "sourceId": "req-catalogue",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data in databases and queues, and not all of it is equally sensitive. Each store needs a level from one scheme the organisation shares, an owner who answers for it, and rules for where data of each level may go, so that the most sensitive data is not copied to a partner or a tool because nobody knew what it was. What counts as personal, special-category, health or cardholder data is a legal reading the organisation makes (its DPO or compliance officer); the pack decides how the answer is recorded and enforced. The snippets assume the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), the inventory as data-inventory.json at the repository root, naming each database and queue by its label in the model, the scripts under scripts/ run by Node 20 with js-yaml, and GitHub as the code host."
     },
     {
       "id": "req-tags--derives--need",
       "sourceId": "req-tags",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data in databases and queues, and not all of it is equally sensitive. Each store needs a level from one scheme the organisation shares, an owner who answers for it, and rules for where data of each level may go, so that the most sensitive data is not copied to a partner or a tool because nobody knew what it was. What counts as personal, special-category, health or cardholder data is a legal reading the organisation makes (its DPO or compliance officer); the pack decides how the answer is recorded and enforced. The snippets assume the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), the inventory as data-inventory.json at the repository root, naming each database and queue by its label in the model, the scripts under scripts/ run by Node 20 with js-yaml, and GitHub as the code host."
     },
     {
       "id": "req-discovery--derives--need",
       "sourceId": "req-discovery",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps data in databases and queues, and not all of it is equally sensitive. Each store needs a level from one scheme the organisation shares, an owner who answers for it, and rules for where data of each level may go, so that the most sensitive data is not copied to a partner or a tool because nobody knew what it was. What counts as personal, special-category, health or cardholder data is a legal reading the organisation makes (its DPO or compliance officer); the pack decides how the answer is recorded and enforced. The snippets assume the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), the inventory as data-inventory.json at the repository root, naming each database and queue by its label in the model, the scripts under scripts/ run by Node 20 with js-yaml, and GitHub as the code host."
     },
     {
       "id": "sc-classified--verifies--req-classified",

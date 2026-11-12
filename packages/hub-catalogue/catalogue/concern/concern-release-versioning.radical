@@ -1094,85 +1094,99 @@
       "id": "req-version-visible--derives--need",
       "sourceId": "req-version-visible",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "req-semver--derives--need",
       "sourceId": "req-semver",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "req-semver-bump--derives--need",
       "sourceId": "req-semver-bump",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "req-calver--derives--need",
       "sourceId": "req-calver",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "req-immutable--derives--need",
       "sourceId": "req-immutable",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "req-build-id--derives--need",
       "sourceId": "req-build-id",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "req-notes-commits--derives--need",
       "sourceId": "req-notes-commits",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "req-changelog-entry--derives--need",
       "sourceId": "req-changelog-entry",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "req-pr-labels--derives--need",
       "sourceId": "req-pr-labels",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "req-latest-only--derives--need",
       "sourceId": "req-latest-only",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "req-lts-policy--derives--need",
       "sourceId": "req-lts-policy",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "req-backport--derives--need",
       "sourceId": "req-backport",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "req-owner-approves--derives--need",
       "sourceId": "req-owner-approves",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "req-auto-release--derives--need",
       "sourceId": "req-auto-release",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and tools outside the team take this element's releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit."
     },
     {
       "id": "sc-version-visible--verifies--req-version-visible",

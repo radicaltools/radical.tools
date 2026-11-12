@@ -147,15 +147,16 @@ export function buildPackDoc(spec: PackSpec): HubRadicalDoc {
     rows[col] = row + 1
     nodes.push({ id, type, label, x: col * 260, y: row * 130, ...props, ...(when ? { hubWhen: when } : {}) })
   }
-  const rel = (relationType: string, sourceId: string, targetId: string): void => {
-    relations.push({ id: `${sourceId}--${relationType}--${targetId}`, sourceId, targetId, relationType })
+  const rel = (relationType: string, sourceId: string, targetId: string, props: Record<string, unknown> = {}): void => {
+    relations.push({ id: `${sourceId}--${relationType}--${targetId}`, sourceId, targetId, relationType, ...props })
   }
 
   node('need', 'need', spec.need.label, undefined, { kind: 'brief', source: `Hub concern pack: ${spec.name}`, description: spec.need.text })
   for (const r of spec.requirements) {
     const { id, label, when, scenario: _scenario, ...ears } = r
     node(id, 'requirement', label, when, ears)
-    rel('derives', id, 'need')
+    // The pack's need is one paragraph that every requirement rests on: each quotes it whole.
+    rel('derives', id, 'need', { quote: spec.need.text })
   }
   for (const r of spec.requirements) {
     const id = `sc-${r.id.replace(/^req-/, '')}`

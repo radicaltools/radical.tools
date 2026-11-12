@@ -855,85 +855,99 @@
       "id": "req-no-swallow--derives--need",
       "sourceId": "req-no-swallow",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "req-cause--derives--need",
       "sourceId": "req-cause",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "req-hierarchy--derives--need",
       "sourceId": "req-hierarchy",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "req-result--derives--need",
       "sourceId": "req-result",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "req-codes--derives--need",
       "sourceId": "req-codes",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "req-edge--derives--need",
       "sourceId": "req-edge",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "req-layered--derives--need",
       "sourceId": "req-layered",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "req-log-once--derives--need",
       "sourceId": "req-log-once",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "req-correlation--derives--need",
       "sourceId": "req-correlation",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "req-structured--derives--need",
       "sourceId": "req-structured",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "req-text--derives--need",
       "sourceId": "req-text",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "req-no-secrets--derives--need",
       "sourceId": "req-no-secrets",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "req-no-leak--derives--need",
       "sourceId": "req-no-leak",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "req-levels--derives--need",
       "sourceId": "req-levels",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When something goes wrong in the element, the person investigating must find every line about that request by one id, see the first cause rather than the last symptom, and tell a bug from an expected refusal at a glance. The caller must get an answer it can act on, with nothing in it about how the element is built. Nobody reading the logs, inside or outside the team, may learn a password, a token or a customer's personal data from them. All of this must hold in code written by many people, so a tool must hold it."
     },
     {
       "id": "sc-no-swallow--verifies--req-no-swallow",

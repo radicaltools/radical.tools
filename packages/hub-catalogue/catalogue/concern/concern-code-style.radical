@@ -794,73 +794,85 @@
       "id": "req-one-config--derives--need",
       "sourceId": "req-one-config",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is read and changed by many people over years. Its code has to look the same whoever wrote it, so that a diff shows what changed in meaning and nothing else, a reviewer spends no time on layout or taste, a name tells the reader what a thing is, and git blame leads to the change that gave a line its meaning, not to the commit that reformatted it. The snippets assume the formatter settings at the repository root (.editorconfig, .prettierrc.json or biome.json, pyproject.toml with Ruff pinned among the development dependencies, .pre-commit-config.yaml where the Python hook comes from pre-commit), CONTRIBUTING.md at the root, the team's own guide, if there is one, in docs/STYLE.md, and GitHub Actions as CI."
     },
     {
       "id": "req-same-version--derives--need",
       "sourceId": "req-same-version",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is read and changed by many people over years. Its code has to look the same whoever wrote it, so that a diff shows what changed in meaning and nothing else, a reviewer spends no time on layout or taste, a name tells the reader what a thing is, and git blame leads to the change that gave a line its meaning, not to the commit that reformatted it. The snippets assume the formatter settings at the repository root (.editorconfig, .prettierrc.json or biome.json, pyproject.toml with Ruff pinned among the development dependencies, .pre-commit-config.yaml where the Python hook comes from pre-commit), CONTRIBUTING.md at the root, the team's own guide, if there is one, in docs/STYLE.md, and GitHub Actions as CI."
     },
     {
       "id": "req-blame-ignore--derives--need",
       "sourceId": "req-blame-ignore",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is read and changed by many people over years. Its code has to look the same whoever wrote it, so that a diff shows what changed in meaning and nothing else, a reviewer spends no time on layout or taste, a name tells the reader what a thing is, and git blame leads to the change that gave a line its meaning, not to the commit that reformatted it. The snippets assume the formatter settings at the repository root (.editorconfig, .prettierrc.json or biome.json, pyproject.toml with Ruff pinned among the development dependencies, .pre-commit-config.yaml where the Python hook comes from pre-commit), CONTRIBUTING.md at the root, the team's own guide, if there is one, in docs/STYLE.md, and GitHub Actions as CI."
     },
     {
       "id": "req-editorconfig--derives--need",
       "sourceId": "req-editorconfig",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is read and changed by many people over years. Its code has to look the same whoever wrote it, so that a diff shows what changed in meaning and nothing else, a reviewer spends no time on layout or taste, a name tells the reader what a thing is, and git blame leads to the change that gave a line its meaning, not to the commit that reformatted it. The snippets assume the formatter settings at the repository root (.editorconfig, .prettierrc.json or biome.json, pyproject.toml with Ruff pinned among the development dependencies, .pre-commit-config.yaml where the Python hook comes from pre-commit), CONTRIBUTING.md at the root, the team's own guide, if there is one, in docs/STYLE.md, and GitHub Actions as CI."
     },
     {
       "id": "req-defaults--derives--need",
       "sourceId": "req-defaults",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is read and changed by many people over years. Its code has to look the same whoever wrote it, so that a diff shows what changed in meaning and nothing else, a reviewer spends no time on layout or taste, a name tells the reader what a thing is, and git blame leads to the change that gave a line its meaning, not to the commit that reformatted it. The snippets assume the formatter settings at the repository root (.editorconfig, .prettierrc.json or biome.json, pyproject.toml with Ruff pinned among the development dependencies, .pre-commit-config.yaml where the Python hook comes from pre-commit), CONTRIBUTING.md at the root, the team's own guide, if there is one, in docs/STYLE.md, and GitHub Actions as CI."
     },
     {
       "id": "req-matched--derives--need",
       "sourceId": "req-matched",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is read and changed by many people over years. Its code has to look the same whoever wrote it, so that a diff shows what changed in meaning and nothing else, a reviewer spends no time on layout or taste, a name tells the reader what a thing is, and git blame leads to the change that gave a line its meaning, not to the commit that reformatted it. The snippets assume the formatter settings at the repository root (.editorconfig, .prettierrc.json or biome.json, pyproject.toml with Ruff pinned among the development dependencies, .pre-commit-config.yaml where the Python hook comes from pre-commit), CONTRIBUTING.md at the root, the team's own guide, if there is one, in docs/STYLE.md, and GitHub Actions as CI."
     },
     {
       "id": "req-guide-published--derives--need",
       "sourceId": "req-guide-published",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is read and changed by many people over years. Its code has to look the same whoever wrote it, so that a diff shows what changed in meaning and nothing else, a reviewer spends no time on layout or taste, a name tells the reader what a thing is, and git blame leads to the change that gave a line its meaning, not to the commit that reformatted it. The snippets assume the formatter settings at the repository root (.editorconfig, .prettierrc.json or biome.json, pyproject.toml with Ruff pinned among the development dependencies, .pre-commit-config.yaml where the Python hook comes from pre-commit), CONTRIBUTING.md at the root, the team's own guide, if there is one, in docs/STYLE.md, and GitHub Actions as CI."
     },
     {
       "id": "req-guide-own--derives--need",
       "sourceId": "req-guide-own",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is read and changed by many people over years. Its code has to look the same whoever wrote it, so that a diff shows what changed in meaning and nothing else, a reviewer spends no time on layout or taste, a name tells the reader what a thing is, and git blame leads to the change that gave a line its meaning, not to the commit that reformatted it. The snippets assume the formatter settings at the repository root (.editorconfig, .prettierrc.json or biome.json, pyproject.toml with Ruff pinned among the development dependencies, .pre-commit-config.yaml where the Python hook comes from pre-commit), CONTRIBUTING.md at the root, the team's own guide, if there is one, in docs/STYLE.md, and GitHub Actions as CI."
     },
     {
       "id": "req-naming-linted--derives--need",
       "sourceId": "req-naming-linted",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is read and changed by many people over years. Its code has to look the same whoever wrote it, so that a diff shows what changed in meaning and nothing else, a reviewer spends no time on layout or taste, a name tells the reader what a thing is, and git blame leads to the change that gave a line its meaning, not to the commit that reformatted it. The snippets assume the formatter settings at the repository root (.editorconfig, .prettierrc.json or biome.json, pyproject.toml with Ruff pinned among the development dependencies, .pre-commit-config.yaml where the Python hook comes from pre-commit), CONTRIBUTING.md at the root, the team's own guide, if there is one, in docs/STYLE.md, and GitHub Actions as CI."
     },
     {
       "id": "req-naming-reviewed--derives--need",
       "sourceId": "req-naming-reviewed",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is read and changed by many people over years. Its code has to look the same whoever wrote it, so that a diff shows what changed in meaning and nothing else, a reviewer spends no time on layout or taste, a name tells the reader what a thing is, and git blame leads to the change that gave a line its meaning, not to the commit that reformatted it. The snippets assume the formatter settings at the repository root (.editorconfig, .prettierrc.json or biome.json, pyproject.toml with Ruff pinned among the development dependencies, .pre-commit-config.yaml where the Python hook comes from pre-commit), CONTRIBUTING.md at the root, the team's own guide, if there is one, in docs/STYLE.md, and GitHub Actions as CI."
     },
     {
       "id": "req-editor-shared--derives--need",
       "sourceId": "req-editor-shared",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is read and changed by many people over years. Its code has to look the same whoever wrote it, so that a diff shows what changed in meaning and nothing else, a reviewer spends no time on layout or taste, a name tells the reader what a thing is, and git blame leads to the change that gave a line its meaning, not to the commit that reformatted it. The snippets assume the formatter settings at the repository root (.editorconfig, .prettierrc.json or biome.json, pyproject.toml with Ruff pinned among the development dependencies, .pre-commit-config.yaml where the Python hook comes from pre-commit), CONTRIBUTING.md at the root, the team's own guide, if there is one, in docs/STYLE.md, and GitHub Actions as CI."
     },
     {
       "id": "req-editor-own--derives--need",
       "sourceId": "req-editor-own",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is read and changed by many people over years. Its code has to look the same whoever wrote it, so that a diff shows what changed in meaning and nothing else, a reviewer spends no time on layout or taste, a name tells the reader what a thing is, and git blame leads to the change that gave a line its meaning, not to the commit that reformatted it. The snippets assume the formatter settings at the repository root (.editorconfig, .prettierrc.json or biome.json, pyproject.toml with Ruff pinned among the development dependencies, .pre-commit-config.yaml where the Python hook comes from pre-commit), CONTRIBUTING.md at the root, the team's own guide, if there is one, in docs/STYLE.md, and GitHub Actions as CI."
     },
     {
       "id": "sc-one-config--verifies--req-one-config",

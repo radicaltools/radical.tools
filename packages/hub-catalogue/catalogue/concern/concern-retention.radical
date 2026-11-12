@@ -1069,85 +1069,99 @@
       "id": "req-schedule--derives--need",
       "sourceId": "req-schedule",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "req-tool-mapping--derives--need",
       "sourceId": "req-tool-mapping",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "req-store-config--derives--need",
       "sourceId": "req-store-config",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "req-dispose--derives--need",
       "sourceId": "req-dispose",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "req-not-early--derives--need",
       "sourceId": "req-not-early",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "req-fail-closed--derives--need",
       "sourceId": "req-fail-closed",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "req-overdue--derives--need",
       "sourceId": "req-overdue",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "req-hold--derives--need",
       "sourceId": "req-hold",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "req-hold-roles--derives--need",
       "sourceId": "req-hold-roles",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "req-hold-store--derives--need",
       "sourceId": "req-hold-store",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "req-conflict-restrict--derives--need",
       "sourceId": "req-conflict-restrict",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "req-conflict-pseudo--derives--need",
       "sourceId": "req-conflict-pseudo",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "req-shred--derives--need",
       "sourceId": "req-shred",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "req-aggregate--derives--need",
       "sourceId": "req-aggregate",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system keeps business records that law or contract requires for a set period, and must keep each one exactly that long: not deleted before its period ends or while a legal hold covers it, and disposed of in every copy once the period is over, including when the person it concerns asked to be erased in the meantime. Which law applies and which period follows from it is the organisation's legal reading, made by its compliance officer or data protection officer; the periods in this pack are examples to set, and nothing in it is legal advice. The snippets assume PostgreSQL with the schema owned by the migrator role and disposal run as the retention_job role, the deletion job in src/retention (job.ts exports runDisposal, holds.ts the legal holds) with its tests under tests/retention, the schedule and its companions under retention/ (schedule.json, labels.json, holds.json, transient-tables.txt listing the tables that hold no records), and the buckets that hold records named in RECORD_BUCKETS by the infrastructure code."
     },
     {
       "id": "sc-schedule--verifies--req-schedule",

@@ -1000,73 +1000,85 @@
       "id": "req-access-patterns--derives--need",
       "sourceId": "req-access-patterns",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code. The checks assume one repository per element with SQL migrations in db/migration, Prisma migrations in prisma/migrations, a Liquibase changelog in db/changelog.xml with its jars in db/lib, request-handling code under src/ and batch jobs under src/jobs/."
     },
     {
       "id": "req-indexed-reads--derives--need",
       "sourceId": "req-indexed-reads",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code. The checks assume one repository per element with SQL migrations in db/migration, Prisma migrations in prisma/migrations, a Liquibase changelog in db/changelog.xml with its jars in db/lib, request-handling code under src/ and batch jobs under src/jobs/."
     },
     {
       "id": "req-versioned--derives--need",
       "sourceId": "req-versioned",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code. The checks assume one repository per element with SQL migrations in db/migration, Prisma migrations in prisma/migrations, a Liquibase changelog in db/changelog.xml with its jars in db/lib, request-handling code under src/ and batch jobs under src/jobs/."
     },
     {
       "id": "req-versioned-doc--derives--need",
       "sourceId": "req-versioned-doc",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code. The checks assume one repository per element with SQL migrations in db/migration, Prisma migrations in prisma/migrations, a Liquibase changelog in db/changelog.xml with its jars in db/lib, request-handling code under src/ and batch jobs under src/jobs/."
     },
     {
       "id": "req-lazy--derives--need",
       "sourceId": "req-lazy",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code. The checks assume one repository per element with SQL migrations in db/migration, Prisma migrations in prisma/migrations, a Liquibase changelog in db/changelog.xml with its jars in db/lib, request-handling code under src/ and batch jobs under src/jobs/."
     },
     {
       "id": "req-integrity--derives--need",
       "sourceId": "req-integrity",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code. The checks assume one repository per element with SQL migrations in db/migration, Prisma migrations in prisma/migrations, a Liquibase changelog in db/changelog.xml with its jars in db/lib, request-handling code under src/ and batch jobs under src/jobs/."
     },
     {
       "id": "req-documents--derives--need",
       "sourceId": "req-documents",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code. The checks assume one repository per element with SQL migrations in db/migration, Prisma migrations in prisma/migrations, a Liquibase changelog in db/changelog.xml with its jars in db/lib, request-handling code under src/ and batch jobs under src/jobs/."
     },
     {
       "id": "req-kv-latency--derives--need",
       "sourceId": "req-kv-latency",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code. The checks assume one repository per element with SQL migrations in db/migration, Prisma migrations in prisma/migrations, a Liquibase changelog in db/changelog.xml with its jars in db/lib, request-handling code under src/ and batch jobs under src/jobs/."
     },
     {
       "id": "req-transactions--derives--need",
       "sourceId": "req-transactions",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code. The checks assume one repository per element with SQL migrations in db/migration, Prisma migrations in prisma/migrations, a Liquibase changelog in db/changelog.xml with its jars in db/lib, request-handling code under src/ and batch jobs under src/jobs/."
     },
     {
       "id": "req-staleness--derives--need",
       "sourceId": "req-staleness",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code. The checks assume one repository per element with SQL migrations in db/migration, Prisma migrations in prisma/migrations, a Liquibase changelog in db/changelog.xml with its jars in db/lib, request-handling code under src/ and batch jobs under src/jobs/."
     },
     {
       "id": "req-exit--derives--need",
       "sourceId": "req-exit",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code. The checks assume one repository per element with SQL migrations in db/migration, Prisma migrations in prisma/migrations, a Liquibase changelog in db/changelog.xml with its jars in db/lib, request-handling code under src/ and batch jobs under src/jobs/."
     },
     {
       "id": "req-engine-patch--derives--need",
       "sourceId": "req-engine-patch",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element keeps data the system depends on. It has to be kept in a store whose data model fits the way the data is read and changed, consistent where it must be, run by people who can keep it healthy, and able to change shape many times while the system stays online. The choice and its reasons must be written down, because data is far harder to move later than code. The checks assume one repository per element with SQL migrations in db/migration, Prisma migrations in prisma/migrations, a Liquibase changelog in db/changelog.xml with its jars in db/lib, request-handling code under src/ and batch jobs under src/jobs/."
     },
     {
       "id": "sc-access-patterns--verifies--req-access-patterns",

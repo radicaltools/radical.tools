@@ -1026,97 +1026,113 @@
       "id": "req-protected-main--derives--need",
       "sourceId": "req-protected-main",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-linear-history--derives--need",
       "sourceId": "req-linear-history",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-one-review--derives--need",
       "sourceId": "req-one-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-two-critical--derives--need",
       "sourceId": "req-two-critical",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-pairing--derives--need",
       "sourceId": "req-pairing",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-turnaround--derives--need",
       "sourceId": "req-turnaround",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-owner-approval--derives--need",
       "sourceId": "req-owner-approval",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-rotation--derives--need",
       "sourceId": "req-rotation",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-pr-size--derives--need",
       "sourceId": "req-pr-size",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-size-reported--derives--need",
       "sourceId": "req-size-reported",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-branch-age--derives--need",
       "sourceId": "req-branch-age",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-conventional--derives--need",
       "sourceId": "req-conventional",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-free-commits--derives--need",
       "sourceId": "req-free-commits",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-trunk--derives--need",
       "sourceId": "req-trunk",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-feature-pr--derives--need",
       "sourceId": "req-feature-pr",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "req-gitflow--derives--need",
       "sourceId": "req-gitflow",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Several people change this element every day. Each change must reach the main branch while it is still small enough to review and fresh enough to merge without conflict, must be seen by someone other than its author before it lands, must be looked at by the people accountable for the code it touches, and must leave a history that explains itself a year later. Reviews must not become the queue everything waits in."
     },
     {
       "id": "sc-protected-main--verifies--req-protected-main",

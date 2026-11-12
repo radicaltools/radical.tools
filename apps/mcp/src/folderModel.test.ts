@@ -1390,6 +1390,20 @@ describe('requirements reviewed against their needs', () => {
     expect(review.text).not.toContain('Ship paid orders')
     expect(review.text).not.toContain('## Requirement "Average cost"')
 
+    // A derives relation that quotes the need shows those words instead of the whole need.
+    await model.call('add_node', { tempId: 'zero', type: 'requirement', label: 'Worth of unknown stock', properties: { ears_type: 'ubiquitous', action: 'value stock without an average at 0' } })
+    await model.call('add_relation', { sourceId: 'zero', targetId: 'cost', relationType: 'derives', properties: { quote: 'its stock is worth 0.' } })
+    const quoted = await model.call('review_requirements', { ids: ['zero'] })
+    expect(quoted.text).toContain('### Rests on need "Cost of goods"')
+    expect(quoted.text).toContain('quoting:\nits stock is worth 0.')
+    expect(quoted.text).not.toContain('From Tomek: I need to know')
+    // What the values alone show is listed with the requirement.
+    await model.call('add_node', { tempId: 'nullv', type: 'requirement', label: 'Stock value without cost', properties: { ears_type: 'ubiquitous', action: 'show the stock value as null without an average' } })
+    await model.call('add_relation', { sourceId: 'nullv', targetId: 'cost', relationType: 'derives', properties: { quote: 'its stock is worth 0.' } })
+    const gaps = await model.call('review_requirements', { ids: ['nullv'] })
+    expect(gaps.text).toContain('Values its quotes say and it does not: "0".')
+    expect(gaps.text).toContain('Values it says and no quote says: "null".')
+
     // A need changed on the branch leads to the requirements that derive from it.
     await model.call('update_node', { id: 'other', description: 'From Kasia: send paid orders out.\n\nQ: Partly? A: Whole orders only.' })
     expect((await model.call('review_requirements', {})).text).toContain('## Requirement "Ship paid orders"')

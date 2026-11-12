@@ -992,79 +992,92 @@
       "id": "req-layers--derives--need",
       "sourceId": "req-layers",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Each deployable holds code several people change every week. Where a business rule, a query, a framework call or a mapping goes should follow from a decided structure, not from whoever wrote it first: then the rules can be tested without starting a database, a change of framework or database stays in one place, a new feature has an obvious home, and reads and writes each get the shape they need. The structure has to hold as the code grows, so the build checks it. Every rule below assumes one package layout under com.example.shop: `domain` holds the domain model (`domain.model`) and domain services (`domain.service`); `application` holds the use cases or transaction scripts and the ports (`application.port.in`, `application.port.out`); `adapter.web`, `adapter.persistence`, `adapter.messaging` and `adapter.jobs` hold the adapters, which are also the presentation and data-access layers; `features.<name>` is one vertical slice; `query` holds read models (in a slice, `features.<name>.query`). Test classes are left out of the rules."
     },
     {
       "id": "req-ports--derives--need",
       "sourceId": "req-ports",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Each deployable holds code several people change every week. Where a business rule, a query, a framework call or a mapping goes should follow from a decided structure, not from whoever wrote it first: then the rules can be tested without starting a database, a change of framework or database stays in one place, a new feature has an obvious home, and reads and writes each get the shape they need. The structure has to hold as the code grows, so the build checks it. Every rule below assumes one package layout under com.example.shop: `domain` holds the domain model (`domain.model`) and domain services (`domain.service`); `application` holds the use cases or transaction scripts and the ports (`application.port.in`, `application.port.out`); `adapter.web`, `adapter.persistence`, `adapter.messaging` and `adapter.jobs` hold the adapters, which are also the presentation and data-access layers; `features.<name>` is one vertical slice; `query` holds read models (in a slice, `features.<name>.query`). Test classes are left out of the rules."
     },
     {
       "id": "req-rings--derives--need",
       "sourceId": "req-rings",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Each deployable holds code several people change every week. Where a business rule, a query, a framework call or a mapping goes should follow from a decided structure, not from whoever wrote it first: then the rules can be tested without starting a database, a change of framework or database stays in one place, a new feature has an obvious home, and reads and writes each get the shape they need. The structure has to hold as the code grows, so the build checks it. Every rule below assumes one package layout under com.example.shop: `domain` holds the domain model (`domain.model`) and domain services (`domain.service`); `application` holds the use cases or transaction scripts and the ports (`application.port.in`, `application.port.out`); `adapter.web`, `adapter.persistence`, `adapter.messaging` and `adapter.jobs` hold the adapters, which are also the presentation and data-access layers; `features.<name>` is one vertical slice; `query` holds read models (in a slice, `features.<name>.query`). Test classes are left out of the rules."
     },
     {
       "id": "req-slices--derives--need",
       "sourceId": "req-slices",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Each deployable holds code several people change every week. Where a business rule, a query, a framework call or a mapping goes should follow from a decided structure, not from whoever wrote it first: then the rules can be tested without starting a database, a change of framework or database stays in one place, a new feature has an obvious home, and reads and writes each get the shape they need. The structure has to hold as the code grows, so the build checks it. Every rule below assumes one package layout under com.example.shop: `domain` holds the domain model (`domain.model`) and domain services (`domain.service`); `application` holds the use cases or transaction scripts and the ports (`application.port.in`, `application.port.out`); `adapter.web`, `adapter.persistence`, `adapter.messaging` and `adapter.jobs` hold the adapters, which are also the presentation and data-access layers; `features.<name>` is one vertical slice; `query` holds read models (in a slice, `features.<name>.query`). Test classes are left out of the rules."
     },
     {
       "id": "req-domain-tests--derives--need",
       "sourceId": "req-domain-tests",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Each deployable holds code several people change every week. Where a business rule, a query, a framework call or a mapping goes should follow from a decided structure, not from whoever wrote it first: then the rules can be tested without starting a database, a change of framework or database stays in one place, a new feature has an obvious home, and reads and writes each get the shape they need. The structure has to hold as the code grows, so the build checks it. Every rule below assumes one package layout under com.example.shop: `domain` holds the domain model (`domain.model`) and domain services (`domain.service`); `application` holds the use cases or transaction scripts and the ports (`application.port.in`, `application.port.out`); `adapter.web`, `adapter.persistence`, `adapter.messaging` and `adapter.jobs` hold the adapters, which are also the presentation and data-access layers; `features.<name>` is one vertical slice; `query` holds read models (in a slice, `features.<name>.query`). Test classes are left out of the rules."
     },
     {
       "id": "req-aggregates--derives--need",
       "sourceId": "req-aggregates",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Each deployable holds code several people change every week. Where a business rule, a query, a framework call or a mapping goes should follow from a decided structure, not from whoever wrote it first: then the rules can be tested without starting a database, a change of framework or database stays in one place, a new feature has an obvious home, and reads and writes each get the shape they need. The structure has to hold as the code grows, so the build checks it. Every rule below assumes one package layout under com.example.shop: `domain` holds the domain model (`domain.model`) and domain services (`domain.service`); `application` holds the use cases or transaction scripts and the ports (`application.port.in`, `application.port.out`); `adapter.web`, `adapter.persistence`, `adapter.messaging` and `adapter.jobs` hold the adapters, which are also the presentation and data-access layers; `features.<name>` is one vertical slice; `query` holds read models (in a slice, `features.<name>.query`). Test classes are left out of the rules."
     },
     {
       "id": "req-scripts--derives--need",
       "sourceId": "req-scripts",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Each deployable holds code several people change every week. Where a business rule, a query, a framework call or a mapping goes should follow from a decided structure, not from whoever wrote it first: then the rules can be tested without starting a database, a change of framework or database stays in one place, a new feature has an obvious home, and reads and writes each get the shape they need. The structure has to hold as the code grows, so the build checks it. Every rule below assumes one package layout under com.example.shop: `domain` holds the domain model (`domain.model`) and domain services (`domain.service`); `application` holds the use cases or transaction scripts and the ports (`application.port.in`, `application.port.out`); `adapter.web`, `adapter.persistence`, `adapter.messaging` and `adapter.jobs` hold the adapters, which are also the presentation and data-access layers; `features.<name>` is one vertical slice; `query` holds read models (in a slice, `features.<name>.query`). Test classes are left out of the rules."
     },
     {
       "id": "req-one-model--derives--need",
       "sourceId": "req-one-model",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Each deployable holds code several people change every week. Where a business rule, a query, a framework call or a mapping goes should follow from a decided structure, not from whoever wrote it first: then the rules can be tested without starting a database, a change of framework or database stays in one place, a new feature has an obvious home, and reads and writes each get the shape they need. The structure has to hold as the code grows, so the build checks it. Every rule below assumes one package layout under com.example.shop: `domain` holds the domain model (`domain.model`) and domain services (`domain.service`); `application` holds the use cases or transaction scripts and the ports (`application.port.in`, `application.port.out`); `adapter.web`, `adapter.persistence`, `adapter.messaging` and `adapter.jobs` hold the adapters, which are also the presentation and data-access layers; `features.<name>` is one vertical slice; `query` holds read models (in a slice, `features.<name>.query`). Test classes are left out of the rules."
     },
     {
       "id": "req-read-models--derives--need",
       "sourceId": "req-read-models",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Each deployable holds code several people change every week. Where a business rule, a query, a framework call or a mapping goes should follow from a decided structure, not from whoever wrote it first: then the rules can be tested without starting a database, a change of framework or database stays in one place, a new feature has an obvious home, and reads and writes each get the shape they need. The structure has to hold as the code grows, so the build checks it. Every rule below assumes one package layout under com.example.shop: `domain` holds the domain model (`domain.model`) and domain services (`domain.service`); `application` holds the use cases or transaction scripts and the ports (`application.port.in`, `application.port.out`); `adapter.web`, `adapter.persistence`, `adapter.messaging` and `adapter.jobs` hold the adapters, which are also the presentation and data-access layers; `features.<name>` is one vertical slice; `query` holds read models (in a slice, `features.<name>.query`). Test classes are left out of the rules."
     },
     {
       "id": "req-read-lag--derives--need",
       "sourceId": "req-read-lag",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Each deployable holds code several people change every week. Where a business rule, a query, a framework call or a mapping goes should follow from a decided structure, not from whoever wrote it first: then the rules can be tested without starting a database, a change of framework or database stays in one place, a new feature has an obvious home, and reads and writes each get the shape they need. The structure has to hold as the code grows, so the build checks it. Every rule below assumes one package layout under com.example.shop: `domain` holds the domain model (`domain.model`) and domain services (`domain.service`); `application` holds the use cases or transaction scripts and the ports (`application.port.in`, `application.port.out`); `adapter.web`, `adapter.persistence`, `adapter.messaging` and `adapter.jobs` hold the adapters, which are also the presentation and data-access layers; `features.<name>` is one vertical slice; `query` holds read models (in a slice, `features.<name>.query`). Test classes are left out of the rules."
     },
     {
       "id": "req-rebuild--derives--need",
       "sourceId": "req-rebuild",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Each deployable holds code several people change every week. Where a business rule, a query, a framework call or a mapping goes should follow from a decided structure, not from whoever wrote it first: then the rules can be tested without starting a database, a change of framework or database stays in one place, a new feature has an obvious home, and reads and writes each get the shape they need. The structure has to hold as the code grows, so the build checks it. Every rule below assumes one package layout under com.example.shop: `domain` holds the domain model (`domain.model`) and domain services (`domain.service`); `application` holds the use cases or transaction scripts and the ports (`application.port.in`, `application.port.out`); `adapter.web`, `adapter.persistence`, `adapter.messaging` and `adapter.jobs` hold the adapters, which are also the presentation and data-access layers; `features.<name>` is one vertical slice; `query` holds read models (in a slice, `features.<name>.query`). Test classes are left out of the rules."
     },
     {
       "id": "req-pure--derives--need",
       "sourceId": "req-pure",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Each deployable holds code several people change every week. Where a business rule, a query, a framework call or a mapping goes should follow from a decided structure, not from whoever wrote it first: then the rules can be tested without starting a database, a change of framework or database stays in one place, a new feature has an obvious home, and reads and writes each get the shape they need. The structure has to hold as the code grows, so the build checks it. Every rule below assumes one package layout under com.example.shop: `domain` holds the domain model (`domain.model`) and domain services (`domain.service`); `application` holds the use cases or transaction scripts and the ports (`application.port.in`, `application.port.out`); `adapter.web`, `adapter.persistence`, `adapter.messaging` and `adapter.jobs` hold the adapters, which are also the presentation and data-access layers; `features.<name>` is one vertical slice; `query` holds read models (in a slice, `features.<name>.query`). Test classes are left out of the rules."
     },
     {
       "id": "req-annotations--derives--need",
       "sourceId": "req-annotations",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Each deployable holds code several people change every week. Where a business rule, a query, a framework call or a mapping goes should follow from a decided structure, not from whoever wrote it first: then the rules can be tested without starting a database, a change of framework or database stays in one place, a new feature has an obvious home, and reads and writes each get the shape they need. The structure has to hold as the code grows, so the build checks it. Every rule below assumes one package layout under com.example.shop: `domain` holds the domain model (`domain.model`) and domain services (`domain.service`); `application` holds the use cases or transaction scripts and the ports (`application.port.in`, `application.port.out`); `adapter.web`, `adapter.persistence`, `adapter.messaging` and `adapter.jobs` hold the adapters, which are also the presentation and data-access layers; `features.<name>` is one vertical slice; `query` holds read models (in a slice, `features.<name>.query`). Test classes are left out of the rules."
     },
     {
       "id": "sc-layers--verifies--req-layers",
