@@ -3582,6 +3582,27 @@
     ] },
     { "element": "edbb650f-d97f-4fbb-ad29-9301a3009a57", "name": "Quoted values reach a scenario", "tests": [
       "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › asks a scenario for the values a requirement takes from its quote (Quoted values reach a scenario)"
+    ] },
+    { "element": "f255b52e-5d2a-4f88-b887-9b6c09a87a5f", "name": "Quotes read as words", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › reads quotes as whole words, Markdown aside, and answers in their forms (Quotes read as words)"
+    ] },
+    { "element": "0947887b-9884-49ee-8f00-3e5a85aa5d52", "name": "Values read in their forms", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › reads values in their forms (Values read in their forms)"
+    ] },
+    { "element": "e25c7fc3-822e-484b-ab53-c17c17b512af", "name": "Limits, units and order kept", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › keeps the sense of a quoted value (Limits, units and order kept)"
+    ] },
+    { "element": "7b99eb7c-88b0-4e05-bda0-aa94f51265b9", "name": "Example missing from scenarios", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › asks a scenario for the person's example (Example missing from scenarios)"
+    ] },
+    { "element": "736d4ae1-cce0-4a68-8f81-49a8716250e3", "name": "Scenario values found in its tests", "tests": [
+      "apps/cli/src/cli.test.ts › radical check › finds the values of a scenario its tests do not use (Scenario values found in its tests)"
+    ] },
+    { "element": "ae223863-1d1b-4cd4-85cb-67aa734d009a", "name": "Write tells of a lost value", "tests": [
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › tells an agent writing the model what it brings in of the person's words (Write tells of a lost value)"
+    ] },
+    { "element": "1ed4224a-2df4-44a5-b366-7488721ae125", "name": "Word rules on a large model", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › checks a model of 5,000 requirements in under 2 seconds (Word rules on a large model)"
     ] }
   ]
 }
