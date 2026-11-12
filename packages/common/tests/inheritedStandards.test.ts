@@ -51,7 +51,7 @@ describe('inherited standards', () => {
     expect(found(data, 'adr-without-fitness-fn')).toEqual([])
 
     // A waiver that is only proposed does not count.
-    data.nodes.find((n) => n.id === 'no-providers')!.status = 'proposed'
+    Object.assign(data.nodes.find((n) => n.id === 'no-providers')!, { status: 'proposed' })
     expect(found(data, 'inherited-adr-unapplied').map((f) => f[2])).toEqual([
       expect.stringContaining('"One gateway per provider kind"'),
     ])
@@ -71,7 +71,7 @@ describe('inherited standards', () => {
     expect(found(data, 'inherited-adr-unchecked')).toHaveLength(1)
 
     // The model's own fitness function with a metric condition checks it.
-    data.nodes.find((n) => n.id === 'ff')!.metrics = 'ledger.updates == 0'
+    Object.assign(data.nodes.find((n) => n.id === 'ff')!, { metrics: 'ledger.updates == 0' })
     expect(found(data, 'inherited-adr-unapplied', 'inherited-adr-unchecked')).toEqual([])
   })
 
