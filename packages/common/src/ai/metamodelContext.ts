@@ -7,7 +7,7 @@
 // get_model_summary.
 
 import type { C4Node } from '../c4'
-import type { Metamodel } from '../metamodel'
+import type { Metamodel, PropertyDef, RelationPair } from '../metamodel/types'
 import { viewpointsOf } from '../viewpoints'
 
 const FALLBACK_TYPES = [
@@ -93,4 +93,94 @@ export function buildMetamodelMessage(
     JSON.stringify({ nodeTypes: types, relationTypes: relations, ...(viewpoints.length ? { viewpoints } : {}) }),
     '```',
   ].join('\n')
+}
+
+// ─── The metamodel in brief, and a type in full ─────────────────────────────
+// What an agent's get_model_summary carries (ADR Agent answers brief, details
+// on request): each type in one line, the viewpoints by name. A type's whole
+// definition comes from metamodelDetail, for the ids the agent names.
+
+/** Enum options shown inline in the brief when they fit in this many characters. */
+const BRIEF_ENUM_CHARS = 90
+
+function briefProperty(p: PropertyDef): string {
+  if (p.type === 'enum' && p.options?.length) {
+    const options = p.options.join('|')
+    return options.length <= BRIEF_ENUM_CHARS ? `${p.key} (${options})` : `${p.key} (enum, ${p.options.length} options)`
+  }
+  if (p.type === 'ref') return `${p.key} (→ ${p.refType ?? 'node'}${p.multiple ? '[]' : ''})`
+  return p.key
+}
+
+/** The pairs of a relation type, sources with the same targets together:
+ *  "adr, fitness-fn → container, component". */
+function briefPairs(pairs: RelationPair[]): string {
+  const targets = new Map<string, string[]>()
+  for (const p of pairs) targets.set(p.from, [...targets.get(p.from) ?? [], p.to])
+  const bySet = new Map<string, string[]>()
+  for (const [from, to] of targets) {
+    const key = to.join(', ')
+    bySet.set(key, [...bySet.get(key) ?? [], from])
+  }
+  return [...bySet].map(([to, from]) => `${from.join(', ')} → ${to}`).join('; ')
+}
+
+/** Each node and relation type of `mm` in one line, and its viewpoints by
+ *  name, with the rules the lines rest on. */
+export function buildMetamodelBrief(mm: Metamodel | undefined): string {
+  if (!mm) return buildMetamodelMessage(mm)
+  const nodeLines = Object.values(mm.nodeTypes).map((t) => {
+    const parents = t.allowedParents?.length ? t.allowedParents : []
+    const atRoot = t.allowedAtRoot ?? parents.length === 0
+    const where = [parents.length ? `in ${parents.join(', ')}` : '', atRoot ? 'at the root' : ''].filter(Boolean).join(' or ')
+    const props = (t.properties ?? []).map(briefProperty)
+    const max = t.cardinality?.max !== undefined ? `; at most ${t.cardinality.max}` : ''
+    return `- ${t.id} (${t.label}): ${where || 'nowhere'}${max}${props.length ? `; properties: ${props.join(', ')}` : ''}`
+  })
+  const relationLines = Object.values(mm.relationTypes).map((r) => {
+    const props = (r.properties ?? []).map(briefProperty)
+    return `- ${r.id} (${r.label}${r.governance ? ', governance' : ''}): ${briefPairs(r.allowedPairs ?? []) || 'any pair'}${props.length ? `; properties: ${props.join(', ')}` : ''}`
+  })
+  const viewpoints = viewpointsOf(mm)
+  const groups = new Map<string, string[]>()
+  for (const v of viewpoints) groups.set(v.group ?? '', [...groups.get(v.group ?? '') ?? [], v.label])
+  return [
+    `Metamodel "${mm.name}", in brief. Use ONLY these node and relation types. A node type`,
+    'goes where its line says (in a parent of those types, or at the root); a relation only',
+    'between the pairs its line names. A `group` only gathers elements and holds what its',
+    'place allows. Between an element and one that holds it, only a governance relation may',
+    'be added. `properties` lists the keys valid in a type\'s `properties` bag, with enum',
+    'options when short and `→ type` for a reference (the id of a node of that type).',
+    'get_model_summary with `types` (node, relation or viewpoint ids or names) gives those',
+    'types in full: labels, every enum option, visibility, layout, a viewpoint\'s chain.',
+    '',
+    'Node types:',
+    ...nodeLines,
+    '',
+    'Relation types:',
+    ...relationLines,
+    ...(viewpoints.length ? ['', 'Viewpoints (create_view and update_view take one as `viewpoint`, by id or name):', ...[...groups].map(([group, labels]) => `- ${group ? `${group}: ` : ''}${labels.join(', ')}`)] : []),
+  ].join('\n')
+}
+
+/** The whole definition of the node types, relation types and viewpoints
+ *  `ids` names (by id or label), and the ids it does not know. */
+export function metamodelDetail(mm: Metamodel | undefined, ids: string[]): { text: string; unknown: string[] } {
+  const wanted = ids.map((id) => id.trim()).filter(Boolean)
+  const nodeTypes = Object.values(mm?.nodeTypes ?? {})
+  const relationTypes = Object.values(mm?.relationTypes ?? {})
+  const viewpoints = viewpointsOf(mm)
+  const matches = (t: { id: string; label: string }, id: string) => t.id === id || t.label.toLowerCase() === id.toLowerCase()
+  const unknown = wanted.filter((id) => ![...nodeTypes, ...relationTypes, ...viewpoints].some((t) => matches(t, id)))
+  const pick = <T extends { id: string; label: string }>(list: T[]) => list.filter((t) => wanted.some((id) => matches(t, id)))
+  const detail = {
+    ...(pick(nodeTypes).length ? { nodeTypes: pick(nodeTypes) } : {}),
+    ...(pick(relationTypes).length ? { relationTypes: pick(relationTypes) } : {}),
+    ...(pick(viewpoints).length ? { viewpoints: pick(viewpoints) } : {}),
+  }
+  const text = [
+    ...(Object.keys(detail).length ? ['```json', JSON.stringify(detail), '```'] : []),
+    ...(unknown.length ? [`Not in the metamodel "${mm?.name ?? 'none'}": ${unknown.join(', ')}.`] : []),
+  ].join('\n')
+  return { text, unknown }
 }

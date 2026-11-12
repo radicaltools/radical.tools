@@ -986,7 +986,9 @@ describe('state machines over MCP', () => {
       const summary = await call('get_model_summary', {})
       expect(summary).toContain('Modelling rules:')
       expect(summary).toContain('A `state-machine` models the lifecycle of one entity')
-      expect(summary).toContain('"refType":"event"')
+      // The transition's trigger points at an event node, in brief and in full.
+      expect(summary).toMatch(/- transition \(Transition\):.*event \(→ event\)/)
+      expect(await call('get_model_summary', { types: ['transition'] })).toContain('"refType":"event"')
 
       await call('add_node', { tempId: 'order', type: 'entity', label: 'Order', properties: { kind: 'aggregate-root' } })
       await call('add_node', { tempId: 'm', type: 'state-machine', label: 'Order lifecycle' })
@@ -1290,5 +1292,61 @@ describe('test bindings', () => {
     expect((await model.call('update_node', { id: 's-pay', properties: { then: 'paid and receipted' } })).ok).toBe(true)
     expect((await model.call('get_changes', { since: 'HEAD' })).text).toContain('    tests (.radical/radical.json): \n      tests/pay.test.ts › pays\n      tests/pay.test.ts › declines')
     expect((await model.call('set_verification', { id: 's-pay', remove: true })).text).toBe('Took scenario "Pays" (s-pay) out of .radical/radical.json.')
+  })
+})
+
+describe('brief answers for agents', () => {
+  it('lists requirements in brief, gives them whole with FULL, and each neighbour once (Requirements listed in brief)', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    const long = 'take the payment through the one gateway of the provider the shop is set to, record the attempt with its outcome and the provider\'s reference, and tell the customer what happened in words a person reads'
+    await model.call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    for (let i = 0; i < 40; i++) {
+      const added = await model.call('add_node', { tempId: `r${i}`, type: 'requirement', label: `Pay ${i}`, parentId: 'shop', properties: { ears_type: 'event-driven', trigger: 'the customer pays', action: long, rationale: 'A long rationale nobody needs in a list. '.repeat(10) } })
+      expect(added.ok, added.text).toBe(true)
+    }
+    await model.call('add_relation', { sourceId: 'shop', targetId: 'r0', relationType: 'satisfies' })
+    const brief = JSON.parse((await model.call('search_model', { query: 'LIST NODES WHERE type = "requirement"' })).text)
+    expect(brief.total).toBe(40)
+    const row = brief.rows[0]
+    expect(Object.keys(row).sort()).toEqual(['ears_type', 'id', 'label', 'parentId', 'text', 'type'])
+    expect(row.text.length).toBe(160)
+    expect(row.text.startsWith('When the customer pays, the system shall take the payment')).toBe(true)
+    expect(row.text.endsWith('…')).toBe(true)
+    expect(brief.note).toContain('GET NODE')
+
+    const full = JSON.parse((await model.call('search_model', { query: 'LIST NODES WHERE type = "requirement" FULL' })).text)
+    expect(full.rows[0]).toMatchObject({ action: long, ears_type: 'event-driven' })
+    expect(full.rows[0].rationale).toContain('A long rationale')
+
+    const around = JSON.parse((await model.call('search_model', { query: `GET NEIGHBORS OF ${row.id}` })).text)
+    expect(around.rows).toBeUndefined()
+    expect(around.neighbors.every((n: Record<string, unknown>) => !('rationale' in n) && typeof n.depth === 'number')).toBe(true)
+    expect(new Set(around.relations.map((r: { id: string }) => r.id)).size).toBe(around.relations.length)
+    expect(brief.rows.length * 600).toBeGreaterThan(JSON.stringify(brief).length)
+    expect(JSON.stringify(full).length).toBeGreaterThan(2.5 * JSON.stringify(brief).length)
+  })
+
+  it('gives the metamodel in brief, and named types in full (Summary names types in brief)', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    const summary = await model.call('get_model_summary', {})
+    expect(summary.ok).toBe(true)
+    expect(summary.text.length).toBeLessThan(15000)
+    const line = summary.text.split('\n').find((l) => l.startsWith('- requirement '))!
+    expect(line).toContain('ears_type (ubiquitous|event-driven|state-driven|unwanted-behaviour|optional|complex)')
+    expect(line).toContain('precondition_state (→ state)')
+    expect(summary.text).toContain('- constrains (Constrains, governance): adr, fitness-fn, requirement → person, system, domain, container, component, database, webapp, queue')
+    expect(summary.text).toContain('get_model_summary with `types`')
+
+    const detail = await model.call('get_model_summary', { types: ['requirement', 'constrains', 'unknown-type'] })
+    expect(detail.ok).toBe(true)
+    const json = JSON.parse(detail.text.slice(detail.text.indexOf('```json') + 7, detail.text.lastIndexOf('```')))
+    expect(json.nodeTypes.map((t: { id: string }) => t.id)).toEqual(['requirement'])
+    expect(json.relationTypes.map((t: { id: string }) => t.id)).toEqual(['constrains'])
+    expect(json.nodeTypes[0].properties.find((p: { key: string }) => p.key === 'trigger').visibleWhen).toBeTruthy()
+    expect(detail.text).toContain('Not in the metamodel "Radical": unknown-type.')
+    expect(detail.text).not.toContain('radicalVersion')
+    expect((await model.call('get_model_summary', { types: 'requirement' })).ok).toBe(false)
   })
 })

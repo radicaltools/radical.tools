@@ -2,6 +2,8 @@ import { isBackwardStep, type C4Node, type C4Relation, type DiagramSequence, typ
 import { viewShownNodes } from '../viewPipeline'
 import type { Metamodel } from '../metamodel/types'
 import { searchModel } from '../search'
+import { composeEarsSentence } from '../metamodel/ears'
+import { requirementStatePhrase } from '../metamodel/statechart'
 
 export const MODEL_QUERY_LANGUAGE_HELP = `Query the CURRENT diagram structure with a small built-in query language —
 use this whenever you need exact data before answering or acting, instead of
@@ -17,7 +19,7 @@ Syntax:
 - LIST VIEWS WHERE <expr> [LIMIT n]
 - LIST SEQUENCES
 - LIST TECHNOLOGIES
-- GET NODE <id>
+- GET NODE <id>  — the element whole, with its ancestors, children and relations
 - GET VIEW <id>
 - GET SEQUENCE <id>
 - GET CHILDREN OF <id>
@@ -39,6 +41,15 @@ Operators:
 Boolean logic in WHERE:
 - AND, OR, NOT
 - Parentheses are supported: ( ... )
+
+Answers to search_model are in brief: LIST NODES, LIST RELATIONS, GET
+CHILDREN OF and the traversals give each element its id, type, label,
+parent, technology, origin, its short properties (enums, numbers, yes/no:
+status, kind, order, ears_type, …) and one sentence (a requirement's EARS
+sentence, an ADR's decision, a scenario's given/when/then, else its
+description, cut to 160 characters), and each relation once. GET NODE <id>
+gives one element whole; FULL at the end of a query gives every field of
+every row ("LIST NODES WHERE type = \"adr\" FULL").
 
 Supported node fields:
 - id, type, label, description, technology, parentId, external,
@@ -66,6 +77,10 @@ Examples:
 - "FIND v: deployment"`.trim()
 
 export interface ModelQueryContext {
+  /** Lists and traversals in brief (search_model for agents): each element in
+   *  one sentence, each relation once; a trailing FULL in the query, or GET
+   *  NODE, gives everything (ADR Agent answers brief, details on request). */
+  brief?: boolean
   nodes: Record<string, C4Node>
   relations: Record<string, C4Relation>
   views?: Record<string, DiagramView>
@@ -508,8 +523,108 @@ function summarizeTraversalResults(
   }
 }
 
+/** The longest sentence a brief row carries. */
+export const BRIEF_SENTENCE_CHARS = 160
+const BRIEF_NOTE = 'In brief: GET NODE <id> gives an element whole, FULL at the end of the query every field of every row.'
+
+const cut = (text: string): string => {
+  const flat = text.replace(/\s+/g, ' ').trim()
+  return flat.length <= BRIEF_SENTENCE_CHARS ? flat : `${flat.slice(0, BRIEF_SENTENCE_CHARS - 1).trimEnd()}…`
+}
+
+/** One sentence that says what the element is: a requirement's EARS
+ *  sentence, an ADR's decision, a scenario's given, when and then, else its
+ *  description; cut to BRIEF_SENTENCE_CHARS. */
+function briefSentence(node: C4Node, ctx: ModelQueryContext): string {
+  const p = node as unknown as Record<string, unknown>
+  const str = (key: string) => (typeof p[key] === 'string' ? (p[key] as string).trim() : '')
+  if (node.type === 'requirement' && str('action')) return cut(composeEarsSentence(p, undefined, requirementStatePhrase(node, ctx.nodes, ctx.relations)).sentence)
+  if (node.type === 'adr' && str('decision')) return cut(str('decision'))
+  if (node.type === 'scenario' && (str('given') || str('when') || str('then'))) {
+    return cut([str('given') && `Given ${str('given')}`, str('when') && `when ${str('when')}`, str('then') && `then ${str('then')}`].filter(Boolean).join(', '))
+  }
+  return node.description ? cut(node.description) : ''
+}
+
+/** The node's short properties: those its type defines as an enum, a
+ *  number or a yes/no (status, kind, order, ears_type, …). */
+function shortProperties(node: C4Node, ctx: ModelQueryContext): Record<string, unknown> {
+  const p = node as unknown as Record<string, unknown>
+  const defs = ctx.metamodel?.nodeTypes[node.type]?.properties ?? []
+  const keys = defs.filter((d) => d.type === 'enum' || d.type === 'number' || d.type === 'boolean').map((d) => d.key)
+  if (!ctx.metamodel && typeof p.status === 'string') keys.push('status')
+  return Object.fromEntries(keys.filter((k) => p[k] !== undefined && p[k] !== '' && p[k] !== null).map((k) => [k, p[k]]))
+}
+
+function briefNode(node: C4Node, ctx: ModelQueryContext): Record<string, unknown> {
+  const p = node as unknown as Record<string, unknown>
+  const sentence = briefSentence(node, ctx)
+  return {
+    id: node.id,
+    type: node.type,
+    label: node.label,
+    ...(node.parentId ? { parentId: node.parentId } : {}),
+    ...(node.technology ? { technology: node.technology } : {}),
+    ...(node.external ? { external: true } : {}),
+    ...(typeof p.origin === 'string' && p.origin ? { origin: p.origin } : {}),
+    ...shortProperties(node, ctx),
+    ...(sentence ? { text: sentence } : {}),
+  }
+}
+
+function briefRelation(rel: C4Relation, nodes: Record<string, C4Node>, labels: boolean): Record<string, unknown> {
+  return {
+    id: rel.id,
+    relationType: rel.relationType ?? null,
+    sourceId: rel.sourceId,
+    ...(labels ? { sourceLabel: nodes[rel.sourceId]?.label ?? null } : {}),
+    targetId: rel.targetId,
+    ...(labels ? { targetLabel: nodes[rel.targetId]?.label ?? null } : {}),
+    ...(rel.label ? { label: rel.label } : {}),
+    // A relation's own properties are short (a guard, an event, a note): kept, long text cut.
+    ...Object.fromEntries(Object.entries(rel as unknown as Record<string, unknown>)
+      .filter(([key, value]) => !RELATION_BASE_KEYS.has(key) && value !== undefined && value !== '' && value !== null)
+      .map(([key, value]) => [key, typeof value === 'string' ? cut(value) : value])),
+  }
+}
+const RELATION_BASE_KEYS = new Set(['id', 'relationType', 'sourceId', 'targetId', 'label', 'technology', 'sourceHandle', 'targetHandle', 'waypoints', 'labelPosition'])
+
+/** The result of a list or traversal, in brief; others as they are. */
+function inBrief(result: ModelQueryResult, ctx: ModelQueryContext): ModelQueryResult {
+  const r = result.result as Record<string, unknown>
+  const node = (row: { id: string }) => briefNode(ctx.nodes[row.id] ?? (row as unknown as C4Node), ctx)
+  switch (result.command) {
+    case 'LIST NODES':
+    case 'GET CHILDREN OF':
+      return { ...result, result: { total: r.total, rows: (r.rows as Array<{ id: string }>).map(node), note: BRIEF_NOTE } }
+    case 'LIST RELATIONS':
+      return { ...result, result: { total: r.total, rows: (r.rows as Array<{ id: string }>).map((row) => briefRelation(ctx.relations[row.id] ?? (row as unknown as C4Relation), ctx.nodes, true)), note: BRIEF_NOTE } }
+    case 'GET NEIGHBORS OF':
+    case 'GET DEPENDENCIES OF':
+    case 'GET DEPENDENTS OF':
+      return {
+        ...result,
+        result: {
+          nodeId: r.nodeId,
+          total: r.total,
+          neighbors: (r.rows as Array<{ node: { id: string }; depth: number }>).map((row) => ({ ...node(row.node), depth: row.depth })),
+          relations: (r.relations as Array<{ id: string }>).map((row) => briefRelation(ctx.relations[row.id] ?? (row as unknown as C4Relation), ctx.nodes, false)),
+          note: BRIEF_NOTE,
+        },
+      }
+    default:
+      return result
+  }
+}
+
 export function runModelQuery(query: string, ctx: ModelQueryContext): ModelQueryResult {
-  const raw = query.trim()
+  const full = /\s+FULL\s*$/i.test(query.trim())
+  const raw = full ? query.trim().replace(/\s+FULL\s*$/i, '') : query.trim()
+  const result = runFullQuery(raw, ctx)
+  return ctx.brief && !full ? inBrief(result, ctx) : result
+}
+
+function runFullQuery(raw: string, ctx: ModelQueryContext): ModelQueryResult {
   const upper = raw.toUpperCase()
   const views = ctx.views ?? {}
   const relations = Object.values(ctx.relations)

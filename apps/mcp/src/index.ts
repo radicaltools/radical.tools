@@ -30,9 +30,10 @@ function parseArgs(args: string[]): { folder?: string } & OpenOptions {
 
 const INSTRUCTIONS = [
   'Reads and edits one Radical Markdown model folder (C4 architecture plus governance records such as ADRs and requirements).',
-  'Call get_model_summary first: besides counts it returns the metamodel context message the other tools refer to,',
-  'with each type\'s valid `properties` keys and enum options, allowedParents/allowedAtRoot/cardinality,',
-  'and the node-type pairs each relation type allows. Use search_model for exact model data before changing it.',
+  'Call get_model_summary first: besides counts it returns the metamodel in brief, the context message the other tools refer to:',
+  'each type with where it may go and its valid `properties` keys, and the node-type pairs each relation type allows;',
+  'get_model_summary with types gives a type in full (every enum option, visibility, layout). Use search_model for exact model data',
+  'before changing it: lists and traversals answer in brief (one sentence an element); GET NODE <id> gives an element whole, FULL at the end of a query every field.',
   'When the user refers to "the selected" element, mockup or view (or "this one") without naming it, call get_selection: it returns what is selected on Studio\'s canvas for this folder.',
   'New nodes appear only in Studio\'s All elements view until you list them in a view (create_view, set_view_nodes).',
   'move_node changes a node\'s parent. New and moved nodes get a simple placement; call smart_layout afterwards to arrange the model or one view.',
