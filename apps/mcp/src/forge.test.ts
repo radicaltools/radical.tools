@@ -885,4 +885,48 @@ describe('concern packs in a Forge run', () => {
       await client.close()
     }
   }, 60_000)
+
+  it('leaves out the stages a back end does not need, in one call, with the reason (Agent skips the stages a back end does not need)', async () => {
+    const { client, folder } = await connect()
+    try {
+      const runFile = async () => parseForgeRun(await readFile(join(folder, '.state/forge-run.json'), 'utf8'))!
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
+      await call(client, 'forge_clarify', { stage: 'requirements' })
+      await call(client, 'forge_generate', { stage: 'requirements' })
+      await call(client, 'add_node', { tempId: 'req', type: 'requirement', label: 'Reserve online', properties: { ears_type: 'ubiquitous', action: 'let shoppers reserve products' } })
+      await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'One requirement.' })
+      // Before any skip, a later stage waits for the ones before it, and says how to leave them out.
+      expect(await refused(client, 'forge_clarify', { stage: 'c4' })).toContain('leave it out with forge_skip_stage')
+
+      const reason = 'a small back end without screens'
+      const skipped = await call(client, 'forge_skip_stage', { stages: ['domain', 'fitness', 'states', 'processes', 'mockups'], reason })
+      expect(skipped).toContain(`Skipped Domain model (domain), Fitness functions (fitness), State machines (states), Processes (processes), Mockups (mockups): ${reason}`)
+      expect(skipped).toContain('Next: forge_clarify with stage "scenarios"')
+      expect(await refused(client, 'forge_clarify', { stage: 'c4' })).toContain('Gherkin scenarios (scenarios) first')
+      await call(client, 'forge_skip_stage', { stages: ['scenarios'], reason: 'scenarios come with the code' })
+      await call(client, 'forge_clarify', { stage: 'c4' })
+
+      // Only stages not begun: a done one, an unknown one, and none at all are refused.
+      expect(await refused(client, 'forge_skip_stage', { stages: ['requirements'], reason })).toContain('Requirements (requirements) is done')
+      expect(await refused(client, 'forge_skip_stage', { stages: ['screens'], reason })).toMatch(/stages/)
+      expect(await refused(client, 'forge_skip_stage', { stages: ['review'], reason: ' ' })).toContain('say why')
+
+      const status = await runFile()
+      expect(status.stages.filter((s) => s.status === 'skipped').map((s) => [s.id, s.reason])).toEqual([
+        ['domain', reason], ['fitness', reason], ['scenarios', 'scenarios come with the code'], ['states', reason], ['processes', reason], ['mockups', reason],
+      ])
+      expect(status.stages.find((s) => s.id === 'c4')!.status).toBe('clarifying')
+
+      // A skipped stage clarified after all runs.
+      await call(client, 'forge_clarify', { stage: 'domain' })
+      expect((await runFile()).stages.find((s) => s.id === 'domain')!.status).toBe('clarifying')
+
+      const finished = await call(client, 'forge_finish', {})
+      expect(finished).toContain(`- Fitness functions: skipped (${reason})`)
+      expect(finished).toContain('- Gherkin scenarios: skipped (scenarios come with the code)')
+      expect(finished).toContain('- Domain model: skipped\n')
+    } finally {
+      await client.close()
+    }
+  }, 90_000)
 })

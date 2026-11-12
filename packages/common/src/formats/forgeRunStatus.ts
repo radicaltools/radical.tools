@@ -16,7 +16,7 @@ export const FORGE_RUN_FILE = `${STATE_DIR}/forge-run.json`
  *  have gone away without the server noticing (a crash, a killed process). */
 export const FORGE_RUN_STALE_MS = 30 * 60 * 1000
 
-export type ForgeRunStageStatus = 'pending' | 'clarifying' | 'generating' | 'done'
+export type ForgeRunStageStatus = 'pending' | 'clarifying' | 'generating' | 'done' | 'skipped'
 
 export interface ForgeRunStageInfo {
   id: ForgeStageId
@@ -29,6 +29,8 @@ export interface ForgeRunStageInfo {
   refined?: number
   /** Generating: a proposed refinement waits for the user's answer. */
   asking?: boolean
+  /** Skipped: why the agent left the stage out (forge_skip_stage). */
+  reason?: string
 }
 
 export interface ForgeRunStatus {
@@ -51,7 +53,7 @@ export function serializeForgeRun(status: Omit<ForgeRunStatus, 'version' | 'upda
 }
 
 const STAGE_IDS = new Set<string>(FORGE_STAGES.map((s) => s.id))
-const STATUSES = new Set<string>(['pending', 'clarifying', 'generating', 'done'])
+const STATUSES = new Set<string>(['pending', 'clarifying', 'generating', 'done', 'skipped'])
 
 /** The run status in `text`, or null when it is not one. */
 export function parseForgeRun(text: string): ForgeRunStatus | null {
@@ -73,6 +75,7 @@ export function parseForgeRun(text: string): ForgeRunStatus | null {
       ...(added && typeof added.nodes === 'number' && typeof added.relations === 'number' ? { added: { nodes: added.nodes, relations: added.relations } } : {}),
       ...(typeof s.refined === 'number' ? { refined: s.refined } : {}),
       ...(s.asking === true ? { asking: true } : {}),
+      ...(typeof s.reason === 'string' && s.reason ? { reason: s.reason } : {}),
     })
   }
   const need = r.need as { id?: unknown; label?: unknown } | undefined

@@ -53,6 +53,11 @@ describe('folder-backed MCP model', () => {
       expect(tools.tools.map((tool) => tool.name)).toContain('add_node')
       expect(tools.tools.map((tool) => tool.name)).not.toContain('reset_diagram')
       expect(client.getInstructions()).toContain('get_model_summary')
+      // By default an agent models as it works; Forge only when the user asks (Agent told to model as it works).
+      expect(client.getInstructions()).toContain('Keep the model current as you work')
+      expect(client.getInstructions()).toContain('and the model before the code')
+      expect(client.getInstructions()).toContain('Run Radical Forge only when the user asks for it')
+      expect(client.getInstructions()).toContain('forge_skip_stage')
       const summary = JSON.stringify((await client.callTool({ name: 'get_model_summary', arguments: {} })).content)
       expect(summary).toContain('ears_type')
       expect(summary).toContain('allowedPairs')
