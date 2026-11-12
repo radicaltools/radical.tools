@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Every standard a model inherits is tested (ADR Inherited decisions bind unless waived). With a `deps.json`, `radical check` and the Inspector report, as errors, an accepted ADR of a model this one depends on that constrains none of this model's elements (`inherited-adr-unapplied`), and each element such an ADR constrains that no fitness function implementing it checks (`inherited-adr-unchecked`). A new relation, Waives (ADR → ADR), records why a standard does not apply: the waiving ADR needs no fitness function. Both rules can be lowered to warnings in `check.json`.
 - Studio shows an agent's Radical Assay run (ADR Agent Assay runs show in Studio). While an agent runs Assay over MCP with the folder Studio has open as its central model, an Assay button appears beside the Forge button: it pulses blue while the agent works and amber while proposals wait for your answer, carries the stage the run is at, and opens a read-only view of the stages from C4 to Scenarios, the repositories read, the plans written and refused, the proposals waiting and Follow on the canvas. The MCP server writes the run's status to `.state/assay-run.json` after every `assay_*` call and tells the stage from the calls: a plan is of the latest stage its contents name, and a stage the run moves past with no plan is skipped.
 
 ### Changed

@@ -38,8 +38,15 @@ describe('moving a relation end', () => {
 
   it('infers the relation type again when the old one no longer fits', () => {
     const s = state()
+    patchRelation(s, 'rule', { sourceId: 'admin' })
+    expect(s.c4Relations.rule).toMatchObject({ sourceId: 'admin', relationType: 'interacts' })
+  })
+
+  it('leaves the type out when several fit the new pair (an ADR supersedes or waives an ADR)', () => {
+    const s = state()
     patchRelation(s, 'rule', { targetId: 'adrOld' })
-    expect(s.c4Relations.rule).toMatchObject({ targetId: 'adrOld', relationType: 'supersedes' })
+    expect(s.c4Relations.rule.targetId).toBe('adrOld')
+    expect(s.c4Relations.rule.relationType).toBeUndefined()
   })
 
   it('keeps a relation type that still fits', () => {

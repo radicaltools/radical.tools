@@ -314,6 +314,21 @@ export function builtInGovernanceMetamodel(): Metamodel {
     builtin: true,
   }
 
+  // The model's own decision that a decision of a model it depends on (a
+  // group's standard, fetched by a federation) does not apply to it, and why.
+  const waives: RelationTypeDef = {
+    id: 'waives',
+    layout: { flow: 'forward' },
+    label: 'Waives',
+    description: 'This model\'s decision says why a decision of a model it depends on does not apply to it.',
+    inverseLabel: 'Waived by',
+    allowedPairs: [{ from: 'adr', to: 'adr' }],
+    properties: [],
+    color: '#f59e0b',
+    governance: true,
+    builtin: true,
+  }
+
   const implements_: RelationTypeDef = {
     id: 'implements',
     layout: { flow: 'side' },
@@ -861,6 +876,7 @@ export function builtInGovernanceMetamodel(): Metamodel {
       ...base.relationTypes,
       constrains,
       supersedes,
+      waives,
       implements: implements_,
       satisfies,
       derives,
