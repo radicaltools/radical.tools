@@ -3564,7 +3564,21 @@
       "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › asks agents for the person's words in the need and a review before the code (Agent told to keep answers and review)"
     ] },
     { "element": "cbce887f-9f98-4bd7-9a4b-9a8ad0991f20", "name": "Requirement review tests", "tests": [
-      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs"
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs",
+      "packages/common/tests/derivesQuotes.test.ts"
+    ] },
+    { "element": "1f79b192-af20-4603-9de9-d0f7721bdb7c", "name": "Quotes of a need checked", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › quotes on derives › checks each quote against its need and names the answers no requirement quotes (Quotes of a need checked)",
+      "packages/common/tests/derivesQuotes.test.ts › quotes on derives › reads fragments line by line, quotation marks and ellipses aside, and answers from A: to the next Q:"
+    ] },
+    { "element": "c0e2e020-393d-47d7-ba0b-a1d9a7678630", "name": "A pack's quotes survive the import", "tests": [
+      "packages/common/tests/hubImport.test.ts › buildConceptInsert › keeps a relation's own properties, such as a derives' quote",
+      "packages/hub-catalogue/tests/concernPacks.test.ts › concern packs › every pack imported and bound passes radical check"
+    ] },
+    { "element": "4a2b45f6-4ff2-45d4-b404-4cbe1020e331", "name": "Values of a quote checked", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › finds a value the quote says and the requirement does not, and one the requirement says that no quote says (Values of a quote checked)",
+      "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › checks no values of a quote of a whole need that holds no answer, and those of a whole need with answers",
+      "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › reads numbers in digits and words, percentages, null and identifiers"
     ] }
   ]
 }
