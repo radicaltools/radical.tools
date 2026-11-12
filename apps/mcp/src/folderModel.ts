@@ -740,7 +740,7 @@ export class FolderModel {
     const props = (n: C4Node) => n as unknown as Record<string, unknown>
     const lines = [
       `Review ${chosen.length} requirement${chosen.length === 1 ? '' : 's'} (${scope}) against the words of the needs they derive from.`,
-      'For each: confirm it says what the person said, or correct it with update_node where it adds, drops or changes a value, a number, a range, a state or who may do what. Where the need does not settle a point, ask the person, add the question and the answer to the need word for word, then correct the requirement.',
+      'For each requirement, go through every value it states (a number, null or zero, a range, a time, a state, who may do what) and find the words of its needs that say it; write each value down with the quoted words. Where the words say something else, the requirement is wrong: correct it with update_node to what the person said. Where no words say it, it is your assumption: ask the person and add the question and the answer to the need word for word, or say so in its rationale. Confirm a requirement only when every value it states has its words.',
     ]
     const without: C4Node[] = []
     const shown = new Set<string>()
