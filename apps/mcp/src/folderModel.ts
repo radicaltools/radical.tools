@@ -8,7 +8,7 @@ import { AI_MODELLING_RULES } from '@radical/common/ai/systemPrompt'
 import { MD_FOLDER_FORMAT_VERSION, MD_FOLDER_JSON_FILES, deserializeFromMdFolder, isOwnedMdFolderFile, isValidMdFolderManifest, keepMdFolderPaths, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
 import { mergeNotices } from '@radical/common/modelMerge'
-import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
+import { builtInC4Metamodel, builtInGovernanceMetamodel, composeEarsSentence, requirementStatePhrase, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { modelChangesSince } from '@radical/node-files/gitModel'
 import { readEditorStateFile, writeAssayRunFile, writeEditorStateFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
@@ -39,7 +39,7 @@ import { ASSAY_TOOL_DEFS, ASSAY_TOOLS, Assay, type AssayResult } from './assay'
  *  focus_node drive the canvas, and reset_diagram is too destructive for an
  *  external client. */
 const EXCLUDED_TOOLS = new Set(['set_active_view', 'focus_node', 'reset_diagram'])
-const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'get_changes', 'get_implementation', 'get_verification', 'search_model', 'list_milestones', 'compare_milestones'])
+const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'get_changes', 'review_requirements', 'get_implementation', 'get_verification', 'search_model', 'list_milestones', 'compare_milestones'])
 
 const SERVER_TOOL_DEFS: ToolDef[] = [
   {
@@ -77,6 +77,18 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
       type: 'object',
       properties: {
         since: { type: 'string', description: 'The git branch, tag or commit to compare with, e.g. "HEAD" for the last commit. Default: where the current branch left the default branch (the merge base with origin/main), so every model change on the branch counts.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'review_requirements',
+    description: 'Check requirements against the words of the needs they derive from (ADR Agents check requirements against the person\'s words). Lists each requirement added or changed since the model\'s version in git, and each one a need changed since then leads to, with its sentence next to the whole text of every need it derives from, directly or through other requirements; names those that derive from no need, and the needs that hold no question asked of a person. Call it after you change requirements and before you write their code; confirm each, or correct it with update_node where it adds, drops or changes a value, a number, a range, a state or who may do what, and where the need does not settle a point, ask the person and add the question and answer to the need word for word. It writes nothing.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ids: { type: 'array', items: { type: 'string' }, description: 'Review these requirements (ids or tempIds) instead of those changed on the branch.' },
+        since: { type: 'string', description: 'As in get_changes: the git branch, tag or commit to compare with. Default: where the branch left the default branch.' },
       },
       additionalProperties: false,
     },
@@ -684,6 +696,71 @@ export class FolderModel {
     return empty ? `Nothing is selected in Studio. ${JSON.stringify(result)}` : JSON.stringify(result)
   }
 
+  /** Each requirement to review next to the words of the needs it derives
+   *  from (ADR Agents check requirements against the person's words). */
+  private async reviewRequirements(input: unknown, data: DiagramData): Promise<CallOutcome> {
+    const { ids, since } = (input ?? {}) as { ids?: unknown; since?: unknown }
+    if (ids !== undefined && (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string'))) return { ok: false, text: 'review_requirements: ids must be an array of requirement ids' }
+    if (since !== undefined && typeof since !== 'string') return { ok: false, text: 'review_requirements: since must be a git branch, tag or commit' }
+    const own = ownModel(data)
+    const nodes = new Map(own.nodes.map((n) => [n.id, n]))
+    const relations = Object.fromEntries(own.relations.map((r) => [r.id, r]))
+    const derivesFrom = (id: string) => own.relations.filter((r) => r.relationType === 'derives' && r.sourceId === id).map((r) => nodes.get(r.targetId)).filter((n): n is C4Node => !!n)
+    // The needs a requirement derives from, directly or through other requirements.
+    const needsOf = (id: string): C4Node[] => {
+      const seen = new Set<string>([id]); const needs: C4Node[] = []; const queue = [id]
+      while (queue.length) {
+        for (const next of derivesFrom(queue.shift()!)) {
+          if (seen.has(next.id)) continue
+          seen.add(next.id)
+          if (next.type === 'need') needs.push(next)
+          else if (next.type === 'requirement') queue.push(next.id)
+        }
+      }
+      return needs
+    }
+    let chosen: C4Node[]
+    let scope: string
+    if (ids) {
+      const wanted = (ids as string[]).map((id) => this.tempIds.get(id) ?? id)
+      const unknown = wanted.filter((id) => nodes.get(id)?.type !== 'requirement')
+      if (unknown.length) return { ok: false, text: `review_requirements: not requirements of this model: ${unknown.join(', ')}` }
+      chosen = wanted.map((id) => nodes.get(id)!)
+      scope = 'the requirements named'
+    } else {
+      let changes
+      try { changes = await modelChangesSince(this.folder, own, since as string | undefined) } catch (err) {
+        return { ok: false, text: `review_requirements: ${(err as Error).message}; name the requirements with ids instead` }
+      }
+      const changed = new Set([...changes.report.elements.added, ...changes.report.elements.changed].map((c) => c.id))
+      chosen = own.nodes.filter((n) => n.type === 'requirement' && (changed.has(n.id) || needsOf(n.id).some((need) => changed.has(need.id))))
+      scope = `the requirements added or changed since ${changes.base.described}, and those a need changed since then leads to`
+    }
+    if (!chosen.length) return { ok: true, text: `Nothing to review: no requirement among ${scope}.` }
+    const props = (n: C4Node) => n as unknown as Record<string, unknown>
+    const lines = [
+      `Review ${chosen.length} requirement${chosen.length === 1 ? '' : 's'} (${scope}) against the words of the needs they derive from.`,
+      'For each: confirm it says what the person said, or correct it with update_node where it adds, drops or changes a value, a number, a range, a state or who may do what. Where the need does not settle a point, ask the person, add the question and the answer to the need word for word, then correct the requirement.',
+    ]
+    const without: C4Node[] = []
+    const shown = new Set<string>()
+    for (const req of chosen.sort((a, b) => a.label.localeCompare(b.label))) {
+      const needs = needsOf(req.id)
+      if (!needs.length) without.push(req)
+      const sentence = composeEarsSentence(props(req), undefined, requirementStatePhrase(req, Object.fromEntries(nodes), relations)).sentence
+      lines.push('', `## Requirement "${req.label}" (${req.id})`, sentence || '(no sentence: it misses its action)')
+      if (typeof props(req).rationale === 'string' && props(req).rationale) lines.push(`Rationale: ${props(req).rationale}`)
+      for (const need of needs) {
+        if (shown.has(need.id)) { lines.push(`Derives from need "${need.label}" (${need.id}), shown above.`); continue }
+        shown.add(need.id)
+        const text = (need.description ?? '').trim()
+        lines.push(`### Need "${need.label}" (${need.id})${text.includes('?') ? '' : ' — holds no question asked of a person: if you asked anything about it, add the questions and answers word for word'}`, text || '(empty)')
+      }
+    }
+    if (without.length) lines.push('', `Derive from no need: ${without.map((r) => `"${r.label}" (${r.id})`).join(', ')}. Derive each from the need that holds the person's words, or say why it has none.`)
+    return { ok: true, text: lines.join('\n') }
+  }
+
   private async dispatch(
     name: string, input: unknown, session: MdFolderSession, before: FolderFiles,
     data: DiagramData, facade: ReturnType<typeof createModelFacade>,
@@ -748,6 +825,7 @@ export class FolderModel {
       if (name === 'get_selection') return { ok: true, text: await this.selection(facade) }
       if (name === 'get_implementation' || name === 'set_implementation') return await this.implementation(name, input, data)
       if (name === 'get_verification' || name === 'set_verification') return await this.verification(name, input, data)
+      if (name === 'review_requirements') return await this.reviewRequirements(input, data)
       if (name === 'get_changes') {
         const { since } = (input ?? {}) as { since?: unknown }
         if (since !== undefined && typeof since !== 'string') return { ok: false, text: 'get_changes: since must be a git branch, tag or commit' }
