@@ -48,6 +48,30 @@ async function run(cwd: string, ...args: string[]): Promise<{ code: number; out:
 }
 
 describe('radical check', () => {
+  it('finds the values of a scenario its tests do not use (Scenario values found in its tests)', async () => {
+    const cwd = await workspace({
+      nodes: [
+        node('need', 'need', 'Brief', { description: 'Shoppers pay by card.' }),
+        node('req', 'requirement', 'Floor', { action: 'keep the price above its cost' }),
+        node('sc', 'scenario', 'Sale stops at the floor', { given: 'a mug at 1230 cents, 23 % VAT, 3 lines, on 2026-03-14', when: 'a sale of 70 % runs', then: 'the mug pays 984' }),
+      ],
+      relations: [
+        { id: 'r1', relationType: 'derives', sourceId: 'req', targetId: 'need' },
+        { id: 'v1', relationType: 'verifies', sourceId: 'sc', targetId: 'req' },
+      ],
+    })
+    await mkdir(join(cwd, '.radical'), { recursive: true })
+    await mkdir(join(cwd, 'test'), { recursive: true })
+    await writeFile(join(cwd, 'test', 'sale.test.ts'), "const MUG = { price: 1_230, vat: 23 }\nit('stops at the floor', () => { expect(pay(MUG, 70)).toBeGreaterThanOrEqual(800) })\n")
+    await writeFile(join(cwd, '.radical', 'radical.json'), JSON.stringify({ verifies: [{ element: 'sc', tests: ['test/sale.test.ts › stops at the floor'] }] }))
+    const { out } = await run(cwd, 'check', 'model', '--verbose')
+    expect(out).toContain('Scenario "Sale stops at the floor" names "984", which the file of the test bound to it does not use')
+    expect(out).not.toMatch(/names "984", "|"3"|2026-03-14/)
+    // Without the file the rule says nothing.
+    await rm(join(cwd, 'test'), { recursive: true })
+    expect((await run(cwd, 'check', 'model', '--verbose')).out).not.toContain('scenario-value-untested')
+  })
+
   it('exits 0 with warnings only, and says what it found', async () => {
     const cwd = await workspace()
     const { code, out } = await run(cwd, 'check', 'model')

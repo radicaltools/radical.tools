@@ -11,12 +11,15 @@ import type { C4Node, C4Relation } from '../c4'
 import { originOf } from '../model'
 import { builtIn } from '../repositoryMapping'
 import { composeEarsSentence, requirementStatePhrase, validateModel, type Metamodel } from '../metamodel'
-import { conditionResults, conditionsOf, elementConditions, linkedNodes, measuredElements, testIdsOf, testOutcomes, TESTED_TYPES, type ConditionOutcome, type ConditionResult, type TestOutcome } from './evidence'
+import { BOUND_TESTS, conditionResults, conditionsOf, elementConditions, linkedNodes, measuredElements, testIdsOf, testOutcomes, TESTED_TYPES, type ConditionOutcome, type ConditionResult, type TestOutcome } from './evidence'
 import { formatAge, parseCombine, parseConditions, parseMaxAge, type Measurement } from './metrics'
 import { SENSOR_NAMES, isSensorName, parseMeasure } from './sensors'
 import { findTests, globMatch, type TestCase } from './reports'
 import type { CheckDimension } from './goals'
 import { concernStatuses, holdsConcerns, questionLine, unboundDecisions, type ConcernPack } from '../concerns'
+import { REFUSAL, exampleSentences, fragmentWords, needAnswers, needParts, oppositeOrder, plainWords, quoteFound, quoteFragments, readLimits, readOrders, readRoundings, readValues, saysValueOf, wordsAt, type Limit, type Op, type ValueReading } from './words'
+
+export { hardValues, needAnswers, needParts, quoteFragments, readValues } from './words'
 
 export type CheckSeverity = 'error' | 'warning'
 
@@ -82,6 +85,9 @@ export interface CheckModel {
   /** The Hub's concern packs, for concern-unaddressed; without them it
    *  finds nothing. */
   concerns?: ConcernPack[]
+  /** By test id as .radical/radical.json binds it, the text of the test's
+   *  file, for scenario-value-untested; not given, the rule does not run. */
+  testSources?: Record<string, string>
   /** The event the check runs on (pull-request in the gate): a metric
    *  condition of a fitness function that runs on another one, or
    *  continually, is not reported when nothing measured it. */
@@ -311,112 +317,196 @@ function invalidChecks(model: CheckModel): RuleFinding[] {
 
 
 // ─── Quotes on derives: a requirement and the words of its need ────────────
-// (ADR Agents check requirements against the person's words)
+// (ADR Agents check requirements against the person's words; the reading of
+// the words is in words.ts)
 
-const normalizeWords = (text: string): string => text.toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/\s+/g, ' ').trim()
+type RelationIndex = { from: Map<string, C4Relation[]>; to: Map<string, C4Relation[]> }
+const RELATION_INDEX = new WeakMap<object, Map<string, RelationIndex>>()
 
-/** The fragments a derives relation quotes: one per line, without the
- *  quotation marks around it; an ellipsis inside joins pieces that must each
- *  be in the need. */
-export function quoteFragments(quote: unknown): string[][] {
-  if (typeof quote !== 'string') return []
-  return quote.split('\n').map((line) => line.trim().replace(/^["'\u201c\u2018>]+|["'\u201d\u2019]+$/g, '').trim()).filter(Boolean)
-    .map((line) => line.split(/\u2026|\.\.\./).map((piece) => normalizeWords(piece)).filter(Boolean))
-    .filter((pieces) => pieces.length)
+/** The relations of one type by their source and by their target, built once
+ *  for a model's relations (rules that walk them per element stay linear). */
+export function relationsOf(model: Pick<CheckModel, 'relations'>, type: string): RelationIndex {
+  let byType = RELATION_INDEX.get(model.relations)
+  if (!byType) { byType = new Map(); RELATION_INDEX.set(model.relations, byType) }
+  let index = byType.get(type)
+  if (!index) {
+    index = { from: new Map(), to: new Map() }
+    for (const r of Object.values(model.relations)) {
+      if (r.relationType !== type) continue
+      const from = index.from.get(r.sourceId); if (from) from.push(r); else index.from.set(r.sourceId, [r])
+      const to = index.to.get(r.targetId); if (to) to.push(r); else index.to.set(r.targetId, [r])
+    }
+    byType.set(type, index)
+  }
+  return index
+}
+
+const READINGS = new Map<string, ValueReading>()
+/** A text's values, read once. */
+export function reading(text: string): ValueReading {
+  let found = READINGS.get(text)
+  if (!found) {
+    if (READINGS.size > 20000) READINGS.clear()
+    found = readValues(text); READINGS.set(text, found)
+  }
+  return found
+}
+
+const relationQuote = (r: C4Relation): string => {
+  const q = (r as unknown as Props).quote
+  return typeof q === 'string' ? q : ''
 }
 
 /** The derives relations from a requirement to a need of this model. */
 const requirementToNeed = (model: CheckModel): C4Relation[] => Object.values(model.relations).filter((r) => r.relationType === 'derives'
   && model.nodes[r.sourceId]?.type === 'requirement' && model.nodes[r.targetId]?.type === 'need' && !originOf(model.nodes[r.targetId]))
 
-/** The answers of a person in a need's text: from a line that starts with
- *  "A:" to the next "Q:" or "A:" line. */
-export function needAnswers(text: string): string[] {
-  const answers: string[] = []
-  let current: string[] | null = null
-  for (const line of text.split('\n')) {
-    if (/^\s*(?:\*\*)?A(?:\*\*)?\s*:/.test(line)) { if (current) answers.push(current.join('\n')); current = [line.replace(/^\s*(?:\*\*)?A(?:\*\*)?\s*:(?:\*\*)?\s*/, '')] }
-    else if (/^\s*(?:\*\*)?Q(?:\*\*)?\s*:/.test(line)) { if (current) answers.push(current.join('\n')); current = null }
-    else if (current) current.push(line)
-  }
-  if (current) answers.push(current.join('\n'))
-  return answers.map((a) => a.trim()).filter(Boolean)
-}
-
-
-// ─── Hard values: what a quote and its requirement must agree on ────────────
-// Numbers, null, true and false, and identifiers in backticks or quotation
-// marks: what cannot be paraphrased without changing the meaning.
-
-const NUMBER_WORDS: Record<string, string> = {
-  zero: '0', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10',
-  eleven: '11', twelve: '12', fifteen: '15', twenty: '20', thirty: '30', forty: '40', fifty: '50', sixty: '60', ninety: '90', hundred: '100', thousand: '1000',
-}
-// Not "none": in prose it is a pronoun ("null when none"), as "one" is.
-const LITERALS = new Set(['null', 'true', 'false'])
-
-/** The hard values of a text, normalised: numbers (written in digits or as a
- *  word, with a percent sign kept), null, true and false, and short
- *  identifiers in backticks or quotation marks. */
-export function hardValues(text: string): Set<string> {
-  const values = new Set<string>()
-  const t = text.replace(/[“”]/g, '"')
-  for (const m of t.matchAll(/`([^`\n]{1,40})`|"([^"\n]{1,40})"/g)) {
-    const id = (m[1] ?? m[2]).trim().toLowerCase()
-    // A name or a code, not a path, a template or punctuation.
-    if (/^[a-z0-9][a-z0-9_-]*$/.test(id)) values.add(id)
-  }
-  for (const m of t.matchAll(/(?<![\w.])(\d{1,3}(?:,\d{3})+|\d+(?:[.,]\d+)?)(\s?%)?(?![\w])/g)) {
-    let n = /^\d{1,3}(,\d{3})+$/.test(m[1]) ? m[1].replace(/,/g, '') : m[1].replace(',', '.')
-    if (/^\d+\.\d+$/.test(n)) n = n.replace(/0+$/, '').replace(/\.$/, '')
-    values.add(m[2] ? `${n}%` : n)
-  }
-  for (const m of t.toLowerCase().matchAll(/\b([a-z]+)\b/g)) {
-    if (Object.prototype.hasOwnProperty.call(NUMBER_WORDS, m[1])) values.add(NUMBER_WORDS[m[1]])
-    else if (LITERALS.has(m[1])) values.add(m[1])
-  }
-  return values
-}
-
 /** What a requirement says, field by field as its EARS sentence reads them. */
-const requirementText = (n: C4Node): string => ['trigger', 'precondition', 'unwanted_condition', 'feature', 'action'].map((k) => prop(n, k)).join(' \n ')
+const CONDITION_FIELDS = ['trigger', 'precondition', 'unwanted_condition']
+const RESPONSE_FIELDS = ['feature', 'action']
+const requirementText = (n: C4Node): string => [...CONDITION_FIELDS, ...RESPONSE_FIELDS].map((k) => prop(n, k)).join(' \n ')
+const scenarioText = (n: C4Node): string => ['given', 'when', 'then', 'gherkin'].map((k) => prop(n, k)).join(' \n ')
+
+/** The words a derives relation quotes, as the value rules read them: only a
+ *  need holds a person's words, and a quote of a need's whole text that holds
+ *  no answer of a person (a brief, a concern pack's paragraph) points at
+ *  nothing in particular. On a need with answers the whole text is still
+ *  checked. */
+function quoteOf(model: Pick<CheckModel, 'nodes'>, r: C4Relation): string {
+  const q = relationQuote(r)
+  const need = model.nodes[r.targetId]
+  if (!q || need?.type !== 'need') return ''
+  const text = need.description ?? ''
+  return plainWords(q) === plainWords(text) && !needAnswers(text).length ? '' : q
+}
+
+const GAPS = new WeakMap<object, WeakMap<object, Map<string, ReturnType<typeof computeGaps>>>>()
 
 /** For a requirement: the values its quotes hold that it does not say, by
- *  the derives relation that quotes them; and the values it says that none
- *  of its quotes, those of the requirements it derives from, or its
- *  rationale hold. Empty when nothing of it is quoted. */
+ *  the derives relation that quotes them; the values it says that none of
+ *  its quotes, those of the requirements it derives from, or its rationale
+ *  hold; and the values it takes from its quotes. Empty when nothing of it
+ *  is quoted. A value counts as said in another form too: 20 percent as
+ *  20%, 15 minutes as 900 seconds, 12.30 € as 1230 cents, "one" as 1. */
 export function quoteValueGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, req: C4Node): { missing: Array<{ value: string; relationId: string }>; unsupported: string[]; carried: string[] } {
-  const rels = Object.values(model.relations).filter((r) => r.relationType === 'derives' && r.sourceId === req.id)
-  // A quote of a whole need that holds no answer of a person (a brief, a
-  // concern pack's paragraph) points at nothing in particular: its values
-  // are not checked. On a need with answers the whole text is still checked.
-  const quoteOf = (r: C4Relation): string => {
-    const q = typeof (r as unknown as Props).quote === 'string' ? ((r as unknown as Props).quote as string) : ''
-    const need = model.nodes[r.targetId]
-    if (!q || need?.type !== 'need') return q
-    const text = need.description ?? ''
-    return normalizeWords(q) === normalizeWords(text) && !needAnswers(text).length ? '' : q
-  }
-  const own = hardValues(requirementText(req))
+  let byRelations = GAPS.get(model.nodes)
+  if (!byRelations) { byRelations = new WeakMap(); GAPS.set(model.nodes, byRelations) }
+  let byReq = byRelations.get(model.relations)
+  if (!byReq) { byReq = new Map(); byRelations.set(model.relations, byReq) }
+  let gaps = byReq.get(req.id)
+  if (!gaps) { gaps = computeGaps(model, req); byReq.set(req.id, gaps) }
+  return gaps
+}
+
+function computeGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, req: C4Node): { missing: Array<{ value: string; relationId: string }>; unsupported: string[]; carried: string[] } {
+  const derives = relationsOf(model, 'derives')
+  const own = reading(requirementText(req))
   const missing: Array<{ value: string; relationId: string }> = []
   // The values the person said that the requirement says too: what its scenarios must name.
   const carried = new Set<string>()
-  for (const r of rels) for (const value of hardValues(quoteOf(r))) { if (own.has(value)) carried.add(value); else missing.push({ value, relationId: r.id }) }
+  for (const r of derives.from.get(req.id) ?? []) {
+    const q = reading(quoteOf(model, r))
+    for (const value of q.values) { if (saysValueOf(q, value, own)) carried.add(value); else missing.push({ value, relationId: r.id }) }
+  }
   // The words this requirement may rest on: its quotes, and those up its chain of requirements.
-  const allowed = new Set<string>()
-  const seen = new Set<string>([req.id]); const queue = [req.id]; let quoted = false
+  const allowed: ValueReading[] = []
+  const seen = new Set<string>([req.id]); const queue = [req.id]
   while (queue.length) {
     const id = queue.shift()!
-    for (const r of Object.values(model.relations).filter((x) => x.relationType === 'derives' && x.sourceId === id)) {
-      const q = quoteOf(r)
-      if (q) { quoted = true; hardValues(q).forEach((v) => allowed.add(v)) }
+    for (const r of derives.from.get(id) ?? []) {
+      const q = quoteOf(model, r)
+      if (q) allowed.push(reading(q))
       if (!seen.has(r.targetId) && model.nodes[r.targetId]?.type === 'requirement') { seen.add(r.targetId); queue.push(r.targetId) }
     }
   }
-  if (!quoted) return { missing, unsupported: [], carried: [...carried] }
-  hardValues(prop(req, 'rationale')).forEach((v) => allowed.add(v))
-  return { missing, unsupported: [...own].filter((v) => !allowed.has(v)), carried: [...carried] }
+  if (!allowed.length) return { missing, unsupported: [], carried: [...carried] }
+  allowed.push(reading(prop(req, 'rationale')))
+  return { missing, unsupported: [...own.values].filter((v) => !allowed.some((a) => saysValueOf(own, v, a))), carried: [...carried] }
 }
+
+const OP_TEXT: Record<Op, string> = { '<=': 'up to and with', '<': 'below', '>=': 'from and with', '>': 'above' }
+const allows = (l: { value: string; op: Op }): string => `${OP_TEXT[l.op]} ${l.value}`
+
+/** The limits a requirement puts on numbers, each as the side it allows: a
+ *  limit in its condition (trigger, precondition, unwanted condition) of a
+ *  requirement that refuses is the refused side. */
+function requirementLimits(req: C4Node): Limit[] {
+  const response = RESPONSE_FIELDS.map((k) => prop(req, k)).join(' \n ')
+  const refuses = REFUSAL.test(plainWords(response))
+  return [
+    ...CONDITION_FIELDS.flatMap((k) => readLimits(prop(req, k), refuses)),
+    ...readLimits(response),
+  ]
+}
+
+/** Where a requirement gives a value it quotes another sense: a limit on the
+ *  other side of the number, another unit, the opposite order, another
+ *  rounding. */
+export function quoteSenseGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, req: C4Node): Array<{ relationId: string; message: string }> {
+  const out: Array<{ relationId: string; message: string }> = []
+  const text = requirementText(req)
+  const limits = requirementLimits(req)
+  const own = reading(text)
+  const orders = readOrders(text)
+  const roundings = readRoundings(text)
+  for (const r of relationsOf(model, 'derives').from.get(req.id) ?? []) {
+    const q = quoteOf(model, r)
+    if (!q) continue
+    const need = quoteLabel(model.nodes[r.targetId])
+    for (const l of readLimits(q)) {
+      const same = limits.filter((m) => m.value === l.value)
+      if (same.length && !same.some((m) => m.op === l.op)) {
+        out.push({ relationId: r.id, message: `Requirement ${quoteLabel(req)} allows ${same.map(allows).join(' and ')} ("${same[0].text}") where the words it quotes from ${need} allow ${allows(l)} ("${l.text}"): check on which side of ${l.value} the limit is.` })
+      }
+    }
+    for (const qty of reading(q).quantities) {
+      if (own.quantities.some((m) => m.dimension === qty.dimension && m.base === qty.base)) continue
+      const other = own.quantities.find((m) => m.dimension === qty.dimension && m.value === qty.value)
+      if (other) out.push({ relationId: r.id, message: `Requirement ${quoteLabel(req)} says "${other.text}" where the words it quotes from ${need} say "${qty.text}".` })
+    }
+    for (const o of readOrders(q)) {
+      if (!orders.has(o) && orders.has(oppositeOrder(o))) out.push({ relationId: r.id, message: `Requirement ${quoteLabel(req)} lists ${oppositeOrder(o).replace('-', ' ')} where the words it quotes from ${need} say ${o.replace('-', ' ')}.` })
+    }
+    const said = readRoundings(q)
+    if (said.size && roundings.size && ![...said].some((x) => roundings.has(x))) {
+      out.push({ relationId: r.id, message: `Requirement ${quoteLabel(req)} rounds ${[...roundings].join(', ')} where the words it quotes from ${need} say ${[...said].join(', ')}.` })
+    }
+  }
+  return out
+}
+
+const quoteLabel = (n: C4Node): string => `"${n.label}"`
+
+/** The requirements a need leads to: those that derive from it, and those
+ *  that derive from them. */
+function requirementsOfNeed(model: CheckModel, needId: string): C4Node[] {
+  const derives = relationsOf(model, 'derives')
+  const found = new Map<string, C4Node>(); const queue = [needId]
+  while (queue.length) {
+    for (const r of derives.to.get(queue.shift()!) ?? []) {
+      const n = model.nodes[r.sourceId]
+      if (n?.type === 'requirement' && !found.has(n.id)) { found.set(n.id, n); queue.push(n.id) }
+    }
+  }
+  return [...found.values()]
+}
+
+/** The scenarios that verify a requirement. */
+const scenariosOf = (model: CheckModel, reqId: string): C4Node[] => (relationsOf(model, 'verifies').to.get(reqId) ?? [])
+  .map((r) => model.nodes[r.sourceId]).filter((n): n is C4Node => n?.type === 'scenario')
+
+/** A test source's values, read leniently: numbers inside identifiers and
+ *  strings ("14T18:00", 1_000, K/2026/0001) and toBeNull's null count. */
+/** A value that tells a case apart: not a small count (2 rows, 3 steps),
+ *  which a test writes in many ways, nor a date or a time of day, which a
+ *  scenario gives as an illustration a test may choose otherwise. */
+const telling = (v: string): boolean => !/^\d$/.test(v) && !(/^[a-z]+$/.test(v) && v.length < 3) && !/^\d{4}-\d{2}-\d{2}$|^\d{2}:\d{2}$/.test(v)
+
+const sourceReading = (text: string): ValueReading => reading(text
+  .replace(/(\d)_(?=\d)/g, '$1')
+  .replace(/\b(?:toBe|is|assert)(Null|True|False)\b/g, ' $1 ')
+  .replace(/(\d)([a-z])/gi, '$1 $2')
+  .replace(/([a-z/])(\d)/gi, '$1 $2'))
 
 export const CHECK_RULES: CheckRule[] = [
   {
@@ -481,23 +571,30 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'warning',
     off: true,
     dimension: 'traceability',
-    run: (model) => requirementToNeed(model).filter((r) => !quoteFragments((r as unknown as Props).quote).length)
+    run: (model) => requirementToNeed(model).filter((r) => !quoteFragments(relationQuote(r)).length)
       .map((r) => ({ nodeId: r.sourceId, message: `Requirement ${quote(model.nodes[r.sourceId])} derives from need ${quote(model.nodes[r.targetId])} without quoting the words it rests on.` })),
   },
   {
     id: 'derives-quote-not-in-need',
-    description: 'Every fragment a derives relation quotes is in the need\'s text, word for word (case, white space and quotation marks aside; an ellipsis joins pieces that must each be there).',
+    description: 'Every fragment a derives relation quotes is in the need\'s text, as whole words (case, white space, Markdown marks, dashes and quotation marks aside; an ellipsis joins pieces that must be there in that order, within one question, answer or the text before the questions), and holds at least two words; only a relation to a need quotes.',
     severity: 'error',
     dimension: 'traceability',
-    run: (model) => requirementToNeed(model).flatMap((r) => {
-      const need = normalizeWords(model.nodes[r.targetId].description ?? '')
-      return quoteFragments((r as unknown as Props).quote).filter((pieces) => pieces.some((piece) => !need.includes(piece)))
-        .map((pieces) => ({ relationId: r.id, message: `Requirement ${quote(model.nodes[r.sourceId])} quotes "${pieces.join(' … ')}", which need ${quote(model.nodes[r.targetId])} does not say.` }))
+    run: (model) => Object.values(model.relations).filter((r) => r.relationType === 'derives' && relationQuote(r).trim()
+      && model.nodes[r.sourceId]?.type === 'requirement' && !originOf(model.nodes[r.sourceId])).flatMap((r) => {
+      const req = model.nodes[r.sourceId]; const target = model.nodes[r.targetId]
+      if (!target) return []
+      if (target.type !== 'need') return [{ relationId: r.id, message: `Requirement ${quote(req)} quotes words on its relation to ${target.type} ${quote(target)}: only a need holds a person's words. Quote them on the requirement's relation to the need.` }]
+      if (originOf(target)) return []
+      const text = target.description ?? ''
+      return quoteFragments(relationQuote(r)).flatMap((pieces) => fragmentWords(pieces) < 2
+        ? [{ relationId: r.id, message: `Requirement ${quote(req)} quotes "${pieces.join(' … ')}", too short to say which words of need ${quote(target)} it rests on: quote the words around it.` }]
+        : quoteFound(text, pieces) ? []
+        : [{ relationId: r.id, message: `Requirement ${quote(req)} quotes "${pieces.join(' … ')}", which need ${quote(target)} does not say${pieces.length > 1 ? ' in that order within one answer' : ''}.` }])
     }),
   },
   {
     id: 'quote-value-missing',
-    description: 'Every hard value a derives relation quotes (a number, null, true or false, an identifier in backticks or quotation marks) is in the requirement\'s sentence.',
+    description: 'Every hard value a derives relation quotes (a number, null, true or false, a date or time, an identifier in backticks or quotation marks) is in the requirement\'s sentence, in that form or another (20 percent as 20%, 15 minutes as 900 seconds, 12.30 € as 1230 cents).',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => {
@@ -507,8 +604,15 @@ export const CHECK_RULES: CheckRule[] = [
     }),
   },
   {
+    id: 'quote-value-differs',
+    description: 'A requirement keeps the sense the words it quotes give a value: the same side of a limit (at most, more than, from … to; a refusal speaks of the other side), the same unit, the same order of a list, the same rounding.',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => quoteSenseGaps(model, req)),
+  },
+  {
     id: 'requirement-value-unquoted',
-    description: 'Every hard value a requirement states that quotes its need is in those quotes (or in those of the requirements it derives from), or its rationale names it as a decision of the model.',
+    description: 'Every hard value a requirement states that quotes its need is in those quotes (or in those of the requirements it derives from), in that form or another, or its rationale names it as a decision of the model.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => {
@@ -522,24 +626,69 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => {
-      const scenarios = linkedNodes(model, req.id, 'verifies', 'source', 'scenario')
+      const scenarios = scenariosOf(model, req.id)
       if (!scenarios.length) return []
-      const said = new Set(scenarios.flatMap((sc) => [...hardValues(['given', 'when', 'then', 'gherkin'].map((k) => prop(sc, k)).join(' \n '))]))
-      const missing = quoteValueGaps(model, req).carried.filter((v) => !said.has(v))
+      const gaps = quoteValueGaps(model, req)
+      if (!gaps.carried.length) return []
+      const quoted = relationsOf(model, 'derives').from.get(req.id) ?? []
+      const from = quoted.map((r) => reading(quoteOf(model, r)))
+      const readings = scenarios.map((sc) => reading(scenarioText(sc)))
+      const missing = gaps.carried.filter((v) => !readings.some((sc) => from.some((q) => q.values.has(v) && saysValueOf(q, v, sc))))
       return missing.length ? [{ nodeId: req.id, relatedIds: scenarios.map((sc) => sc.id), message: `Requirement ${quote(req)} takes ${missing.map((v) => `"${v}"`).join(', ')} from the words it quotes, which ${scenarios.length === 1 ? `its scenario ${quote(scenarios[0])} does not say` : `none of its ${scenarios.length} scenarios says`}: a scenario that checks the requirement names the values the person gave.` }] : []
     }),
   },
   {
+    id: 'example-not-in-scenario',
+    description: 'Every example a need gives with values ("for example", "e.g.", "Example:") is whole in one scenario of the requirements derived from the need: the person\'s own case checks what they meant.',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: (model) => nodesOf(model, 'need').filter((n) => !originOf(n)).flatMap((need) => {
+      const scenarios = [...new Map(requirementsOfNeed(model, need.id).flatMap((req) => scenariosOf(model, req.id)).map((sc) => [sc.id, sc])).values()]
+      if (!scenarios.length) return []
+      const readings = scenarios.map((sc) => ({ sc, reading: reading(scenarioText(sc)) }))
+      return needParts(need.description ?? '').filter((part) => part.kind !== 'question' && !/\(no requirement\)/i.test(part.text))
+        .flatMap((part) => exampleSentences(part.text)).flatMap((example) => {
+          const ex = reading(example)
+          const closest = readings.map(({ sc, reading: r }) => ({ sc, missing: [...ex.values].filter((v) => !saysValueOf(ex, v, r)) }))
+            .sort((x, y) => x.missing.length - y.missing.length)[0]
+          if (!closest.missing.length) return []
+          const shown = example.length > 140 ? `${example.slice(0, 139)}…` : example
+          return [{ nodeId: need.id, relatedIds: [closest.sc.id], message: `Need ${quote(need)} gives the example "${shown}", which no scenario of its requirements holds whole: the closest, ${quote(closest.sc)}, does not say ${closest.missing.map((v) => `"${v}"`).join(', ')}. A scenario with the person's own example checks what they meant.` }]
+        })
+    }),
+  },
+  {
+    id: 'scenario-value-untested',
+    description: 'With the test sources (radical check reads the files of the tests .radical/radical.json binds): every hard value a scenario names that tells a case apart (not a count below 10) is in the file of a test bound to it.',
+    severity: 'warning',
+    dimension: 'traceability',
+    run: (model) => {
+      const sources = model.testSources
+      if (!sources) return []
+      return nodesOf(model, 'scenario').filter((n) => !originOf(n)).flatMap((sc) => {
+        const bound = (sc as unknown as Props)[BOUND_TESTS]
+        const tests = Array.isArray(bound) ? (bound as string[]).filter((id) => typeof sources[id] === 'string') : []
+        if (!tests.length) return []
+        const said = reading(scenarioText(sc))
+        const source = sourceReading(tests.map((id) => sources[id]).join('\n'))
+        const text = tests.map((id) => sources[id]).join('\n').toLowerCase()
+        // A name the scenario quotes counts anywhere in the file, in any case (typeOfBroker).
+        const missing = [...said.values].filter((v) => telling(v) && !saysValueOf(said, v, source) && !(/[a-z]/.test(v) && text.includes(v)))
+        return missing.length ? [{ nodeId: sc.id, details: tests, message: `Scenario ${quote(sc)} names ${missing.map((v) => `"${v}"`).join(', ')}, which ${tests.length === 1 ? 'the file of the test bound to it does not use' : `the files of the ${tests.length} tests bound to it do not use`}: a test that checks the scenario uses the values it names, or the scenario says what the test checks.` }] : []
+      })
+    },
+  },
+  {
     id: 'need-answer-unquoted',
-    description: 'Every answer of a person in a need (a line that starts with A:) is quoted by a requirement that derives from the need, or marked (no requirement).',
+    description: 'Every answer of a person in a need (from a line that starts with A:, Answer: or A1:, or an answer on its question\'s line) is quoted by a requirement that derives from the need, or marked (no requirement).',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => {
       const quotes = new Map<string, string[][]>()
-      for (const r of requirementToNeed(model)) quotes.set(r.targetId, [...quotes.get(r.targetId) ?? [], ...quoteFragments((r as unknown as Props).quote)])
+      for (const r of requirementToNeed(model)) quotes.set(r.targetId, [...quotes.get(r.targetId) ?? [], ...quoteFragments(relationQuote(r))])
       return nodesOf(model, 'need').filter((n) => !originOf(n)).flatMap((need) => needAnswers(need.description ?? '')
         .filter((answer) => !/\(no requirement\)/i.test(answer))
-        .filter((answer) => !(quotes.get(need.id) ?? []).some((pieces) => pieces.some((piece) => normalizeWords(answer).includes(piece))))
+        .filter((answer) => { const text = plainWords(answer); return !(quotes.get(need.id) ?? []).some((pieces) => pieces.some((piece) => wordsAt(text, piece) >= 0)) })
         .map((answer) => ({ nodeId: need.id, message: `No requirement quotes this answer in need ${quote(need)}: "${answer.replace(/\s+/g, ' ').slice(0, 90)}${answer.length > 90 ? '…' : ''}" Quote it on a requirement's derives relation, or mark it (no requirement).` })))
     },
   },
@@ -874,3 +1023,15 @@ export function testBinding(model: CheckModel): Map<string, { total: number; unb
   return byFile
 }
 
+
+/** The rules about the person's words: a write through the MCP server tells
+ *  the agent at once what it brings in of them (ADR Agents check
+ *  requirements against the person's words). */
+export const WORD_RULES: ReadonlySet<string> = new Set(['derives-quote-not-in-need', 'quote-value-missing', 'quote-value-differs', 'requirement-value-unquoted', 'scenario-value-missing', 'example-not-in-scenario', 'need-answer-unquoted'])
+
+/** What the word rules find in a model, each with its rule and severity;
+ *  `off`, the rules check.json turns off. */
+export function wordFindings(model: CheckModel, off: ReadonlySet<string> = new Set()): Array<{ rule: string; severity: CheckSeverity; message: string }> {
+  return CHECK_RULES.filter((r) => WORD_RULES.has(r.id) && !off.has(r.id))
+    .flatMap((rule) => rule.run(model).map((f) => ({ rule: rule.id, severity: f.severity ?? rule.severity, message: f.message })))
+}

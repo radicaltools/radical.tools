@@ -28,7 +28,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel, originOf, ownModel } from '@radical/common/model'
 import { REPOSITORY_FILE, builtIn, parseRepositoryFile, serializeRepositoryFile, testsBoundTo, type RepositoryFile } from '@radical/common/repositoryMapping'
-import { conditionsOf, quoteValueGaps, verifiedHere, withBoundTests, type CheckModel } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, WORD_RULES, conditionsOf, parseCheckConfig, quoteValueGaps, verifiedHere, wordFindings, withBoundTests, type CheckModel } from '@radical/common/check'
 import { mappingRoot } from '@radical/node-files/repositoryLayout'
 import { FEDERATION_FILE, parseFederationFile, withOtherModels } from '@radical/common/federation'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
@@ -1040,6 +1040,9 @@ export class FolderModel {
     const warned = !warnings.length ? ''
       : retyped ? ` Warning: the metamodel change brings in ${warnings.length} ${warnings.length === 1 ? 'issue' : 'issues'} (fix them or change the metamodel back, see get_issues):${list}`
       : ` New warnings (fine while you are still building; fix them before you finish, see get_issues):${list}`
+    const words = await this.wordsBroughtIn(data, changed, metamodel)
+    const wordList = `${words.slice(0, MAX_WARNINGS).map((f) => `\n- ${f.message}${f.severity === 'error' ? ' (an error in radical check)' : ''}`).join('')}${words.length > MAX_WARNINGS ? `\n- …and ${words.length - MAX_WARNINGS} more` : ''}`
+    const wordsText = words.length ? ` The person's words, as radical check reads them, after this change (correct the requirement, its quote or its scenario; review_requirements shows them side by side):${wordList}` : ''
     // Each element's file where the folder has it (the session keeps them
     // too; here so that the files named as changed are the ones written).
     const next = keepMdFolderPaths(before, serializeToMdFolderWithPaths(changed).files)
@@ -1050,7 +1053,7 @@ export class FolderModel {
       .filter((path) => before[path] !== next[path]
         && (path in next || isOwnedMdFolderFile(path, before[path])))
       .sort()
-    if (!paths.length) return { ok: true, text: `${resultText} No files changed.${warned}` }
+    if (!paths.length) return { ok: true, text: `${resultText} No files changed.${warned}${wordsText}` }
     // Studio (or an editor, git) may have written the folder since this call
     // read it: the change is merged with that edit rather than written over it.
     const write = await session.write(next, mergeMdFolderFiles)
@@ -1066,7 +1069,23 @@ export class FolderModel {
     // One relation made is named by id; several (an Assay plan, a Forge stage) are counted, not one of them named as if it were the only one.
     const created = changed.relations.filter((relation) => !data.relations.some((old) => old.id === relation.id))
     const madeText = created.length === 1 ? ` Relation ID: ${created[0].id}.` : created.length > 1 ? ` ${created.length} relations created.` : ''
-    return { ok: true, text: `${resultText}${madeText} Changed: ${paths.join(', ')}. Revision: ${revision}.${merged}${warned}` }
+    return { ok: true, text: `${resultText}${madeText} Changed: ${paths.join(', ')}. Revision: ${revision}.${merged}${warned}${wordsText}` }
+  }
+
+  /** What a change brings in of the rules about the person's words (a quote
+   *  the need does not hold, a value lost on the way to the requirement or
+   *  its scenario, an example no scenario holds): the findings it has that
+   *  the model before it had not, without the rules check.json turns off. */
+  private async wordsBroughtIn(data: DiagramData, changed: DiagramData, metamodel: Metamodel): Promise<Array<{ rule: string; severity: string; message: string }>> {
+    if (!metamodel.nodeTypes.need || !metamodel.nodeTypes.requirement) return []
+    let off = new Set<string>()
+    try {
+      const config = parseCheckConfig(await readFile(join(this.folder, CHECK_CONFIG_FILE), 'utf8'))
+      off = new Set(Object.entries(config.rules ?? {}).filter(([id, setting]) => WORD_RULES.has(id) && (setting === 'off' || (typeof setting === 'object' && setting !== null && (setting as { severity?: unknown }).severity === 'off'))).map(([id]) => id))
+    } catch { /* no check.json: every rule on */ }
+    const findings = (d: DiagramData) => wordFindings({ nodes: byId(d.nodes), relations: byId(d.relations), metamodel }, off)
+    const before = new Set(findings(data).map((f) => `${f.rule}\0${f.message}`))
+    return findings(changed).filter((f) => !before.has(`${f.rule}\0${f.message}`))
   }
 
   /** Tell Studio, open on the folder, that an agent is writing it: it holds

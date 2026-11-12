@@ -229,7 +229,7 @@ describe('radical check: config', () => {
       node('a', 'requirement', 'A', { action: 'a' }),
       node('b', 'requirement', 'B', { action: 'b' }),
     )
-    data.relations.push({ ...rel('ra', 'derives', 'a', 'need'), quote: 'pay' } as C4Relation, { ...rel('rb', 'derives', 'b', 'need'), quote: 'card' } as C4Relation, rel('sa', 'satisfies', 'sys', 'a'), rel('sb', 'satisfies', 'sys', 'b'))
+    data.relations.push({ ...rel('ra', 'derives', 'a', 'need'), quote: 'shoppers pay' } as C4Relation, { ...rel('rb', 'derives', 'b', 'need'), quote: 'by card' } as C4Relation, rel('sa', 'satisfies', 'sys', 'a'), rel('sb', 'satisfies', 'sys', 'b'))
     return data
   }
 
@@ -310,7 +310,7 @@ describe('radical check: output', () => {
     const data = complete()
     for (let i = 0; i < 7; i++) {
       data.nodes.push(node(`n${i}`, 'requirement', `R${i}`, { action: 'x' }))
-      data.relations.push({ ...rel(`d${i}`, 'derives', `n${i}`, 'need'), quote: 'shoppers' } as C4Relation, rel(`s${i}`, 'satisfies', 'sys', `n${i}`))
+      data.relations.push({ ...rel(`d${i}`, 'derives', `n${i}`, 'need'), quote: 'shoppers pay' } as C4Relation, rel(`s${i}`, 'satisfies', 'sys', `n${i}`))
     }
     return data
   }

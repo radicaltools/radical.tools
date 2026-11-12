@@ -1418,6 +1418,26 @@ describe('requirements reviewed against their needs', () => {
     expect((await model.call('review_requirements', { ids: ['orphan'] })).text).toContain('holds no question asked of a person')
   })
 
+  it("tells an agent writing the model what it brings in of the person's words (Write tells of a lost value)", async () => {
+    const write = async (folder: string) => {
+      const model = await FolderModel.open(folder)
+      await model.call('add_node', { tempId: 'cost', type: 'need', label: 'Cost of goods', description: 'Q: What is stock without a cost worth?\nA: The stock is worth 0.' })
+      await model.call('add_node', { tempId: 'value', type: 'requirement', label: 'Stock value', properties: { ears_type: 'ubiquitous', action: 'show the stock value as null without an average' } })
+      return await model.call('add_relation', { sourceId: 'value', targetId: 'cost', relationType: 'derives', properties: { quote: 'The stock is worth 0' } })
+    }
+    const told = await write(await fixture())
+    expect(told.ok, told.text).toBe(true)
+    expect(told.text).toContain('Changed: relations.json')
+    expect(told.text).toContain("The person's words, as radical check reads them, after this change")
+    expect(told.text).toContain('Requirement "Stock value" does not say "0", which the words it quotes from "Cost of goods" say.')
+    // A rule check.json turns off is not named.
+    const quiet = await fixture()
+    await writeFile(join(quiet, 'check.json'), JSON.stringify({ rules: { 'quote-value-missing': 'off', 'requirement-value-unquoted': 'off' } }))
+    const silent = await write(quiet)
+    expect(silent.ok, silent.text).toBe(true)
+    expect(silent.text).not.toContain('does not say "0"')
+  })
+
   it('asks agents for the person\'s words in the need and a review before the code (Agent told to keep answers and review)', async () => {
     const folder = await fixture()
     const model = await FolderModel.open(folder)
