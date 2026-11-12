@@ -3579,6 +3579,9 @@
       "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › finds a value the quote says and the requirement does not, and one the requirement says that no quote says (Values of a quote checked)",
       "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › checks no values of a quote of a whole need that holds no answer, and those of a whole need with answers",
       "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › reads numbers in digits and words, percentages, null and identifiers"
+    ] },
+    { "element": "edbb650f-d97f-4fbb-ad29-9301a3009a57", "name": "Quoted values reach a scenario", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › asks a scenario for the values a requirement takes from its quote (Quoted values reach a scenario)"
     ] }
   ]
 }
