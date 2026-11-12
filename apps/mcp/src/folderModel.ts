@@ -3,7 +3,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import { createHash } from 'node:crypto'
 import { buildToolDefs, noCanvasLayout, runTool, type ToolDef, type ToolRunContext } from '@radical/common/ai/tools'
 import { createModelFacade } from '@radical/common/ai/modelFacade'
-import { buildMetamodelMessage } from '@radical/common/ai/metamodelContext'
+import { buildMetamodelBrief, metamodelDetail } from '@radical/common/ai/metamodelContext'
 import { AI_MODELLING_RULES } from '@radical/common/ai/systemPrompt'
 import { MD_FOLDER_FORMAT_VERSION, MD_FOLDER_JSON_FILES, deserializeFromMdFolder, isOwnedMdFolderFile, isValidMdFolderManifest, keepMdFolderPaths, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
@@ -44,8 +44,14 @@ const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', '
 const SERVER_TOOL_DEFS: ToolDef[] = [
   {
     name: 'get_model_summary',
-    description: "Call this first. Shows the product version of this radical-mcp server (radicalVersion) and the model folder format it reads and writes (modelFormat), counts, the views, sequences, milestones and presentations in the bound Radical model folder, the modelling rules (how to build requirements, needs, state machines, …), plus the metamodel context message: each type's valid properties keys and enum options, allowed parents, cardinality and relation allowedPairs.",
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    description: "Call this first. Shows the product version of this radical-mcp server (radicalVersion) and the model folder format it reads and writes (modelFormat), counts, the views, sequences, milestones and presentations in the bound Radical model folder, the modelling rules (how to build requirements, needs, state machines, …), plus the metamodel in brief (the metamodel context message the other tools refer to): each node type in one line with where it may go and its properties keys (enum options when short, → the type a reference points at), each relation type with its allowed pairs, the viewpoints by name. With types, it returns only the whole definition of those node types, relation types and viewpoints: labels, every enum option, visibility, cardinality, layout, a viewpoint's chain.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        types: { type: 'array', items: { type: 'string' }, description: 'Node type, relation type or viewpoint ids (or names) to get in full instead of the summary.' },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: 'get_issues',
@@ -686,6 +692,12 @@ export class FolderModel {
     try {
       if (name === 'get_model_summary') {
         const metamodel = facade.getMetamodel?.()
+        const { types } = (input ?? {}) as { types?: unknown }
+        if (types !== undefined) {
+          if (!Array.isArray(types) || types.some((t) => typeof t !== 'string')) return { ok: false, text: 'get_model_summary: types must be an array of type or viewpoint ids' }
+          const detail = metamodelDetail(metamodel, types as string[])
+          return { ok: !!detail.text, text: detail.text || 'get_model_summary: types names nothing' }
+        }
         const summary = JSON.stringify({
           radicalVersion: displayVersion(),
           modelFormat: MD_FOLDER_FORMAT_VERSION,
@@ -722,7 +734,7 @@ export class FolderModel {
         // message" for property keys and pairing rules; MCP clients get it here,
         // with the modelling rules Studio's chat and Forge follow.
         const rules = `Modelling rules:\n${AI_MODELLING_RULES.map((rule) => `- ${rule}`).join('\n')}`
-        return { ok: true, text: `${summary}\n\n${rules}\n\n${buildMetamodelMessage(metamodel)}` }
+        return { ok: true, text: `${summary}\n\n${rules}\n\n${buildMetamodelBrief(metamodel)}` }
       }
       if (name === 'get_issues') {
         const mm = facade.getMetamodel?.()

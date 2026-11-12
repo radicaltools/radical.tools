@@ -503,6 +503,35 @@ test('an agent\'s Forge run on the folder makes the Forge button pulse and opens
   await expect(panel).toHaveCount(0)
 })
 
+test('an agent\'s Forge run shows the stages it left out, with why', async ({ page }) => {
+  await saveAsFolder(page)
+  const stages = ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups', 'c4', 'review']
+  const reason = 'a small back end without screens'
+  const statuses: Record<string, string> = { requirements: 'done', domain: 'skipped', fitness: 'skipped', scenarios: 'done', states: 'skipped', processes: 'skipped', mockups: 'skipped', c4: 'generating' }
+  await folder.write('.state/forge-run.json', JSON.stringify({
+    version: 1,
+    client: 'claude-code',
+    startedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    state: 'active',
+    stages: stages.map((id) => ({
+      id, status: statuses[id] ?? 'pending',
+      ...(statuses[id] === 'done' ? { summary: `${id} summary`, added: { nodes: 2, relations: 1 } } : {}),
+      ...(statuses[id] === 'skipped' ? { reason } : {}),
+    })),
+  }))
+  const button = page.locator('.qs-forge-toggle')
+  await expect(button).toHaveAttribute('data-agent-phase', 'working', { timeout: 10_000 })
+  await expect(button.locator('.qs-forge-badge')).toHaveText('8/9')
+  await button.click()
+  const panel = page.getByRole('dialog', { name: 'Radical Forge — agent run' })
+  const skipped = panel.locator('.forge-step[data-status="skipped"]')
+  await expect(skipped).toHaveCount(5)
+  await expect(skipped.first()).toHaveClass(/\bskipped\b/)
+  await expect(skipped.first()).toHaveAttribute('title', `Domain model: skipped — ${reason}`)
+  await expect(panel.locator('.forge-step.active')).toHaveText('C4')
+})
+
 test('an agent\'s Assay run on the folder shows an Assay button that pulses and opens read only', async ({ page }) => {
   await saveAsFolder(page)
   const stages = ['c4', 'explore', 'documents', 'domain', 'processes', 'states', 'scenarios']

@@ -45,8 +45,8 @@ async function run() {
   const model = await FolderModel.open(join(root, '.radical', 'model'))
   const call = async (name: string, input: unknown = {}) => model.call(name, input)
   await call('assay_start', { directories: ['../shop'] })
-  const nodes = async () => JSON.parse((await call('search_model', { query: 'LIST NODES' })).text).rows as Array<{ id: string; type: string; label: string } & Record<string, unknown>>
-  const relations = async () => JSON.parse((await call('search_model', { query: 'LIST RELATIONS' })).text).rows as Array<{ sourceId: string; targetId: string; relationType: string } & Record<string, unknown>>
+  const nodes = async () => JSON.parse((await call('search_model', { query: 'LIST NODES FULL' })).text).rows as Array<{ id: string; type: string; label: string } & Record<string, unknown>>
+  const relations = async () => JSON.parse((await call('search_model', { query: 'LIST RELATIONS FULL' })).text).rows as Array<{ sourceId: string; targetId: string; relationType: string } & Record<string, unknown>>
   const ref = (text: string, role: string, name: string) => new RegExp(`(e\\d+) ${role} "${name}"`).exec(text)?.[1]
   return { dir, root, call, nodes, relations, ref, close: () => call('assay_start', { directories: ['../shop'] }) }
 }

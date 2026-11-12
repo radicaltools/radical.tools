@@ -300,6 +300,19 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
     },
   },
   {
+    name: 'forge_skip_stage',
+    description: 'Leave stages of the Forge run out, with why: a system of this size does not need them (a back end without screens needs no mockups; one whose entities have no real lifecycle no state machines). Any stages not begun, in one call; the later stages then run without them, and forge_finish and Studio\'s view of the run name them with the reason. Clarifying or generating a skipped stage later runs it after all.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        stages: { type: 'array', items: { type: 'string', enum: STAGE_IDS }, description: 'The stages to leave out.' },
+        reason: { type: 'string', description: 'Why, in one sentence the user reads.' },
+      },
+      required: ['stages', 'reason'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'forge_finish',
     description: 'End the Forge run: what each stage added (or that it was skipped) and the Gherkin .feature files built from the scenarios in the model.',
     inputSchema: {
@@ -370,6 +383,8 @@ interface ForgeRun {
   languages: ForgeLanguages
   clarified: Set<ForgeStageId>
   stages: Partial<Record<ForgeStageId, StageState>>
+  /** The stages the agent left out (forge_skip_stage), with why. */
+  skipped: Map<ForgeStageId, string>
 }
 
 /** The Hub catalogue the build copies next to the bundle (see tsup.config.ts);
@@ -510,6 +525,7 @@ export class Forge {
       case 'forge_arrange': return this.arrange(args, facade)
       case 'forge_wireframe': return this.wireframe(args, ctx, facade)
       case 'forge_import_hub_concept': return this.importConcept(args, facade)
+      case 'forge_skip_stage': return this.skip(args)
       case 'forge_finish': return this.finish(args, facade)
       default: return fail(`Unknown tool ${name}`)
     }
@@ -527,8 +543,8 @@ export class Forge {
   private blocked(run: ForgeRun, stage: ForgeStageId): string | null {
     const generating = STAGE_IDS.find((id) => run.stages[id]?.status === 'generating' && id !== stage)
     if (generating) return `The ${stageTitle(generating)} stage is still open; finish it with forge_complete_stage first.`
-    const missing = STAGE_IDS.slice(0, STAGE_IDS.indexOf(stage)).find((id) => run.stages[id]?.status !== 'done')
-    if (missing) return `Stages run in order: generate ${stageTitle(missing)} (${missing}) first.`
+    const missing = STAGE_IDS.slice(0, STAGE_IDS.indexOf(stage)).find((id) => run.stages[id]?.status !== 'done' && !run.skipped.has(id))
+    if (missing) return `Stages run in order: generate ${stageTitle(missing)} (${missing}) first, or leave it out with forge_skip_stage.`
     return null
   }
 
@@ -594,6 +610,7 @@ export class Forge {
       structure,
       languages,
       clarified: new Set(),
+      skipped: new Map(),
       stages: {},
     }
     const lines = [
@@ -612,6 +629,26 @@ export class Forge {
     return ok(lines.join('\n'), { readOnly, data, commit: () => { this.run = run } })
   }
 
+  /** Leaves the stages named out of the run, with why (ADR Agents model as
+   *  they work; Forge on request). */
+  private skip(args: Record<string, unknown>): ForgeResult {
+    const run = this.run
+    if (!run) return fail('forge_skip_stage: no Forge run; call forge_start first')
+    const reason = typeof args.reason === 'string' ? args.reason.trim() : ''
+    if (!reason) return fail('forge_skip_stage: say why in reason')
+    if (!Array.isArray(args.stages) || !args.stages.length) return fail('forge_skip_stage: stages must name at least one stage')
+    const unknown = args.stages.filter((s) => typeof s !== 'string' || !STAGE_IDS.includes(s as ForgeStageId))
+    if (unknown.length) return fail(`forge_skip_stage: stages must be among ${STAGE_IDS.join(', ')}; not ${unknown.join(', ')}`)
+    const ids = [...new Set(args.stages as ForgeStageId[])]
+    const begun = ids.filter((id) => run.stages[id])
+    if (begun.length) return fail(`forge_skip_stage: ${begun.map((id) => `${stageTitle(id)} (${id}) is ${run.stages[id]!.status === 'done' ? 'done' : 'open'}`).join(', ')}; only stages not begun can be left out`)
+    const next = STAGE_IDS.find((id) => run.stages[id]?.status !== 'done' && !run.skipped.has(id) && !ids.includes(id))
+    return ok([
+      `Skipped ${ids.map((id) => `${stageTitle(id)} (${id})`).join(', ')}: ${reason}`,
+      next ? `Next: forge_clarify with stage "${next}", or forge_skip_stage for it too.` : 'No stage is left: call forge_finish.',
+    ].join('\n'), { readOnly: true, commit: () => { for (const id of ids) { run.skipped.set(id, reason); run.clarified.delete(id) } } })
+  }
+
   private clarify(args: Record<string, unknown>): ForgeResult {
     const run = this.run
     if (!run) return fail('forge_clarify: no Forge run; call forge_start first')
@@ -627,7 +664,7 @@ export class Forge {
       .join('\n\n')
     const lines = [buildClarifyPrompt(stageTitle(id), run.description, packs, priorQA, 'ask'), '', ...forgeLanguageRules(run.languages)]
     lines.push('', `Then call forge_generate with stage "${id}"${packs.length ? ', the answers and the concerns' : ' and the answers'}.`)
-    return ok(lines.join('\n'), { readOnly: true, commit: () => { run.clarified.add(id) } })
+    return ok(lines.join('\n'), { readOnly: true, commit: () => { run.clarified.add(id); run.skipped.delete(id) } })
   }
 
   private generate(args: Record<string, unknown>, facade: ModelFacade): ForgeResult {
@@ -1019,7 +1056,8 @@ export class Forge {
     if (!run) return fail('forge_finish: no Forge run; call forge_start first')
     const lines = FORGE_STAGES.map((stage) => {
       const state = run.stages[stage.id]
-      if (!state) return `- ${stage.title}: skipped`
+      const why = run.skipped.get(stage.id)
+      if (!state) return `- ${stage.title}: skipped${why ? ` (${why})` : ''}`
       if (state.status === 'generating') return `- ${stage.title}: begun but not completed`
       const refined = state.refinements?.length ? ` · ${state.refinements.length} refinements of earlier stages accepted` : ''
       return `- ${stage.title}: +${state.added!.nodes.length} nodes · +${state.added!.relations.length} relations${refined}`
@@ -1062,6 +1100,8 @@ export class Forge {
           }
         }
         if (state?.status === 'generating') return { id: stage.id, status: 'generating' as const, ...(state.pending ? { asking: true } : {}) }
+        const why = run.skipped.get(stage.id)
+        if (why !== undefined) return { id: stage.id, status: 'skipped' as const, reason: why }
         return { id: stage.id, status: run.clarified.has(stage.id) ? 'clarifying' as const : 'pending' as const }
       }),
     }

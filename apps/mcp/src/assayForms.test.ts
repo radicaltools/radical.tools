@@ -35,8 +35,8 @@ async function central() {
   execFileSync('git', ['init', '-q'], { cwd: root })
   const model = await FolderModel.open(join(root, '.radical', 'model'))
   const call = async (name: string, input: unknown = {}) => model.call(name, input)
-  const nodes = async () => JSON.parse((await call('search_model', { query: 'LIST NODES' })).text).rows as Array<{ id: string; type: string; label: string } & Record<string, unknown>>
-  const relations = async () => JSON.parse((await call('search_model', { query: 'LIST RELATIONS' })).text).rows as Array<{ relationType: string; sourceLabel: string; targetLabel: string } & Record<string, unknown>>
+  const nodes = async () => JSON.parse((await call('search_model', { query: 'LIST NODES FULL' })).text).rows as Array<{ id: string; type: string; label: string } & Record<string, unknown>>
+  const relations = async () => JSON.parse((await call('search_model', { query: 'LIST RELATIONS FULL' })).text).rows as Array<{ relationType: string; sourceLabel: string; targetLabel: string } & Record<string, unknown>>
   return { code, root, call, nodes, relations, model }
 }
 

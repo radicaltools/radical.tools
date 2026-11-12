@@ -153,6 +153,23 @@ function unlinked(model: CheckModel, type: string, relation: string, end: 'in' |
 
 const quote = (n: C4Node): string => `"${n.label}"`
 
+/** The accepted ADRs of the models this one depends on (with an origin),
+ *  none of which an accepted ADR of this model waives, each with this
+ *  model's own elements it constrains (ADR Inherited decisions bind unless
+ *  waived). */
+function inheritedDecisions(model: CheckModel): Array<{ adr: C4Node; origin: string; elements: C4Node[] }> {
+  const waived = new Set(Object.values(model.relations)
+    .filter((r) => r.relationType === 'waives' && !originOf(model.nodes[r.sourceId]) && model.nodes[r.sourceId] && prop(model.nodes[r.sourceId], 'status') === 'accepted')
+    .map((r) => r.targetId))
+  return nodesOf(model, 'adr')
+    .filter((n) => originOf(n) && prop(n, 'status') === 'accepted' && !waived.has(n.id))
+    .map((adr) => ({ adr, origin: originOf(adr)!, elements: linkedNodes(model, adr.id, 'constrains', 'target').filter((e) => !originOf(e)) }))
+}
+
+/** Whether a fitness function names what checks it: metric conditions, or
+ *  tests the repository binds to it (they come in as test conditions). */
+const namesCheck = (ff: C4Node): boolean => conditionsOf(ff).some((c) => c.kind !== 'invalid')
+
 const TYPE_NAME: Record<string, string> = { scenario: 'Scenario', 'fitness-fn': 'Fitness function' }
 /** A node's type as a message names it: Scenario, Fitness function, else its type. */
 const TYPE_LABEL = (node: C4Node): string => TYPE_NAME[node.type] ?? node.type.charAt(0).toUpperCase() + node.type.slice(1)
@@ -362,8 +379,34 @@ export const CHECK_RULES: CheckRule[] = [
     run: (model) => model.metamodel.nodeTypes['fitness-fn']
       ? unlinked(model, 'adr', 'implements', 'in', ['fitness-fn'])
         .filter((n) => prop(n, 'status') === 'accepted')
+        // A waiver says why another model's decision does not apply: nothing to check.
+        .filter((n) => !Object.values(model.relations).some((r) => r.relationType === 'waives' && r.sourceId === n.id))
         .map((n) => ({ nodeId: n.id, message: `No fitness function implements accepted ADR ${quote(n)}.` }))
       : [],
+  },
+  {
+    id: 'inherited-adr-unapplied',
+    description: 'Every accepted ADR of a model this one depends on (deps.json) binds it: it constrains at least one of this model\'s elements, or an accepted ADR of this model waives it and says why.',
+    severity: 'error',
+    dimension: 'decisions',
+    run: (model) => inheritedDecisions(model).filter((d) => !d.elements.length).map(({ adr, origin }) => ({
+      relatedIds: [adr.id],
+      message: `ADR ${quote(adr)} of ${origin} binds this model and applies to none of its elements: link it with constrains to the elements it governs, or record an accepted ADR of this model that waives it and says why.`,
+    })),
+  },
+  {
+    id: 'inherited-adr-unchecked',
+    description: 'Every element an accepted ADR of a model this one depends on constrains is checked: a fitness function implements the ADR (this model\'s or the other\'s) and names its check (metric conditions, or tests .radical/radical.json binds to it).',
+    severity: 'error',
+    dimension: 'decisions',
+    run: (model) => inheritedDecisions(model).flatMap(({ adr, origin, elements }) => {
+      if (!model.metamodel.nodeTypes['fitness-fn'] || linkedNodes(model, adr.id, 'implements', 'source', 'fitness-fn').some(namesCheck)) return []
+      return elements.map((e) => ({
+        nodeId: e.id,
+        relatedIds: [adr.id],
+        message: `Nothing checks ADR ${quote(adr)} of ${origin} on ${e.type} ${quote(e)}: add a fitness function that implements the ADR and names its check (metrics, or tests .radical/radical.json binds to it).`,
+      }))
+    }),
   },
   {
     id: 'adr-incomplete',
