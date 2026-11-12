@@ -3556,6 +3556,15 @@
     { "element": "ebf65f91-08b0-4c56-ad88-1fe8a44eb416", "name": "Forge on request tests", "tests": [
       "apps/mcp/src/forge.test.ts › concern packs in a Forge run › leaves out the stages a back end does not need, in one call, with the reason (Agent skips the stages a back end does not need)",
       "apps/mcp/src/folderModel.test.ts › folder-backed MCP model › lists and calls tools over stdio, persisting a real node ID"
+    ] },
+    { "element": "69f458a2-d468-4401-8577-2264ee34eb69", "name": "Requirement read against the client's words", "tests": [
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › lists each changed requirement next to the words of its needs (Requirement read against the client's words)"
+    ] },
+    { "element": "7ae02607-fa47-460a-85cc-81ba7e9218ca", "name": "Agent told to keep answers and review", "tests": [
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › asks agents for the person's words in the need and a review before the code (Agent told to keep answers and review)"
+    ] },
+    { "element": "cbce887f-9f98-4bd7-9a4b-9a8ad0991f20", "name": "Requirement review tests", "tests": [
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs"
     ] }
   ]
 }
