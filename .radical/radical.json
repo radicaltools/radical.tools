@@ -3603,6 +3603,12 @@
     ] },
     { "element": "1ed4224a-2df4-44a5-b366-7488721ae125", "name": "Word rules on a large model", "tests": [
       "packages/common/tests/derivesQuotes.test.ts › reading the person's words › checks a model of 5,000 requirements in under 2 seconds (Word rules on a large model)"
+    ] },
+    { "element": "72c0c982-207b-4291-beb8-1efc46d9670f", "name": "Every part of an answer quoted", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › every part of an answer, and answers kept › asks for a quote of each paragraph and list item of an answer (Every part of an answer quoted)"
+    ] },
+    { "element": "07454d1d-3e59-4682-b8e3-4aea22e6df34", "name": "Answers only added to", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › every part of an answer, and answers kept › keeps the answers the need held at the base, and quotes none marked superseded (Answers only added to)"
     ] }
   ]
 }
