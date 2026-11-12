@@ -3535,6 +3535,16 @@
     ] },
     { "element": "aef8d454-6592-4913-8de5-557b1b3a222b", "name": "Inherited standards tests", "tests": [
       "packages/common/tests/inheritedStandards.test.ts"
+    ] },
+    { "element": "741adce6-2bb2-440d-9924-934f33685364", "name": "Requirements listed in brief", "tests": [
+      "apps/mcp/src/folderModel.test.ts › brief answers for agents › lists requirements in brief, gives them whole with FULL, and each neighbour once (Requirements listed in brief)"
+    ] },
+    { "element": "a63d53ee-9a75-4857-aafa-09f152452a1a", "name": "Summary names types in brief", "tests": [
+      "apps/mcp/src/folderModel.test.ts › brief answers for agents › gives the metamodel in brief, and named types in full (Summary names types in brief)",
+      "apps/mcp/src/folderModel.test.ts › state machines over MCP › are offered, explained, built with event references, checked and laid out"
+    ] },
+    { "element": "7b39fbc4-6620-4f1a-85da-c242151fe321", "name": "Brief agent answers tests", "tests": [
+      "apps/mcp/src/folderModel.test.ts › brief answers for agents"
     ] }
   ]
 }
