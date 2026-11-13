@@ -1,0 +1,18 @@
+{
+  "name": "@radical/bench",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Radical benchmark: the same agent builds and changes a system with and without Radical, scored by hidden tests. Never published; CI does not run it.",
+  "type": "module",
+  "scripts": {
+    "run": "node harness/run.mjs",
+    "report": "node harness/report.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.11"
+  }
+}

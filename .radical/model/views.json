@@ -4627,5 +4627,150 @@
     },
     "subject": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3",
     "viewpoint": "container-components"
+  },
+  {
+    "expandedNodeIds": [
+      "01ff4301-0015-4343-ac51-d82810510d01"
+    ],
+    "folder": "Conceptual",
+    "id": "cd0c7dec-9821-4b71-81c6-12b490205469",
+    "kind": "static",
+    "name": "Benchmark",
+    "nodeIds": [],
+    "partOf": "c7d12e18-403a-4cf9-aa5a-ec8acf32025f",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "01ff4301-0015-4343-ac51-d82810510d01",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "domain",
+                "entity"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "references"
+              }
+            },
+            {
+              "types": [
+                "entity"
+              ],
+              "via": {
+                "direction": "out",
+                "relationType": "part-of"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "01ff4301-0015-4343-ac51-d82810510d01": {
+        "height": 360,
+        "width": 520,
+        "x": 83065.96088864165,
+        "y": 120
+      },
+      "07ce7238-e6c9-4e78-b08c-514cca305bbd": {
+        "height": 26021.960759395006,
+        "width": 83615.96088864165,
+        "x": -4839.531999754183,
+        "y": -10634.785416666666
+      }
+    },
+    "subject": "01ff4301-0015-4343-ac51-d82810510d01",
+    "viewpoint": "domain-entities"
+  },
+  {
+    "expandedNodeIds": [
+      "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b"
+    ],
+    "folder": "Logical",
+    "id": "8f589801-3637-418f-880c-81ba39f45601",
+    "kind": "static",
+    "name": "Radical benchmark",
+    "nodeIds": [],
+    "partOf": "90fa29b2-0263-4dd3-b17d-0f5ca475209a",
+    "pipeline": {
+      "edges": "all",
+      "levels": [
+        {
+          "filters": [
+            {
+              "kind": "within",
+              "nodeId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+              "self": true
+            }
+          ],
+          "ways": [
+            {
+              "types": [
+                "container",
+                "webapp",
+                "component"
+              ]
+            }
+          ]
+        },
+        {
+          "ways": [
+            {
+              "types": [
+                "person",
+                "system",
+                "container",
+                "webapp",
+                "database",
+                "queue",
+                "component"
+              ],
+              "via": {
+                "anyRelation": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "positions": {
+      "974cc763-a121-4f53-a92d-18a64562a0c9": {
+        "height": 2305.2,
+        "width": 4100,
+        "x": 1718.613333333333,
+        "y": 759.4
+      },
+      "c3073e61-3a0b-4d1f-980b-a65f1e4992f5": {
+        "height": 3453.999999999999,
+        "width": 5848.613333333333,
+        "x": 1965.1500664927692,
+        "y": -14108.785416666664
+      },
+      "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b": {
+        "height": 200,
+        "width": 300,
+        "x": 3769.9999999999995,
+        "y": 120
+      }
+    },
+    "subject": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "viewpoint": "container-components"
   }
 ]
