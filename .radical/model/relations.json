@@ -2030,6 +2030,13 @@
     "targetId": "7bbeaca4-2a83-4111-81c3-e17d864d7db6"
   },
   {
+    "id": "17ad0bd0-974d-463f-8f39-4d83848f3673",
+    "quote": "but not add any of the results I have after the runs",
+    "relationType": "derives",
+    "sourceId": "bdc93adb-17d8-47b2-aea8-64c1941291f9",
+    "targetId": "36570de4-4262-4847-81a0-4289f276bec3"
+  },
+  {
     "id": "17ade27e-d897-400a-b9ff-e4fa04c46445",
     "relationType": "satisfies",
     "sourceId": "45c95a3b-968d-4b77-8fc3-94af06de5087",
@@ -7064,6 +7071,12 @@
     "targetId": "13ab9449-714d-41f2-b853-664476d0f6d7"
   },
   {
+    "id": "4fdd6ec7-6e0a-44ce-8aca-17f1ecf6fb98",
+    "relationType": "satisfies",
+    "sourceId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "targetId": "bdc93adb-17d8-47b2-aea8-64c1941291f9"
+  },
+  {
     "id": "4fe2e6a8-37f3-4b21-bc5d-7e717d1c1ec5",
     "relationType": "satisfies",
     "sourceId": "45c95a3b-968d-4b77-8fc3-94af06de5087",
@@ -9842,6 +9855,13 @@
     "targetId": "9e78e63f-48bb-4be3-ab03-9cf858beaabb"
   },
   {
+    "id": "6ffd4270-1a4d-48cf-a073-f3b2d1815dd2",
+    "label": "sets up the Radical arm's repository with",
+    "relationType": "interacts",
+    "sourceId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
+  },
+  {
     "id": "700d44d1-8189-4c84-a3cb-f36570be54ca",
     "relationType": "satisfies",
     "sourceId": "731e69c8-4e87-44fd-ab1a-196edfb83008",
@@ -11740,6 +11760,13 @@
     "targetId": "80fb7d0f-9084-4b24-8ad1-dd48e23af036"
   },
   {
+    "id": "84a287cf-fb8f-46ee-b09c-7259f27b0ef7",
+    "label": "gives the Radical arm's agent the model folder through",
+    "relationType": "interacts",
+    "sourceId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
+  },
+  {
     "id": "84a58883-c223-40f2-b926-f0ad7c36fb40",
     "relationType": "verifies",
     "sourceId": "73fe7c6b-d35a-44ab-b51a-d488cec01297",
@@ -12995,6 +13022,12 @@
     "relationType": "derives",
     "sourceId": "24e7f236-9c77-4dd3-8b31-5ba4abe09e8a",
     "targetId": "0b8590ab-daf6-4b95-972e-67d03a743b74"
+  },
+  {
+    "id": "92c15076-f213-46e2-b729-edbb92d00c36",
+    "relationType": "constrains",
+    "sourceId": "e61d543b-8618-41ea-8bdf-f7797a06d73c",
+    "targetId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b"
   },
   {
     "id": "92dda595-649e-481f-afc6-3afdac95bb5e",
@@ -15546,6 +15579,13 @@
     "targetId": "b648d253-5b56-4e46-8f44-1a720925fefb"
   },
   {
+    "id": "aee86229-7ed9-4be6-8107-06a94d634807",
+    "label": "runs the agent under test and the product owner as headless sessions",
+    "relationType": "interacts",
+    "sourceId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "targetId": "27effcd1-fdf7-4173-8d66-0c1ab7a8dbb9"
+  },
+  {
     "id": "af116244-1c22-4845-b6b4-ff637098b568",
     "relationType": "satisfies",
     "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
@@ -17877,6 +17917,12 @@
     "targetId": "03641e2c-07be-43a6-a3a4-92e14d4b983f"
   },
   {
+    "id": "c9c6c0cd-25f6-46c2-b828-bde5586a6038",
+    "relationType": "constrains",
+    "sourceId": "2094b496-032d-4923-860a-60fb07e50a08",
+    "targetId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b"
+  },
+  {
     "id": "c9d1d92f-10a1-4946-8613-9a4f59174b60",
     "relationType": "satisfies",
     "sourceId": "45c95a3b-968d-4b77-8fc3-94af06de5087",
@@ -17911,6 +17957,12 @@
     "relationType": "verifies",
     "sourceId": "0b820fa7-ebc8-401c-82d9-eb566524ca24",
     "targetId": "d7403bea-6d05-4284-b64f-8c2716d74963"
+  },
+  {
+    "id": "ca116b34-9ee9-4ded-8b02-da92840b866d",
+    "relationType": "verifies",
+    "sourceId": "480c4aaf-127f-4142-9995-2c3b63c1df5a",
+    "targetId": "bdc93adb-17d8-47b2-aea8-64c1941291f9"
   },
   {
     "id": "ca3b158e-cfd7-41aa-bc64-c6f67fafcfd8",
@@ -21409,6 +21461,12 @@
     "relationType": "verifies",
     "sourceId": "e55c472a-8c17-4450-9130-d0b52e7194d5",
     "targetId": "ed01c892-c440-4072-a41d-cb3ffdaee97e"
+  },
+  {
+    "id": "f1fafe96-fd42-4ec0-b680-581098a0a49e",
+    "relationType": "implements",
+    "sourceId": "e61d543b-8618-41ea-8bdf-f7797a06d73c",
+    "targetId": "2094b496-032d-4923-860a-60fb07e50a08"
   },
   {
     "id": "f201a13b-e2fb-4ec5-9682-d9322a851f4c",

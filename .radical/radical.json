@@ -18,7 +18,8 @@
     { "element": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed", "name": "@radical/host-bridge", "paths": ["packages/host-bridge"] },
     { "element": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea", "name": "@radical/hub-catalogue", "paths": ["packages/hub-catalogue"] },
     { "element": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3", "name": "Crucible engine package", "paths": ["apps/crucible"] },
-    { "element": "917d9018-dff9-45b1-87dc-d01f8ac836bb", "name": "@radical/assay", "paths": ["packages/assay"] }
+    { "element": "917d9018-dff9-45b1-87dc-d01f8ac836bb", "name": "@radical/assay", "paths": ["packages/assay"] },
+    { "element": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b", "name": "Radical benchmark", "paths": ["apps/bench"] }
   ],
   "verifies": [
     { "element": "1c0c7414-2092-4c70-a233-51bd95a280cc", "name": "Recover interrupted discussion sync", "tests": [
@@ -3607,8 +3608,14 @@
     { "element": "72c0c982-207b-4291-beb8-1efc46d9670f", "name": "Every part of an answer quoted", "tests": [
       "packages/common/tests/derivesQuotes.test.ts › every part of an answer, and answers kept › asks for a quote of each paragraph and list item of an answer (Every part of an answer quoted)"
     ] },
-    { "element": "07454d1d-3e59-4682-b8e3-4aea22e6df34", "name": "Answers only added to", "tests": [
+    { "element": "07454d1d-3e59-4682-b8e3-4aea22e6df34", "name": "Rewritten answer is an error", "tests": [
       "packages/common/tests/derivesQuotes.test.ts › every part of an answer, and answers kept › keeps the answers the need held at the base, and quotes none marked superseded (Answers only added to)"
+    ] },
+    { "element": "480c4aaf-127f-4142-9995-2c3b63c1df5a", "name": "Results ignored by git", "tests": [
+      "apps/bench/tests/layout.test.ts › radical.bench in the monorepo › keeps the results of runs out of git (Run results stay off git)"
+    ] },
+    { "element": "e61d543b-8618-41ea-8bdf-f7797a06d73c", "name": "Benchmark runs off git", "tests": [
+      "apps/bench/tests/layout.test.ts"
     ] }
   ]
 }
