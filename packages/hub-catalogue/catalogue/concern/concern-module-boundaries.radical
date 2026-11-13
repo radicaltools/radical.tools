@@ -693,55 +693,64 @@
       "id": "req-allowlist--derives--need",
       "sourceId": "req-allowlist",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The code in this element must stay easy to understand, test and change as it grows and as people come and go. That needs parts with clear boundaries: a change to one part should not ripple through the others, each part should be testable on its own, and the rules about what may depend on what should hold because the build checks them, not because everyone remembers them. The checks below share one layout: each part lives in src/modules/<name> with its published API in src/modules/<name>/index.ts and its declarations in src/modules/<name>/module.json; shared code, where allowed, lives in src/shared-kernel; the rules are in .dependency-cruiser.cjs and run as `npm run check:deps` (depcruise src --config .dependency-cruiser.cjs); known violations, where frozen, are in .dependency-cruiser-known-violations.json."
     },
     {
       "id": "req-levels--derives--need",
       "sourceId": "req-levels",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The code in this element must stay easy to understand, test and change as it grows and as people come and go. That needs parts with clear boundaries: a change to one part should not ripple through the others, each part should be testable on its own, and the rules about what may depend on what should hold because the build checks them, not because everyone remembers them. The checks below share one layout: each part lives in src/modules/<name> with its published API in src/modules/<name>/index.ts and its declarations in src/modules/<name>/module.json; shared code, where allowed, lives in src/shared-kernel; the rules are in .dependency-cruiser.cjs and run as `npm run check:deps` (depcruise src --config .dependency-cruiser.cjs); known violations, where frozen, are in .dependency-cruiser-known-violations.json."
     },
     {
       "id": "req-public-api--derives--need",
       "sourceId": "req-public-api",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The code in this element must stay easy to understand, test and change as it grows and as people come and go. That needs parts with clear boundaries: a change to one part should not ripple through the others, each part should be testable on its own, and the rules about what may depend on what should hold because the build checks them, not because everyone remembers them. The checks below share one layout: each part lives in src/modules/<name> with its published API in src/modules/<name>/index.ts and its declarations in src/modules/<name>/module.json; shared code, where allowed, lives in src/shared-kernel; the rules are in .dependency-cruiser.cjs and run as `npm run check:deps` (depcruise src --config .dependency-cruiser.cjs); known violations, where frozen, are in .dependency-cruiser-known-violations.json."
     },
     {
       "id": "req-cycles--derives--need",
       "sourceId": "req-cycles",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The code in this element must stay easy to understand, test and change as it grows and as people come and go. That needs parts with clear boundaries: a change to one part should not ripple through the others, each part should be testable on its own, and the rules about what may depend on what should hold because the build checks them, not because everyone remembers them. The checks below share one layout: each part lives in src/modules/<name> with its published API in src/modules/<name>/index.ts and its declarations in src/modules/<name>/module.json; shared code, where allowed, lives in src/shared-kernel; the rules are in .dependency-cruiser.cjs and run as `npm run check:deps` (depcruise src --config .dependency-cruiser.cjs); known violations, where frozen, are in .dependency-cruiser-known-violations.json."
     },
     {
       "id": "req-fail--derives--need",
       "sourceId": "req-fail",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The code in this element must stay easy to understand, test and change as it grows and as people come and go. That needs parts with clear boundaries: a change to one part should not ripple through the others, each part should be testable on its own, and the rules about what may depend on what should hold because the build checks them, not because everyone remembers them. The checks below share one layout: each part lives in src/modules/<name> with its published API in src/modules/<name>/index.ts and its declarations in src/modules/<name>/module.json; shared code, where allowed, lives in src/shared-kernel; the rules are in .dependency-cruiser.cjs and run as `npm run check:deps` (depcruise src --config .dependency-cruiser.cjs); known violations, where frozen, are in .dependency-cruiser-known-violations.json."
     },
     {
       "id": "req-ratchet--derives--need",
       "sourceId": "req-ratchet",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The code in this element must stay easy to understand, test and change as it grows and as people come and go. That needs parts with clear boundaries: a change to one part should not ripple through the others, each part should be testable on its own, and the rules about what may depend on what should hold because the build checks them, not because everyone remembers them. The checks below share one layout: each part lives in src/modules/<name> with its published API in src/modules/<name>/index.ts and its declarations in src/modules/<name>/module.json; shared code, where allowed, lives in src/shared-kernel; the rules are in .dependency-cruiser.cjs and run as `npm run check:deps` (depcruise src --config .dependency-cruiser.cjs); known violations, where frozen, are in .dependency-cruiser-known-violations.json."
     },
     {
       "id": "req-kernel--derives--need",
       "sourceId": "req-kernel",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The code in this element must stay easy to understand, test and change as it grows and as people come and go. That needs parts with clear boundaries: a change to one part should not ripple through the others, each part should be testable on its own, and the rules about what may depend on what should hold because the build checks them, not because everyone remembers them. The checks below share one layout: each part lives in src/modules/<name> with its published API in src/modules/<name>/index.ts and its declarations in src/modules/<name>/module.json; shared code, where allowed, lives in src/shared-kernel; the rules are in .dependency-cruiser.cjs and run as `npm run check:deps` (depcruise src --config .dependency-cruiser.cjs); known violations, where frozen, are in .dependency-cruiser-known-violations.json."
     },
     {
       "id": "req-library--derives--need",
       "sourceId": "req-library",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The code in this element must stay easy to understand, test and change as it grows and as people come and go. That needs parts with clear boundaries: a change to one part should not ripple through the others, each part should be testable on its own, and the rules about what may depend on what should hold because the build checks them, not because everyone remembers them. The checks below share one layout: each part lives in src/modules/<name> with its published API in src/modules/<name>/index.ts and its declarations in src/modules/<name>/module.json; shared code, where allowed, lives in src/shared-kernel; the rules are in .dependency-cruiser.cjs and run as `npm run check:deps` (depcruise src --config .dependency-cruiser.cjs); known violations, where frozen, are in .dependency-cruiser-known-violations.json."
     },
     {
       "id": "req-no-shared--derives--need",
       "sourceId": "req-no-shared",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The code in this element must stay easy to understand, test and change as it grows and as people come and go. That needs parts with clear boundaries: a change to one part should not ripple through the others, each part should be testable on its own, and the rules about what may depend on what should hold because the build checks them, not because everyone remembers them. The checks below share one layout: each part lives in src/modules/<name> with its published API in src/modules/<name>/index.ts and its declarations in src/modules/<name>/module.json; shared code, where allowed, lives in src/shared-kernel; the rules are in .dependency-cruiser.cjs and run as `npm run check:deps` (depcruise src --config .dependency-cruiser.cjs); known violations, where frozen, are in .dependency-cruiser-known-violations.json."
     },
     {
       "id": "sc-allowlist--verifies--req-allowlist",

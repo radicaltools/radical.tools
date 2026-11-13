@@ -775,67 +775,78 @@
       "id": "req-sli-request--derives--need",
       "sourceId": "req-sli-request",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system runs in production for its users. Someone must know when it is unhealthy before users say so, be woken only for what matters, and find the cause of a failure across elements quickly. The indicator the objective is computed from must measure what users see, and what is collected must not cost more than it explains."
     },
     {
       "id": "req-sli-probe--derives--need",
       "sourceId": "req-sli-probe",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system runs in production for its users. Someone must know when it is unhealthy before users say so, be woken only for what matters, and find the cause of a failure across elements quickly. The indicator the objective is computed from must measure what users see, and what is collected must not cost more than it explains."
     },
     {
       "id": "req-alert--derives--need",
       "sourceId": "req-alert",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system runs in production for its users. Someone must know when it is unhealthy before users say so, be woken only for what matters, and find the cause of a failure across elements quickly. The indicator the objective is computed from must measure what users see, and what is collected must not cost more than it explains."
     },
     {
       "id": "req-escalate--derives--need",
       "sourceId": "req-escalate",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system runs in production for its users. Someone must know when it is unhealthy before users say so, be woken only for what matters, and find the cause of a failure across elements quickly. The indicator the objective is computed from must measure what users see, and what is collected must not cost more than it explains."
     },
     {
       "id": "req-hours--derives--need",
       "sourceId": "req-hours",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system runs in production for its users. Someone must know when it is unhealthy before users say so, be woken only for what matters, and find the cause of a failure across elements quickly. The indicator the objective is computed from must measure what users see, and what is collected must not cost more than it explains."
     },
     {
       "id": "req-retention--derives--need",
       "sourceId": "req-retention",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system runs in production for its users. Someone must know when it is unhealthy before users say so, be woken only for what matters, and find the cause of a failure across elements quickly. The indicator the objective is computed from must measure what users see, and what is collected must not cost more than it explains."
     },
     {
       "id": "req-trace--derives--need",
       "sourceId": "req-trace",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system runs in production for its users. Someone must know when it is unhealthy before users say so, be woken only for what matters, and find the cause of a failure across elements quickly. The indicator the objective is computed from must measure what users see, and what is collected must not cost more than it explains."
     },
     {
       "id": "req-sample-head--derives--need",
       "sourceId": "req-sample-head",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system runs in production for its users. Someone must know when it is unhealthy before users say so, be woken only for what matters, and find the cause of a failure across elements quickly. The indicator the objective is computed from must measure what users see, and what is collected must not cost more than it explains."
     },
     {
       "id": "req-sample-tail--derives--need",
       "sourceId": "req-sample-tail",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system runs in production for its users. Someone must know when it is unhealthy before users say so, be woken only for what matters, and find the cause of a failure across elements quickly. The indicator the objective is computed from must measure what users see, and what is collected must not cost more than it explains."
     },
     {
       "id": "req-sample-all--derives--need",
       "sourceId": "req-sample-all",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system runs in production for its users. Someone must know when it is unhealthy before users say so, be woken only for what matters, and find the cause of a failure across elements quickly. The indicator the objective is computed from must measure what users see, and what is collected must not cost more than it explains."
     },
     {
       "id": "req-health--derives--need",
       "sourceId": "req-health",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system runs in production for its users. Someone must know when it is unhealthy before users say so, be woken only for what matters, and find the cause of a failure across elements quickly. The indicator the objective is computed from must measure what users see, and what is collected must not cost more than it explains."
     },
     {
       "id": "sc-sli-request--verifies--req-sli-request",

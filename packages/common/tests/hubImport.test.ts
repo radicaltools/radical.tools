@@ -21,6 +21,19 @@ const concept: HubConcept = {
 }
 
 describe('buildConceptInsert', () => {
+  it('keeps a relation\'s own properties, such as a derives\' quote', () => {
+    let n = 0
+    const withQuote: HubConcept = {
+      ...concept,
+      nodes: [{ id: 'need', type: 'need', label: 'N', description: 'Lists stay fast.', x: 0, y: 0 }, { id: 'req', type: 'requirement', label: 'R', x: 260, y: 0 }],
+      relations: [{ id: 'd', sourceId: 'req', targetId: 'need', relationType: 'derives', quote: 'Lists stay fast.' }],
+      sequences: [], views: [],
+    }
+    const [relation] = Object.values(buildConceptInsert(withQuote, { newId: () => `id-${++n}`, place: () => ({ x: 0, y: 0 }) }).relations)
+    expect(relation).toMatchObject({ relationType: 'derives', quote: 'Lists stay fast.' })
+    expect(relation.id).not.toBe('d')
+  })
+
   it('re-ids everything, fills template params and puts the root cluster where asked', () => {
     let n = 0
     const sizes: Array<{ width: number; height: number }> = []

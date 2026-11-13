@@ -3556,6 +3556,59 @@
     { "element": "ebf65f91-08b0-4c56-ad88-1fe8a44eb416", "name": "Forge on request tests", "tests": [
       "apps/mcp/src/forge.test.ts › concern packs in a Forge run › leaves out the stages a back end does not need, in one call, with the reason (Agent skips the stages a back end does not need)",
       "apps/mcp/src/folderModel.test.ts › folder-backed MCP model › lists and calls tools over stdio, persisting a real node ID"
+    ] },
+    { "element": "69f458a2-d468-4401-8577-2264ee34eb69", "name": "Requirement read against the client's words", "tests": [
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › lists each changed requirement next to the words of its needs (Requirement read against the client's words)"
+    ] },
+    { "element": "7ae02607-fa47-460a-85cc-81ba7e9218ca", "name": "Agent told to keep answers and review", "tests": [
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › asks agents for the person's words in the need and a review before the code (Agent told to keep answers and review)"
+    ] },
+    { "element": "cbce887f-9f98-4bd7-9a4b-9a8ad0991f20", "name": "Requirement review tests", "tests": [
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs",
+      "packages/common/tests/derivesQuotes.test.ts"
+    ] },
+    { "element": "1f79b192-af20-4603-9de9-d0f7721bdb7c", "name": "Quotes of a need checked", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › quotes on derives › checks each quote against its need and names the answers no requirement quotes (Quotes of a need checked)",
+      "packages/common/tests/derivesQuotes.test.ts › quotes on derives › reads fragments line by line, quotation marks and ellipses aside, and answers from A: to the next Q:"
+    ] },
+    { "element": "c0e2e020-393d-47d7-ba0b-a1d9a7678630", "name": "A pack's quotes survive the import", "tests": [
+      "packages/common/tests/hubImport.test.ts › buildConceptInsert › keeps a relation's own properties, such as a derives' quote",
+      "packages/hub-catalogue/tests/concernPacks.test.ts › concern packs › every pack imported and bound passes radical check"
+    ] },
+    { "element": "4a2b45f6-4ff2-45d4-b404-4cbe1020e331", "name": "Values of a quote checked", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › finds a value the quote says and the requirement does not, and one the requirement says that no quote says (Values of a quote checked)",
+      "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › checks no values of a quote of a whole need that holds no answer, and those of a whole need with answers",
+      "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › reads numbers in digits and words, percentages, null and identifiers"
+    ] },
+    { "element": "edbb650f-d97f-4fbb-ad29-9301a3009a57", "name": "Quoted values reach a scenario", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › asks a scenario for the values a requirement takes from its quote (Quoted values reach a scenario)"
+    ] },
+    { "element": "f255b52e-5d2a-4f88-b887-9b6c09a87a5f", "name": "Quotes read as words", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › reads quotes as whole words, Markdown aside, and answers in their forms (Quotes read as words)"
+    ] },
+    { "element": "0947887b-9884-49ee-8f00-3e5a85aa5d52", "name": "Values read in their forms", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › reads values in their forms (Values read in their forms)"
+    ] },
+    { "element": "e25c7fc3-822e-484b-ab53-c17c17b512af", "name": "Limits, units and order kept", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › keeps the sense of a quoted value (Limits, units and order kept)"
+    ] },
+    { "element": "7b99eb7c-88b0-4e05-bda0-aa94f51265b9", "name": "Example missing from scenarios", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › asks a scenario for the person's example (Example missing from scenarios)"
+    ] },
+    { "element": "736d4ae1-cce0-4a68-8f81-49a8716250e3", "name": "Scenario values found in its tests", "tests": [
+      "apps/cli/src/cli.test.ts › radical check › finds the values of a scenario its tests do not use (Scenario values found in its tests)"
+    ] },
+    { "element": "ae223863-1d1b-4cd4-85cb-67aa734d009a", "name": "Write tells of a lost value", "tests": [
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › tells an agent writing the model what it brings in of the person's words (Write tells of a lost value)"
+    ] },
+    { "element": "1ed4224a-2df4-44a5-b366-7488721ae125", "name": "Word rules on a large model", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › checks a model of 5,000 requirements in under 2 seconds (Word rules on a large model)"
+    ] },
+    { "element": "72c0c982-207b-4291-beb8-1efc46d9670f", "name": "Every part of an answer quoted", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › every part of an answer, and answers kept › asks for a quote of each paragraph and list item of an answer (Every part of an answer quoted)"
+    ] },
+    { "element": "07454d1d-3e59-4682-b8e3-4aea22e6df34", "name": "Answers only added to", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › every part of an answer, and answers kept › keeps the answers the need held at the base, and quotes none marked superseded (Answers only added to)"
     ] }
   ]
 }

@@ -961,85 +961,99 @@
       "id": "req-automerge--derives--need",
       "sourceId": "req-automerge",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "req-weekly-batch--derives--need",
       "sourceId": "req-weekly-batch",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "req-manual-cadence--derives--need",
       "sourceId": "req-manual-cadence",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "req-same-checks--derives--need",
       "sourceId": "req-same-checks",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "req-lockfile-install--derives--need",
       "sourceId": "req-lockfile-install",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "req-exact-versions--derives--need",
       "sourceId": "req-exact-versions",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "req-floating-range--derives--need",
       "sourceId": "req-floating-range",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "req-unused-fails--derives--need",
       "sourceId": "req-unused-fails",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "req-unused-review--derives--need",
       "sourceId": "req-unused-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "req-abandoned--derives--need",
       "sourceId": "req-abandoned",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "req-licence-allowlist--derives--need",
       "sourceId": "req-licence-allowlist",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "req-licence-denylist--derives--need",
       "sourceId": "req-licence-denylist",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "req-internal-only--derives--need",
       "sourceId": "req-internal-only",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "req-freshness--derives--need",
       "sourceId": "req-freshness",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element runs mostly on code we did not write, and that code keeps changing upstream. Updates must arrive in small steps that a build can prove safe, instead of one upgrade a year that breaks everything at once; every build must install the versions that were tested; what is installed must be what the code uses, with nothing abandoned or forgotten in it; and every package must carry a licence we may ship under. The security side of the same packages, known vulnerabilities, integrity and provenance, is decided by the Software supply chain concern."
     },
     {
       "id": "sc-automerge--verifies--req-automerge",

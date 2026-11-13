@@ -1018,85 +1018,99 @@
       "id": "req-inventory--derives--need",
       "sourceId": "req-inventory",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-revisit--derives--need",
       "sourceId": "req-revisit",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-build--derives--need",
       "sourceId": "req-build",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-modules--derives--need",
       "sourceId": "req-modules",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-independent--derives--need",
       "sourceId": "req-independent",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-owners--derives--need",
       "sourceId": "req-owners",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-functions--derives--need",
       "sourceId": "req-functions",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-own-data--derives--need",
       "sourceId": "req-own-data",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-schemas--derives--need",
       "sourceId": "req-schemas",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-shared--derives--need",
       "sourceId": "req-shared",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-contexts--derives--need",
       "sourceId": "req-contexts",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-team-changes--derives--need",
       "sourceId": "req-team-changes",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-split-need--derives--need",
       "sourceId": "req-split-need",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "req-strangler--derives--need",
       "sourceId": "req-strangler",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams building this system: {{TEAMS}}. Each should be able to change, test and release its part without waiting for the others, while the system as a whole stays something the organisation can afford to run: every extra deployable is another pipeline, another data store, more network calls and more on-call. Who owns which data has to be clear, because shared data couples parts no matter how they are deployed; and if an existing system is being replaced, it has to keep working while it is. The checks below share one layout: each deployable lives in services/<name> with a Backstage catalog-info.yaml naming its owner (spec.owner) and a workflow .github/workflows/deploy-<name>.yml of its own; the architecture model is the Radical Markdown folder architecture/ (nodes under architecture/nodes, one Markdown file per element with its type and label in the front matter); database users are named module_<name> and tables carry their owning module in a table comment."
     },
     {
       "id": "sc-inventory--verifies--req-inventory",

@@ -1332,103 +1332,120 @@
       "id": "req-deny--derives--need",
       "sourceId": "req-deny",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-default-deny--derives--need",
       "sourceId": "req-default-deny",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-object--derives--need",
       "sourceId": "req-object",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-sod--derives--need",
       "sourceId": "req-sod",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-relation-revoke--derives--need",
       "sourceId": "req-relation-revoke",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-attributes--derives--need",
       "sourceId": "req-attributes",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-pdp-down--derives--need",
       "sourceId": "req-pdp-down",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-policy-release--derives--need",
       "sourceId": "req-policy-release",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-review--derives--need",
       "sourceId": "req-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-leaver--derives--need",
       "sourceId": "req-leaver",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-directory--derives--need",
       "sourceId": "req-directory",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-elevation--derives--need",
       "sourceId": "req-elevation",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-break-glass--derives--need",
       "sourceId": "req-break-glass",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-named-admins--derives--need",
       "sourceId": "req-named-admins",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-admin-audit--derives--need",
       "sourceId": "req-admin-audit",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-no-direct--derives--need",
       "sourceId": "req-no-direct",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "req-flat--derives--need",
       "sourceId": "req-flat",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People with different jobs, and other systems, use the same element. Each may see and change only what their role, their relation to the record or the policy allows: a check missing at one operation, a check only in the interface, a record fetched by an id the caller should not know, or a list that shows what the detail would refuse each lets data out. Administrators and support need more than everyone else without holding it all the time, and permissions must be taken back when people change jobs or leave. The snippets assume the application under src/ (src/app exports the router's table, src/authz the permission code) and the tests under tests/ with their fixtures in tests/authz."
     },
     {
       "id": "sc-deny--verifies--req-deny",

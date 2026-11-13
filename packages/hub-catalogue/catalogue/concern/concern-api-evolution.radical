@@ -826,79 +826,92 @@
       "id": "req-contract--derives--need",
       "sourceId": "req-contract",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems call this API, and they are released on their own schedule by people who do not see our code. A renamed field, a new required parameter, a narrower type or a changed error breaks them without warning; without a contract nobody can tell which change breaks what, and without notice and a date a caller cannot plan its move off an old version. The API also has to keep changing, so the rules must make safe changes cheap and unsafe ones visible."
     },
     {
       "id": "req-compat--derives--need",
       "sourceId": "req-compat",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems call this API, and they are released on their own schedule by people who do not see our code. A renamed field, a new required parameter, a narrower type or a changed error breaks them without warning; without a contract nobody can tell which change breaks what, and without notice and a date a caller cannot plan its move off an old version. The API also has to keep changing, so the rules must make safe changes cheap and unsafe ones visible."
     },
     {
       "id": "req-path--derives--need",
       "sourceId": "req-path",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems call this API, and they are released on their own schedule by people who do not see our code. A renamed field, a new required parameter, a narrower type or a changed error breaks them without warning; without a contract nobody can tell which change breaks what, and without notice and a date a caller cannot plan its move off an old version. The API also has to keep changing, so the rules must make safe changes cheap and unsafe ones visible."
     },
     {
       "id": "req-header--derives--need",
       "sourceId": "req-header",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems call this API, and they are released on their own schedule by people who do not see our code. A renamed field, a new required parameter, a narrower type or a changed error breaks them without warning; without a contract nobody can tell which change breaks what, and without notice and a date a caller cannot plan its move off an old version. The API also has to keep changing, so the rules must make safe changes cheap and unsafe ones visible."
     },
     {
       "id": "req-header-echo--derives--need",
       "sourceId": "req-header-echo",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems call this API, and they are released on their own schedule by people who do not see our code. A renamed field, a new required parameter, a narrower type or a changed error breaks them without warning; without a contract nobody can tell which change breaks what, and without notice and a date a caller cannot plan its move off an old version. The API also has to keep changing, so the rules must make safe changes cheap and unsafe ones visible."
     },
     {
       "id": "req-versionless--derives--need",
       "sourceId": "req-versionless",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems call this API, and they are released on their own schedule by people who do not see our code. A renamed field, a new required parameter, a narrower type or a changed error breaks them without warning; without a contract nobody can tell which change breaks what, and without notice and a date a caller cannot plan its move off an old version. The API also has to keep changing, so the rules must make safe changes cheap and unsafe ones visible."
     },
     {
       "id": "req-sunset--derives--need",
       "sourceId": "req-sunset",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems call this API, and they are released on their own schedule by people who do not see our code. A renamed field, a new required parameter, a narrower type or a changed error breaks them without warning; without a contract nobody can tell which change breaks what, and without notice and a date a caller cannot plan its move off an old version. The API also has to keep changing, so the rules must make safe changes cheap and unsafe ones visible."
     },
     {
       "id": "req-sunset-graphql--derives--need",
       "sourceId": "req-sunset-graphql",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems call this API, and they are released on their own schedule by people who do not see our code. A renamed field, a new required parameter, a narrower type or a changed error breaks them without warning; without a contract nobody can tell which change breaks what, and without notice and a date a caller cannot plan its move off an old version. The API also has to keep changing, so the rules must make safe changes cheap and unsafe ones visible."
     },
     {
       "id": "req-sunset-protobuf--derives--need",
       "sourceId": "req-sunset-protobuf",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems call this API, and they are released on their own schedule by people who do not see our code. A renamed field, a new required parameter, a narrower type or a changed error breaks them without warning; without a contract nobody can tell which change breaks what, and without notice and a date a caller cannot plan its move off an old version. The API also has to keep changing, so the rules must make safe changes cheap and unsafe ones visible."
     },
     {
       "id": "req-usage--derives--need",
       "sourceId": "req-usage",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems call this API, and they are released on their own schedule by people who do not see our code. A renamed field, a new required parameter, a narrower type or a changed error breaks them without warning; without a contract nobody can tell which change breaks what, and without notice and a date a caller cannot plan its move off an old version. The API also has to keep changing, so the rules must make safe changes cheap and unsafe ones visible."
     },
     {
       "id": "req-pact--derives--need",
       "sourceId": "req-pact",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems call this API, and they are released on their own schedule by people who do not see our code. A renamed field, a new required parameter, a narrower type or a changed error breaks them without warning; without a contract nobody can tell which change breaks what, and without notice and a date a caller cannot plan its move off an old version. The API also has to keep changing, so the rules must make safe changes cheap and unsafe ones visible."
     },
     {
       "id": "req-conformance--derives--need",
       "sourceId": "req-conformance",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems call this API, and they are released on their own schedule by people who do not see our code. A renamed field, a new required parameter, a narrower type or a changed error breaks them without warning; without a contract nobody can tell which change breaks what, and without notice and a date a caller cannot plan its move off an old version. The API also has to keep changing, so the rules must make safe changes cheap and unsafe ones visible."
     },
     {
       "id": "req-conformance-grpc--derives--need",
       "sourceId": "req-conformance-grpc",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems call this API, and they are released on their own schedule by people who do not see our code. A renamed field, a new required parameter, a narrower type or a changed error breaks them without warning; without a contract nobody can tell which change breaks what, and without notice and a date a caller cannot plan its move off an old version. The API also has to keep changing, so the rules must make safe changes cheap and unsafe ones visible."
     },
     {
       "id": "sc-contract--verifies--req-contract",

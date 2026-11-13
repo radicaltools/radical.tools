@@ -768,67 +768,78 @@
       "id": "req-deploy-recorded--derives--need",
       "sourceId": "req-deploy-recorded",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team needs to know how often and how fast its changes reach production, how often a change breaks something and how long the break lasts, and whether that is getting better, so that improvement work goes where it pays. The figures must count the same things every week, be read against the team's own targets rather than other teams, and lead to action when they stay off target. The snippets assume the code on GitHub with GitHub Actions: the deploy job records each production deployment through the GitHub Deployments API, scripts/delivery-metrics.sh runs the measurement (scripts/delivery-flow.mjs and scripts/delivery-failures.mjs, or the platform query) and writes reports/delivery-*.json, improvement items are issues labelled delivery-improvement, and quarterly reviews are kept under docs/delivery-reviews/; the platform snippets use GitLab's DORA API, with glab in place of gh."
     },
     {
       "id": "req-failure-marked--derives--need",
       "sourceId": "req-failure-marked",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team needs to know how often and how fast its changes reach production, how often a change breaks something and how long the break lasts, and whether that is getting better, so that improvement work goes where it pays. The figures must count the same things every week, be read against the team's own targets rather than other teams, and lead to action when they stay off target. The snippets assume the code on GitHub with GitHub Actions: the deploy job records each production deployment through the GitHub Deployments API, scripts/delivery-metrics.sh runs the measurement (scripts/delivery-flow.mjs and scripts/delivery-failures.mjs, or the platform query) and writes reports/delivery-*.json, improvement items are issues labelled delivery-improvement, and quarterly reviews are kept under docs/delivery-reviews/; the platform snippets use GitLab's DORA API, with glab in place of gh."
     },
     {
       "id": "req-flow-targets--derives--need",
       "sourceId": "req-flow-targets",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team needs to know how often and how fast its changes reach production, how often a change breaks something and how long the break lasts, and whether that is getting better, so that improvement work goes where it pays. The figures must count the same things every week, be read against the team's own targets rather than other teams, and lead to action when they stay off target. The snippets assume the code on GitHub with GitHub Actions: the deploy job records each production deployment through the GitHub Deployments API, scripts/delivery-metrics.sh runs the measurement (scripts/delivery-flow.mjs and scripts/delivery-failures.mjs, or the platform query) and writes reports/delivery-*.json, improvement items are issues labelled delivery-improvement, and quarterly reviews are kept under docs/delivery-reviews/; the platform snippets use GitLab's DORA API, with glab in place of gh."
     },
     {
       "id": "req-stability-targets--derives--need",
       "sourceId": "req-stability-targets",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team needs to know how often and how fast its changes reach production, how often a change breaks something and how long the break lasts, and whether that is getting better, so that improvement work goes where it pays. The figures must count the same things every week, be read against the team's own targets rather than other teams, and lead to action when they stay off target. The snippets assume the code on GitHub with GitHub Actions: the deploy job records each production deployment through the GitHub Deployments API, scripts/delivery-metrics.sh runs the measurement (scripts/delivery-flow.mjs and scripts/delivery-failures.mjs, or the platform query) and writes reports/delivery-*.json, improvement items are issues labelled delivery-improvement, and quarterly reviews are kept under docs/delivery-reviews/; the platform snippets use GitLab's DORA API, with glab in place of gh."
     },
     {
       "id": "req-rework--derives--need",
       "sourceId": "req-rework",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team needs to know how often and how fast its changes reach production, how often a change breaks something and how long the break lasts, and whether that is getting better, so that improvement work goes where it pays. The figures must count the same things every week, be read against the team's own targets rather than other teams, and lead to action when they stay off target. The snippets assume the code on GitHub with GitHub Actions: the deploy job records each production deployment through the GitHub Deployments API, scripts/delivery-metrics.sh runs the measurement (scripts/delivery-flow.mjs and scripts/delivery-failures.mjs, or the platform query) and writes reports/delivery-*.json, improvement items are issues labelled delivery-improvement, and quarterly reviews are kept under docs/delivery-reviews/; the platform snippets use GitLab's DORA API, with glab in place of gh."
     },
     {
       "id": "req-platform-data--derives--need",
       "sourceId": "req-platform-data",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team needs to know how often and how fast its changes reach production, how often a change breaks something and how long the break lasts, and whether that is getting better, so that improvement work goes where it pays. The figures must count the same things every week, be read against the team's own targets rather than other teams, and lead to action when they stay off target. The snippets assume the code on GitHub with GitHub Actions: the deploy job records each production deployment through the GitHub Deployments API, scripts/delivery-metrics.sh runs the measurement (scripts/delivery-flow.mjs and scripts/delivery-failures.mjs, or the platform query) and writes reports/delivery-*.json, improvement items are issues labelled delivery-improvement, and quarterly reviews are kept under docs/delivery-reviews/; the platform snippets use GitLab's DORA API, with glab in place of gh."
     },
     {
       "id": "req-response-retro--derives--need",
       "sourceId": "req-response-retro",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team needs to know how often and how fast its changes reach production, how often a change breaks something and how long the break lasts, and whether that is getting better, so that improvement work goes where it pays. The figures must count the same things every week, be read against the team's own targets rather than other teams, and lead to action when they stay off target. The snippets assume the code on GitHub with GitHub Actions: the deploy job records each production deployment through the GitHub Deployments API, scripts/delivery-metrics.sh runs the measurement (scripts/delivery-flow.mjs and scripts/delivery-failures.mjs, or the platform query) and writes reports/delivery-*.json, improvement items are issues labelled delivery-improvement, and quarterly reviews are kept under docs/delivery-reviews/; the platform snippets use GitLab's DORA API, with glab in place of gh."
     },
     {
       "id": "req-response-reserve--derives--need",
       "sourceId": "req-response-reserve",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team needs to know how often and how fast its changes reach production, how often a change breaks something and how long the break lasts, and whether that is getting better, so that improvement work goes where it pays. The figures must count the same things every week, be read against the team's own targets rather than other teams, and lead to action when they stay off target. The snippets assume the code on GitHub with GitHub Actions: the deploy job records each production deployment through the GitHub Deployments API, scripts/delivery-metrics.sh runs the measurement (scripts/delivery-flow.mjs and scripts/delivery-failures.mjs, or the platform query) and writes reports/delivery-*.json, improvement items are issues labelled delivery-improvement, and quarterly reviews are kept under docs/delivery-reviews/; the platform snippets use GitLab's DORA API, with glab in place of gh."
     },
     {
       "id": "req-response-report--derives--need",
       "sourceId": "req-response-report",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team needs to know how often and how fast its changes reach production, how often a change breaks something and how long the break lasts, and whether that is getting better, so that improvement work goes where it pays. The figures must count the same things every week, be read against the team's own targets rather than other teams, and lead to action when they stay off target. The snippets assume the code on GitHub with GitHub Actions: the deploy job records each production deployment through the GitHub Deployments API, scripts/delivery-metrics.sh runs the measurement (scripts/delivery-flow.mjs and scripts/delivery-failures.mjs, or the platform query) and writes reports/delivery-*.json, improvement items are issues labelled delivery-improvement, and quarterly reviews are kept under docs/delivery-reviews/; the platform snippets use GitLab's DORA API, with glab in place of gh."
     },
     {
       "id": "req-review--derives--need",
       "sourceId": "req-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team needs to know how often and how fast its changes reach production, how often a change breaks something and how long the break lasts, and whether that is getting better, so that improvement work goes where it pays. The figures must count the same things every week, be read against the team's own targets rather than other teams, and lead to action when they stay off target. The snippets assume the code on GitHub with GitHub Actions: the deploy job records each production deployment through the GitHub Deployments API, scripts/delivery-metrics.sh runs the measurement (scripts/delivery-flow.mjs and scripts/delivery-failures.mjs, or the platform query) and writes reports/delivery-*.json, improvement items are issues labelled delivery-improvement, and quarterly reviews are kept under docs/delivery-reviews/; the platform snippets use GitLab's DORA API, with glab in place of gh."
     },
     {
       "id": "req-no-ranking--derives--need",
       "sourceId": "req-no-ranking",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team needs to know how often and how fast its changes reach production, how often a change breaks something and how long the break lasts, and whether that is getting better, so that improvement work goes where it pays. The figures must count the same things every week, be read against the team's own targets rather than other teams, and lead to action when they stay off target. The snippets assume the code on GitHub with GitHub Actions: the deploy job records each production deployment through the GitHub Deployments API, scripts/delivery-metrics.sh runs the measurement (scripts/delivery-flow.mjs and scripts/delivery-failures.mjs, or the platform query) and writes reports/delivery-*.json, improvement items are issues labelled delivery-improvement, and quarterly reviews are kept under docs/delivery-reviews/; the platform snippets use GitLab's DORA API, with glab in place of gh."
     },
     {
       "id": "sc-deploy-recorded--verifies--req-deploy-recorded",

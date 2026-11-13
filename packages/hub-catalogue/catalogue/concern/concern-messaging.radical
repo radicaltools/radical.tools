@@ -769,55 +769,64 @@
       "id": "req-envelope--derives--need",
       "sourceId": "req-envelope",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Parts of the system talk through queues. A message can be delivered twice, lost, arrive out of order, or fail every time it is handled; a producer can change a message so that a consumer released last month cannot read it. Each of these quietly corrupts data, and a stuck consumer looks like silence, unless it is decided how each is handled."
     },
     {
       "id": "req-dedupe--derives--need",
       "sourceId": "req-dedupe",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Parts of the system talk through queues. A message can be delivered twice, lost, arrive out of order, or fail every time it is handled; a producer can change a message so that a consumer released last month cannot read it. Each of these quietly corrupts data, and a stuck consumer looks like silence, unless it is decided how each is handled."
     },
     {
       "id": "req-dlq--derives--need",
       "sourceId": "req-dlq",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Parts of the system talk through queues. A message can be delivered twice, lost, arrive out of order, or fail every time it is handled; a producer can change a message so that a consumer released last month cannot read it. Each of these quietly corrupts data, and a stuck consumer looks like silence, unless it is decided how each is handled."
     },
     {
       "id": "req-lossy--derives--need",
       "sourceId": "req-lossy",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Parts of the system talk through queues. A message can be delivered twice, lost, arrive out of order, or fail every time it is handled; a producer can change a message so that a consumer released last month cannot read it. Each of these quietly corrupts data, and a stuck consumer looks like silence, unless it is decided how each is handled."
     },
     {
       "id": "req-order--derives--need",
       "sourceId": "req-order",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Parts of the system talk through queues. A message can be delivered twice, lost, arrive out of order, or fail every time it is handled; a producer can change a message so that a consumer released last month cannot read it. Each of these quietly corrupts data, and a stuck consumer looks like silence, unless it is decided how each is handled."
     },
     {
       "id": "req-stale--derives--need",
       "sourceId": "req-stale",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Parts of the system talk through queues. A message can be delivered twice, lost, arrive out of order, or fail every time it is handled; a producer can change a message so that a consumer released last month cannot read it. Each of these quietly corrupts data, and a stuck consumer looks like silence, unless it is decided how each is handled."
     },
     {
       "id": "req-schema-registry--derives--need",
       "sourceId": "req-schema-registry",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Parts of the system talk through queues. A message can be delivered twice, lost, arrive out of order, or fail every time it is handled; a producer can change a message so that a consumer released last month cannot read it. Each of these quietly corrupts data, and a stuck consumer looks like silence, unless it is decided how each is handled."
     },
     {
       "id": "req-schema-repo--derives--need",
       "sourceId": "req-schema-repo",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Parts of the system talk through queues. A message can be delivered twice, lost, arrive out of order, or fail every time it is handled; a producer can change a message so that a consumer released last month cannot read it. Each of these quietly corrupts data, and a stuck consumer looks like silence, unless it is decided how each is handled."
     },
     {
       "id": "req-lag--derives--need",
       "sourceId": "req-lag",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Parts of the system talk through queues. A message can be delivered twice, lost, arrive out of order, or fail every time it is handled; a producer can change a message so that a consumer released last month cannot read it. Each of these quietly corrupts data, and a stuck consumer looks like silence, unless it is decided how each is handled."
     },
     {
       "id": "sc-envelope--verifies--req-envelope",

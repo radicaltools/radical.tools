@@ -844,73 +844,85 @@
       "id": "req-casing--derives--need",
       "sourceId": "req-casing",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other parts of the system and outside systems call this element over HTTP and JSON. Each caller learns the API's conventions once and builds on them: a field named in another style, a path that hides a verb, a GET that changes something, a 200 where a 201 or a 404 belongs, or a request that hangs for minutes each costs every caller a special case, a retry that does harm, or a timeout. The snippets assume the OpenAPI document at api/openapi.yaml, linted by Spectral with the ruleset .spectral.yaml at the repository root (each check adds its rules to it), the application exported by src/app, and the HTTP tests under test/api with their fixtures in test/api/fixtures.ts."
     },
     {
       "id": "req-paths--derives--need",
       "sourceId": "req-paths",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other parts of the system and outside systems call this element over HTTP and JSON. Each caller learns the API's conventions once and builds on them: a field named in another style, a path that hides a verb, a GET that changes something, a 200 where a 201 or a 404 belongs, or a request that hangs for minutes each costs every caller a special case, a retry that does harm, or a timeout. The snippets assume the OpenAPI document at api/openapi.yaml, linted by Spectral with the ruleset .spectral.yaml at the repository root (each check adds its rules to it), the application exported by src/app, and the HTTP tests under test/api with their fixtures in test/api/fixtures.ts."
     },
     {
       "id": "req-methods--derives--need",
       "sourceId": "req-methods",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other parts of the system and outside systems call this element over HTTP and JSON. Each caller learns the API's conventions once and builds on them: a field named in another style, a path that hides a verb, a GET that changes something, a 200 where a 201 or a 404 belongs, or a request that hangs for minutes each costs every caller a special case, a retry that does harm, or a timeout. The snippets assume the OpenAPI document at api/openapi.yaml, linted by Spectral with the ruleset .spectral.yaml at the repository root (each check adds its rules to it), the application exported by src/app, and the HTTP tests under test/api with their fixtures in test/api/fixtures.ts."
     },
     {
       "id": "req-create--derives--need",
       "sourceId": "req-create",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other parts of the system and outside systems call this element over HTTP and JSON. Each caller learns the API's conventions once and builds on them: a field named in another style, a path that hides a verb, a GET that changes something, a 200 where a 201 or a 404 belongs, or a request that hangs for minutes each costs every caller a special case, a retry that does harm, or a timeout. The snippets assume the OpenAPI document at api/openapi.yaml, linted by Spectral with the ruleset .spectral.yaml at the repository root (each check adds its rules to it), the application exported by src/app, and the HTTP tests under test/api with their fixtures in test/api/fixtures.ts."
     },
     {
       "id": "req-unsupported--derives--need",
       "sourceId": "req-unsupported",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other parts of the system and outside systems call this element over HTTP and JSON. Each caller learns the API's conventions once and builds on them: a field named in another style, a path that hides a verb, a GET that changes something, a 200 where a 201 or a 404 belongs, or a request that hangs for minutes each costs every caller a special case, a retry that does harm, or a timeout. The snippets assume the OpenAPI document at api/openapi.yaml, linted by Spectral with the ruleset .spectral.yaml at the repository root (each check adds its rules to it), the application exported by src/app, and the HTTP tests under test/api with their fixtures in test/api/fixtures.ts."
     },
     {
       "id": "req-formats--derives--need",
       "sourceId": "req-formats",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other parts of the system and outside systems call this element over HTTP and JSON. Each caller learns the API's conventions once and builds on them: a field named in another style, a path that hides a verb, a GET that changes something, a 200 where a 201 or a 404 belongs, or a request that hangs for minutes each costs every caller a special case, a retry that does harm, or a timeout. The snippets assume the OpenAPI document at api/openapi.yaml, linted by Spectral with the ruleset .spectral.yaml at the repository root (each check adds its rules to it), the application exported by src/app, and the HTTP tests under test/api with their fixtures in test/api/fixtures.ts."
     },
     {
       "id": "req-sync--derives--need",
       "sourceId": "req-sync",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other parts of the system and outside systems call this element over HTTP and JSON. Each caller learns the API's conventions once and builds on them: a field named in another style, a path that hides a verb, a GET that changes something, a 200 where a 201 or a 404 belongs, or a request that hangs for minutes each costs every caller a special case, a retry that does harm, or a timeout. The snippets assume the OpenAPI document at api/openapi.yaml, linted by Spectral with the ruleset .spectral.yaml at the repository root (each check adds its rules to it), the application exported by src/app, and the HTTP tests under test/api with their fixtures in test/api/fixtures.ts."
     },
     {
       "id": "req-actions-custom--derives--need",
       "sourceId": "req-actions-custom",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other parts of the system and outside systems call this element over HTTP and JSON. Each caller learns the API's conventions once and builds on them: a field named in another style, a path that hides a verb, a GET that changes something, a 200 where a 201 or a 404 belongs, or a request that hangs for minutes each costs every caller a special case, a retry that does harm, or a timeout. The snippets assume the OpenAPI document at api/openapi.yaml, linted by Spectral with the ruleset .spectral.yaml at the repository root (each check adds its rules to it), the application exported by src/app, and the HTTP tests under test/api with their fixtures in test/api/fixtures.ts."
     },
     {
       "id": "req-actions-resource--derives--need",
       "sourceId": "req-actions-resource",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other parts of the system and outside systems call this element over HTTP and JSON. Each caller learns the API's conventions once and builds on them: a field named in another style, a path that hides a verb, a GET that changes something, a 200 where a 201 or a 404 belongs, or a request that hangs for minutes each costs every caller a special case, a retry that does harm, or a timeout. The snippets assume the OpenAPI document at api/openapi.yaml, linted by Spectral with the ruleset .spectral.yaml at the repository root (each check adds its rules to it), the application exported by src/app, and the HTTP tests under test/api with their fixtures in test/api/fixtures.ts."
     },
     {
       "id": "req-actions-patch--derives--need",
       "sourceId": "req-actions-patch",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other parts of the system and outside systems call this element over HTTP and JSON. Each caller learns the API's conventions once and builds on them: a field named in another style, a path that hides a verb, a GET that changes something, a 200 where a 201 or a 404 belongs, or a request that hangs for minutes each costs every caller a special case, a retry that does harm, or a timeout. The snippets assume the OpenAPI document at api/openapi.yaml, linted by Spectral with the ruleset .spectral.yaml at the repository root (each check adds its rules to it), the application exported by src/app, and the HTTP tests under test/api with their fixtures in test/api/fixtures.ts."
     },
     {
       "id": "req-lro-operation--derives--need",
       "sourceId": "req-lro-operation",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other parts of the system and outside systems call this element over HTTP and JSON. Each caller learns the API's conventions once and builds on them: a field named in another style, a path that hides a verb, a GET that changes something, a 200 where a 201 or a 404 belongs, or a request that hangs for minutes each costs every caller a special case, a retry that does harm, or a timeout. The snippets assume the OpenAPI document at api/openapi.yaml, linted by Spectral with the ruleset .spectral.yaml at the repository root (each check adds its rules to it), the application exported by src/app, and the HTTP tests under test/api with their fixtures in test/api/fixtures.ts."
     },
     {
       "id": "req-lro-callback--derives--need",
       "sourceId": "req-lro-callback",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other parts of the system and outside systems call this element over HTTP and JSON. Each caller learns the API's conventions once and builds on them: a field named in another style, a path that hides a verb, a GET that changes something, a 200 where a 201 or a 404 belongs, or a request that hangs for minutes each costs every caller a special case, a retry that does harm, or a timeout. The snippets assume the OpenAPI document at api/openapi.yaml, linted by Spectral with the ruleset .spectral.yaml at the repository root (each check adds its rules to it), the application exported by src/app, and the HTTP tests under test/api with their fixtures in test/api/fixtures.ts."
     },
     {
       "id": "sc-casing--verifies--req-casing",

@@ -894,79 +894,92 @@
       "id": "req-pr-suite--derives--need",
       "sourceId": "req-pr-suite",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element changes often, and every change must be releasable without fear: the tests have to catch a broken rule, a broken integration and a broken journey before users do, give that answer quickly enough that people wait for it, and give the same answer every time they run on the same code. A green build must mean something. The checks below share one layout: unit tests under test/unit, integration tests under test/integration, end-to-end journeys as Playwright specs under e2e/<journey>.spec.ts, JUnit reports written to reports/<suite>.xml, quarantined tests listed in quarantine.json."
     },
     {
       "id": "req-coverage--derives--need",
       "sourceId": "req-coverage",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element changes often, and every change must be releasable without fear: the tests have to catch a broken rule, a broken integration and a broken journey before users do, give that answer quickly enough that people wait for it, and give the same answer every time they run on the same code. A green build must mean something. The checks below share one layout: unit tests under test/unit, integration tests under test/integration, end-to-end journeys as Playwright specs under e2e/<journey>.spec.ts, JUnit reports written to reports/<suite>.xml, quarantined tests listed in quarantine.json."
     },
     {
       "id": "req-mutation--derives--need",
       "sourceId": "req-mutation",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element changes often, and every change must be releasable without fear: the tests have to catch a broken rule, a broken integration and a broken journey before users do, give that answer quickly enough that people wait for it, and give the same answer every time they run on the same code. A green build must mean something. The checks below share one layout: unit tests under test/unit, integration tests under test/integration, end-to-end journeys as Playwright specs under e2e/<journey>.spec.ts, JUnit reports written to reports/<suite>.xml, quarantined tests listed in quarantine.json."
     },
     {
       "id": "req-pyramid--derives--need",
       "sourceId": "req-pyramid",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element changes often, and every change must be releasable without fear: the tests have to catch a broken rule, a broken integration and a broken journey before users do, give that answer quickly enough that people wait for it, and give the same answer every time they run on the same code. A green build must mean something. The checks below share one layout: unit tests under test/unit, integration tests under test/integration, end-to-end journeys as Playwright specs under e2e/<journey>.spec.ts, JUnit reports written to reports/<suite>.xml, quarantined tests listed in quarantine.json."
     },
     {
       "id": "req-trophy--derives--need",
       "sourceId": "req-trophy",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element changes often, and every change must be releasable without fear: the tests have to catch a broken rule, a broken integration and a broken journey before users do, give that answer quickly enough that people wait for it, and give the same answer every time they run on the same code. A green build must mean something. The checks below share one layout: unit tests under test/unit, integration tests under test/integration, end-to-end journeys as Playwright specs under e2e/<journey>.spec.ts, JUnit reports written to reports/<suite>.xml, quarantined tests listed in quarantine.json."
     },
     {
       "id": "req-own-data--derives--need",
       "sourceId": "req-own-data",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element changes often, and every change must be releasable without fear: the tests have to catch a broken rule, a broken integration and a broken journey before users do, give that answer quickly enough that people wait for it, and give the same answer every time they run on the same code. A green build must mean something. The checks below share one layout: unit tests under test/unit, integration tests under test/integration, end-to-end journeys as Playwright specs under e2e/<journey>.spec.ts, JUnit reports written to reports/<suite>.xml, quarantined tests listed in quarantine.json."
     },
     {
       "id": "req-fixtures--derives--need",
       "sourceId": "req-fixtures",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element changes often, and every change must be releasable without fear: the tests have to catch a broken rule, a broken integration and a broken journey before users do, give that answer quickly enough that people wait for it, and give the same answer every time they run on the same code. A green build must mean something. The checks below share one layout: unit tests under test/unit, integration tests under test/integration, end-to-end journeys as Playwright specs under e2e/<journey>.spec.ts, JUnit reports written to reports/<suite>.xml, quarantined tests listed in quarantine.json."
     },
     {
       "id": "req-masking--derives--need",
       "sourceId": "req-masking",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element changes often, and every change must be releasable without fear: the tests have to catch a broken rule, a broken integration and a broken journey before users do, give that answer quickly enough that people wait for it, and give the same answer every time they run on the same code. A green build must mean something. The checks below share one layout: unit tests under test/unit, integration tests under test/integration, end-to-end journeys as Playwright specs under e2e/<journey>.spec.ts, JUnit reports written to reports/<suite>.xml, quarantined tests listed in quarantine.json."
     },
     {
       "id": "req-e2e-pr--derives--need",
       "sourceId": "req-e2e-pr",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element changes often, and every change must be releasable without fear: the tests have to catch a broken rule, a broken integration and a broken journey before users do, give that answer quickly enough that people wait for it, and give the same answer every time they run on the same code. A green build must mean something. The checks below share one layout: unit tests under test/unit, integration tests under test/integration, end-to-end journeys as Playwright specs under e2e/<journey>.spec.ts, JUnit reports written to reports/<suite>.xml, quarantined tests listed in quarantine.json."
     },
     {
       "id": "req-e2e-staging--derives--need",
       "sourceId": "req-e2e-staging",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element changes often, and every change must be releasable without fear: the tests have to catch a broken rule, a broken integration and a broken journey before users do, give that answer quickly enough that people wait for it, and give the same answer every time they run on the same code. A green build must mean something. The checks below share one layout: unit tests under test/unit, integration tests under test/integration, end-to-end journeys as Playwright specs under e2e/<journey>.spec.ts, JUnit reports written to reports/<suite>.xml, quarantined tests listed in quarantine.json."
     },
     {
       "id": "req-e2e-prod--derives--need",
       "sourceId": "req-e2e-prod",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element changes often, and every change must be releasable without fear: the tests have to catch a broken rule, a broken integration and a broken journey before users do, give that answer quickly enough that people wait for it, and give the same answer every time they run on the same code. A green build must mean something. The checks below share one layout: unit tests under test/unit, integration tests under test/integration, end-to-end journeys as Playwright specs under e2e/<journey>.spec.ts, JUnit reports written to reports/<suite>.xml, quarantined tests listed in quarantine.json."
     },
     {
       "id": "req-quarantine--derives--need",
       "sourceId": "req-quarantine",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element changes often, and every change must be releasable without fear: the tests have to catch a broken rule, a broken integration and a broken journey before users do, give that answer quickly enough that people wait for it, and give the same answer every time they run on the same code. A green build must mean something. The checks below share one layout: unit tests under test/unit, integration tests under test/integration, end-to-end journeys as Playwright specs under e2e/<journey>.spec.ts, JUnit reports written to reports/<suite>.xml, quarantined tests listed in quarantine.json."
     },
     {
       "id": "req-no-retry--derives--need",
       "sourceId": "req-no-retry",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element changes often, and every change must be releasable without fear: the tests have to catch a broken rule, a broken integration and a broken journey before users do, give that answer quickly enough that people wait for it, and give the same answer every time they run on the same code. A green build must mean something. The checks below share one layout: unit tests under test/unit, integration tests under test/integration, end-to-end journeys as Playwright specs under e2e/<journey>.spec.ts, JUnit reports written to reports/<suite>.xml, quarantined tests listed in quarantine.json."
     },
     {
       "id": "sc-pr-suite--verifies--req-pr-suite",

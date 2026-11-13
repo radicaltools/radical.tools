@@ -803,73 +803,85 @@
       "id": "req-ranking--derives--need",
       "sourceId": "req-ranking",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system has to be reliable, secure, fast, easy to change and affordable, and these goals pull against each other: redundancy costs money, encryption costs latency, a fast release cadence costs stability. Settled one conflict at a time, the answer depends on who is in the room. The order has to be written down and signed before the conflicts come, the goals have to be measurable, and every decision that gives one up has to say so. The checks assume the architecture model as the Radical Markdown folder architecture/ (nodes under architecture/nodes with their properties in the front matter, relations in architecture/relations.json), and one folder quality/<system>/ per system of the model (its label in lower case, other characters as dashes) holding ranking.json and, with a utility tree, utility-tree.yaml."
     },
     {
       "id": "req-signoff--derives--need",
       "sourceId": "req-signoff",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system has to be reliable, secure, fast, easy to change and affordable, and these goals pull against each other: redundancy costs money, encryption costs latency, a fast release cadence costs stability. Settled one conflict at a time, the answer depends on who is in the room. The order has to be written down and signed before the conflicts come, the goals have to be measurable, and every decision that gives one up has to say so. The checks assume the architecture model as the Radical Markdown folder architecture/ (nodes under architecture/nodes with their properties in the front matter, relations in architecture/relations.json), and one folder quality/<system>/ per system of the model (its label in lower case, other characters as dashes) holding ranking.json and, with a utility tree, utility-tree.yaml."
     },
     {
       "id": "req-review-calendar--derives--need",
       "sourceId": "req-review-calendar",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system has to be reliable, secure, fast, easy to change and affordable, and these goals pull against each other: redundancy costs money, encryption costs latency, a fast release cadence costs stability. Settled one conflict at a time, the answer depends on who is in the room. The order has to be written down and signed before the conflicts come, the goals have to be measurable, and every decision that gives one up has to say so. The checks assume the architecture model as the Radical Markdown folder architecture/ (nodes under architecture/nodes with their properties in the front matter, relations in architecture/relations.json), and one folder quality/<system>/ per system of the model (its label in lower case, other characters as dashes) holding ranking.json and, with a utility tree, utility-tree.yaml."
     },
     {
       "id": "req-review-release--derives--need",
       "sourceId": "req-review-release",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system has to be reliable, secure, fast, easy to change and affordable, and these goals pull against each other: redundancy costs money, encryption costs latency, a fast release cadence costs stability. Settled one conflict at a time, the answer depends on who is in the room. The order has to be written down and signed before the conflicts come, the goals have to be measurable, and every decision that gives one up has to say so. The checks assume the architecture model as the Radical Markdown folder architecture/ (nodes under architecture/nodes with their properties in the front matter, relations in architecture/relations.json), and one folder quality/<system>/ per system of the model (its label in lower case, other characters as dashes) holding ranking.json and, with a utility tree, utility-tree.yaml."
     },
     {
       "id": "req-qas-form--derives--need",
       "sourceId": "req-qas-form",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system has to be reliable, secure, fast, easy to change and affordable, and these goals pull against each other: redundancy costs money, encryption costs latency, a fast release cadence costs stability. Settled one conflict at a time, the answer depends on who is in the room. The order has to be written down and signed before the conflicts come, the goals have to be measurable, and every decision that gives one up has to say so. The checks assume the architecture model as the Radical Markdown folder architecture/ (nodes under architecture/nodes with their properties in the front matter, relations in architecture/relations.json), and one folder quality/<system>/ per system of the model (its label in lower case, other characters as dashes) holding ranking.json and, with a utility tree, utility-tree.yaml."
     },
     {
       "id": "req-lead-scenarios--derives--need",
       "sourceId": "req-lead-scenarios",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system has to be reliable, secure, fast, easy to change and affordable, and these goals pull against each other: redundancy costs money, encryption costs latency, a fast release cadence costs stability. Settled one conflict at a time, the answer depends on who is in the room. The order has to be written down and signed before the conflicts come, the goals have to be measurable, and every decision that gives one up has to say so. The checks assume the architecture model as the Radical Markdown folder architecture/ (nodes under architecture/nodes with their properties in the front matter, relations in architecture/relations.json), and one folder quality/<system>/ per system of the model (its label in lower case, other characters as dashes) holding ranking.json and, with a utility tree, utility-tree.yaml."
     },
     {
       "id": "req-utility-tree--derives--need",
       "sourceId": "req-utility-tree",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system has to be reliable, secure, fast, easy to change and affordable, and these goals pull against each other: redundancy costs money, encryption costs latency, a fast release cadence costs stability. Settled one conflict at a time, the answer depends on who is in the room. The order has to be written down and signed before the conflicts come, the goals have to be measurable, and every decision that gives one up has to say so. The checks assume the architecture model as the Radical Markdown folder architecture/ (nodes under architecture/nodes with their properties in the front matter, relations in architecture/relations.json), and one folder quality/<system>/ per system of the model (its label in lower case, other characters as dashes) holding ranking.json and, with a utility tree, utility-tree.yaml."
     },
     {
       "id": "req-workshop--derives--need",
       "sourceId": "req-workshop",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system has to be reliable, secure, fast, easy to change and affordable, and these goals pull against each other: redundancy costs money, encryption costs latency, a fast release cadence costs stability. Settled one conflict at a time, the answer depends on who is in the room. The order has to be written down and signed before the conflicts come, the goals have to be measurable, and every decision that gives one up has to say so. The checks assume the architecture model as the Radical Markdown folder architecture/ (nodes under architecture/nodes with their properties in the front matter, relations in architecture/relations.json), and one folder quality/<system>/ per system of the model (its label in lower case, other characters as dashes) holding ranking.json and, with a utility tree, utility-tree.yaml."
     },
     {
       "id": "req-qas-review--derives--need",
       "sourceId": "req-qas-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system has to be reliable, secure, fast, easy to change and affordable, and these goals pull against each other: redundancy costs money, encryption costs latency, a fast release cadence costs stability. Settled one conflict at a time, the answer depends on who is in the room. The order has to be written down and signed before the conflicts come, the goals have to be measurable, and every decision that gives one up has to say so. The checks assume the architecture model as the Radical Markdown folder architecture/ (nodes under architecture/nodes with their properties in the front matter, relations in architecture/relations.json), and one folder quality/<system>/ per system of the model (its label in lower case, other characters as dashes) holding ranking.json and, with a utility tree, utility-tree.yaml."
     },
     {
       "id": "req-anchors--derives--need",
       "sourceId": "req-anchors",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system has to be reliable, secure, fast, easy to change and affordable, and these goals pull against each other: redundancy costs money, encryption costs latency, a fast release cadence costs stability. Settled one conflict at a time, the answer depends on who is in the room. The order has to be written down and signed before the conflicts come, the goals have to be measurable, and every decision that gives one up has to say so. The checks assume the architecture model as the Radical Markdown folder architecture/ (nodes under architecture/nodes with their properties in the front matter, relations in architecture/relations.json), and one folder quality/<system>/ per system of the model (its label in lower case, other characters as dashes) holding ranking.json and, with a utility tree, utility-tree.yaml."
     },
     {
       "id": "req-tradeoff-line--derives--need",
       "sourceId": "req-tradeoff-line",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system has to be reliable, secure, fast, easy to change and affordable, and these goals pull against each other: redundancy costs money, encryption costs latency, a fast release cadence costs stability. Settled one conflict at a time, the answer depends on who is in the room. The order has to be written down and signed before the conflicts come, the goals have to be measurable, and every decision that gives one up has to say so. The checks assume the architecture model as the Radical Markdown folder architecture/ (nodes under architecture/nodes with their properties in the front matter, relations in architecture/relations.json), and one folder quality/<system>/ per system of the model (its label in lower case, other characters as dashes) holding ranking.json and, with a utility tree, utility-tree.yaml."
     },
     {
       "id": "req-tradeoff-exception--derives--need",
       "sourceId": "req-tradeoff-exception",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system has to be reliable, secure, fast, easy to change and affordable, and these goals pull against each other: redundancy costs money, encryption costs latency, a fast release cadence costs stability. Settled one conflict at a time, the answer depends on who is in the room. The order has to be written down and signed before the conflicts come, the goals have to be measurable, and every decision that gives one up has to say so. The checks assume the architecture model as the Radical Markdown folder architecture/ (nodes under architecture/nodes with their properties in the front matter, relations in architecture/relations.json), and one folder quality/<system>/ per system of the model (its label in lower case, other characters as dashes) holding ranking.json and, with a utility tree, utility-tree.yaml."
     },
     {
       "id": "sc-ranking--verifies--req-ranking",

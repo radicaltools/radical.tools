@@ -1178,85 +1178,99 @@
       "id": "req-default--derives--need",
       "sourceId": "req-default",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-depth--derives--need",
       "sourceId": "req-depth",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-contracts--derives--need",
       "sourceId": "req-contracts",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-deadline--derives--need",
       "sourceId": "req-deadline",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-commands--derives--need",
       "sourceId": "req-commands",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-events--derives--need",
       "sourceId": "req-events",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-propagation--derives--need",
       "sourceId": "req-propagation",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-replay--derives--need",
       "sourceId": "req-replay",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-orchestrated--derives--need",
       "sourceId": "req-orchestrated",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-orchestrated-fallback--derives--need",
       "sourceId": "req-orchestrated-fallback",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-choreographed--derives--need",
       "sourceId": "req-choreographed",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-local-flows--derives--need",
       "sourceId": "req-local-flows",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-contract-diff--derives--need",
       "sourceId": "req-contract-diff",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "req-pacts--derives--need",
       "sourceId": "req-pacts",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system's parts depend on each other for data and for work. When one is slow or down, the others should degrade in a known way instead of stalling in a chain of waiting calls; when one changes, the others should not break; and when a business flow runs across several parts, someone should be able to tell where it stands and what happens when a step fails. That needs a default way of talking, known exceptions, contracts for every interaction, and limits that the build and the monitoring check. The checks below share one layout: each part lives in services/<name> with its contract in services/<name>/openapi.yaml, services/<name>/asyncapi.yaml or proto/; the parts started for the end-to-end suite export their traces over OTLP (port 4318) to a Jaeger container whose query API (port 16686) the tests read through test/e2e/traces.ts; Kafka topics are declared as Strimzi KafkaTopic manifests in platform/kafka/topics/, RabbitMQ queues in platform/rabbitmq/definitions.json, and the topics and queues of a managed broker (Amazon SNS and SQS, Google Pub/Sub, Azure Service Bus, Confluent Cloud) in Terraform under infra/."
     },
     {
       "id": "sc-default--verifies--req-default",

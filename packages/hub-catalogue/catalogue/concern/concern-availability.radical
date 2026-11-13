@@ -812,61 +812,71 @@
       "id": "req-target--derives--need",
       "sourceId": "req-target",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element and depend on it answering. They need to know how much downtime to expect, and the team needs a number that decides when reliability work comes before features. The target has to be paid for with the redundancy it implies, hold up when a zone or a dependency fails, and survive the team's own releases and maintenance."
     },
     {
       "id": "req-instance--derives--need",
       "sourceId": "req-instance",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element and depend on it answering. They need to know how much downtime to expect, and the team needs a number that decides when reliability work comes before features. The target has to be paid for with the redundancy it implies, hold up when a zone or a dependency fails, and survive the team's own releases and maintenance."
     },
     {
       "id": "req-zones--derives--need",
       "sourceId": "req-zones",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element and depend on it answering. They need to know how much downtime to expect, and the team needs a number that decides when reliability work comes before features. The target has to be paid for with the redundancy it implies, hold up when a zone or a dependency fails, and survive the team's own releases and maintenance."
     },
     {
       "id": "req-region--derives--need",
       "sourceId": "req-region",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element and depend on it answering. They need to know how much downtime to expect, and the team needs a number that decides when reliability work comes before features. The target has to be paid for with the redundancy it implies, hold up when a zone or a dependency fails, and survive the team's own releases and maintenance."
     },
     {
       "id": "req-freeze--derives--need",
       "sourceId": "req-freeze",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element and depend on it answering. They need to know how much downtime to expect, and the team needs a number that decides when reliability work comes before features. The target has to be paid for with the redundancy it implies, hold up when a zone or a dependency fails, and survive the team's own releases and maintenance."
     },
     {
       "id": "req-review--derives--need",
       "sourceId": "req-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element and depend on it answering. They need to know how much downtime to expect, and the team needs a number that decides when reliability work comes before features. The target has to be paid for with the redundancy it implies, hold up when a zone or a dependency fails, and survive the team's own releases and maintenance."
     },
     {
       "id": "req-dependencies--derives--need",
       "sourceId": "req-dependencies",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element and depend on it answering. They need to know how much downtime to expect, and the team needs a number that decides when reliability work comes before features. The target has to be paid for with the redundancy it implies, hold up when a zone or a dependency fails, and survive the team's own releases and maintenance."
     },
     {
       "id": "req-degrade--derives--need",
       "sourceId": "req-degrade",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element and depend on it answering. They need to know how much downtime to expect, and the team needs a number that decides when reliability work comes before features. The target has to be paid for with the redundancy it implies, hold up when a zone or a dependency fails, and survive the team's own releases and maintenance."
     },
     {
       "id": "req-online--derives--need",
       "sourceId": "req-online",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element and depend on it answering. They need to know how much downtime to expect, and the team needs a number that decides when reliability work comes before features. The target has to be paid for with the redundancy it implies, hold up when a zone or a dependency fails, and survive the team's own releases and maintenance."
     },
     {
       "id": "req-window--derives--need",
       "sourceId": "req-window",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element and depend on it answering. They need to know how much downtime to expect, and the team needs a number that decides when reliability work comes before features. The target has to be paid for with the redundancy it implies, hold up when a zone or a dependency fails, and survive the team's own releases and maintenance."
     },
     {
       "id": "sc-target--verifies--req-target",

@@ -20,6 +20,7 @@ import { concernPacks, type ConcernPack } from '@radical/common/concerns'
 import { samePlacesAside } from '@radical/common/model'
 import { documents, useDocumentsStore } from '../store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './autosave'
+import { useBranchStore } from './branchChanges'
 
 const POLL_MS = 3000
 /** After the last change of the model, so a drag does not check every frame. */
@@ -149,7 +150,9 @@ function recheck(): void {
   // scenario's and fitness function's.
   const repo = useDiagramStore.getState().repository
   const repository = repo ? { file: REPOSITORY_FILE, implements: repo.implements.map((m) => ({ ...m, missing: [] })), verifies: repo.verifies, ...(repo.tests ? { tests: repo.tests } : {}), ...(repo.ci ? { ci: repo.ci } : {}) } : undefined
-  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases, testsReadAt: testsRanAt(results) } : {}), ...(measurements ? { measurements } : {}), concerns, ...(repository ? { repository } : {}) })
+  // The branch's base, for need-answer-changed: a person's words are only added to.
+  const baseNodes = useBranchStore.getState().base?.nodes
+  const check = checkModel(useDiagramStore.getState().saveDiagram(), config, { ...(results ? { tests: results.cases, testsReadAt: testsRanAt(results) } : {}), ...(measurements ? { measurements } : {}), concerns, ...(repository ? { repository } : {}), ...(baseNodes ? { baseNodes } : {}) })
   useInspectorStore.setState({ check })
   // Each one's tests with their outcomes, for the element's card.
   const testOutcomes = check.evidence
@@ -242,6 +245,9 @@ if (typeof window !== 'undefined') {
     void poll()
   })
 
+
+  // The branch's base came in or changed: answers held there are checked against it.
+  useBranchStore.subscribe((s, prev) => { if (s.base !== prev.base) { clearTimeout(timer); timer = setTimeout(recheck, RECHECK_MS) } })
 
   setInterval(() => { void poll() }, POLL_MS)
   useDocumentsStore.subscribe((s) => { if (s.activeId !== polledFor) void poll() })

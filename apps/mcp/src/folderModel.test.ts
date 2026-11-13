@@ -1355,3 +1355,101 @@ describe('brief answers for agents', () => {
     expect((await model.call('get_model_summary', { types: 'requirement' })).ok).toBe(false)
   })
 })
+
+describe('requirements reviewed against their needs', () => {
+  const exec = promisify(execFile)
+  const git = (cwd: string, ...args: string[]) =>
+    exec('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd })
+
+  it('lists each changed requirement next to the words of its needs (Requirement read against the client\'s words)', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    const words = 'From Tomek: I need to know what our goods cost us.\n\nQ: What does a product never received at a cost show?\nA: No average (null, not zero), and its stock is worth 0.'
+    await model.call('add_node', { tempId: 'cost', type: 'need', label: 'Cost of goods', description: words })
+    await model.call('add_node', { tempId: 'old', type: 'requirement', label: 'Average cost', properties: { ears_type: 'ubiquitous', action: 'keep one weighted average cost per product' } })
+    await model.call('add_relation', { sourceId: 'old', targetId: 'cost', relationType: 'derives' })
+    await model.call('add_node', { tempId: 'other', type: 'need', label: 'Shipping', description: 'From Kasia: send paid orders out.' })
+    await model.call('add_node', { tempId: 'ship', type: 'requirement', label: 'Ship paid orders', properties: { ears_type: 'ubiquitous', action: 'ship only paid orders' } })
+    await model.call('add_relation', { sourceId: 'ship', targetId: 'other', relationType: 'derives' })
+    await git(folder, 'init', '-q', '-b', 'main')
+    await git(folder, 'add', '.')
+    await git(folder, 'commit', '-q', '-m', 'model')
+
+    // On the branch: a requirement from the need, one through another requirement, one from no need.
+    await model.call('add_node', { tempId: 'value', type: 'requirement', label: 'Show stock value', properties: { ears_type: 'ubiquitous', action: 'show the stock value of each product, null when it has no average' } })
+    await model.call('add_relation', { sourceId: 'value', targetId: 'old', relationType: 'derives' })
+    await model.call('add_node', { tempId: 'orphan', type: 'requirement', label: 'List products', properties: { ears_type: 'ubiquitous', action: 'list the products' } })
+    const review = await model.call('review_requirements', {})
+    expect(review.ok, review.text).toBe(true)
+    expect(review.text).toContain('Review 2 requirements')
+    expect(review.text).toContain('## Requirement "Show stock value"')
+    expect(review.text).toContain('The system shall show the stock value of each product, null when it has no average')
+    expect(review.text).toContain('### Need "Cost of goods"')
+    expect(review.text).toContain('A: No average (null, not zero), and its stock is worth 0.')
+    expect(review.text).toContain('Derive from no need: "List products"')
+    expect(review.text).not.toContain('Ship paid orders')
+    expect(review.text).not.toContain('## Requirement "Average cost"')
+
+    // A derives relation that quotes the need shows those words instead of the whole need.
+    await model.call('add_node', { tempId: 'zero', type: 'requirement', label: 'Worth of unknown stock', properties: { ears_type: 'ubiquitous', action: 'value stock without an average at 0' } })
+    await model.call('add_relation', { sourceId: 'zero', targetId: 'cost', relationType: 'derives', properties: { quote: 'its stock is worth 0.' } })
+    const quoted = await model.call('review_requirements', { ids: ['zero'] })
+    expect(quoted.text).toContain('### Rests on need "Cost of goods"')
+    expect(quoted.text).toContain('quoting:\nits stock is worth 0.')
+    expect(quoted.text).not.toContain('From Tomek: I need to know')
+    // What the values alone show is listed with the requirement.
+    await model.call('add_node', { tempId: 'nullv', type: 'requirement', label: 'Stock value without cost', properties: { ears_type: 'ubiquitous', action: 'show the stock value as null without an average' } })
+    await model.call('add_relation', { sourceId: 'nullv', targetId: 'cost', relationType: 'derives', properties: { quote: 'its stock is worth 0.' } })
+    const gaps = await model.call('review_requirements', { ids: ['nullv'] })
+    expect(gaps.text).toContain('Values its quotes say and it does not: "0".')
+    expect(gaps.text).toContain('Values it says and no quote says: "null".')
+
+    // A need changed on the branch leads to the requirements that derive from it.
+    await model.call('update_node', { id: 'other', description: 'From Kasia: send paid orders out.\n\nQ: Partly? A: Whole orders only.' })
+    expect((await model.call('review_requirements', {})).text).toContain('## Requirement "Ship paid orders"')
+
+    // Named, only those; a need without a question is pointed out.
+    const named = await model.call('review_requirements', { ids: ['orphan'] })
+    expect(named.text).toContain('Review 1 requirement (the requirements named)')
+    expect(named.text).not.toContain('Show stock value')
+    expect((await model.call('review_requirements', { ids: ['cost'] })).text).toContain('not requirements of this model')
+    await model.call('add_relation', { sourceId: 'orphan', targetId: 'other', relationType: 'derives' })
+    await model.call('update_node', { id: 'other', description: 'From Kasia: send paid orders out.' })
+    expect((await model.call('review_requirements', { ids: ['orphan'] })).text).toContain('holds no question asked of a person')
+  })
+
+  it("tells an agent writing the model what it brings in of the person's words (Write tells of a lost value)", async () => {
+    const write = async (folder: string) => {
+      const model = await FolderModel.open(folder)
+      await model.call('add_node', { tempId: 'cost', type: 'need', label: 'Cost of goods', description: 'Q: What is stock without a cost worth?\nA: The stock is worth 0.' })
+      await model.call('add_node', { tempId: 'value', type: 'requirement', label: 'Stock value', properties: { ears_type: 'ubiquitous', action: 'show the stock value as null without an average' } })
+      return await model.call('add_relation', { sourceId: 'value', targetId: 'cost', relationType: 'derives', properties: { quote: 'The stock is worth 0' } })
+    }
+    const told = await write(await fixture())
+    expect(told.ok, told.text).toBe(true)
+    expect(told.text).toContain('Changed: relations.json')
+    expect(told.text).toContain("The person's words, as radical check reads them, after this change")
+    expect(told.text).toContain('Requirement "Stock value" does not say "0", which the words it quotes from "Cost of goods" say.')
+    // A rule check.json turns off is not named.
+    const quiet = await fixture()
+    await writeFile(join(quiet, 'check.json'), JSON.stringify({ rules: { 'quote-value-missing': 'off', 'requirement-value-unquoted': 'off' } }))
+    const silent = await write(quiet)
+    expect(silent.ok, silent.text).toBe(true)
+    expect(silent.text).not.toContain('does not say "0"')
+  })
+
+  it('asks agents for the person\'s words in the need and a review before the code (Agent told to keep answers and review)', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    const summary = (await model.call('get_model_summary', {})).text
+    expect(summary).toContain('add your question and their answer to the need\'s description word for word')
+    const client = new Client({ name: 'radical-test', version: '1.0.0' })
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(import.meta.dirname, '../dist/index.js'), '--folder', folder] }))
+    try {
+      expect(client.getInstructions()).toContain('call review_requirements and correct each requirement that does not say what the person said')
+      expect((await client.listTools()).tools.map((t) => t.name)).toContain('review_requirements')
+    } finally {
+      await client.close()
+    }
+  })
+})

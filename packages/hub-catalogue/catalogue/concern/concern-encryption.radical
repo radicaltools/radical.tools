@@ -994,85 +994,99 @@
       "id": "req-tls-outside--derives--need",
       "sourceId": "req-tls-outside",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "req-tls13--derives--need",
       "sourceId": "req-tls13",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "req-tls12--derives--need",
       "sourceId": "req-tls12",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "req-mtls--derives--need",
       "sourceId": "req-mtls",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "req-internal-tls--derives--need",
       "sourceId": "req-internal-tls",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "req-private--derives--need",
       "sourceId": "req-private",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "req-rest--derives--need",
       "sourceId": "req-rest",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "req-key-access--derives--need",
       "sourceId": "req-key-access",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "req-field--derives--need",
       "sourceId": "req-field",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "req-rotate-auto--derives--need",
       "sourceId": "req-rotate-auto",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "req-rotate-reencrypt--derives--need",
       "sourceId": "req-rotate-reencrypt",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "req-key-compromise--derives--need",
       "sourceId": "req-key-compromise",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "req-certs-acme--derives--need",
       "sourceId": "req-certs-acme",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "req-certs-ca--derives--need",
       "sourceId": "req-certs-ca",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Data reaches the element from people and other systems and is kept in its databases, queues, files and backups. Nobody between the caller and the element, nobody on the network inside, and nobody who gets a disk, a snapshot or a backup may read or change it; the people who can decrypt it are known and few; and the certificates and keys that protect it neither expire unnoticed nor stay in use for years."
     },
     {
       "id": "sc-tls-outside--verifies--req-tls-outside",

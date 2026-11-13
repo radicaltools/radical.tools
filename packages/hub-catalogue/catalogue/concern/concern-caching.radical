@@ -994,85 +994,99 @@
       "id": "req-cache-control--derives--need",
       "sourceId": "req-cache-control",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "req-no-cache--derives--need",
       "sourceId": "req-no-cache",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "req-expiry--derives--need",
       "sourceId": "req-expiry",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "req-invalidate--derives--need",
       "sourceId": "req-invalidate",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "req-writes-bypass--derives--need",
       "sourceId": "req-writes-bypass",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "req-coalesce--derives--need",
       "sourceId": "req-coalesce",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "req-early--derives--need",
       "sourceId": "req-early",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "req-cold--derives--need",
       "sourceId": "req-cold",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "req-down-store--derives--need",
       "sourceId": "req-down-store",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "req-down-fail--derives--need",
       "sourceId": "req-down-fail",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "req-local-bound--derives--need",
       "sourceId": "req-local-bound",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "req-shared-own--derives--need",
       "sourceId": "req-shared-own",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "req-hit-ratio--derives--need",
       "sourceId": "req-hit-ratio",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "req-conditional--derives--need",
       "sourceId": "req-conditional",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element reads the same data from its store again and again, and the store's latency and capacity limit how fast and how many reads it can serve. Reads have to stay fast under load, yet a reader must not see data older than a stated bound, no write may be decided on a stale copy, no response meant for one caller may reach another, and neither an expired hot entry nor a cache outage may take the store down. The snippets assume the application under src/ (src/app exports the app, the router's table and createApp, src/http/cachePolicy the Cache-Control per route and the set of personal routes, src/cache/read the cached reads, src/cache/invalidate the removal after a write, src/cache/local and src/cache/xfetch the in-process cache and the early refresh, src/commands the operations that change data, src/catalog/store the store reads) and the tests under tests/ with their fixtures in tests/cache."
     },
     {
       "id": "sc-cache-control--verifies--req-cache-control",

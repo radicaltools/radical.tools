@@ -367,6 +367,26 @@ feat/assay-syntax (2026-11-09, which does not touch Studio) and once in 4
 runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main.
 
+### Dogfooding (2026-11-12): the Radical benchmark and the person's words
+
+Building the benchmark's product changes (PR #360) through the worktree's own MCP server, and measuring the
+benchmark's runs. Open:
+
+- **No text search in search_model.** `SEARCH "quote"` is unsupported, and `FIND NODES WHERE label CONTAINS "a" OR
+  label CONTAINS "b"` fails with "Expected operator after field label"; finding the elements about a topic took
+  `get_changes` or a whole `LIST … FULL` read through a script.
+- **Forge's stage order cost the benchmark's agent most of its time** on a small system (fixed by
+  `forge_skip_stage` and "Forge on request"); every arm still read its whole model at each session's start.
+- **A scenario file keeps its old name** (`quoted-values-reach-a-scenario-2.md`) after the requirement it was named
+  beside was renamed: file names follow the first label, not the current one.
+- **radical.tools' own requirements quote no need** (0 of 759): the word rules check nothing of our own model
+  yet. Quoting the needs written since the benchmark is the first step to the goal `requirements-quoting-need`.
+- **scenario-value-untested names 16 of our own scenarios** (a value such as "18", "1001" or "25010" that the
+  bound test's file does not hold): each is a scenario that says more than its test checks, or a test to extend.
+- **What the word rules cannot read**: a negation inside a clause ("null, not zero" against "zero, not null"),
+  which of two values a word belongs to, an answer half quoted (one quote silences the whole answer). The agent's
+  review (`review_requirements`) is the check of meaning.
+
 ### Dogfooding (2026-11-10): the tests a database declares, six repositories held out
 
 Six repositories were written down before Assay read them, their tests too (file › titles): plscope-utils,

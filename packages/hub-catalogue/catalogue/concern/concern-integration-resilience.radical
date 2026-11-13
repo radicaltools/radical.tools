@@ -828,79 +828,92 @@
       "id": "req-timeout--derives--need",
       "sourceId": "req-timeout",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system depends on systems it does not run: payment, e-mail, maps, partners. They are slow or down at times, and their answers get lost on the way. Without decisions, one slow partner holds every thread, retries make a charge twice or pile onto a system that is already struggling, and users see errors, or wait without end, for something that could have waited or come from a cache."
     },
     {
       "id": "req-retry--derives--need",
       "sourceId": "req-retry",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system depends on systems it does not run: payment, e-mail, maps, partners. They are slow or down at times, and their answers get lost on the way. Without decisions, one slow partner holds every thread, retries make a charge twice or pile onto a system that is already struggling, and users see errors, or wait without end, for something that could have waited or come from a cache."
     },
     {
       "id": "req-breaker--derives--need",
       "sourceId": "req-breaker",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system depends on systems it does not run: payment, e-mail, maps, partners. They are slow or down at times, and their answers get lost on the way. Without decisions, one slow partner holds every thread, retries make a charge twice or pile onto a system that is already struggling, and users see errors, or wait without end, for something that could have waited or come from a cache."
     },
     {
       "id": "req-fail--derives--need",
       "sourceId": "req-fail",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system depends on systems it does not run: payment, e-mail, maps, partners. They are slow or down at times, and their answers get lost on the way. Without decisions, one slow partner holds every thread, retries make a charge twice or pile onto a system that is already struggling, and users see errors, or wait without end, for something that could have waited or come from a cache."
     },
     {
       "id": "req-degrade--derives--need",
       "sourceId": "req-degrade",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system depends on systems it does not run: payment, e-mail, maps, partners. They are slow or down at times, and their answers get lost on the way. Without decisions, one slow partner holds every thread, retries make a charge twice or pile onto a system that is already struggling, and users see errors, or wait without end, for something that could have waited or come from a cache."
     },
     {
       "id": "req-degrade-writes--derives--need",
       "sourceId": "req-degrade-writes",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system depends on systems it does not run: payment, e-mail, maps, partners. They are slow or down at times, and their answers get lost on the way. Without decisions, one slow partner holds every thread, retries make a charge twice or pile onto a system that is already struggling, and users see errors, or wait without end, for something that could have waited or come from a cache."
     },
     {
       "id": "req-defer--derives--need",
       "sourceId": "req-defer",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system depends on systems it does not run: payment, e-mail, maps, partners. They are slow or down at times, and their answers get lost on the way. Without decisions, one slow partner holds every thread, retries make a charge twice or pile onto a system that is already struggling, and users see errors, or wait without end, for something that could have waited or come from a cache."
     },
     {
       "id": "req-defer-expire--derives--need",
       "sourceId": "req-defer-expire",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system depends on systems it does not run: payment, e-mail, maps, partners. They are slow or down at times, and their answers get lost on the way. Without decisions, one slow partner holds every thread, retries make a charge twice or pile onto a system that is already struggling, and users see errors, or wait without end, for something that could have waited or come from a cache."
     },
     {
       "id": "req-idem-key--derives--need",
       "sourceId": "req-idem-key",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system depends on systems it does not run: payment, e-mail, maps, partners. They are slow or down at times, and their answers get lost on the way. Without decisions, one slow partner holds every thread, retries make a charge twice or pile onto a system that is already struggling, and users see errors, or wait without end, for something that could have waited or come from a cache."
     },
     {
       "id": "req-idem-lookup--derives--need",
       "sourceId": "req-idem-lookup",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system depends on systems it does not run: payment, e-mail, maps, partners. They are slow or down at times, and their answers get lost on the way. Without decisions, one slow partner holds every thread, retries make a charge twice or pile onto a system that is already struggling, and users see errors, or wait without end, for something that could have waited or come from a cache."
     },
     {
       "id": "req-readonly--derives--need",
       "sourceId": "req-readonly",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system depends on systems it does not run: payment, e-mail, maps, partners. They are slow or down at times, and their answers get lost on the way. Without decisions, one slow partner holds every thread, retries make a charge twice or pile onto a system that is already struggling, and users see errors, or wait without end, for something that could have waited or come from a cache."
     },
     {
       "id": "req-library--derives--need",
       "sourceId": "req-library",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system depends on systems it does not run: payment, e-mail, maps, partners. They are slow or down at times, and their answers get lost on the way. Without decisions, one slow partner holds every thread, retries make a charge twice or pile onto a system that is already struggling, and users see errors, or wait without end, for something that could have waited or come from a cache."
     },
     {
       "id": "req-mesh--derives--need",
       "sourceId": "req-mesh",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The system depends on systems it does not run: payment, e-mail, maps, partners. They are slow or down at times, and their answers get lost on the way. Without decisions, one slow partner holds every thread, retries make a charge twice or pile onto a system that is already struggling, and users see errors, or wait without end, for something that could have waited or come from a cache."
     },
     {
       "id": "sc-timeout--verifies--req-timeout",

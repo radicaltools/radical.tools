@@ -21,7 +21,8 @@ import type { TestCase } from './reports'
 import type { Measurement } from './metrics'
 import type { ConcernPack } from '../concerns'
 
-export { CHECK_RULES, verifiedHere, type CheckRule, type CheckSeverity, type CheckModel, type RepositoryMapping, type RuleFinding } from './rules'
+export { CHECK_RULES, hardValues, needAnswers, needParts, quoteFragments, quoteSenseGaps, quoteValueGaps, readValues, relationsOf, verifiedHere, WORD_RULES, wordFindings, type CheckRule, type CheckSeverity, type CheckModel, type RepositoryMapping, type RuleFinding } from './rules'
+export { splitTestId } from './testSource'
 export { parseTestReport, parseTestIds, type TestCase, type TestId, type TestStatus } from './reports'
 export { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, testsRanAt, type CiRun, type CiSource, type TestResults } from './files'
 export { BOUND_TESTS, ELEMENT_LABEL, TESTED_TYPES, appliedElements, computeEvidence, conditionResults, conditionsOf, measuredElements, withBoundTests, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome, type ConditionOutcome, type ConditionResult } from './evidence'
@@ -144,6 +145,13 @@ export interface CheckOptions {
   /** By element, the paths from the repository's root its description
    *  names that the repository does not have (the CLI). */
   missingPaths?: Record<string, string[]>
+  /** By bound test id, the test's source, for scenario-value-untested (the
+   *  CLI reads the files of the tests .radical/radical.json binds). */
+  /** The model's elements at the base (the merge base with the default
+   *  branch), for need-answer-changed: radical check reads them from git,
+   *  the Inspector from the branch's base. */
+  baseNodes?: C4Node[]
+  testSources?: Record<string, string>
   /** Earlier measurements a condition against a baseline compares with. */
   baseline?: Measurement[]
   /** The event the check runs on (pull-request in the gate): what runs on
@@ -194,6 +202,7 @@ export function upgradeCheckConfig(config: CheckConfig): CheckConfig {
 }
 const RULE_IDS = new Set(ALL_RULES.map((r) => r.id))
 const DEFAULT_SEVERITY = new Map(ALL_RULES.map((r) => [r.id, r.severity]))
+const DEFAULT_OFF = new Set(ALL_RULES.filter((r) => (r as { off?: true }).off).map((r) => r.id))
 
 /** Checks the model in `files` (paths relative to the model folder). */
 export function runCheck(files: FolderFiles, given: CheckConfig = {}, options: CheckOptions = {}): CheckResult {
@@ -312,6 +321,8 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
     ...(options.sensors !== undefined ? { sensors: options.sensors } : {}),
     ...(options.repository !== undefined ? { repository: options.repository } : {}),
     ...(options.missingPaths ? { missingPaths: options.missingPaths } : {}),
+    ...(options.testSources ? { testSources: options.testSources } : {}),
+    ...(options.baseNodes ? { baseNodes: byId(options.baseNodes) } : {}),
   }
   const model = { nodes, relations, ...settings }
   const theirs = new Set([...data.nodes, ...data.relations].filter((item) => originOf(item)).map((item) => item.id))
@@ -412,7 +423,8 @@ function settle(found: Array<RuleFinding & { rule: string }>, config: CheckConfi
   const results: CheckRuleResult[] = []
   for (const key of keys) {
     const list = groups.get(key) ?? []
-    const { severity: set, max } = settingOf(rules[key])
+    const { severity: given, max } = settingOf(rules[key])
+    const set = given ?? (DEFAULT_OFF.has(key.split('/')[0]) ? 'off' as const : undefined)
     const ruleSeverity = DEFAULT_SEVERITY.get(key.split('/')[0]) ?? 'error'
     const why = notRun.get(key.split('/')[0])
     if (why) {
@@ -474,4 +486,5 @@ export { formatCheckText, formatCheckGithub, type FormatOptions } from './format
 export { compareCheckConfig, type CheckConfigChange } from './configChanges'
 
 /** A rule's severity when the config does not set it. */
-export const defaultSeverity = (rule: string): CheckSeverity => DEFAULT_SEVERITY.get(rule) ?? 'error'
+/** What a rule is with no setting in check.json: its severity, or off. */
+export const defaultSeverity = (rule: string): CheckSeverity | 'off' => DEFAULT_OFF.has(rule) ? 'off' : DEFAULT_SEVERITY.get(rule) ?? 'error'

@@ -891,79 +891,92 @@
       "id": "req-redo-change--derives--need",
       "sourceId": "req-redo-change",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
     },
     {
       "id": "req-redo-release--derives--need",
       "sourceId": "req-redo-release",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
     },
     {
       "id": "req-redo-yearly--derives--need",
       "sourceId": "req-redo-yearly",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
     },
     {
       "id": "req-in-repo--derives--need",
       "sourceId": "req-in-repo",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
     },
     {
       "id": "req-pytm-triaged--derives--need",
       "sourceId": "req-pytm-triaged",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
     },
     {
       "id": "req-external-callers--derives--need",
       "sourceId": "req-external-callers",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
     },
     {
       "id": "req-statuses--derives--need",
       "sourceId": "req-statuses",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
     },
     {
       "id": "req-acceptance--derives--need",
       "sourceId": "req-acceptance",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
     },
     {
       "id": "req-expired--derives--need",
       "sourceId": "req-expired",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
     },
     {
       "id": "req-high-blocks--derives--need",
       "sourceId": "req-high-blocks",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
     },
     {
       "id": "req-stride--derives--need",
       "sourceId": "req-stride",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
     },
     {
       "id": "req-linddun--derives--need",
       "sourceId": "req-linddun",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
     },
     {
       "id": "req-pasta--derives--need",
       "sourceId": "req-pasta",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element across a trust boundary. Before a new caller, data store or third party goes live, someone has to have asked what can go wrong there, and each answer has to end somewhere: a control that mitigates it, a party that carries it under contract, or a named person who accepts it until a date. The threat model has to stay as current as the boundaries it describes. The snippets assume the threat models under threat-model/ (threat-model/<system>.json for Threat Dragon, threat-model/<system>/ for pytm and the register), the architecture model as a Markdown folder under architecture/ (nodes/**/*.md and relations.json), scripts under scripts/ run by Node 20 with js-yaml or Python 3 with PyYAML, reports/threats.json as the one list of threats the reader of the chosen form writes, and GitHub as the code host."
     },
     {
       "id": "sc-redo-change--verifies--req-redo-change",

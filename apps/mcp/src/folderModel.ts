@@ -8,7 +8,7 @@ import { AI_MODELLING_RULES } from '@radical/common/ai/systemPrompt'
 import { MD_FOLDER_FORMAT_VERSION, MD_FOLDER_JSON_FILES, deserializeFromMdFolder, isOwnedMdFolderFile, isValidMdFolderManifest, keepMdFolderPaths, serializeToMdFolder, serializeToMdFolderWithPaths, type FolderFiles } from '@radical/common/formats/mdFolder'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
 import { mergeNotices } from '@radical/common/modelMerge'
-import { builtInC4Metamodel, builtInGovernanceMetamodel, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
+import { builtInC4Metamodel, builtInGovernanceMetamodel, composeEarsSentence, requirementStatePhrase, validateModel, type Issue, type Metamodel } from '@radical/common/metamodel'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { modelChangesSince } from '@radical/node-files/gitModel'
 import { readEditorStateFile, writeAssayRunFile, writeEditorStateFile, writeForgeRunFile } from '@radical/node-files/selectionFile'
@@ -28,7 +28,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel, originOf, ownModel } from '@radical/common/model'
 import { REPOSITORY_FILE, builtIn, parseRepositoryFile, serializeRepositoryFile, testsBoundTo, type RepositoryFile } from '@radical/common/repositoryMapping'
-import { conditionsOf, verifiedHere, withBoundTests, type CheckModel } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, WORD_RULES, conditionsOf, parseCheckConfig, quoteValueGaps, verifiedHere, wordFindings, withBoundTests, type CheckModel } from '@radical/common/check'
 import { mappingRoot } from '@radical/node-files/repositoryLayout'
 import { FEDERATION_FILE, parseFederationFile, withOtherModels } from '@radical/common/federation'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
@@ -39,7 +39,7 @@ import { ASSAY_TOOL_DEFS, ASSAY_TOOLS, Assay, type AssayResult } from './assay'
  *  focus_node drive the canvas, and reset_diagram is too destructive for an
  *  external client. */
 const EXCLUDED_TOOLS = new Set(['set_active_view', 'focus_node', 'reset_diagram'])
-const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'get_changes', 'get_implementation', 'get_verification', 'search_model', 'list_milestones', 'compare_milestones'])
+const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'get_changes', 'review_requirements', 'get_implementation', 'get_verification', 'search_model', 'list_milestones', 'compare_milestones'])
 
 const SERVER_TOOL_DEFS: ToolDef[] = [
   {
@@ -77,6 +77,18 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
       type: 'object',
       properties: {
         since: { type: 'string', description: 'The git branch, tag or commit to compare with, e.g. "HEAD" for the last commit. Default: where the current branch left the default branch (the merge base with origin/main), so every model change on the branch counts.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'review_requirements',
+    description: 'Check requirements against the words of the needs they derive from (ADR Agents check requirements against the person\'s words). Lists each requirement added or changed since the model\'s version in git, and each one a need changed since then leads to, with its sentence next to the whole text of every need it derives from, directly or through other requirements; names those that derive from no need, and the needs that hold no question asked of a person. Call it after you change requirements and before you write their code; confirm each, or correct it with update_node where it adds, drops or changes a value, a number, a range, a state or who may do what, and where the need does not settle a point, ask the person and add the question and answer to the need word for word. It writes nothing.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ids: { type: 'array', items: { type: 'string' }, description: 'Review these requirements (ids or tempIds) instead of those changed on the branch.' },
+        since: { type: 'string', description: 'As in get_changes: the git branch, tag or commit to compare with. Default: where the branch left the default branch.' },
       },
       additionalProperties: false,
     },
@@ -684,6 +696,83 @@ export class FolderModel {
     return empty ? `Nothing is selected in Studio. ${JSON.stringify(result)}` : JSON.stringify(result)
   }
 
+  /** Each requirement to review next to the words of the needs it derives
+   *  from (ADR Agents check requirements against the person's words). */
+  private async reviewRequirements(input: unknown, data: DiagramData): Promise<CallOutcome> {
+    const { ids, since } = (input ?? {}) as { ids?: unknown; since?: unknown }
+    if (ids !== undefined && (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string'))) return { ok: false, text: 'review_requirements: ids must be an array of requirement ids' }
+    if (since !== undefined && typeof since !== 'string') return { ok: false, text: 'review_requirements: since must be a git branch, tag or commit' }
+    const own = ownModel(data)
+    const nodes = new Map(own.nodes.map((n) => [n.id, n]))
+    const relations = Object.fromEntries(own.relations.map((r) => [r.id, r]))
+    const derivesFrom = (id: string) => own.relations.filter((r) => r.relationType === 'derives' && r.sourceId === id).map((r) => nodes.get(r.targetId)).filter((n): n is C4Node => !!n)
+    // The words a requirement's derives relation quotes from a need, if any.
+    const quoted = (reqId: string, needId: string): string => {
+      const r = own.relations.find((rel) => rel.relationType === 'derives' && rel.sourceId === reqId && rel.targetId === needId)
+      const q = (r as unknown as Record<string, unknown> | undefined)?.quote
+      return typeof q === 'string' ? q.trim() : ''
+    }
+    // The needs a requirement derives from, directly or through other requirements.
+    const needsOf = (id: string): C4Node[] => {
+      const seen = new Set<string>([id]); const needs: C4Node[] = []; const queue = [id]
+      while (queue.length) {
+        for (const next of derivesFrom(queue.shift()!)) {
+          if (seen.has(next.id)) continue
+          seen.add(next.id)
+          if (next.type === 'need') needs.push(next)
+          else if (next.type === 'requirement') queue.push(next.id)
+        }
+      }
+      return needs
+    }
+    let chosen: C4Node[]
+    let scope: string
+    if (ids) {
+      const wanted = (ids as string[]).map((id) => this.tempIds.get(id) ?? id)
+      const unknown = wanted.filter((id) => nodes.get(id)?.type !== 'requirement')
+      if (unknown.length) return { ok: false, text: `review_requirements: not requirements of this model: ${unknown.join(', ')}` }
+      chosen = wanted.map((id) => nodes.get(id)!)
+      scope = 'the requirements named'
+    } else {
+      let changes
+      try { changes = await modelChangesSince(this.folder, own, since as string | undefined) } catch (err) {
+        return { ok: false, text: `review_requirements: ${(err as Error).message}; name the requirements with ids instead` }
+      }
+      const changed = new Set([...changes.report.elements.added, ...changes.report.elements.changed].map((c) => c.id))
+      chosen = own.nodes.filter((n) => n.type === 'requirement' && (changed.has(n.id) || needsOf(n.id).some((need) => changed.has(need.id))))
+      scope = `the requirements added or changed since ${changes.base.described}, and those a need changed since then leads to`
+    }
+    if (!chosen.length) return { ok: true, text: `Nothing to review: no requirement among ${scope}.` }
+    const props = (n: C4Node) => n as unknown as Record<string, unknown>
+    const lines = [
+      `Review ${chosen.length} requirement${chosen.length === 1 ? '' : 's'} (${scope}) against the words of the needs they derive from.`,
+      'For each requirement, go through every value it states (a number, null or zero, a range, a time, a state, who may do what) and find the words of its needs that say it; write each value down with the quoted words. Where the words say something else, the requirement is wrong: correct it with update_node to what the person said. Where no words say it, it is your assumption: ask the person and add the question and the answer to the need word for word, or say so in its rationale. Confirm a requirement only when every value it states has its words.',
+    ]
+    const without: C4Node[] = []
+    const shown = new Set<string>()
+    for (const req of chosen.sort((a, b) => a.label.localeCompare(b.label))) {
+      const needs = needsOf(req.id)
+      if (!needs.length) without.push(req)
+      const sentence = composeEarsSentence(props(req), undefined, requirementStatePhrase(req, Object.fromEntries(nodes), relations)).sentence
+      lines.push('', `## Requirement "${req.label}" (${req.id})`, sentence || '(no sentence: it misses its action)')
+      if (typeof props(req).rationale === 'string' && props(req).rationale) lines.push(`Rationale: ${props(req).rationale}`)
+      // What radical check finds by the values alone: the place to start.
+      const gaps = quoteValueGaps({ nodes: Object.fromEntries(nodes), relations }, req)
+      if (gaps.missing.length) lines.push(`Values its quotes say and it does not: ${[...new Set(gaps.missing.map((g) => g.value))].map((v) => `"${v}"`).join(', ')}.`)
+      if (gaps.unsupported.length) lines.push(`Values it says and no quote says: ${gaps.unsupported.map((v) => `"${v}"`).join(', ')}.`)
+      for (const need of needs) {
+        const words = quoted(req.id, need.id)
+        if (words) { lines.push(`### Rests on need "${need.label}" (${need.id}), quoting:`, words); continue }
+        if (shown.has(need.id)) { lines.push(`Derives from need "${need.label}" (${need.id}), shown above; its derives relation quotes nothing: set quote to the words it rests on.`); continue }
+        shown.add(need.id)
+        const text = (need.description ?? '').trim()
+        lines.push(`### Need "${need.label}" (${need.id}), quoted by no word: set quote on the derives relation to the words it rests on${text.includes('?') ? '' : '; it holds no question asked of a person: if you asked anything about it, add the questions and answers word for word'}`, text || '(empty)')
+      }
+    }
+    if (without.length) lines.push('', `Derive from no need: ${without.map((r) => `"${r.label}" (${r.id})`).join(', ')}. Derive each from the need that holds the person's words, or say why it has none.`)
+    return { ok: true, text: lines.join('\n') }
+  }
+
   private async dispatch(
     name: string, input: unknown, session: MdFolderSession, before: FolderFiles,
     data: DiagramData, facade: ReturnType<typeof createModelFacade>,
@@ -748,6 +837,7 @@ export class FolderModel {
       if (name === 'get_selection') return { ok: true, text: await this.selection(facade) }
       if (name === 'get_implementation' || name === 'set_implementation') return await this.implementation(name, input, data)
       if (name === 'get_verification' || name === 'set_verification') return await this.verification(name, input, data)
+      if (name === 'review_requirements') return await this.reviewRequirements(input, data)
       if (name === 'get_changes') {
         const { since } = (input ?? {}) as { since?: unknown }
         if (since !== undefined && typeof since !== 'string') return { ok: false, text: 'get_changes: since must be a git branch, tag or commit' }
@@ -950,6 +1040,9 @@ export class FolderModel {
     const warned = !warnings.length ? ''
       : retyped ? ` Warning: the metamodel change brings in ${warnings.length} ${warnings.length === 1 ? 'issue' : 'issues'} (fix them or change the metamodel back, see get_issues):${list}`
       : ` New warnings (fine while you are still building; fix them before you finish, see get_issues):${list}`
+    const words = await this.wordsBroughtIn(data, changed, metamodel)
+    const wordList = `${words.slice(0, MAX_WARNINGS).map((f) => `\n- ${f.message}${f.severity === 'error' ? ' (an error in radical check)' : ''}`).join('')}${words.length > MAX_WARNINGS ? `\n- …and ${words.length - MAX_WARNINGS} more` : ''}`
+    const wordsText = words.length ? ` The person's words, as radical check reads them, after this change (correct the requirement, its quote or its scenario; review_requirements shows them side by side):${wordList}` : ''
     // Each element's file where the folder has it (the session keeps them
     // too; here so that the files named as changed are the ones written).
     const next = keepMdFolderPaths(before, serializeToMdFolderWithPaths(changed).files)
@@ -960,7 +1053,7 @@ export class FolderModel {
       .filter((path) => before[path] !== next[path]
         && (path in next || isOwnedMdFolderFile(path, before[path])))
       .sort()
-    if (!paths.length) return { ok: true, text: `${resultText} No files changed.${warned}` }
+    if (!paths.length) return { ok: true, text: `${resultText} No files changed.${warned}${wordsText}` }
     // Studio (or an editor, git) may have written the folder since this call
     // read it: the change is merged with that edit rather than written over it.
     const write = await session.write(next, mergeMdFolderFiles)
@@ -976,7 +1069,23 @@ export class FolderModel {
     // One relation made is named by id; several (an Assay plan, a Forge stage) are counted, not one of them named as if it were the only one.
     const created = changed.relations.filter((relation) => !data.relations.some((old) => old.id === relation.id))
     const madeText = created.length === 1 ? ` Relation ID: ${created[0].id}.` : created.length > 1 ? ` ${created.length} relations created.` : ''
-    return { ok: true, text: `${resultText}${madeText} Changed: ${paths.join(', ')}. Revision: ${revision}.${merged}${warned}` }
+    return { ok: true, text: `${resultText}${madeText} Changed: ${paths.join(', ')}. Revision: ${revision}.${merged}${warned}${wordsText}` }
+  }
+
+  /** What a change brings in of the rules about the person's words (a quote
+   *  the need does not hold, a value lost on the way to the requirement or
+   *  its scenario, an example no scenario holds): the findings it has that
+   *  the model before it had not, without the rules check.json turns off. */
+  private async wordsBroughtIn(data: DiagramData, changed: DiagramData, metamodel: Metamodel): Promise<Array<{ rule: string; severity: string; message: string }>> {
+    if (!metamodel.nodeTypes.need || !metamodel.nodeTypes.requirement) return []
+    let off = new Set<string>()
+    try {
+      const config = parseCheckConfig(await readFile(join(this.folder, CHECK_CONFIG_FILE), 'utf8'))
+      off = new Set(Object.entries(config.rules ?? {}).filter(([id, setting]) => WORD_RULES.has(id) && (setting === 'off' || (typeof setting === 'object' && setting !== null && (setting as { severity?: unknown }).severity === 'off'))).map(([id]) => id))
+    } catch { /* no check.json: every rule on */ }
+    const findings = (d: DiagramData) => wordFindings({ nodes: byId(d.nodes), relations: byId(d.relations), metamodel }, off)
+    const before = new Set(findings(data).map((f) => `${f.rule}\0${f.message}`))
+    return findings(changed).filter((f) => !before.has(`${f.rule}\0${f.message}`))
   }
 
   /** Tell Studio, open on the folder, that an agent is writing it: it holds

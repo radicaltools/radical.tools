@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/pro
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, testsRanAt, type CheckConfig, type CiSource, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, splitTestId, testsRanAt, type CheckConfig, type CiSource, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { DEPS_FILE } from '@radical/common/federation'
 import { STATE_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
@@ -16,6 +16,7 @@ import { repositorySensors } from './repositorySensors'
 import { REVIEWS_FILE as REPOSITORY_REVIEWS, mappingRoot, missingCodePaths, readRepositoryMapping } from '@radical/node-files/repositoryLayout'
 import { modelFolderArg } from './modelFolder'
 import { deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
+import { readModelAtCommit, resolveGitBase } from '@radical/node-files/gitModel'
 
 export const CHECK_USAGE = `Usage: radical check [folder] [options]
 
@@ -144,7 +145,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   const { values, positionals } = parsed
   if (values.help) { io.out(CHECK_USAGE); return 0 }
   if (values['list-rules']) {
-    for (const rule of [...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE]) io.out(`${rule.id.padEnd(30)} ${rule.severity.padEnd(8)} ${rule.description}`)
+    for (const rule of [...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE]) io.out(`${rule.id.padEnd(30)} ${((rule as { off?: true }).off ? 'off' : rule.severity).padEnd(8)} ${rule.description}`)
     io.out('\nMetrics for goals (in percent):')
     for (const metric of CHECK_METRICS) io.out(`${metric.id.padEnd(30)} ${(metric.tests ? 'evidence' : '').padEnd(8)} ${metric.description}`)
     return 0
@@ -190,8 +191,11 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   // Where the repository builds the model's elements, and which of those
   // paths it does not have.
   let repository: RepositoryMapping | null
+  // The folder the mapping's paths, and its tests' files, are from.
+  let mappedFrom = root
   try {
     const mapping = await readRepositoryMapping(root)
+    if (mapping) mappedFrom = mapping.root
     repository = mapping && {
       file: relative(io.cwd, mapping.file),
       ...(mapping.model ? { model: mapping.model } : {}),
@@ -329,7 +333,11 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   // Code paths the model's descriptions name that the repository lacks.
   let missingPaths: Record<string, string[]> = {}
   try { missingPaths = await missingCodePaths(await mappingRoot(root), deserializeFromMdFolder(files).data.nodes) } catch { /* the folder's own rules say what is wrong */ }
-  const result = runCheck(files, config, { sensors, repository, missingPaths, ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
+  // The sources of the tests .radical/radical.json binds, for scenario-value-untested.
+  const testSources = repository?.verifies?.length ? await boundTestSources(mappedFrom, repository.verifies) : undefined
+  // The model at the base (where the branch left the default branch), for need-answer-changed.
+  const baseNodes = await baseModelNodes(root)
+  const result = runCheck(files, config, { sensors, repository, missingPaths, ...(testSources ? { testSources } : {}), ...(baseNodes ? { baseNodes } : {}), ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
   if (tests && (keep || !fromCi)) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited; with the commit they were read at, so
@@ -397,4 +405,32 @@ export async function writeBeside(path: string, content: string): Promise<void> 
 function concernPacks() {
   const bundled = join(dirname(fileURLToPath(import.meta.url)), 'hub-catalogue')
   return concernPacksOf(readCatalogue(existsSync(bundled) ? bundled : CATALOGUE_DIR))
+}
+
+/** By bound test id, the file of the test (fixtures sit beside the test, not
+ *  in it); tests whose file the repository lacks are left out. */
+async function boundTestSources(root: string, verifies: Array<{ tests: string[] }>): Promise<Record<string, string>> {
+  const files = new Map<string, string | null>()
+  const sources: Record<string, string> = {}
+  for (const id of new Set(verifies.flatMap((v) => v.tests))) {
+    const { file } = splitTestId(id)
+    if (!files.has(file)) {
+      const path = resolve(root, file)
+      files.set(file, path.startsWith(resolve(root)) && existsSync(path) && (await stat(path)).isFile() ? await readFile(path, 'utf8') : null)
+    }
+    const text = files.get(file)
+    if (text != null) sources[id] = text
+  }
+  return sources
+}
+
+/** The model's elements at its git base (the merge base with the default
+ *  branch); undefined out of git, or when the folder held no model then. */
+async function baseModelNodes(folder: string): Promise<ReturnType<typeof deserializeFromMdFolder>['data']['nodes'] | undefined> {
+  try {
+    const files = await readModelAtCommit(folder, (await resolveGitBase(folder)).commit)
+    return Object.keys(files).length ? deserializeFromMdFolder(files).data.nodes : undefined
+  } catch {
+    return undefined
+  }
 }
