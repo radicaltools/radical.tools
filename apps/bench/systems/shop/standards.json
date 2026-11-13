@@ -1,0 +1,66 @@
+{
+  "group": "Herba Group",
+  "about": "Zielony Kubek belongs to the Herba Group. Group IT keeps one set of technical standards that every system of a group company follows from its first day, whatever the system does. They are engineering rules, not features: they say how a system is built and how it behaves, never what it is for. They hold for the whole life of a system.",
+  "standards": [
+    {
+      "id": "TS-01", "label": "One gateway per provider kind", "tags": ["R3"],
+      "context": "Integrations with outside providers (payment, shipping, mail) are audited and replaced often. Calls spread through the code make both impossible.",
+      "decision": "Exactly one module of a system talks to the outside providers of one kind (for payments: every payment provider the system uses) and knows their addresses, credentials and settings. Everything asked of such a provider goes through that module: charges, refunds, statements. No other code calls a provider or reads its configuration.",
+      "consequences": "A second provider is added inside the same module. Business code never branches on which provider is in use."
+    },
+    {
+      "id": "TS-02", "label": "Money as whole minor units", "tags": ["R7"],
+      "context": "Floating point amounts and totals worked out twice have produced figures one cent apart in the books of group companies.",
+      "decision": "Money is kept, calculated and shown as whole minor units (cents), never as fractions. Where a calculation gives a fraction of a cent it is rounded at once, at the lowest level (the line), half up unless the business rule for that amount names another rounding. Every total a system shows is the sum of the rounded figures below it and is never worked out again from a percentage or a rate.",
+      "consequences": "Per-line amounts are stored. Parts of a split amount add up exactly to the whole: the last part takes what is left."
+    },
+    {
+      "id": "TS-03", "label": "Append-only records", "tags": ["R1", "R5", "R6", "R9"],
+      "context": "Quantities, balances and issued documents that are overwritten cannot be audited or explained afterwards.",
+      "decision": "Anything a system counts or owes (stock quantities, loyalty points, costs, money) is kept as a history of records that are never changed or deleted; the current figure is the sum of those records and is never written directly. A correction, also one a person asks for as \"just set the number\", is a new record for the difference; when the number given equals the current figure nothing is recorded. Each record says how much, why, when and what it was for. A document that has been issued (an invoice, a credit note) is never changed or deleted and its number is never reused: it is corrected by a new document against it. Histories can be listed.",
+      "consequences": "There is no update or delete on these tables. A request to overwrite a figure or edit a document is met by a new record or a new document that gives the person the result they need."
+    },
+    {
+      "id": "TS-04", "label": "Personal data kept apart", "tags": ["R4"],
+      "context": "People have the right to have their data erased; the company has the duty to keep its books.",
+      "decision": "Personal data (names, e-mail addresses, phone numbers, postal addresses) is kept so that it can be taken out while every record stays. Erasing a person removes their data from everything the system shows, including copies on orders and documents and every look-up by that data. Business records (orders, payments, returns, invoices, credit notes, histories) are never deleted for it and keep their amounts, products and dates. A request to delete a person \"with everything\" is met by erasing the person and keeping the records without them.",
+      "consequences": "Records refer to a person by an id that says nothing about them. After erasure the id stays as an empty record."
+    },
+    {
+      "id": "TS-05", "label": "Repeating a state change is harmless", "tags": ["HD-15", "HD-59", "HD-61", "HD-69", "HD-104"],
+      "context": "Screens and integrations of the group send the same request twice.",
+      "decision": "Asking for something to go into the state it is already in is not an error and changes nothing: cancelling what is cancelled, blocking who is blocked, unblocking who is not blocked, erasing who is erased, ending what has ended. This does not hold for operations that move money or goods (paying an order, shipping it, booking a parcel as come back): the same one is never done twice, a second one is refused.",
+      "consequences": "State-changing endpoints answer success for a repeat; money and goods endpoints answer a refusal."
+    },
+    {
+      "id": "TS-06", "label": "Text identity ignores case", "tags": ["HD-09", "HD-33", "HD-40", "HD-57", "HD-65", "HD-93"],
+      "context": "People type the same name, address or code in different ways.",
+      "decision": "Names, e-mail addresses and codes that customers type are the same whatever their upper and lower case: when a value must be unique, when it is looked up and when a rule is applied to it. They are kept and shown as typed unless a rule of that field says otherwise. A required text that is empty or only spaces is missing and the request is refused. Identifiers that staff define (SKUs, warehouse codes) follow the format rule of their field instead.",
+      "consequences": "Uniqueness and look-ups use a normalised form beside the stored value."
+    },
+    {
+      "id": "TS-07", "label": "A provider failure is not an answer", "tags": ["HD-05", "HD-28", "HD-116", "HD-159", "HD-166"],
+      "context": "Outages of providers were recorded as declined payments and as refunds that never happened.",
+      "decision": "When an outside provider answers with a 5xx error or cannot be reached, that is not an answer of the provider. The system records nothing and changes nothing (no payment attempt, no return, no stock movement, no document, no number used) and tells the caller that the provider is unavailable, which is a different outcome from a refusal. Whatever gives money back asks the provider first and records only after the provider has answered.",
+      "consequences": "Callers can tell \"refused\" from \"try again later\". A failed call leaves no trace to clean up."
+    },
+    {
+      "id": "TS-08", "label": "All or nothing", "tags": ["HD-74", "HD-23", "HD-06", "HD-45"],
+      "context": "Half-done requests cannot be explained or repaired.",
+      "decision": "A request that is refused changes nothing and records nothing. A request with several parts (an order with several lines, a delivery of several products, a return of several lines) is carried out whole or not at all: when one part cannot be done, none is.",
+      "consequences": "Each request is one transaction, validated before anything is written."
+    },
+    {
+      "id": "TS-09", "label": "Strict dates, time as a parameter", "tags": ["HD-125"],
+      "context": "Reports for days that do not exist were once sent to the tax office, and jobs that read the clock could not be tested.",
+      "decision": "A day is given as a date like 2026-03-14 and a moment as an ISO date and time. A value that is not a real date (month 13, 30 February, free text) is refused, never corrected and never read as another day. Anything that depends on time passing or puts a date on a record accepts the time to assume as a parameter.",
+      "consequences": "No endpoint reads the clock without a way to be told the time."
+    },
+    {
+      "id": "TS-10", "label": "Defined order of lists", "tags": ["HD-46"],
+      "context": "Clients of group systems relied on an order that later changed.",
+      "decision": "Every list an API returns has a defined order. Histories (stock movements, points, costs, returns of an order) are oldest first. What staff look up for a customer (their orders, by account or by e-mail address) is newest first. Catalogue lists are ordered by their key.",
+      "consequences": "The order is part of the API description."
+    }
+  ]
+}
