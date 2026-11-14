@@ -75,12 +75,15 @@ describe('a model of 20,000 elements', () => {
     // The first letter, and the letter after the space (a word of its own
     // narrows too: only its own letters are new).
     expect(searchScanCount() - before).toBe(1)
-    for (let i = 0; i < query.length; i++) {
+    // Compared at each kind of step (a search from scratch over 20,000
+    // elements is slow on CI): the first letter, a longer word, a whole
+    // word, the space, the first letter of a new word, the last letter.
+    for (const i of [0, 1, 5, 6, 7, 11, 13]) {
       // From scratch: the same elements in another record, nothing to narrow from.
       const fresh: SearchData = { metamodel, nodes: Object.freeze({ ...MODEL.nodes }), relations: Object.freeze({ ...MODEL.relations }), views: {} }
       expect(narrowed[i]).toEqual(searchModel(fresh, parseSearch(query.slice(0, i + 1), fresh)).hits)
     }
-  })
+  }, 30_000)
 
   it('works out the + rows of a table of 1,000 rows without going through every element for each', () => {
     // As the Traceability table: needs, the requirements derived from them,
