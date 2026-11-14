@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseSearch, searchFoldCount, searchModel, type SearchData } from '../src/search'
+import { parseSearch, searchFoldCount, searchModel, searchScanCount, type SearchData } from '../src/search'
 import { addChoices, buildViewIndex, modelStructure, presetViewIndex, viewIndexKey, viewShownNodes } from '../src/viewPipeline'
 import { MdFolderSession, readEach, type MdFolderStorage } from '../src/formats/mdFolderSync'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
@@ -65,6 +65,21 @@ describe('a model of 20,000 elements', () => {
     for (const q of ['la', 'lay', 'layout', 'layout s', 'layout sta']) hits = searchModel(data, parseSearch(q, data)).hits.length
     expect(hits).toBeGreaterThan(1000)
     expect(searchFoldCount() - before).toBe(first)
+  })
+
+  it('finds, letter by letter, what a search from scratch finds, going through the model once a word', () => {
+    const typed: SearchData = { metamodel, nodes: MODEL.nodes, relations: MODEL.relations, views: {} }
+    const query = 'layout stays 1'
+    const before = searchScanCount()
+    const narrowed = [...query].map((_, i) => searchModel(typed, parseSearch(query.slice(0, i + 1), typed)).hits)
+    // The first letter, and the letter after the space (a word of its own
+    // narrows too: only its own letters are new).
+    expect(searchScanCount() - before).toBe(1)
+    for (let i = 0; i < query.length; i++) {
+      // From scratch: the same elements in another record, nothing to narrow from.
+      const fresh: SearchData = { metamodel, nodes: Object.freeze({ ...MODEL.nodes }), relations: Object.freeze({ ...MODEL.relations }), views: {} }
+      expect(narrowed[i]).toEqual(searchModel(fresh, parseSearch(query.slice(0, i + 1), fresh)).hits)
+    }
   })
 
   it('works out the + rows of a table of 1,000 rows without going through every element for each', () => {
