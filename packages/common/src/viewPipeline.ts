@@ -11,7 +11,7 @@
 // the steps that fit, with how many elements each concerns.
 
 import type { C4Node, C4Relation, ChainLevel, ChainVia, ChainWay, DiagramView, ViewFilter, ViewPipeline, ViewSort } from './c4'
-import { holderOf, viewShowsEveryNode } from './c4'
+import { holderOf, notedPlacesOnly, viewShowsEveryNode } from './c4'
 import type { Metamodel, PropertyDef } from './metamodel/types'
 import type { WizardLink } from './metamodel/wizard'
 import { inferRelationType, isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypesFitting } from './metamodel/lookup'
@@ -637,7 +637,12 @@ export function viewShownNodes(view: DiagramView | undefined, nodes: Record<stri
   const cacheable = Object.isFrozen(nodes) && Object.isFrozen(relations) && Object.isFrozen(view.nodeIds)
   if (cacheable) {
     const hit = shownCache.get(view.nodeIds)
-    if (hit && hit.relations === relations && hit.pipeline === view.pipeline && hit.kind === view.kind && hit.empty === view.empty && sameForChain(hit.nodes, nodes, chainKeys(view.pipeline))) return hit.shown
+    if (hit && hit.relations === relations && hit.pipeline === view.pipeline && hit.kind === view.kind && hit.empty === view.empty && sameForChain(hit.nodes, nodes, chainKeys(view.pipeline))) {
+      // Asked next with these elements moved again (the live layout, each
+      // frame): compared with these, the step from them is noted.
+      hit.nodes = nodes
+      return hit.shown
+    }
   }
   // Another model's view (a federation) shows what it shows in its own
   // repository: that model's elements and those of the models it depends on.
@@ -698,6 +703,8 @@ const keysOfChain = new WeakMap<object, string>()
  *  however many views ask. */
 function sameForChain(a: Record<string, C4Node>, b: Record<string, C4Node>, keys: string): boolean {
   if (a === b) return true
+  // Moved by the live layout or a glide (every frame): what no chain reads.
+  if (!PLACE_KEY.test(keys) && notedPlacesOnly(a, b)) return true
   let byB = sameAnswers.get(a)
   if (!byB) sameAnswers.set(a, byB = new WeakMap())
   let byKeys = byB.get(b)
@@ -710,6 +717,7 @@ function sameForChain(a: Record<string, C4Node>, b: Record<string, C4Node>, keys
 }
 
 const sameAnswers = new WeakMap<object, WeakMap<object, Map<string, boolean>>>()
+const PLACE_KEY = /(^|,)(x|y|width|height)(,|$)/
 
 function compareFor(a: Record<string, C4Node>, b: Record<string, C4Node>, keys: string[]): boolean {
   // The lists are kept for frozen data: no walk of 21,000 keys each time.

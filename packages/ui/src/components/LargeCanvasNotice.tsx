@@ -9,9 +9,10 @@ export const OPEN_VIEW_PROPERTIES_EVENT = 'radical:open-view-properties'
  *  canvas draws (oversizedCanvas); null otherwise. */
 export function useOversizedCanvas(): { view: DiagramView; count: number } | null {
   const view = useDiagramStore((s) => (s.activeViewId ? s.views[s.activeViewId] : undefined))
-  const nodes = useDiagramStore((s) => s.c4Nodes)
-  const relations = useDiagramStore((s) => s.c4Relations)
-  return useMemo(() => oversizedCanvas({ activeViewId: view?.id ?? null, views: view ? { [view.id]: view } : {}, c4Nodes: nodes, c4Relations: relations }), [view, nodes, relations])
+  // Only the count: the elements change every frame while the live layout
+  // moves them, and the app around the canvas drew again each time.
+  const count = useDiagramStore((s) => oversizedCanvas(s)?.count ?? 0)
+  return useMemo(() => (view && count ? { view, count } : null), [view, count])
 }
 
 /** In place of a canvas with more elements than a canvas draws: how many,

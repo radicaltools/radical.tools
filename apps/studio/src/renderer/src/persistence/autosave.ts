@@ -12,6 +12,7 @@
 
 import './configureDocuments' // must run before the store module is evaluated
 import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
+import { notedPlacesOnly } from '@radical/common/c4'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { ownModel } from '@radical/common/model'
 import { withOtherModels } from '@radical/common/federation'
@@ -309,7 +310,7 @@ if (typeof window !== 'undefined') {
     s.snapshots === prev.snapshots &&
     s.presentations === prev.presentations &&
     s.metamodel === prev.metamodel &&
-    (s.c4Nodes === prev.c4Nodes || placesOnly(prev.c4Nodes as Record<string, object>, s.c4Nodes as Record<string, object>, NODE_PLACE)) &&
+    (notedPlacesOnly(prev.c4Nodes, s.c4Nodes) || placesOnly(prev.c4Nodes as Record<string, object>, s.c4Nodes as Record<string, object>, NODE_PLACE)) &&
     (s.views === prev.views || placesOnly(prev.views as Record<string, object>, s.views as Record<string, object>, VIEW_PLACE))
 
   let prev = useDiagramStore.getState()

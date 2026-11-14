@@ -18,7 +18,7 @@ import { useFollowAgentStore } from '../persistence/followAgent'
 import { pickViewFor, showOnPage, viewNodeSets as viewNodeSetsOf } from '../navigation'
 import { keysTakenByDialog } from './dialogKeys'
 import { FORGE_NEEDS_AI } from '../ai/settings'
-import { KIND_PREFIXES, SEARCH_KINDS, foldText, parseSearch, searchModel, searchSuggestions, viewTypeName, type Mark, type SearchData, type SearchHit, type SearchKind } from '@radical/common/search'
+import { KIND_PREFIXES, SEARCH_KINDS, foldText, parseSearch, searchModel, searchSuggestions, searchWarmUp, viewTypeName, type Mark, type SearchData, type SearchHit, type SearchKind } from '@radical/common/search'
 import { normalizeViewFolder, type DiagramView } from '@radical/common/c4'
 import type { Metamodel } from '@radical/common/metamodel'
 import { revealViewFolder, useLeftPanelSection } from '@radical/ui/components/RightPanel'
@@ -314,6 +314,19 @@ export function QuickSearch(): React.ReactElement | null {
       nodes: activeViewId ? (viewNodeSets[activeViewId] ?? null) : null,
     },
   }), [c4Nodes, c4Relations, views, sequences, presentations, snapshots, metamodel, viewNodeSets, activeViewId])
+
+  // The model's texts folded while nothing else runs, a moment after it
+  // came in or changed: the first letter typed folded them all.
+  useEffect(() => {
+    if (typeof requestIdleCallback === 'undefined') return
+    let idle = 0
+    const timer = setTimeout(() => {
+      const step = searchWarmUp({ nodes: c4Nodes, relations: c4Relations, metamodel })
+      const run = (deadline: IdleDeadline): void => { if (step(() => deadline.timeRemaining() > 2)) idle = requestIdleCallback(run) }
+      idle = requestIdleCallback(run)
+    }, 1000)
+    return () => { clearTimeout(timer); if (idle) cancelIdleCallback(idle) }
+  }, [c4Nodes, c4Relations, metamodel])
 
   // The letters typed show at once; the results follow when they are found
   // (a model of 20,000 elements takes a moment), and are for those letters.

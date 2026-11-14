@@ -7,7 +7,7 @@
 // can read it from a file beside the model; it never goes into the model's
 // own files.
 
-import type { C4Node } from '../c4'
+import type { C4Node, C4Relation } from '../c4'
 import { originOf } from '../model'
 import type { CheckModel } from './rules'
 import { findTests, outcomeOf, type TestId, type TestStatus } from './reports'
@@ -184,11 +184,35 @@ function combineElements(statuses: CheckedStatus[]): CheckedStatus {
   return statuses.includes('stale') ? 'stale' : 'not-run'
 }
 
+type RelationIndex = { from: ReadonlyMap<string, C4Relation[]>; to: ReadonlyMap<string, C4Relation[]> }
+const RELATION_INDEX = new WeakMap<object, Map<string, RelationIndex>>()
+const NO_RELATIONS: RelationIndex = { from: new Map(), to: new Map() }
+
+/** The relations of one type by their source and by their target, in the
+ *  model's order: built for every type in one pass over a model's relations
+ *  (rules that walk them per element stay linear). Read only. */
+export function relationsOf(model: Pick<CheckModel, 'relations'>, type: string): RelationIndex {
+  let byType = RELATION_INDEX.get(model.relations)
+  if (!byType) {
+    const built = new Map<string, { from: Map<string, C4Relation[]>; to: Map<string, C4Relation[]> }>()
+    for (const r of Object.values(model.relations)) {
+      if (r.relationType === undefined) continue
+      let index = built.get(r.relationType)
+      if (!index) { index = { from: new Map(), to: new Map() }; built.set(r.relationType, index) }
+      const from = index.from.get(r.sourceId); if (from) from.push(r); else index.from.set(r.sourceId, [r])
+      const to = index.to.get(r.targetId); if (to) to.push(r); else index.to.set(r.targetId, [r])
+    }
+    byType = built
+    RELATION_INDEX.set(model.relations, byType)
+  }
+  return byType.get(type) ?? NO_RELATIONS
+}
+
 /** The nodes of `type` that the relation `relationType` links to `id`, from
  *  their side (`from`: source of the relation). */
 export function linkedNodes(model: CheckModel, id: string, relationType: string, end: 'source' | 'target', type?: string): C4Node[] {
-  return Object.values(model.relations)
-    .filter((r) => r.relationType === relationType && (end === 'source' ? r.targetId : r.sourceId) === id)
+  const index = relationsOf(model, relationType)
+  return ((end === 'source' ? index.to.get(id) : index.from.get(id)) ?? [])
     .map((r) => model.nodes[end === 'source' ? r.sourceId : r.targetId])
     .filter((n): n is C4Node => !!n && (!type || n.type === type))
 }

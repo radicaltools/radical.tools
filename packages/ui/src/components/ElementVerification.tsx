@@ -50,7 +50,8 @@ function ElementLink({ id, status }: { id: string; status?: string }): React.Rea
 function FindingMessage({ f, self }: { f: CheckFinding; self: string }): React.ReactElement {
   const nodes = useDiagramStore((s) => s.c4Nodes)
   const text = f.relatedIds?.length ? f.message.replace(/ Not verified now: .*$/, '') : f.message
-  const ids = [...new Set([f.nodeId, ...(f.relatedIds ?? [])].filter((id): id is string => !!id && id !== self && !!nodes[id]))]
+  // Only those the message names: a finding may relate hundreds.
+  const ids = [...new Set([f.nodeId, ...(f.relatedIds ?? [])].filter((id): id is string => !!id && id !== self && !!nodes[id] && text.includes(`"${nodes[id].label}"`)))]
   const parts: React.ReactNode[] = []
   let rest = text
   for (let guard = 0; guard < 20; guard++) {

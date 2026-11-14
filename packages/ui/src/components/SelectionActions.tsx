@@ -8,6 +8,7 @@ import { nestRefusal, relationTypeOnMove } from '@radical/common/model'
 import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { useMenuKeys } from '../hooks/menuKeys'
 import { useOutsideClick } from '../hooks/useOutsideClick'
+import { useTextAsideMemo } from '../store/nodeSelectors'
 
 // ─── What is done to selected elements and relations ────────────────────────
 //
@@ -202,9 +203,11 @@ function NodeActionItems({ ids, variant }: { ids: string[]; variant: Variant }):
 
   // Where the elements can move: siblings only, not into themselves or what
   // they hold, nor where they are, and only where the metamodel lets each.
-  const moveTargets = useMemo(() => {
+  // Which ones, worked out again when the model's structure changes, not at
+  // each letter typed in a name; their names and paths as they are now.
+  const moveTargetIds = useTextAsideMemo(() => {
     const nodes = ids.map((id) => c4Nodes[id]).filter(Boolean)
-    if (nodes.length === 0 || !metamodel) return [] as { id: string | null; label: string; path: string }[]
+    if (nodes.length === 0 || !metamodel) return [] as (string | null)[]
     const parentId = nodes[0].parentId ?? null
     if (!nodes.every((n) => (n.parentId ?? null) === parentId)) return []
     const forbidden = new Set<string>(ids)
@@ -219,14 +222,21 @@ function NodeActionItems({ ids, variant }: { ids: string[]; variant: Variant }):
     const modelState = { c4Nodes, c4Relations: {}, views: {}, activeViewId: null, metamodel }
     const allowedIn = (target: C4Node | undefined): boolean => nodes.every((n) => isPlacementAllowed(metamodel, n.type, target, c4Nodes))
       && nestRefusal(modelState, ids, target?.id ?? null) === null
-    const out: { id: string | null; label: string; path: string }[] = []
-    if (parentId !== null && allowedIn(undefined)) out.push({ id: null, label: 'Canvas root', path: 'Canvas root' })
+    const out: (string | null)[] = []
+    if (parentId !== null && allowedIn(undefined)) out.push(null)
     for (const cand of Object.values(c4Nodes)) {
       if (forbidden.has(cand.id) || cand.id === parentId || !allowedIn(cand)) continue
-      out.push({ id: cand.id, label: `${cand.label || cand.type} (${metamodel.nodeTypes[cand.type]?.label ?? cand.type})`, path: pathOf(c4Nodes, cand.id) })
+      out.push(cand.id)
     }
-    return out.sort((a, b) => a.path.localeCompare(b.path))
-  }, [ids, c4Nodes, metamodel])
+    return out
+  }, c4Nodes, [ids.join('\u0000'), metamodel])
+  const moveTargets = useMemo(() => moveTargetIds
+    .flatMap((id) => {
+      if (id === null) return [{ id: null, label: 'Canvas root', path: 'Canvas root' }]
+      const cand = c4Nodes[id]
+      return cand ? [{ id: cand.id as string | null, label: `${cand.label || cand.type} (${metamodel.nodeTypes[cand.type]?.label ?? cand.type})`, path: pathOf(c4Nodes, cand.id) }] : []
+    })
+    .sort((a, b) => a.path.localeCompare(b.path)), [moveTargetIds, c4Nodes, metamodel])
 
   // Unwrap: one element that holds others (else it is Delete, or nothing).
   const only = ids.length === 1 ? c4Nodes[ids[0]] : undefined
