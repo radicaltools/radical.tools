@@ -1242,91 +1242,106 @@
       "id": "req-sync--derives--need",
       "sourceId": "req-sync",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-pitr--derives--need",
       "sourceId": "req-pitr",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-snapshot--derives--need",
       "sourceId": "req-snapshot",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-recover--derives--need",
       "sourceId": "req-recover",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-copy-alert--derives--need",
       "sourceId": "req-copy-alert",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-copies-vault--derives--need",
       "sourceId": "req-copies-vault",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-copies-region--derives--need",
       "sourceId": "req-copies-region",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-copies-offline--derives--need",
       "sourceId": "req-copies-offline",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-dr-restore--derives--need",
       "sourceId": "req-dr-restore",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-dr-standby--derives--need",
       "sourceId": "req-dr-standby",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-dr-single--derives--need",
       "sourceId": "req-dr-single",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-rebuild--derives--need",
       "sourceId": "req-rebuild",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-derived--derives--need",
       "sourceId": "req-derived",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-drill-auto--derives--need",
       "sourceId": "req-drill-auto",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "req-drill-manual--derives--need",
       "sourceId": "req-drill-manual",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Stores get lost: a broken disk, a deleted table, a bad migration, ransomware, a region down. How much data may be lost, how fast the system is back, whether the copies survive the same attack, and whether they actually restore are decisions that are usually tested only on the day they are needed. The snippets assume the application under src/ (src/projection for a derived store, src/stores for data access), the recovery scripts under ops/ and the drill records under docs/drills."
     },
     {
       "id": "sc-sync--verifies--req-sync",

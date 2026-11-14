@@ -18,7 +18,8 @@
     { "element": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed", "name": "@radical/host-bridge", "paths": ["packages/host-bridge"] },
     { "element": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea", "name": "@radical/hub-catalogue", "paths": ["packages/hub-catalogue"] },
     { "element": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3", "name": "Crucible engine package", "paths": ["apps/crucible"] },
-    { "element": "917d9018-dff9-45b1-87dc-d01f8ac836bb", "name": "@radical/assay", "paths": ["packages/assay"] }
+    { "element": "917d9018-dff9-45b1-87dc-d01f8ac836bb", "name": "@radical/assay", "paths": ["packages/assay"] },
+    { "element": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b", "name": "Radical benchmark", "paths": ["apps/bench"] }
   ],
   "verifies": [
     { "element": "1c0c7414-2092-4c70-a233-51bd95a280cc", "name": "Recover interrupted discussion sync", "tests": [
@@ -3540,6 +3541,102 @@
     ] },
     { "element": "5460d9dd-e1ed-4b41-ac58-d486eccd0f25", "name": "Verification on the card everywhere", "tests": [
       "apps/e2e/tests/studio/cardVerification.spec.ts › the card says in every perspective what the check says of the element, and the Inspector opens the same card"
+    ] },
+    { "element": "b2feb337-2d58-46da-af18-8e7281d8d52b", "name": "Unapplied standard is an error", "tests": [
+      "packages/common/tests/inheritedStandards.test.ts › inherited standards › reports a standard applied to none of the model's elements and waived by none, as an error (Unapplied standard is an error)",
+      "packages/common/tests/inheritedStandards.test.ts › inherited standards › says nothing in a model that depends on no other model",
+      "packages/common/tests/inheritedStandards.test.ts › inherited standards › lowers to a warning in check.json"
+    ] },
+    { "element": "71708640-50db-4990-9820-c7828c1ae919", "name": "Waived standard passes", "tests": [
+      "packages/common/tests/inheritedStandards.test.ts › inherited standards › passes a standard an accepted ADR of the model waives, and asks that waiver for no fitness function (Waived standard passes)",
+      "packages/common/tests/relationEndpoints.test.ts › moving a relation end › leaves the type out when several fit the new pair (an ADR supersedes or waives an ADR)"
+    ] },
+    { "element": "0f9b61c2-2663-478e-9407-d93680e452dc", "name": "Applied standard without a check is an error", "tests": [
+      "packages/common/tests/inheritedStandards.test.ts › inherited standards › reports an applied standard no fitness function checks on each element it constrains (Applied standard without a check is an error)",
+      "packages/common/tests/inheritedStandards.test.ts › inherited standards › takes a fitness function fetched with the standard, and tests the repository binds to the model's own"
+    ] },
+    { "element": "aef8d454-6592-4913-8de5-557b1b3a222b", "name": "Inherited standards tests", "tests": [
+      "packages/common/tests/inheritedStandards.test.ts"
+    ] },
+    { "element": "741adce6-2bb2-440d-9924-934f33685364", "name": "Requirements listed in brief", "tests": [
+      "apps/mcp/src/folderModel.test.ts › brief answers for agents › lists requirements in brief, gives them whole with FULL, and each neighbour once (Requirements listed in brief)"
+    ] },
+    { "element": "a63d53ee-9a75-4857-aafa-09f152452a1a", "name": "Summary names types in brief", "tests": [
+      "apps/mcp/src/folderModel.test.ts › brief answers for agents › gives the metamodel in brief, and named types in full (Summary names types in brief)",
+      "apps/mcp/src/folderModel.test.ts › state machines over MCP › are offered, explained, built with event references, checked and laid out"
+    ] },
+    { "element": "7b39fbc4-6620-4f1a-85da-c242151fe321", "name": "Brief agent answers tests", "tests": [
+      "apps/mcp/src/folderModel.test.ts › brief answers for agents"
+    ] },
+    { "element": "1480bdf5-1800-4854-8000-8ad63200a29c", "name": "Agent skips the stages a back end does not need", "tests": [
+      "apps/mcp/src/forge.test.ts › concern packs in a Forge run › leaves out the stages a back end does not need, in one call, with the reason (Agent skips the stages a back end does not need)",
+      "apps/e2e/tests/studio/folders.spec.ts › an agent's Forge run shows the stages it left out, with why"
+    ] },
+    { "element": "243370ec-7638-4690-b801-7487a70388cf", "name": "Agent told to model as it works", "tests": [
+      "apps/mcp/src/folderModel.test.ts › folder-backed MCP model › lists and calls tools over stdio, persisting a real node ID"
+    ] },
+    { "element": "ebf65f91-08b0-4c56-ad88-1fe8a44eb416", "name": "Forge on request tests", "tests": [
+      "apps/mcp/src/forge.test.ts › concern packs in a Forge run › leaves out the stages a back end does not need, in one call, with the reason (Agent skips the stages a back end does not need)",
+      "apps/mcp/src/folderModel.test.ts › folder-backed MCP model › lists and calls tools over stdio, persisting a real node ID"
+    ] },
+    { "element": "69f458a2-d468-4401-8577-2264ee34eb69", "name": "Requirement read against the client's words", "tests": [
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › lists each changed requirement next to the words of its needs (Requirement read against the client's words)"
+    ] },
+    { "element": "7ae02607-fa47-460a-85cc-81ba7e9218ca", "name": "Agent told to keep answers and review", "tests": [
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › asks agents for the person's words in the need and a review before the code (Agent told to keep answers and review)"
+    ] },
+    { "element": "cbce887f-9f98-4bd7-9a4b-9a8ad0991f20", "name": "Requirement review tests", "tests": [
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs",
+      "packages/common/tests/derivesQuotes.test.ts"
+    ] },
+    { "element": "1f79b192-af20-4603-9de9-d0f7721bdb7c", "name": "Quotes of a need checked", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › quotes on derives › checks each quote against its need and names the answers no requirement quotes (Quotes of a need checked)",
+      "packages/common/tests/derivesQuotes.test.ts › quotes on derives › reads fragments line by line, quotation marks and ellipses aside, and answers from A: to the next Q:"
+    ] },
+    { "element": "c0e2e020-393d-47d7-ba0b-a1d9a7678630", "name": "A pack's quotes survive the import", "tests": [
+      "packages/common/tests/hubImport.test.ts › buildConceptInsert › keeps a relation's own properties, such as a derives' quote",
+      "packages/hub-catalogue/tests/concernPacks.test.ts › concern packs › every pack imported and bound passes radical check"
+    ] },
+    { "element": "4a2b45f6-4ff2-45d4-b404-4cbe1020e331", "name": "Values of a quote checked", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › finds a value the quote says and the requirement does not, and one the requirement says that no quote says (Values of a quote checked)",
+      "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › checks no values of a quote of a whole need that holds no answer, and those of a whole need with answers",
+      "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › reads numbers in digits and words, percentages, null and identifiers"
+    ] },
+    { "element": "edbb650f-d97f-4fbb-ad29-9301a3009a57", "name": "Quoted values reach a scenario", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › hard values of a quote and its requirement › asks a scenario for the values a requirement takes from its quote (Quoted values reach a scenario)"
+    ] },
+    { "element": "f255b52e-5d2a-4f88-b887-9b6c09a87a5f", "name": "Quotes read as words", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › reads quotes as whole words, Markdown aside, and answers in their forms (Quotes read as words)"
+    ] },
+    { "element": "0947887b-9884-49ee-8f00-3e5a85aa5d52", "name": "Values read in their forms", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › reads values in their forms (Values read in their forms)"
+    ] },
+    { "element": "e25c7fc3-822e-484b-ab53-c17c17b512af", "name": "Limits, units and order kept", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › keeps the sense of a quoted value (Limits, units and order kept)"
+    ] },
+    { "element": "7b99eb7c-88b0-4e05-bda0-aa94f51265b9", "name": "Example missing from scenarios", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › asks a scenario for the person's example (Example missing from scenarios)"
+    ] },
+    { "element": "736d4ae1-cce0-4a68-8f81-49a8716250e3", "name": "Scenario values found in its tests", "tests": [
+      "apps/cli/src/cli.test.ts › radical check › finds the values of a scenario its tests do not use (Scenario values found in its tests)"
+    ] },
+    { "element": "ae223863-1d1b-4cd4-85cb-67aa734d009a", "name": "Write tells of a lost value", "tests": [
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › tells an agent writing the model what it brings in of the person's words (Write tells of a lost value)"
+    ] },
+    { "element": "1ed4224a-2df4-44a5-b366-7488721ae125", "name": "Word rules on a large model", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › checks a model of 5,000 requirements in under 2 seconds (Word rules on a large model)"
+    ] },
+    { "element": "72c0c982-207b-4291-beb8-1efc46d9670f", "name": "Every part of an answer quoted", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › every part of an answer, and answers kept › asks for a quote of each paragraph and list item of an answer (Every part of an answer quoted)"
+    ] },
+    { "element": "07454d1d-3e59-4682-b8e3-4aea22e6df34", "name": "Rewritten answer is an error", "tests": [
+      "packages/common/tests/derivesQuotes.test.ts › every part of an answer, and answers kept › keeps the answers the need held at the base, and quotes none marked superseded (Answers only added to)"
+    ] },
+    { "element": "480c4aaf-127f-4142-9995-2c3b63c1df5a", "name": "Results ignored by git", "tests": [
+      "apps/bench/tests/layout.test.ts › radical.bench in the monorepo › keeps the results of runs out of git (Run results stay off git)"
+    ] },
+    { "element": "e61d543b-8618-41ea-8bdf-f7797a06d73c", "name": "Benchmark runs off git", "tests": [
+      "apps/bench/tests/layout.test.ts"
     ] }
   ]
 }

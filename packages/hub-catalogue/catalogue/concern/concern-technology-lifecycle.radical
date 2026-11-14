@@ -821,79 +821,92 @@
       "id": "req-radar-from-adrs--derives--need",
       "sourceId": "req-radar-from-adrs",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams need to know which technologies to pick, which are being tried, and which to stay away from, and that answer has to come from the decisions the organisation has actually made, not from a slide that drifts from them. A technology should enter Trial with an owner and leave it with a decision, and Hold has to stop new use and say what happens to the old. The snippets assume the architecture model in architecture/ (ADRs as Markdown files with YAML front matter under architecture/nodes), radar/overrides.json beside it, the generated radar/radar.json, the scripts under scripts/, and GitHub with the gh CLI. A radar view in Studio, drawn from the same ADRs, is coming; until then the generated file is the radar."
     },
     {
       "id": "req-overrides-valid--derives--need",
       "sourceId": "req-overrides-valid",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams need to know which technologies to pick, which are being tried, and which to stay away from, and that answer has to come from the decisions the organisation has actually made, not from a slide that drifts from them. A technology should enter Trial with an owner and leave it with a decision, and Hold has to stop new use and say what happens to the old. The snippets assume the architecture model in architecture/ (ADRs as Markdown files with YAML front matter under architecture/nodes), radar/overrides.json beside it, the generated radar/radar.json, the scripts under scripts/, and GitHub with the gh CLI. A radar view in Studio, drawn from the same ADRs, is coming; until then the generated file is the radar."
     },
     {
       "id": "req-radar-current--derives--need",
       "sourceId": "req-radar-current",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams need to know which technologies to pick, which are being tried, and which to stay away from, and that answer has to come from the decisions the organisation has actually made, not from a slide that drifts from them. A technology should enter Trial with an owner and leave it with a decision, and Hold has to stop new use and say what happens to the old. The snippets assume the architecture model in architecture/ (ADRs as Markdown files with YAML front matter under architecture/nodes), radar/overrides.json beside it, the generated radar/radar.json, the scripts under scripts/, and GitHub with the gh CLI. A radar view in Studio, drawn from the same ADRs, is coming; until then the generated file is the radar."
     },
     {
       "id": "req-review--derives--need",
       "sourceId": "req-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams need to know which technologies to pick, which are being tried, and which to stay away from, and that answer has to come from the decisions the organisation has actually made, not from a slide that drifts from them. A technology should enter Trial with an owner and leave it with a decision, and Hold has to stop new use and say what happens to the old. The snippets assume the architecture model in architecture/ (ADRs as Markdown files with YAML front matter under architecture/nodes), radar/overrides.json beside it, the generated radar/radar.json, the scripts under scripts/, and GitHub with the gh CLI. A radar view in Studio, drawn from the same ADRs, is coming; until then the generated file is the radar."
     },
     {
       "id": "req-ring-approval--derives--need",
       "sourceId": "req-ring-approval",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams need to know which technologies to pick, which are being tried, and which to stay away from, and that answer has to come from the decisions the organisation has actually made, not from a slide that drifts from them. A technology should enter Trial with an owner and leave it with a decision, and Hold has to stop new use and say what happens to the old. The snippets assume the architecture model in architecture/ (ADRs as Markdown files with YAML front matter under architecture/nodes), radar/overrides.json beside it, the generated radar/radar.json, the scripts under scripts/, and GitHub with the gh CLI. A radar view in Studio, drawn from the same ADRs, is coming; until then the generated file is the radar."
     },
     {
       "id": "req-rfc-answered--derives--need",
       "sourceId": "req-rfc-answered",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams need to know which technologies to pick, which are being tried, and which to stay away from, and that answer has to come from the decisions the organisation has actually made, not from a slide that drifts from them. A technology should enter Trial with an owner and leave it with a decision, and Hold has to stop new use and say what happens to the old. The snippets assume the architecture model in architecture/ (ADRs as Markdown files with YAML front matter under architecture/nodes), radar/overrides.json beside it, the generated radar/radar.json, the scripts under scripts/, and GitHub with the gh CLI. A radar view in Studio, drawn from the same ADRs, is coming; until then the generated file is the radar."
     },
     {
       "id": "req-team-owned--derives--need",
       "sourceId": "req-team-owned",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams need to know which technologies to pick, which are being tried, and which to stay away from, and that answer has to come from the decisions the organisation has actually made, not from a slide that drifts from them. A technology should enter Trial with an owner and leave it with a decision, and Hold has to stop new use and say what happens to the old. The snippets assume the architecture model in architecture/ (ADRs as Markdown files with YAML front matter under architecture/nodes), radar/overrides.json beside it, the generated radar/radar.json, the scripts under scripts/, and GitHub with the gh CLI. A radar view in Studio, drawn from the same ADRs, is coming; until then the generated file is the radar."
     },
     {
       "id": "req-hold-no-new-use--derives--need",
       "sourceId": "req-hold-no-new-use",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams need to know which technologies to pick, which are being tried, and which to stay away from, and that answer has to come from the decisions the organisation has actually made, not from a slide that drifts from them. A technology should enter Trial with an owner and leave it with a decision, and Hold has to stop new use and say what happens to the old. The snippets assume the architecture model in architecture/ (ADRs as Markdown files with YAML front matter under architecture/nodes), radar/overrides.json beside it, the generated radar/radar.json, the scripts under scripts/, and GitHub with the gh CLI. A radar view in Studio, drawn from the same ADRs, is coming; until then the generated file is the radar."
     },
     {
       "id": "req-hold-instead--derives--need",
       "sourceId": "req-hold-instead",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams need to know which technologies to pick, which are being tried, and which to stay away from, and that answer has to come from the decisions the organisation has actually made, not from a slide that drifts from them. A technology should enter Trial with an owner and leave it with a decision, and Hold has to stop new use and say what happens to the old. The snippets assume the architecture model in architecture/ (ADRs as Markdown files with YAML front matter under architecture/nodes), radar/overrides.json beside it, the generated radar/radar.json, the scripts under scripts/, and GitHub with the gh CLI. A radar view in Studio, drawn from the same ADRs, is coming; until then the generated file is the radar."
     },
     {
       "id": "req-hold-migrated--derives--need",
       "sourceId": "req-hold-migrated",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams need to know which technologies to pick, which are being tried, and which to stay away from, and that answer has to come from the decisions the organisation has actually made, not from a slide that drifts from them. A technology should enter Trial with an owner and leave it with a decision, and Hold has to stop new use and say what happens to the old. The snippets assume the architecture model in architecture/ (ADRs as Markdown files with YAML front matter under architecture/nodes), radar/overrides.json beside it, the generated radar/radar.json, the scripts under scripts/, and GitHub with the gh CLI. A radar view in Studio, drawn from the same ADRs, is coming; until then the generated file is the radar."
     },
     {
       "id": "req-trial-recorded--derives--need",
       "sourceId": "req-trial-recorded",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams need to know which technologies to pick, which are being tried, and which to stay away from, and that answer has to come from the decisions the organisation has actually made, not from a slide that drifts from them. A technology should enter Trial with an owner and leave it with a decision, and Hold has to stop new use and say what happens to the old. The snippets assume the architecture model in architecture/ (ADRs as Markdown files with YAML front matter under architecture/nodes), radar/overrides.json beside it, the generated radar/radar.json, the scripts under scripts/, and GitHub with the gh CLI. A radar view in Studio, drawn from the same ADRs, is coming; until then the generated file is the radar."
     },
     {
       "id": "req-trial-timebox--derives--need",
       "sourceId": "req-trial-timebox",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams need to know which technologies to pick, which are being tried, and which to stay away from, and that answer has to come from the decisions the organisation has actually made, not from a slide that drifts from them. A technology should enter Trial with an owner and leave it with a decision, and Hold has to stop new use and say what happens to the old. The snippets assume the architecture model in architecture/ (ADRs as Markdown files with YAML front matter under architecture/nodes), radar/overrides.json beside it, the generated radar/radar.json, the scripts under scripts/, and GitHub with the gh CLI. A radar view in Studio, drawn from the same ADRs, is coming; until then the generated file is the radar."
     },
     {
       "id": "req-published--derives--need",
       "sourceId": "req-published",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Teams need to know which technologies to pick, which are being tried, and which to stay away from, and that answer has to come from the decisions the organisation has actually made, not from a slide that drifts from them. A technology should enter Trial with an owner and leave it with a decision, and Hold has to stop new use and say what happens to the old. The snippets assume the architecture model in architecture/ (ADRs as Markdown files with YAML front matter under architecture/nodes), radar/overrides.json beside it, the generated radar/radar.json, the scripts under scripts/, and GitHub with the gh CLI. A radar view in Studio, drawn from the same ADRs, is coming; until then the generated file is the radar."
     },
     {
       "id": "sc-radar-from-adrs--verifies--req-radar-from-adrs",

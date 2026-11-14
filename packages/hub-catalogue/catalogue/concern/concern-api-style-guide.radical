@@ -862,79 +862,92 @@
       "id": "req-guide-declared--derives--need",
       "sourceId": "req-guide-declared",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems and other parts of this system call its APIs. Every caller learns one API and expects the next to work the same way: the same names, the same lists, the same errors. Without a guide, and without a check that the guide is followed, each API drifts its own way and every caller pays for it in client code. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the style ruleset in api/style/ruleset.yaml extended by .spectral.yaml at the root, our own guide (where there is one) in api/style/guide.md, the router's table exported from src/app, and CODEOWNERS and the pull-request template under .github/."
     },
     {
       "id": "req-lint--derives--need",
       "sourceId": "req-lint",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems and other parts of this system call its APIs. Every caller learns one API and expects the next to work the same way: the same names, the same lists, the same errors. Without a guide, and without a check that the guide is followed, each API drifts its own way and every caller pays for it in client code. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the style ruleset in api/style/ruleset.yaml extended by .spectral.yaml at the root, our own guide (where there is one) in api/style/guide.md, the router's table exported from src/app, and CODEOWNERS and the pull-request template under .github/."
     },
     {
       "id": "req-ruleset-pinned--derives--need",
       "sourceId": "req-ruleset-pinned",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems and other parts of this system call its APIs. Every caller learns one API and expects the next to work the same way: the same names, the same lists, the same errors. Without a guide, and without a check that the guide is followed, each API drifts its own way and every caller pays for it in client code. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the style ruleset in api/style/ruleset.yaml extended by .spectral.yaml at the root, our own guide (where there is one) in api/style/guide.md, the router's table exported from src/app, and CODEOWNERS and the pull-request template under .github/."
     },
     {
       "id": "req-rule-sources--derives--need",
       "sourceId": "req-rule-sources",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems and other parts of this system call its APIs. Every caller learns one API and expects the next to work the same way: the same names, the same lists, the same errors. Without a guide, and without a check that the guide is followed, each API drifts its own way and every caller pays for it in client code. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the style ruleset in api/style/ruleset.yaml extended by .spectral.yaml at the root, our own guide (where there is one) in api/style/guide.md, the router's table exported from src/app, and CODEOWNERS and the pull-request template under .github/."
     },
     {
       "id": "req-owners-review--derives--need",
       "sourceId": "req-owners-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems and other parts of this system call its APIs. Every caller learns one API and expects the next to work the same way: the same names, the same lists, the same errors. Without a guide, and without a check that the guide is followed, each API drifts its own way and every caller pays for it in client code. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the style ruleset in api/style/ruleset.yaml extended by .spectral.yaml at the root, our own guide (where there is one) in api/style/guide.md, the router's table exported from src/app, and CODEOWNERS and the pull-request template under .github/."
     },
     {
       "id": "req-review-checklist--derives--need",
       "sourceId": "req-review-checklist",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems and other parts of this system call its APIs. Every caller learns one API and expects the next to work the same way: the same names, the same lists, the same errors. Without a guide, and without a check that the guide is followed, each API drifts its own way and every caller pays for it in client code. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the style ruleset in api/style/ruleset.yaml extended by .spectral.yaml at the root, our own guide (where there is one) in api/style/guide.md, the router's table exported from src/app, and CODEOWNERS and the pull-request template under .github/."
     },
     {
       "id": "req-design-first--derives--need",
       "sourceId": "req-design-first",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems and other parts of this system call its APIs. Every caller learns one API and expects the next to work the same way: the same names, the same lists, the same errors. Without a guide, and without a check that the guide is followed, each API drifts its own way and every caller pays for it in client code. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the style ruleset in api/style/ruleset.yaml extended by .spectral.yaml at the root, our own guide (where there is one) in api/style/guide.md, the router's table exported from src/app, and CODEOWNERS and the pull-request template under .github/."
     },
     {
       "id": "req-design-routes--derives--need",
       "sourceId": "req-design-routes",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems and other parts of this system call its APIs. Every caller learns one API and expects the next to work the same way: the same names, the same lists, the same errors. Without a guide, and without a check that the guide is followed, each API drifts its own way and every caller pays for it in client code. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the style ruleset in api/style/ruleset.yaml extended by .spectral.yaml at the root, our own guide (where there is one) in api/style/guide.md, the router's table exported from src/app, and CODEOWNERS and the pull-request template under .github/."
     },
     {
       "id": "req-code-first--derives--need",
       "sourceId": "req-code-first",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems and other parts of this system call its APIs. Every caller learns one API and expects the next to work the same way: the same names, the same lists, the same errors. Without a guide, and without a check that the guide is followed, each API drifts its own way and every caller pays for it in client code. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the style ruleset in api/style/ruleset.yaml extended by .spectral.yaml at the root, our own guide (where there is one) in api/style/guide.md, the router's table exported from src/app, and CODEOWNERS and the pull-request template under .github/."
     },
     {
       "id": "req-exception-recorded--derives--need",
       "sourceId": "req-exception-recorded",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems and other parts of this system call its APIs. Every caller learns one API and expects the next to work the same way: the same names, the same lists, the same errors. Without a guide, and without a check that the guide is followed, each API drifts its own way and every caller pays for it in client code. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the style ruleset in api/style/ruleset.yaml extended by .spectral.yaml at the root, our own guide (where there is one) in api/style/guide.md, the router's table exported from src/app, and CODEOWNERS and the pull-request template under .github/."
     },
     {
       "id": "req-exception-expiry--derives--need",
       "sourceId": "req-exception-expiry",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems and other parts of this system call its APIs. Every caller learns one API and expects the next to work the same way: the same names, the same lists, the same errors. Without a guide, and without a check that the guide is followed, each API drifts its own way and every caller pays for it in client code. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the style ruleset in api/style/ruleset.yaml extended by .spectral.yaml at the root, our own guide (where there is one) in api/style/guide.md, the router's table exported from src/app, and CODEOWNERS and the pull-request template under .github/."
     },
     {
       "id": "req-no-exceptions--derives--need",
       "sourceId": "req-no-exceptions",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems and other parts of this system call its APIs. Every caller learns one API and expects the next to work the same way: the same names, the same lists, the same errors. Without a guide, and without a check that the guide is followed, each API drifts its own way and every caller pays for it in client code. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the style ruleset in api/style/ruleset.yaml extended by .spectral.yaml at the root, our own guide (where there is one) in api/style/guide.md, the router's table exported from src/app, and CODEOWNERS and the pull-request template under .github/."
     },
     {
       "id": "req-own-guide--derives--need",
       "sourceId": "req-own-guide",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Other systems and other parts of this system call its APIs. Every caller learns one API and expects the next to work the same way: the same names, the same lists, the same errors. Without a guide, and without a check that the guide is followed, each API drifts its own way and every caller pays for it in client code. The snippets assume one OpenAPI document per API under api/ (api/orders.yaml), the style ruleset in api/style/ruleset.yaml extended by .spectral.yaml at the root, our own guide (where there is one) in api/style/guide.md, the router's table exported from src/app, and CODEOWNERS and the pull-request template under .github/."
     },
     {
       "id": "sc-guide-declared--verifies--req-guide-declared",

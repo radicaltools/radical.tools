@@ -1015,79 +1015,92 @@
       "id": "req-scope--derives--need",
       "sourceId": "req-scope",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The organisation that runs this system may be bound by the EU Digital Operational Resilience Act (DORA, Regulation (EU) 2022/2554), as a financial entity or as an ICT provider to one. Where it is, the team must classify ICT-related incidents and report the major ones to the competent authority within hours, keep a register of the ICT services the system buys, test the system on a regulatory cycle and hold contracts that say what DORA requires, and it must be able to show all of it at any time. This pack describes what the system and its team do and how they prove it; it is not legal advice, and whether and how DORA applies is for the organisation's compliance officer and legal counsel to decide. The snippets assume the records under compliance/dora/ (scope.yaml, register.yaml or subcontractors.yaml, resilience-tests.yaml), the runbook at docs/dora/incident-reporting.md, the contract addendum at contracts/dora-addendum.md, the architecture model as a Radical Markdown folder under architecture/, the incident tool's export at reports/incidents.json, and the checks under tools/dora/ (Node 20 with js-yaml and csv-parse, jq)."
     },
     {
       "id": "req-classify--derives--need",
       "sourceId": "req-classify",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The organisation that runs this system may be bound by the EU Digital Operational Resilience Act (DORA, Regulation (EU) 2022/2554), as a financial entity or as an ICT provider to one. Where it is, the team must classify ICT-related incidents and report the major ones to the competent authority within hours, keep a register of the ICT services the system buys, test the system on a regulatory cycle and hold contracts that say what DORA requires, and it must be able to show all of it at any time. This pack describes what the system and its team do and how they prove it; it is not legal advice, and whether and how DORA applies is for the organisation's compliance officer and legal counsel to decide. The snippets assume the records under compliance/dora/ (scope.yaml, register.yaml or subcontractors.yaml, resilience-tests.yaml), the runbook at docs/dora/incident-reporting.md, the contract addendum at contracts/dora-addendum.md, the architecture model as a Radical Markdown folder under architecture/, the incident tool's export at reports/incidents.json, and the checks under tools/dora/ (Node 20 with js-yaml and csv-parse, jq)."
     },
     {
       "id": "req-report--derives--need",
       "sourceId": "req-report",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The organisation that runs this system may be bound by the EU Digital Operational Resilience Act (DORA, Regulation (EU) 2022/2554), as a financial entity or as an ICT provider to one. Where it is, the team must classify ICT-related incidents and report the major ones to the competent authority within hours, keep a register of the ICT services the system buys, test the system on a regulatory cycle and hold contracts that say what DORA requires, and it must be able to show all of it at any time. This pack describes what the system and its team do and how they prove it; it is not legal advice, and whether and how DORA applies is for the organisation's compliance officer and legal counsel to decide. The snippets assume the records under compliance/dora/ (scope.yaml, register.yaml or subcontractors.yaml, resilience-tests.yaml), the runbook at docs/dora/incident-reporting.md, the contract addendum at contracts/dora-addendum.md, the architecture model as a Radical Markdown folder under architecture/, the incident tool's export at reports/incidents.json, and the checks under tools/dora/ (Node 20 with js-yaml and csv-parse, jq)."
     },
     {
       "id": "req-runbook--derives--need",
       "sourceId": "req-runbook",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The organisation that runs this system may be bound by the EU Digital Operational Resilience Act (DORA, Regulation (EU) 2022/2554), as a financial entity or as an ICT provider to one. Where it is, the team must classify ICT-related incidents and report the major ones to the competent authority within hours, keep a register of the ICT services the system buys, test the system on a regulatory cycle and hold contracts that say what DORA requires, and it must be able to show all of it at any time. This pack describes what the system and its team do and how they prove it; it is not legal advice, and whether and how DORA applies is for the organisation's compliance officer and legal counsel to decide. The snippets assume the records under compliance/dora/ (scope.yaml, register.yaml or subcontractors.yaml, resilience-tests.yaml), the runbook at docs/dora/incident-reporting.md, the contract addendum at contracts/dora-addendum.md, the architecture model as a Radical Markdown folder under architecture/, the incident tool's export at reports/incidents.json, and the checks under tools/dora/ (Node 20 with js-yaml and csv-parse, jq)."
     },
     {
       "id": "req-clients--derives--need",
       "sourceId": "req-clients",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The organisation that runs this system may be bound by the EU Digital Operational Resilience Act (DORA, Regulation (EU) 2022/2554), as a financial entity or as an ICT provider to one. Where it is, the team must classify ICT-related incidents and report the major ones to the competent authority within hours, keep a register of the ICT services the system buys, test the system on a regulatory cycle and hold contracts that say what DORA requires, and it must be able to show all of it at any time. This pack describes what the system and its team do and how they prove it; it is not legal advice, and whether and how DORA applies is for the organisation's compliance officer and legal counsel to decide. The snippets assume the records under compliance/dora/ (scope.yaml, register.yaml or subcontractors.yaml, resilience-tests.yaml), the runbook at docs/dora/incident-reporting.md, the contract addendum at contracts/dora-addendum.md, the architecture model as a Radical Markdown folder under architecture/, the incident tool's export at reports/incidents.json, and the checks under tools/dora/ (Node 20 with js-yaml and csv-parse, jq)."
     },
     {
       "id": "req-register--derives--need",
       "sourceId": "req-register",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The organisation that runs this system may be bound by the EU Digital Operational Resilience Act (DORA, Regulation (EU) 2022/2554), as a financial entity or as an ICT provider to one. Where it is, the team must classify ICT-related incidents and report the major ones to the competent authority within hours, keep a register of the ICT services the system buys, test the system on a regulatory cycle and hold contracts that say what DORA requires, and it must be able to show all of it at any time. This pack describes what the system and its team do and how they prove it; it is not legal advice, and whether and how DORA applies is for the organisation's compliance officer and legal counsel to decide. The snippets assume the records under compliance/dora/ (scope.yaml, register.yaml or subcontractors.yaml, resilience-tests.yaml), the runbook at docs/dora/incident-reporting.md, the contract addendum at contracts/dora-addendum.md, the architecture model as a Radical Markdown folder under architecture/, the incident tool's export at reports/incidents.json, and the checks under tools/dora/ (Node 20 with js-yaml and csv-parse, jq)."
     },
     {
       "id": "req-critical-contracts--derives--need",
       "sourceId": "req-critical-contracts",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The organisation that runs this system may be bound by the EU Digital Operational Resilience Act (DORA, Regulation (EU) 2022/2554), as a financial entity or as an ICT provider to one. Where it is, the team must classify ICT-related incidents and report the major ones to the competent authority within hours, keep a register of the ICT services the system buys, test the system on a regulatory cycle and hold contracts that say what DORA requires, and it must be able to show all of it at any time. This pack describes what the system and its team do and how they prove it; it is not legal advice, and whether and how DORA applies is for the organisation's compliance officer and legal counsel to decide. The snippets assume the records under compliance/dora/ (scope.yaml, register.yaml or subcontractors.yaml, resilience-tests.yaml), the runbook at docs/dora/incident-reporting.md, the contract addendum at contracts/dora-addendum.md, the architecture model as a Radical Markdown folder under architecture/, the incident tool's export at reports/incidents.json, and the checks under tools/dora/ (Node 20 with js-yaml and csv-parse, jq)."
     },
     {
       "id": "req-register-submit--derives--need",
       "sourceId": "req-register-submit",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The organisation that runs this system may be bound by the EU Digital Operational Resilience Act (DORA, Regulation (EU) 2022/2554), as a financial entity or as an ICT provider to one. Where it is, the team must classify ICT-related incidents and report the major ones to the competent authority within hours, keep a register of the ICT services the system buys, test the system on a regulatory cycle and hold contracts that say what DORA requires, and it must be able to show all of it at any time. This pack describes what the system and its team do and how they prove it; it is not legal advice, and whether and how DORA applies is for the organisation's compliance officer and legal counsel to decide. The snippets assume the records under compliance/dora/ (scope.yaml, register.yaml or subcontractors.yaml, resilience-tests.yaml), the runbook at docs/dora/incident-reporting.md, the contract addendum at contracts/dora-addendum.md, the architecture model as a Radical Markdown folder under architecture/, the incident tool's export at reports/incidents.json, and the checks under tools/dora/ (Node 20 with js-yaml and csv-parse, jq)."
     },
     {
       "id": "req-testing--derives--need",
       "sourceId": "req-testing",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The organisation that runs this system may be bound by the EU Digital Operational Resilience Act (DORA, Regulation (EU) 2022/2554), as a financial entity or as an ICT provider to one. Where it is, the team must classify ICT-related incidents and report the major ones to the competent authority within hours, keep a register of the ICT services the system buys, test the system on a regulatory cycle and hold contracts that say what DORA requires, and it must be able to show all of it at any time. This pack describes what the system and its team do and how they prove it; it is not legal advice, and whether and how DORA applies is for the organisation's compliance officer and legal counsel to decide. The snippets assume the records under compliance/dora/ (scope.yaml, register.yaml or subcontractors.yaml, resilience-tests.yaml), the runbook at docs/dora/incident-reporting.md, the contract addendum at contracts/dora-addendum.md, the architecture model as a Radical Markdown folder under architecture/, the incident tool's export at reports/incidents.json, and the checks under tools/dora/ (Node 20 with js-yaml and csv-parse, jq)."
     },
     {
       "id": "req-tlpt--derives--need",
       "sourceId": "req-tlpt",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The organisation that runs this system may be bound by the EU Digital Operational Resilience Act (DORA, Regulation (EU) 2022/2554), as a financial entity or as an ICT provider to one. Where it is, the team must classify ICT-related incidents and report the major ones to the competent authority within hours, keep a register of the ICT services the system buys, test the system on a regulatory cycle and hold contracts that say what DORA requires, and it must be able to show all of it at any time. This pack describes what the system and its team do and how they prove it; it is not legal advice, and whether and how DORA applies is for the organisation's compliance officer and legal counsel to decide. The snippets assume the records under compliance/dora/ (scope.yaml, register.yaml or subcontractors.yaml, resilience-tests.yaml), the runbook at docs/dora/incident-reporting.md, the contract addendum at contracts/dora-addendum.md, the architecture model as a Radical Markdown folder under architecture/, the incident tool's export at reports/incidents.json, and the checks under tools/dora/ (Node 20 with js-yaml and csv-parse, jq)."
     },
     {
       "id": "req-provider-notice--derives--need",
       "sourceId": "req-provider-notice",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The organisation that runs this system may be bound by the EU Digital Operational Resilience Act (DORA, Regulation (EU) 2022/2554), as a financial entity or as an ICT provider to one. Where it is, the team must classify ICT-related incidents and report the major ones to the competent authority within hours, keep a register of the ICT services the system buys, test the system on a regulatory cycle and hold contracts that say what DORA requires, and it must be able to show all of it at any time. This pack describes what the system and its team do and how they prove it; it is not legal advice, and whether and how DORA applies is for the organisation's compliance officer and legal counsel to decide. The snippets assume the records under compliance/dora/ (scope.yaml, register.yaml or subcontractors.yaml, resilience-tests.yaml), the runbook at docs/dora/incident-reporting.md, the contract addendum at contracts/dora-addendum.md, the architecture model as a Radical Markdown folder under architecture/, the incident tool's export at reports/incidents.json, and the checks under tools/dora/ (Node 20 with js-yaml and csv-parse, jq)."
     },
     {
       "id": "req-subcontractors--derives--need",
       "sourceId": "req-subcontractors",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The organisation that runs this system may be bound by the EU Digital Operational Resilience Act (DORA, Regulation (EU) 2022/2554), as a financial entity or as an ICT provider to one. Where it is, the team must classify ICT-related incidents and report the major ones to the competent authority within hours, keep a register of the ICT services the system buys, test the system on a regulatory cycle and hold contracts that say what DORA requires, and it must be able to show all of it at any time. This pack describes what the system and its team do and how they prove it; it is not legal advice, and whether and how DORA applies is for the organisation's compliance officer and legal counsel to decide. The snippets assume the records under compliance/dora/ (scope.yaml, register.yaml or subcontractors.yaml, resilience-tests.yaml), the runbook at docs/dora/incident-reporting.md, the contract addendum at contracts/dora-addendum.md, the architecture model as a Radical Markdown folder under architecture/, the incident tool's export at reports/incidents.json, and the checks under tools/dora/ (Node 20 with js-yaml and csv-parse, jq)."
     },
     {
       "id": "req-provider-contract--derives--need",
       "sourceId": "req-provider-contract",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The organisation that runs this system may be bound by the EU Digital Operational Resilience Act (DORA, Regulation (EU) 2022/2554), as a financial entity or as an ICT provider to one. Where it is, the team must classify ICT-related incidents and report the major ones to the competent authority within hours, keep a register of the ICT services the system buys, test the system on a regulatory cycle and hold contracts that say what DORA requires, and it must be able to show all of it at any time. This pack describes what the system and its team do and how they prove it; it is not legal advice, and whether and how DORA applies is for the organisation's compliance officer and legal counsel to decide. The snippets assume the records under compliance/dora/ (scope.yaml, register.yaml or subcontractors.yaml, resilience-tests.yaml), the runbook at docs/dora/incident-reporting.md, the contract addendum at contracts/dora-addendum.md, the architecture model as a Radical Markdown folder under architecture/, the incident tool's export at reports/incidents.json, and the checks under tools/dora/ (Node 20 with js-yaml and csv-parse, jq)."
     },
     {
       "id": "sc-scope--verifies--req-scope",

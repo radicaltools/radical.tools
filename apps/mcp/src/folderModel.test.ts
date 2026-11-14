@@ -54,6 +54,11 @@ describe('folder-backed MCP model', () => {
       expect(tools.tools.map((tool) => tool.name)).toContain('add_node')
       expect(tools.tools.map((tool) => tool.name)).not.toContain('reset_diagram')
       expect(client.getInstructions()).toContain('get_model_summary')
+      // By default an agent models as it works; Forge only when the user asks (Agent told to model as it works).
+      expect(client.getInstructions()).toContain('Keep the model current as you work')
+      expect(client.getInstructions()).toContain('and the model before the code')
+      expect(client.getInstructions()).toContain('Run Radical Forge only when the user asks for it')
+      expect(client.getInstructions()).toContain('forge_skip_stage')
       const summary = JSON.stringify((await client.callTool({ name: 'get_model_summary', arguments: {} })).content)
       expect(summary).toContain('ears_type')
       expect(summary).toContain('allowedPairs')
@@ -987,7 +992,9 @@ describe('state machines over MCP', () => {
       const summary = await call('get_model_summary', {})
       expect(summary).toContain('Modelling rules:')
       expect(summary).toContain('A `state-machine` models the lifecycle of one entity')
-      expect(summary).toContain('"refType":"event"')
+      // The transition's trigger points at an event node, in brief and in full.
+      expect(summary).toMatch(/- transition \(Transition\):.*event \(→ event\)/)
+      expect(await call('get_model_summary', { types: ['transition'] })).toContain('"refType":"event"')
 
       await call('add_node', { tempId: 'order', type: 'entity', label: 'Order', properties: { kind: 'aggregate-root' } })
       await call('add_node', { tempId: 'm', type: 'state-machine', label: 'Order lifecycle' })
@@ -1342,5 +1349,159 @@ describe('verification path', () => {
       '        · tests/pay.test.ts › pays — passed',
     ].join('\n'))
     expect(await model.call('get_trace', { id: 'gone' })).toMatchObject({ ok: false, text: 'get_trace: no element gone in the model' })
+  })
+})
+
+describe('brief answers for agents', () => {
+  it('lists requirements in brief, gives them whole with FULL, and each neighbour once (Requirements listed in brief)', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    const long = 'take the payment through the one gateway of the provider the shop is set to, record the attempt with its outcome and the provider\'s reference, and tell the customer what happened in words a person reads'
+    await model.call('add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+    for (let i = 0; i < 40; i++) {
+      const added = await model.call('add_node', { tempId: `r${i}`, type: 'requirement', label: `Pay ${i}`, parentId: 'shop', properties: { ears_type: 'event-driven', trigger: 'the customer pays', action: long, rationale: 'A long rationale nobody needs in a list. '.repeat(10) } })
+      expect(added.ok, added.text).toBe(true)
+    }
+    await model.call('add_relation', { sourceId: 'shop', targetId: 'r0', relationType: 'satisfies' })
+    const brief = JSON.parse((await model.call('search_model', { query: 'LIST NODES WHERE type = "requirement"' })).text)
+    expect(brief.total).toBe(40)
+    const row = brief.rows[0]
+    expect(Object.keys(row).sort()).toEqual(['ears_type', 'id', 'label', 'parentId', 'text', 'type'])
+    expect(row.text.length).toBe(160)
+    expect(row.text.startsWith('When the customer pays, the system shall take the payment')).toBe(true)
+    expect(row.text.endsWith('…')).toBe(true)
+    expect(brief.note).toContain('GET NODE')
+
+    const full = JSON.parse((await model.call('search_model', { query: 'LIST NODES WHERE type = "requirement" FULL' })).text)
+    expect(full.rows[0]).toMatchObject({ action: long, ears_type: 'event-driven' })
+    expect(full.rows[0].rationale).toContain('A long rationale')
+
+    const around = JSON.parse((await model.call('search_model', { query: `GET NEIGHBORS OF ${row.id}` })).text)
+    expect(around.rows).toBeUndefined()
+    expect(around.neighbors.every((n: Record<string, unknown>) => !('rationale' in n) && typeof n.depth === 'number')).toBe(true)
+    expect(new Set(around.relations.map((r: { id: string }) => r.id)).size).toBe(around.relations.length)
+    expect(brief.rows.length * 600).toBeGreaterThan(JSON.stringify(brief).length)
+    expect(JSON.stringify(full).length).toBeGreaterThan(2.5 * JSON.stringify(brief).length)
+  })
+
+  it('gives the metamodel in brief, and named types in full (Summary names types in brief)', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    const summary = await model.call('get_model_summary', {})
+    expect(summary.ok).toBe(true)
+    expect(summary.text.length).toBeLessThan(15000)
+    const line = summary.text.split('\n').find((l) => l.startsWith('- requirement '))!
+    expect(line).toContain('ears_type (ubiquitous|event-driven|state-driven|unwanted-behaviour|optional|complex)')
+    expect(line).toContain('precondition_state (→ state)')
+    expect(summary.text).toContain('- constrains (Constrains, governance): adr, fitness-fn, requirement → person, system, domain, container, component, database, webapp, queue')
+    expect(summary.text).toContain('get_model_summary with `types`')
+
+    const detail = await model.call('get_model_summary', { types: ['requirement', 'constrains', 'unknown-type'] })
+    expect(detail.ok).toBe(true)
+    const json = JSON.parse(detail.text.slice(detail.text.indexOf('```json') + 7, detail.text.lastIndexOf('```')))
+    expect(json.nodeTypes.map((t: { id: string }) => t.id)).toEqual(['requirement'])
+    expect(json.relationTypes.map((t: { id: string }) => t.id)).toEqual(['constrains'])
+    expect(json.nodeTypes[0].properties.find((p: { key: string }) => p.key === 'trigger').visibleWhen).toBeTruthy()
+    expect(detail.text).toContain('Not in the metamodel "Radical": unknown-type.')
+    expect(detail.text).not.toContain('radicalVersion')
+    expect((await model.call('get_model_summary', { types: 'requirement' })).ok).toBe(false)
+  })
+})
+
+describe('requirements reviewed against their needs', () => {
+  const exec = promisify(execFile)
+  const git = (cwd: string, ...args: string[]) =>
+    exec('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], { cwd })
+
+  it('lists each changed requirement next to the words of its needs (Requirement read against the client\'s words)', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    const words = 'From Tomek: I need to know what our goods cost us.\n\nQ: What does a product never received at a cost show?\nA: No average (null, not zero), and its stock is worth 0.'
+    await model.call('add_node', { tempId: 'cost', type: 'need', label: 'Cost of goods', description: words })
+    await model.call('add_node', { tempId: 'old', type: 'requirement', label: 'Average cost', properties: { ears_type: 'ubiquitous', action: 'keep one weighted average cost per product' } })
+    await model.call('add_relation', { sourceId: 'old', targetId: 'cost', relationType: 'derives' })
+    await model.call('add_node', { tempId: 'other', type: 'need', label: 'Shipping', description: 'From Kasia: send paid orders out.' })
+    await model.call('add_node', { tempId: 'ship', type: 'requirement', label: 'Ship paid orders', properties: { ears_type: 'ubiquitous', action: 'ship only paid orders' } })
+    await model.call('add_relation', { sourceId: 'ship', targetId: 'other', relationType: 'derives' })
+    await git(folder, 'init', '-q', '-b', 'main')
+    await git(folder, 'add', '.')
+    await git(folder, 'commit', '-q', '-m', 'model')
+
+    // On the branch: a requirement from the need, one through another requirement, one from no need.
+    await model.call('add_node', { tempId: 'value', type: 'requirement', label: 'Show stock value', properties: { ears_type: 'ubiquitous', action: 'show the stock value of each product, null when it has no average' } })
+    await model.call('add_relation', { sourceId: 'value', targetId: 'old', relationType: 'derives' })
+    await model.call('add_node', { tempId: 'orphan', type: 'requirement', label: 'List products', properties: { ears_type: 'ubiquitous', action: 'list the products' } })
+    const review = await model.call('review_requirements', {})
+    expect(review.ok, review.text).toBe(true)
+    expect(review.text).toContain('Review 2 requirements')
+    expect(review.text).toContain('## Requirement "Show stock value"')
+    expect(review.text).toContain('The system shall show the stock value of each product, null when it has no average')
+    expect(review.text).toContain('### Need "Cost of goods"')
+    expect(review.text).toContain('A: No average (null, not zero), and its stock is worth 0.')
+    expect(review.text).toContain('Derive from no need: "List products"')
+    expect(review.text).not.toContain('Ship paid orders')
+    expect(review.text).not.toContain('## Requirement "Average cost"')
+
+    // A derives relation that quotes the need shows those words instead of the whole need.
+    await model.call('add_node', { tempId: 'zero', type: 'requirement', label: 'Worth of unknown stock', properties: { ears_type: 'ubiquitous', action: 'value stock without an average at 0' } })
+    await model.call('add_relation', { sourceId: 'zero', targetId: 'cost', relationType: 'derives', properties: { quote: 'its stock is worth 0.' } })
+    const quoted = await model.call('review_requirements', { ids: ['zero'] })
+    expect(quoted.text).toContain('### Rests on need "Cost of goods"')
+    expect(quoted.text).toContain('quoting:\nits stock is worth 0.')
+    expect(quoted.text).not.toContain('From Tomek: I need to know')
+    // What the values alone show is listed with the requirement.
+    await model.call('add_node', { tempId: 'nullv', type: 'requirement', label: 'Stock value without cost', properties: { ears_type: 'ubiquitous', action: 'show the stock value as null without an average' } })
+    await model.call('add_relation', { sourceId: 'nullv', targetId: 'cost', relationType: 'derives', properties: { quote: 'its stock is worth 0.' } })
+    const gaps = await model.call('review_requirements', { ids: ['nullv'] })
+    expect(gaps.text).toContain('Values its quotes say and it does not: "0".')
+    expect(gaps.text).toContain('Values it says and no quote says: "null".')
+
+    // A need changed on the branch leads to the requirements that derive from it.
+    await model.call('update_node', { id: 'other', description: 'From Kasia: send paid orders out.\n\nQ: Partly? A: Whole orders only.' })
+    expect((await model.call('review_requirements', {})).text).toContain('## Requirement "Ship paid orders"')
+
+    // Named, only those; a need without a question is pointed out.
+    const named = await model.call('review_requirements', { ids: ['orphan'] })
+    expect(named.text).toContain('Review 1 requirement (the requirements named)')
+    expect(named.text).not.toContain('Show stock value')
+    expect((await model.call('review_requirements', { ids: ['cost'] })).text).toContain('not requirements of this model')
+    await model.call('add_relation', { sourceId: 'orphan', targetId: 'other', relationType: 'derives' })
+    await model.call('update_node', { id: 'other', description: 'From Kasia: send paid orders out.' })
+    expect((await model.call('review_requirements', { ids: ['orphan'] })).text).toContain('holds no question asked of a person')
+  })
+
+  it("tells an agent writing the model what it brings in of the person's words (Write tells of a lost value)", async () => {
+    const write = async (folder: string) => {
+      const model = await FolderModel.open(folder)
+      await model.call('add_node', { tempId: 'cost', type: 'need', label: 'Cost of goods', description: 'Q: What is stock without a cost worth?\nA: The stock is worth 0.' })
+      await model.call('add_node', { tempId: 'value', type: 'requirement', label: 'Stock value', properties: { ears_type: 'ubiquitous', action: 'show the stock value as null without an average' } })
+      return await model.call('add_relation', { sourceId: 'value', targetId: 'cost', relationType: 'derives', properties: { quote: 'The stock is worth 0' } })
+    }
+    const told = await write(await fixture())
+    expect(told.ok, told.text).toBe(true)
+    expect(told.text).toContain('Changed: relations.json')
+    expect(told.text).toContain("The person's words, as radical check reads them, after this change")
+    expect(told.text).toContain('Requirement "Stock value" does not say "0", which the words it quotes from "Cost of goods" say.')
+    // A rule check.json turns off is not named.
+    const quiet = await fixture()
+    await writeFile(join(quiet, 'check.json'), JSON.stringify({ rules: { 'quote-value-missing': 'off', 'requirement-value-unquoted': 'off' } }))
+    const silent = await write(quiet)
+    expect(silent.ok, silent.text).toBe(true)
+    expect(silent.text).not.toContain('does not say "0"')
+  })
+
+  it('asks agents for the person\'s words in the need and a review before the code (Agent told to keep answers and review)', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    const summary = (await model.call('get_model_summary', {})).text
+    expect(summary).toContain('add your question and their answer to the need\'s description word for word')
+    const client = new Client({ name: 'radical-test', version: '1.0.0' })
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(import.meta.dirname, '../dist/index.js'), '--folder', folder] }))
+    try {
+      expect(client.getInstructions()).toContain('call review_requirements and correct each requirement that does not say what the person said')
+      expect((await client.listTools()).tools.map((t) => t.name)).toContain('review_requirements')
+    } finally {
+      await client.close()
+    }
   })
 })

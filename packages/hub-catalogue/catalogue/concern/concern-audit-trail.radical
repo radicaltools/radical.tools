@@ -820,79 +820,92 @@
       "id": "req-catalogue--derives--need",
       "sourceId": "req-catalogue",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "This element moves money, changes customers' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation's compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router's table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml)."
     },
     {
       "id": "req-record--derives--need",
       "sourceId": "req-record",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "This element moves money, changes customers' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation's compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router's table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml)."
     },
     {
       "id": "req-atomic--derives--need",
       "sourceId": "req-atomic",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "This element moves money, changes customers' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation's compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router's table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml)."
     },
     {
       "id": "req-hashes--derives--need",
       "sourceId": "req-hashes",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "This element moves money, changes customers' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation's compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router's table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml)."
     },
     {
       "id": "req-values--derives--need",
       "sourceId": "req-values",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "This element moves money, changes customers' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation's compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router's table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml)."
     },
     {
       "id": "req-clock--derives--need",
       "sourceId": "req-clock",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "This element moves money, changes customers' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation's compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router's table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml)."
     },
     {
       "id": "req-append-only--derives--need",
       "sourceId": "req-append-only",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "This element moves money, changes customers' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation's compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router's table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml)."
     },
     {
       "id": "req-tamper--derives--need",
       "sourceId": "req-tamper",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "This element moves money, changes customers' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation's compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router's table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml)."
     },
     {
       "id": "req-retention--derives--need",
       "sourceId": "req-retention",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "This element moves money, changes customers' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation's compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router's table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml)."
     },
     {
       "id": "req-readers-auditors--derives--need",
       "sourceId": "req-readers-auditors",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "This element moves money, changes customers' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation's compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router's table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml)."
     },
     {
       "id": "req-readers-team--derives--need",
       "sourceId": "req-readers-team",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "This element moves money, changes customers' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation's compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router's table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml)."
     },
     {
       "id": "req-reads-recorded--derives--need",
       "sourceId": "req-reads-recorded",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "This element moves money, changes customers' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation's compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router's table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml)."
     },
     {
       "id": "req-cdc--derives--need",
       "sourceId": "req-cdc",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "This element moves money, changes customers' records and permissions, or lets people read and export data that matters to someone outside the team. When a regulator, an auditor, a court or an incident investigation asks who did what, when, to which record and from where, the answer has to come from records that are complete, that nobody could have changed unnoticed, that are still there years later, and that the people they record cannot read or edit at will. The pack says what the system does and how the team proves it; which regulations apply and how long records must be kept is for the organisation's compliance officer or DPO to read, and nothing here is legal advice. The snippets assume the application under src/ (src/app exports the router's table, src/audit the audit writer and store), the tests under tests/ with fixtures in tests/audit, and under audit/ in the repository the catalogue (audit/catalogue.yaml), the record schema (audit/record.schema.json) and the readers (audit/readers.yaml)."
     },
     {
       "id": "sc-catalogue--verifies--req-catalogue",

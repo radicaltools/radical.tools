@@ -31,7 +31,7 @@ Full schema lives in `packages/common/src/c4.ts` (`DiagramData`) and `packages/c
 }
 ```
 
-Built-in C4 relation types: `interacts` (general use; database never a source). The DDD preset adds `realises`, `depends-on`, `partnership`; the governance preset adds `constrains`, `supersedes`, `implements`, `satisfies`, `derives` (requirement → requirement, requirement → the `need` it was written from, need → a broader need), `traces-to`, `verifies`, `illustrates`, `presented-by`, `navigates-to`. If `relationType` is omitted the default type is assumed.
+Built-in C4 relation types: `interacts` (general use; database never a source). The DDD preset adds `realises`, `depends-on`, `partnership`; the governance preset adds `constrains`, `supersedes`, `waives` (ADR → ADR: this model's decision that a decision of a model it depends on does not apply here), `implements`, `satisfies`, `derives` (requirement → requirement, requirement → the `need` it was written from, need → a broader need; property `quote`: the need's words the requirement rests on, verbatim, at least two words, one fragment per line; only on a relation to a need), `traces-to`, `verifies`, `illustrates`, `presented-by`, `navigates-to`. If `relationType` is omitted the default type is assumed.
 
 ## Views (filtered perspectives)
 

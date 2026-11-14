@@ -47,7 +47,7 @@ function builtInPreset(id) {
     for (const from of ['adr', 'fitness-fn', 'requirement']) for (const to of constraintTargets) pairs.push([from, to])
     for (const to of constraintTargets) pairs.push([to, 'requirement'])
     pairs.push(['adr', 'adr'], ['fitness-fn', 'adr'], ['requirement', 'requirement'], ['requirement', 'adr'], ['requirement', 'fitness-fn'])
-    for (const type of ['constrains', 'supersedes', 'implements', 'satisfies', 'derives', 'traces-to']) relationTypeIds.add(type)
+    for (const type of ['constrains', 'supersedes', 'waives', 'implements', 'satisfies', 'derives', 'traces-to']) relationTypeIds.add(type)
   }
   return { nodeTypes, pairs, relationTypeIds, allowAnyPair: false }
 }

@@ -181,7 +181,10 @@ export function buildConceptInsert(concept: HubConcept, options: ConceptInsertOp
     if (!srcId || !dstId) continue
     const relId = newId()
     if (typeof raw.id === 'string') relIdMap.set(raw.id, relId)
+    // The relation's own properties (a derives' quote, a transition's guard) come with it.
+    const { id: _id, sourceId: _source, targetId: _target, ...own } = raw as Record<string, unknown>
     relations[relId] = {
+      ...own,
       id: relId,
       sourceId: srcId,
       targetId: dstId,

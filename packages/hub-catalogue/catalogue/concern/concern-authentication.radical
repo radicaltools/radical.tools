@@ -703,55 +703,64 @@
       "id": "req-reject--derives--need",
       "sourceId": "req-reject",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element from outside. Whatever it does on their behalf rests on knowing who they are: a stolen or guessed credential, a session that outlives its user, a token that cannot be taken back, or a call from a system nobody vouched for each turns into data read or changed by the wrong party. Sign-in also has to stay usable, and the evidence of who did what has to hold up after an incident. The snippets assume the application under src/ (src/app exports the router's table, src/auth the sign-in code, src/audit the audit store) and the tests under tests/ with their fixtures in tests/auth."
     },
     {
       "id": "req-idle--derives--need",
       "sourceId": "req-idle",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element from outside. Whatever it does on their behalf rests on knowing who they are: a stolen or guessed credential, a session that outlives its user, a token that cannot be taken back, or a call from a system nobody vouched for each turns into data read or changed by the wrong party. Sign-in also has to stay usable, and the evidence of who did what has to hold up after an incident. The snippets assume the application under src/ (src/app exports the router's table, src/auth the sign-in code, src/audit the audit store) and the tests under tests/ with their fixtures in tests/auth."
     },
     {
       "id": "req-revoke--derives--need",
       "sourceId": "req-revoke",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element from outside. Whatever it does on their behalf rests on knowing who they are: a stolen or guessed credential, a session that outlives its user, a token that cannot be taken back, or a call from a system nobody vouched for each turns into data read or changed by the wrong party. Sign-in also has to stay usable, and the evidence of who did what has to hold up after an incident. The snippets assume the application under src/ (src/app exports the router's table, src/auth the sign-in code, src/audit the audit store) and the tests under tests/ with their fixtures in tests/auth."
     },
     {
       "id": "req-audit--derives--need",
       "sourceId": "req-audit",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element from outside. Whatever it does on their behalf rests on knowing who they are: a stolen or guessed credential, a session that outlives its user, a token that cannot be taken back, or a call from a system nobody vouched for each turns into data read or changed by the wrong party. Sign-in also has to stay usable, and the evidence of who did what has to hold up after an incident. The snippets assume the application under src/ (src/app exports the router's table, src/auth the sign-in code, src/audit the audit store) and the tests under tests/ with their fixtures in tests/auth."
     },
     {
       "id": "req-lockout--derives--need",
       "sourceId": "req-lockout",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element from outside. Whatever it does on their behalf rests on knowing who they are: a stolen or guessed credential, a session that outlives its user, a token that cannot be taken back, or a call from a system nobody vouched for each turns into data read or changed by the wrong party. Sign-in also has to stay usable, and the evidence of who did what has to hold up after an incident. The snippets assume the application under src/ (src/app exports the router's table, src/auth the sign-in code, src/audit the audit store) and the tests under tests/ with their fixtures in tests/auth."
     },
     {
       "id": "req-passwords--derives--need",
       "sourceId": "req-passwords",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element from outside. Whatever it does on their behalf rests on knowing who they are: a stolen or guessed credential, a session that outlives its user, a token that cannot be taken back, or a call from a system nobody vouched for each turns into data read or changed by the wrong party. Sign-in also has to stay usable, and the evidence of who did what has to hold up after an incident. The snippets assume the application under src/ (src/app exports the router's table, src/auth the sign-in code, src/audit the audit store) and the tests under tests/ with their fixtures in tests/auth."
     },
     {
       "id": "req-stepup--derives--need",
       "sourceId": "req-stepup",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element from outside. Whatever it does on their behalf rests on knowing who they are: a stolen or guessed credential, a session that outlives its user, a token that cannot be taken back, or a call from a system nobody vouched for each turns into data read or changed by the wrong party. Sign-in also has to stay usable, and the evidence of who did what has to hold up after an incident. The snippets assume the application under src/ (src/app exports the router's table, src/auth the sign-in code, src/audit the audit store) and the tests under tests/ with their fixtures in tests/auth."
     },
     {
       "id": "req-machine--derives--need",
       "sourceId": "req-machine",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element from outside. Whatever it does on their behalf rests on knowing who they are: a stolen or guessed credential, a session that outlives its user, a token that cannot be taken back, or a call from a system nobody vouched for each turns into data read or changed by the wrong party. Sign-in also has to stay usable, and the evidence of who did what has to hold up after an incident. The snippets assume the application under src/ (src/app exports the router's table, src/auth the sign-in code, src/audit the audit store) and the tests under tests/ with their fixtures in tests/auth."
     },
     {
       "id": "req-public--derives--need",
       "sourceId": "req-public",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People and other systems reach this element from outside. Whatever it does on their behalf rests on knowing who they are: a stolen or guessed credential, a session that outlives its user, a token that cannot be taken back, or a call from a system nobody vouched for each turns into data read or changed by the wrong party. Sign-in also has to stay usable, and the evidence of who did what has to hold up after an incident. The snippets assume the application under src/ (src/app exports the router's table, src/auth the sign-in code, src/audit the audit store) and the tests under tests/ with their fixtures in tests/auth."
     },
     {
       "id": "sc-reject--verifies--req-reject",

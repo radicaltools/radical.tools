@@ -957,73 +957,85 @@
       "id": "req-rollback--derives--need",
       "sourceId": "req-rollback",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, a feature must be switchable without a deploy where the team decides so, and the team must know how often it ships and how long a change takes to reach users."
     },
     {
       "id": "req-graceful--derives--need",
       "sourceId": "req-graceful",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, a feature must be switchable without a deploy where the team decides so, and the team must know how often it ships and how long a change takes to reach users."
     },
     {
       "id": "req-rolling--derives--need",
       "sourceId": "req-rolling",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, a feature must be switchable without a deploy where the team decides so, and the team must know how often it ships and how long a change takes to reach users."
     },
     {
       "id": "req-bluegreen--derives--need",
       "sourceId": "req-bluegreen",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, a feature must be switchable without a deploy where the team decides so, and the team must know how often it ships and how long a change takes to reach users."
     },
     {
       "id": "req-canary--derives--need",
       "sourceId": "req-canary",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, a feature must be switchable without a deploy where the team decides so, and the team must know how often it ships and how long a change takes to reach users."
     },
     {
       "id": "req-expand-contract--derives--need",
       "sourceId": "req-expand-contract",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, a feature must be switchable without a deploy where the team decides so, and the team must know how often it ships and how long a change takes to reach users."
     },
     {
       "id": "req-migration-window--derives--need",
       "sourceId": "req-migration-window",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, a feature must be switchable without a deploy where the team decides so, and the team must know how often it ships and how long a change takes to reach users."
     },
     {
       "id": "req-no-schema--derives--need",
       "sourceId": "req-no-schema",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, a feature must be switchable without a deploy where the team decides so, and the team must know how often it ships and how long a change takes to reach users."
     },
     {
       "id": "req-flags--derives--need",
       "sourceId": "req-flags",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, a feature must be switchable without a deploy where the team decides so, and the team must know how often it ships and how long a change takes to reach users."
     },
     {
       "id": "req-no-flags--derives--need",
       "sourceId": "req-no-flags",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, a feature must be switchable without a deploy where the team decides so, and the team must know how often it ships and how long a change takes to reach users."
     },
     {
       "id": "req-continuous--derives--need",
       "sourceId": "req-continuous",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, a feature must be switchable without a deploy where the team decides so, and the team must know how often it ships and how long a change takes to reach users."
     },
     {
       "id": "req-train--derives--need",
       "sourceId": "req-train",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The team changes this element often while people use it. A change must reach production without an outage, a bad change must be stopped before it reaches most users and be undone within minutes, the database must never block a rollback, a feature must be switchable without a deploy where the team decides so, and the team must know how often it ships and how long a change takes to reach users."
     },
     {
       "id": "sc-rollback--verifies--req-rollback",

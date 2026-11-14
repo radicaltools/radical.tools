@@ -45,6 +45,7 @@ apps/
   mcp/            — @radicaltools/mcp: local stdio MCP server for model folders
   cli/            — @radicaltools/cli: radical check, which checks a model folder
   web/            — Marketing site and manual (radical.tools)
+  bench/          — The Radical benchmark: with and without Radical, scored by hidden tests (private; CI does not run it; results stay off git), see apps/bench/README.md
 packages/
   common/         — @radical/common: model types, metamodels, formats, AI tools (no UI deps)
   layout/         — @radical/layout: Smart Layout and headless layout engines

@@ -896,79 +896,92 @@
       "id": "req-dod-items--derives--need",
       "sourceId": "req-dod-items",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every change to this element must arrive in production carrying the same evidence: tested, checked, reviewed, free of open security findings above the bar, documented and rolled out as the packs owning those rules decide. Someone or something accountable must have approved it going to production, no one may be able to put it there alone where the firm needs that, an emergency needs a path that is fast and still recorded, and afterwards it must be possible to show who approved what, and why the change was made. The snippets assume GitHub: the Definition of Done in .github/pull_request_template.md or docs/definition-of-done.md with its checkable items written \"(check: <status check name>)\", rulesets on main, a deployment environment for production, and workflows under .github/workflows/."
     },
     {
       "id": "req-dod-template--derives--need",
       "sourceId": "req-dod-template",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every change to this element must arrive in production carrying the same evidence: tested, checked, reviewed, free of open security findings above the bar, documented and rolled out as the packs owning those rules decide. Someone or something accountable must have approved it going to production, no one may be able to put it there alone where the firm needs that, an emergency needs a path that is fast and still recorded, and afterwards it must be possible to show who approved what, and why the change was made. The snippets assume GitHub: the Definition of Done in .github/pull_request_template.md or docs/definition-of-done.md with its checkable items written \"(check: <status check name>)\", rulesets on main, a deployment environment for production, and workflows under .github/workflows/."
     },
     {
       "id": "req-dod-agreement--derives--need",
       "sourceId": "req-dod-agreement",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every change to this element must arrive in production carrying the same evidence: tested, checked, reviewed, free of open security findings above the bar, documented and rolled out as the packs owning those rules decide. Someone or something accountable must have approved it going to production, no one may be able to put it there alone where the firm needs that, an emergency needs a path that is fast and still recorded, and afterwards it must be possible to show who approved what, and why the change was made. The snippets assume GitHub: the Definition of Done in .github/pull_request_template.md or docs/definition-of-done.md with its checkable items written \"(check: <status check name>)\", rulesets on main, a deployment environment for production, and workflows under .github/workflows/."
     },
     {
       "id": "req-change-record--derives--need",
       "sourceId": "req-change-record",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every change to this element must arrive in production carrying the same evidence: tested, checked, reviewed, free of open security findings above the bar, documented and rolled out as the packs owning those rules decide. Someone or something accountable must have approved it going to production, no one may be able to put it there alone where the firm needs that, an emergency needs a path that is fast and still recorded, and afterwards it must be possible to show who approved what, and why the change was made. The snippets assume GitHub: the Definition of Done in .github/pull_request_template.md or docs/definition-of-done.md with its checkable items written \"(check: <status check name>)\", rulesets on main, a deployment environment for production, and workflows under .github/workflows/."
     },
     {
       "id": "req-peer-approval--derives--need",
       "sourceId": "req-peer-approval",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every change to this element must arrive in production carrying the same evidence: tested, checked, reviewed, free of open security findings above the bar, documented and rolled out as the packs owning those rules decide. Someone or something accountable must have approved it going to production, no one may be able to put it there alone where the firm needs that, an emergency needs a path that is fast and still recorded, and afterwards it must be possible to show who approved what, and why the change was made. The snippets assume GitHub: the Definition of Done in .github/pull_request_template.md or docs/definition-of-done.md with its checkable items written \"(check: <status check name>)\", rulesets on main, a deployment environment for production, and workflows under .github/workflows/."
     },
     {
       "id": "req-cab--derives--need",
       "sourceId": "req-cab",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every change to this element must arrive in production carrying the same evidence: tested, checked, reviewed, free of open security findings above the bar, documented and rolled out as the packs owning those rules decide. Someone or something accountable must have approved it going to production, no one may be able to put it there alone where the firm needs that, an emergency needs a path that is fast and still recorded, and afterwards it must be possible to show who approved what, and why the change was made. The snippets assume GitHub: the Definition of Done in .github/pull_request_template.md or docs/definition-of-done.md with its checkable items written \"(check: <status check name>)\", rulesets on main, a deployment environment for production, and workflows under .github/workflows/."
     },
     {
       "id": "req-cab-calibrate--derives--need",
       "sourceId": "req-cab-calibrate",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every change to this element must arrive in production carrying the same evidence: tested, checked, reviewed, free of open security findings above the bar, documented and rolled out as the packs owning those rules decide. Someone or something accountable must have approved it going to production, no one may be able to put it there alone where the firm needs that, an emergency needs a path that is fast and still recorded, and afterwards it must be possible to show who approved what, and why the change was made. The snippets assume GitHub: the Definition of Done in .github/pull_request_template.md or docs/definition-of-done.md with its checkable items written \"(check: <status check name>)\", rulesets on main, a deployment environment for production, and workflows under .github/workflows/."
     },
     {
       "id": "req-release-approver--derives--need",
       "sourceId": "req-release-approver",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every change to this element must arrive in production carrying the same evidence: tested, checked, reviewed, free of open security findings above the bar, documented and rolled out as the packs owning those rules decide. Someone or something accountable must have approved it going to production, no one may be able to put it there alone where the firm needs that, an emergency needs a path that is fast and still recorded, and afterwards it must be possible to show who approved what, and why the change was made. The snippets assume GitHub: the Definition of Done in .github/pull_request_template.md or docs/definition-of-done.md with its checkable items written \"(check: <status check name>)\", rulesets on main, a deployment environment for production, and workflows under .github/workflows/."
     },
     {
       "id": "req-segregation--derives--need",
       "sourceId": "req-segregation",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every change to this element must arrive in production carrying the same evidence: tested, checked, reviewed, free of open security findings above the bar, documented and rolled out as the packs owning those rules decide. Someone or something accountable must have approved it going to production, no one may be able to put it there alone where the firm needs that, an emergency needs a path that is fast and still recorded, and afterwards it must be possible to show who approved what, and why the change was made. The snippets assume GitHub: the Definition of Done in .github/pull_request_template.md or docs/definition-of-done.md with its checkable items written \"(check: <status check name>)\", rulesets on main, a deployment environment for production, and workflows under .github/workflows/."
     },
     {
       "id": "req-bypass-reported--derives--need",
       "sourceId": "req-bypass-reported",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every change to this element must arrive in production carrying the same evidence: tested, checked, reviewed, free of open security findings above the bar, documented and rolled out as the packs owning those rules decide. Someone or something accountable must have approved it going to production, no one may be able to put it there alone where the firm needs that, an emergency needs a path that is fast and still recorded, and afterwards it must be possible to show who approved what, and why the change was made. The snippets assume GitHub: the Definition of Done in .github/pull_request_template.md or docs/definition-of-done.md with its checkable items written \"(check: <status check name>)\", rulesets on main, a deployment environment for production, and workflows under .github/workflows/."
     },
     {
       "id": "req-emergency-path--derives--need",
       "sourceId": "req-emergency-path",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every change to this element must arrive in production carrying the same evidence: tested, checked, reviewed, free of open security findings above the bar, documented and rolled out as the packs owning those rules decide. Someone or something accountable must have approved it going to production, no one may be able to put it there alone where the firm needs that, an emergency needs a path that is fast and still recorded, and afterwards it must be possible to show who approved what, and why the change was made. The snippets assume GitHub: the Definition of Done in .github/pull_request_template.md or docs/definition-of-done.md with its checkable items written \"(check: <status check name>)\", rulesets on main, a deployment environment for production, and workflows under .github/workflows/."
     },
     {
       "id": "req-break-glass--derives--need",
       "sourceId": "req-break-glass",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every change to this element must arrive in production carrying the same evidence: tested, checked, reviewed, free of open security findings above the bar, documented and rolled out as the packs owning those rules decide. Someone or something accountable must have approved it going to production, no one may be able to put it there alone where the firm needs that, an emergency needs a path that is fast and still recorded, and afterwards it must be possible to show who approved what, and why the change was made. The snippets assume GitHub: the Definition of Done in .github/pull_request_template.md or docs/definition-of-done.md with its checkable items written \"(check: <status check name>)\", rulesets on main, a deployment environment for production, and workflows under .github/workflows/."
     },
     {
       "id": "req-ticket--derives--need",
       "sourceId": "req-ticket",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every change to this element must arrive in production carrying the same evidence: tested, checked, reviewed, free of open security findings above the bar, documented and rolled out as the packs owning those rules decide. Someone or something accountable must have approved it going to production, no one may be able to put it there alone where the firm needs that, an emergency needs a path that is fast and still recorded, and afterwards it must be possible to show who approved what, and why the change was made. The snippets assume GitHub: the Definition of Done in .github/pull_request_template.md or docs/definition-of-done.md with its checkable items written \"(check: <status check name>)\", rulesets on main, a deployment environment for production, and workflows under .github/workflows/."
     },
     {
       "id": "sc-dod-items--verifies--req-dod-items",

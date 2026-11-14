@@ -723,55 +723,64 @@
       "id": "req-peak--derives--need",
       "sourceId": "req-peak",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element serves a load that changes over the day and peaks on known and unknown occasions. It must carry the peak at an acceptable response time without paying for the peak all year, must not collapse when more arrives than it can handle, must not overwhelm what it depends on, and its real limits must be known before users find them."
     },
     {
       "id": "req-headroom--derives--need",
       "sourceId": "req-headroom",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element serves a load that changes over the day and peaks on known and unknown occasions. It must carry the peak at an acceptable response time without paying for the peak all year, must not collapse when more arrives than it can handle, must not overwhelm what it depends on, and its real limits must be known before users find them."
     },
     {
       "id": "req-autoscale--derives--need",
       "sourceId": "req-autoscale",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element serves a load that changes over the day and peaks on known and unknown occasions. It must carry the peak at an acceptable response time without paying for the peak all year, must not collapse when more arrives than it can handle, must not overwhelm what it depends on, and its real limits must be known before users find them."
     },
     {
       "id": "req-cold-start--derives--need",
       "sourceId": "req-cold-start",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element serves a load that changes over the day and peaks on known and unknown occasions. It must carry the peak at an acceptable response time without paying for the peak all year, must not collapse when more arrives than it can handle, must not overwhelm what it depends on, and its real limits must be known before users find them."
     },
     {
       "id": "req-downstream--derives--need",
       "sourceId": "req-downstream",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element serves a load that changes over the day and peaks on known and unknown occasions. It must carry the peak at an acceptable response time without paying for the peak all year, must not collapse when more arrives than it can handle, must not overwhelm what it depends on, and its real limits must be known before users find them."
     },
     {
       "id": "req-shed--derives--need",
       "sourceId": "req-shed",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element serves a load that changes over the day and peaks on known and unknown occasions. It must carry the peak at an acceptable response time without paying for the peak all year, must not collapse when more arrives than it can handle, must not overwhelm what it depends on, and its real limits must be known before users find them."
     },
     {
       "id": "req-backpressure--derives--need",
       "sourceId": "req-backpressure",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element serves a load that changes over the day and peaks on known and unknown occasions. It must carry the peak at an acceptable response time without paying for the peak all year, must not collapse when more arrives than it can handle, must not overwhelm what it depends on, and its real limits must be known before users find them."
     },
     {
       "id": "req-loadtest-release--derives--need",
       "sourceId": "req-loadtest-release",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element serves a load that changes over the day and peaks on known and unknown occasions. It must carry the peak at an acceptable response time without paying for the peak all year, must not collapse when more arrives than it can handle, must not overwhelm what it depends on, and its real limits must be known before users find them."
     },
     {
       "id": "req-loadtest-scheduled--derives--need",
       "sourceId": "req-loadtest-scheduled",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element serves a load that changes over the day and peaks on known and unknown occasions. It must carry the peak at an acceptable response time without paying for the peak all year, must not collapse when more arrives than it can handle, must not overwhelm what it depends on, and its real limits must be known before users find them."
     },
     {
       "id": "sc-peak--verifies--req-peak",

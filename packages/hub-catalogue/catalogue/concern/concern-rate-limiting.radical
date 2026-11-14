@@ -995,91 +995,106 @@
       "id": "req-limit--derives--need",
       "sourceId": "req-limit",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-size--derives--need",
       "sourceId": "req-size",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-pages--derives--need",
       "sourceId": "req-pages",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-token-bucket--derives--need",
       "sourceId": "req-token-bucket",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-sliding-window--derives--need",
       "sourceId": "req-sliding-window",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-fixed-window--derives--need",
       "sourceId": "req-fixed-window",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-key-account--derives--need",
       "sourceId": "req-key-account",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-key-apikey--derives--need",
       "sourceId": "req-key-apikey",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-key-ip--derives--need",
       "sourceId": "req-key-ip",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-shared-counters--derives--need",
       "sourceId": "req-shared-counters",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-bots-challenge--derives--need",
       "sourceId": "req-bots-challenge",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-bots-managed--derives--need",
       "sourceId": "req-bots-managed",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-bots-none--derives--need",
       "sourceId": "req-bots-none",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-internet--derives--need",
       "sourceId": "req-internet",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "req-partners--derives--need",
       "sourceId": "req-partners",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element takes requests from outside. One caller, by mistake or on purpose, can send enough to slow it for everyone; bots try passwords, create accounts and scrape data; oversized requests and pages use up memory; and costly operations run up bills because nothing limits them. Real users behind a shared address must not be locked out on the way."
     },
     {
       "id": "sc-limit--verifies--req-limit",

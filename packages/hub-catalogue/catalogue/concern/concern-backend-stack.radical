@@ -701,49 +701,57 @@
       "id": "req-one-stack--derives--need",
       "sourceId": "req-one-stack",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The service has to be built on a language, runtime and framework the team can work in well, that have the libraries it needs, that fit the footprint the hosting pays for, and that keep receiving security fixes for as long as the service runs. The choice must be written down with its reasons, and keeping it current must be routine work, not a project every few years. The checks assume one service per repository, with its Dockerfile and build manifest at the root, a versions.txt listing the endoflife.date products and cycles in use, and team.txt with the owning team's e-mail addresses next to CODEOWNERS."
     },
     {
       "id": "req-eol--derives--need",
       "sourceId": "req-eol",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The service has to be built on a language, runtime and framework the team can work in well, that have the libraries it needs, that fit the footprint the hosting pays for, and that keep receiving security fixes for as long as the service runs. The choice must be written down with its reasons, and keeping it current must be routine work, not a project every few years. The checks assume one service per repository, with its Dockerfile and build manifest at the root, a versions.txt listing the endoflife.date products and cycles in use, and team.txt with the owning team's e-mail addresses next to CODEOWNERS."
     },
     {
       "id": "req-lts--derives--need",
       "sourceId": "req-lts",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The service has to be built on a language, runtime and framework the team can work in well, that have the libraries it needs, that fit the footprint the hosting pays for, and that keep receiving security fixes for as long as the service runs. The choice must be written down with its reasons, and keeping it current must be routine work, not a project every few years. The checks assume one service per repository, with its Dockerfile and build manifest at the root, a versions.txt listing the endoflife.date products and cycles in use, and team.txt with the owning team's e-mail addresses next to CODEOWNERS."
     },
     {
       "id": "req-n1--derives--need",
       "sourceId": "req-n1",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The service has to be built on a language, runtime and framework the team can work in well, that have the libraries it needs, that fit the footprint the hosting pays for, and that keep receiving security fixes for as long as the service runs. The choice must be written down with its reasons, and keeping it current must be routine work, not a project every few years. The checks assume one service per repository, with its Dockerfile and build manifest at the root, a versions.txt listing the endoflife.date products and cycles in use, and team.txt with the owning team's e-mail addresses next to CODEOWNERS."
     },
     {
       "id": "req-latest--derives--need",
       "sourceId": "req-latest",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The service has to be built on a language, runtime and framework the team can work in well, that have the libraries it needs, that fit the footprint the hosting pays for, and that keep receiving security fixes for as long as the service runs. The choice must be written down with its reasons, and keeping it current must be routine work, not a project every few years. The checks assume one service per repository, with its Dockerfile and build manifest at the root, a versions.txt listing the endoflife.date products and cycles in use, and team.txt with the owning team's e-mail addresses next to CODEOWNERS."
     },
     {
       "id": "req-skills--derives--need",
       "sourceId": "req-skills",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The service has to be built on a language, runtime and framework the team can work in well, that have the libraries it needs, that fit the footprint the hosting pays for, and that keep receiving security fixes for as long as the service runs. The choice must be written down with its reasons, and keeping it current must be routine work, not a project every few years. The checks assume one service per repository, with its Dockerfile and build manifest at the root, a versions.txt listing the endoflife.date products and cycles in use, and team.txt with the owning team's e-mail addresses next to CODEOWNERS."
     },
     {
       "id": "req-maintained--derives--need",
       "sourceId": "req-maintained",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The service has to be built on a language, runtime and framework the team can work in well, that have the libraries it needs, that fit the footprint the hosting pays for, and that keep receiving security fixes for as long as the service runs. The choice must be written down with its reasons, and keeping it current must be routine work, not a project every few years. The checks assume one service per repository, with its Dockerfile and build manifest at the root, a versions.txt listing the endoflife.date products and cycles in use, and team.txt with the owning team's e-mail addresses next to CODEOWNERS."
     },
     {
       "id": "req-footprint--derives--need",
       "sourceId": "req-footprint",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The service has to be built on a language, runtime and framework the team can work in well, that have the libraries it needs, that fit the footprint the hosting pays for, and that keep receiving security fixes for as long as the service runs. The choice must be written down with its reasons, and keeping it current must be routine work, not a project every few years. The checks assume one service per repository, with its Dockerfile and build manifest at the root, a versions.txt listing the endoflife.date products and cycles in use, and team.txt with the owning team's e-mail addresses next to CODEOWNERS."
     },
     {
       "id": "sc-one-stack--verifies--req-one-stack",

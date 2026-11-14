@@ -30,6 +30,7 @@ function stageTip(stage: ForgeRunStageInfo): string {
   }
   if (stage.status === 'generating') return stage.asking ? `${title}: waiting for your answer to a proposed refinement` : `${title}: generating`
   if (stage.status === 'clarifying') return `${title}: asking you a few questions`
+  if (stage.status === 'skipped') return `${title}: skipped${stage.reason ? ` — ${stage.reason}` : ''}`
   return `${title}: not started`
 }
 
@@ -88,7 +89,7 @@ export function AgentForgeModal({ open, onClose }: Props): React.ReactElement | 
               key={stage.id}
               role="listitem"
               data-status={stage.status}
-              className={`forge-step${stage.status === 'done' ? ' done' : ''}${active ? ' active' : ''}${stage.status === 'clarifying' || stage.asking ? ' waiting' : ''}`}
+              className={`forge-step${stage.status === 'done' ? ' done' : ''}${stage.status === 'skipped' ? ' skipped' : ''}${active ? ' active' : ''}${stage.status === 'clarifying' || stage.asking ? ' waiting' : ''}`}
               title={stageTip(stage)}
             >
               {stage.status === 'done' && <span className="forge-step-check" aria-hidden>✓</span>}

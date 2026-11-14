@@ -978,85 +978,99 @@
       "id": "req-key-replay--derives--need",
       "sourceId": "req-key-replay",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "req-key-required--derives--need",
       "sourceId": "req-key-required",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "req-key-mismatch--derives--need",
       "sourceId": "req-key-mismatch",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "req-key-concurrent--derives--need",
       "sourceId": "req-key-concurrent",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "req-key-expiry--derives--need",
       "sourceId": "req-key-expiry",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "req-key-atomic--derives--need",
       "sourceId": "req-key-atomic",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "req-key-redis--derives--need",
       "sourceId": "req-key-redis",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "req-put-create--derives--need",
       "sourceId": "req-put-create",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "req-put-no-post--derives--need",
       "sourceId": "req-put-no-post",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "req-none-retry--derives--need",
       "sourceId": "req-none-retry",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "req-etag--derives--need",
       "sourceId": "req-etag",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "req-etag-required--derives--need",
       "sourceId": "req-etag-required",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "req-version--derives--need",
       "sourceId": "req-version",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "req-lww--derives--need",
       "sourceId": "req-lww",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Callers of this element's API retry when a connection drops or an answer is late, and several callers change the same resources. A retry must not create a second order or charge a second time, and a change made from a stale copy must not silently overwrite someone else's. The snippets assume a Node service: the HTTP app exported from src/app, the OpenAPI document at openapi.yaml, HTTP tests with Vitest and supertest under tests/api, a database client in tests/db, a fixture createOrder() in tests/api/fixtures that creates an order the way the API does, and an orders resource at /orders/{id} that answers GET and PUT."
     },
     {
       "id": "sc-key-replay--verifies--req-key-replay",

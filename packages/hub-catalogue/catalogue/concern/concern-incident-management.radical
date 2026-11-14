@@ -880,79 +880,92 @@
       "id": "req-classify--derives--need",
       "sourceId": "req-classify",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When the system fails its customers, the team has to recognise it quickly, agree how bad it is, put one person in charge, keep customers and the business told, get service back, and make the same failure less likely. Without an agreed process every incident is improvised, the loudest guess sets the severity, the best engineer is buried in messages, and the lessons are lost. The checks assume the severity definitions in docs/incidents/severity.md and Node 20 scripts under scripts/incidents/ that a daily CI job runs with read-only keys for incident.io (INCIDENT_IO_API_KEY), Atlassian Statuspage (STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID) and GitHub (GITHUB_TOKEN)."
     },
     {
       "id": "req-declare--derives--need",
       "sourceId": "req-declare",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When the system fails its customers, the team has to recognise it quickly, agree how bad it is, put one person in charge, keep customers and the business told, get service back, and make the same failure less likely. Without an agreed process every incident is improvised, the loudest guess sets the severity, the best engineer is buried in messages, and the lessons are lost. The checks assume the severity definitions in docs/incidents/severity.md and Node 20 scripts under scripts/incidents/ that a daily CI job runs with read-only keys for incident.io (INCIDENT_IO_API_KEY), Atlassian Statuspage (STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID) and GitHub (GITHUB_TOKEN)."
     },
     {
       "id": "req-dora--derives--need",
       "sourceId": "req-dora",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When the system fails its customers, the team has to recognise it quickly, agree how bad it is, put one person in charge, keep customers and the business told, get service back, and make the same failure less likely. Without an agreed process every incident is improvised, the loudest guess sets the severity, the best engineer is buried in messages, and the lessons are lost. The checks assume the severity definitions in docs/incidents/severity.md and Node 20 scripts under scripts/incidents/ that a daily CI job runs with read-only keys for incident.io (INCIDENT_IO_API_KEY), Atlassian Statuspage (STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID) and GitHub (GITHUB_TOKEN)."
     },
     {
       "id": "req-security--derives--need",
       "sourceId": "req-security",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When the system fails its customers, the team has to recognise it quickly, agree how bad it is, put one person in charge, keep customers and the business told, get service back, and make the same failure less likely. Without an agreed process every incident is improvised, the loudest guess sets the severity, the best engineer is buried in messages, and the lessons are lost. The checks assume the severity definitions in docs/incidents/severity.md and Node 20 scripts under scripts/incidents/ that a daily CI job runs with read-only keys for incident.io (INCIDENT_IO_API_KEY), Atlassian Statuspage (STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID) and GitHub (GITHUB_TOKEN)."
     },
     {
       "id": "req-commander--derives--need",
       "sourceId": "req-commander",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When the system fails its customers, the team has to recognise it quickly, agree how bad it is, put one person in charge, keep customers and the business told, get service back, and make the same failure less likely. Without an agreed process every incident is improvised, the loudest guess sets the severity, the best engineer is buried in messages, and the lessons are lost. The checks assume the severity definitions in docs/incidents/severity.md and Node 20 scripts under scripts/incidents/ that a daily CI job runs with read-only keys for incident.io (INCIDENT_IO_API_KEY), Atlassian Statuspage (STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID) and GitHub (GITHUB_TOKEN)."
     },
     {
       "id": "req-oncall-lead--derives--need",
       "sourceId": "req-oncall-lead",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When the system fails its customers, the team has to recognise it quickly, agree how bad it is, put one person in charge, keep customers and the business told, get service back, and make the same failure less likely. Without an agreed process every incident is improvised, the loudest guess sets the severity, the best engineer is buried in messages, and the lessons are lost. The checks assume the severity definitions in docs/incidents/severity.md and Node 20 scripts under scripts/incidents/ that a daily CI job runs with read-only keys for incident.io (INCIDENT_IO_API_KEY), Atlassian Statuspage (STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID) and GitHub (GITHUB_TOKEN)."
     },
     {
       "id": "req-status-page--derives--need",
       "sourceId": "req-status-page",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When the system fails its customers, the team has to recognise it quickly, agree how bad it is, put one person in charge, keep customers and the business told, get service back, and make the same failure less likely. Without an agreed process every incident is improvised, the loudest guess sets the severity, the best engineer is buried in messages, and the lessons are lost. The checks assume the severity definitions in docs/incidents/severity.md and Node 20 scripts under scripts/incidents/ that a daily CI job runs with read-only keys for incident.io (INCIDENT_IO_API_KEY), Atlassian Statuspage (STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID) and GitHub (GITHUB_TOKEN)."
     },
     {
       "id": "req-direct--derives--need",
       "sourceId": "req-direct",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When the system fails its customers, the team has to recognise it quickly, agree how bad it is, put one person in charge, keep customers and the business told, get service back, and make the same failure less likely. Without an agreed process every incident is improvised, the loudest guess sets the severity, the best engineer is buried in messages, and the lessons are lost. The checks assume the severity definitions in docs/incidents/severity.md and Node 20 scripts under scripts/incidents/ that a daily CI job runs with read-only keys for incident.io (INCIDENT_IO_API_KEY), Atlassian Statuspage (STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID) and GitHub (GITHUB_TOKEN)."
     },
     {
       "id": "req-stakeholders--derives--need",
       "sourceId": "req-stakeholders",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When the system fails its customers, the team has to recognise it quickly, agree how bad it is, put one person in charge, keep customers and the business told, get service back, and make the same failure less likely. Without an agreed process every incident is improvised, the loudest guess sets the severity, the best engineer is buried in messages, and the lessons are lost. The checks assume the severity definitions in docs/incidents/severity.md and Node 20 scripts under scripts/incidents/ that a daily CI job runs with read-only keys for incident.io (INCIDENT_IO_API_KEY), Atlassian Statuspage (STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID) and GitHub (GITHUB_TOKEN)."
     },
     {
       "id": "req-deploy-failure--derives--need",
       "sourceId": "req-deploy-failure",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When the system fails its customers, the team has to recognise it quickly, agree how bad it is, put one person in charge, keep customers and the business told, get service back, and make the same failure less likely. Without an agreed process every incident is improvised, the loudest guess sets the severity, the best engineer is buried in messages, and the lessons are lost. The checks assume the severity definitions in docs/incidents/severity.md and Node 20 scripts under scripts/incidents/ that a daily CI job runs with read-only keys for incident.io (INCIDENT_IO_API_KEY), Atlassian Statuspage (STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID) and GitHub (GITHUB_TOKEN)."
     },
     {
       "id": "req-postmortem--derives--need",
       "sourceId": "req-postmortem",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When the system fails its customers, the team has to recognise it quickly, agree how bad it is, put one person in charge, keep customers and the business told, get service back, and make the same failure less likely. Without an agreed process every incident is improvised, the loudest guess sets the severity, the best engineer is buried in messages, and the lessons are lost. The checks assume the severity definitions in docs/incidents/severity.md and Node 20 scripts under scripts/incidents/ that a daily CI job runs with read-only keys for incident.io (INCIDENT_IO_API_KEY), Atlassian Statuspage (STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID) and GitHub (GITHUB_TOKEN)."
     },
     {
       "id": "req-retro--derives--need",
       "sourceId": "req-retro",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When the system fails its customers, the team has to recognise it quickly, agree how bad it is, put one person in charge, keep customers and the business told, get service back, and make the same failure less likely. Without an agreed process every incident is improvised, the loudest guess sets the severity, the best engineer is buried in messages, and the lessons are lost. The checks assume the severity definitions in docs/incidents/severity.md and Node 20 scripts under scripts/incidents/ that a daily CI job runs with read-only keys for incident.io (INCIDENT_IO_API_KEY), Atlassian Statuspage (STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID) and GitHub (GITHUB_TOKEN)."
     },
     {
       "id": "req-actions--derives--need",
       "sourceId": "req-actions",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "When the system fails its customers, the team has to recognise it quickly, agree how bad it is, put one person in charge, keep customers and the business told, get service back, and make the same failure less likely. Without an agreed process every incident is improvised, the loudest guess sets the severity, the best engineer is buried in messages, and the lessons are lost. The checks assume the severity definitions in docs/incidents/severity.md and Node 20 scripts under scripts/incidents/ that a daily CI job runs with read-only keys for incident.io (INCIDENT_IO_API_KEY), Atlassian Statuspage (STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID) and GitHub (GITHUB_TOKEN)."
     },
     {
       "id": "sc-classify--verifies--req-classify",

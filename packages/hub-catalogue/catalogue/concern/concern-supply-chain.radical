@@ -1002,85 +1002,99 @@
       "id": "req-vuln-sla--derives--need",
       "sourceId": "req-vuln-sla",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "req-vuln-gate--derives--need",
       "sourceId": "req-vuln-gate",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "req-vuln-report--derives--need",
       "sourceId": "req-vuln-report",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "req-review--derives--need",
       "sourceId": "req-review",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "req-pin-hash--derives--need",
       "sourceId": "req-pin-hash",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "req-pin-proxy--derives--need",
       "sourceId": "req-pin-proxy",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "req-provenance-l1--derives--need",
       "sourceId": "req-provenance-l1",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "req-provenance-l2--derives--need",
       "sourceId": "req-provenance-l2",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "req-provenance-l3--derives--need",
       "sourceId": "req-provenance-l3",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "req-sbom-internal--derives--need",
       "sourceId": "req-sbom-internal",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "req-sbom-shipped--derives--need",
       "sourceId": "req-sbom-shipped",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "req-base-minimal--derives--need",
       "sourceId": "req-base-minimal",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "req-base-official--derives--need",
       "sourceId": "req-base-official",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "req-base-golden--derives--need",
       "sourceId": "req-base-golden",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "The element is built from our code, open-source dependencies and a base image. Known vulnerabilities in what it contains must be found and fixed before they are exploited; no dependency, build step or image may change what we ship without us knowing; every artifact running in production must be traceable to a reviewed commit and the build that made it; and when a new vulnerability is announced we must know within hours which running versions contain it."
     },
     {
       "id": "sc-vuln-sla--verifies--req-vuln-sla",

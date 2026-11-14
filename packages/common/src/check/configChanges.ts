@@ -22,7 +22,7 @@ const RANK: Record<string, number> = { off: 0, warning: 1, error: 2 }
 
 interface Effective { severity: CheckSeverity | 'off'; max?: number; include: string[]; exclude: string[] }
 
-function effective(setting: RuleSetting | undefined, fallback: CheckSeverity): Effective {
+function effective(setting: RuleSetting | undefined, fallback: CheckSeverity | 'off'): Effective {
   if (setting === undefined) return { severity: fallback, include: [], exclude: [] }
   if (typeof setting === 'string') return { severity: setting, include: [], exclude: [] }
   return { severity: setting.severity ?? fallback, ...(setting.max !== undefined ? { max: setting.max } : {}), include: setting.include ?? [], exclude: setting.exclude ?? [] }
@@ -32,7 +32,7 @@ const shown = (max: number | undefined): string => max === undefined ? 'none' : 
 
 /** Each rule and goal `after` sets otherwise than `before`. `defaults`
  *  gives a rule's severity when the config does not set it. */
-export function compareCheckConfig(before: CheckConfig, after: CheckConfig, defaults: (rule: string) => CheckSeverity): CheckConfigChange[] {
+export function compareCheckConfig(before: CheckConfig, after: CheckConfig, defaults: (rule: string) => CheckSeverity | 'off'): CheckConfigChange[] {
   const out: CheckConfigChange[] = []
   const ruleKeys = [...new Set([...Object.keys(before.rules ?? {}), ...Object.keys(after.rules ?? {})])]
   for (const key of ruleKeys) {

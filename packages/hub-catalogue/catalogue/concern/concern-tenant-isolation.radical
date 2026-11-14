@@ -1110,79 +1110,92 @@
       "id": "req-tenant-context--derives--need",
       "sourceId": "req-tenant-context",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Customer organisations may share this system, and the element keeps their data. No tenant may ever see, change or slow down another: a forgotten tenant filter, a tenant id taken from the request, a shared cache key or file path, or one tenant's heavy job each breaks that promise for everyone. Customers also ask whose keys protect their data, where it is kept, and for proof that it is gone when they leave. If the system serves one organisation only, that has to be a decision too, so a second one is not added on the quiet. The snippets assume the application under src/ (src/app exports the router's table, src/tenants the catalogue and offboarding, src/crypto the envelope layer, src/stores the data access) and the tests under tests/ with their fixtures in tests/tenants."
     },
     {
       "id": "req-cross-tenant--derives--need",
       "sourceId": "req-cross-tenant",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Customer organisations may share this system, and the element keeps their data. No tenant may ever see, change or slow down another: a forgotten tenant filter, a tenant id taken from the request, a shared cache key or file path, or one tenant's heavy job each breaks that promise for everyone. Customers also ask whose keys protect their data, where it is kept, and for proof that it is gone when they leave. If the system serves one organisation only, that has to be a decision too, so a second one is not added on the quiet. The snippets assume the application under src/ (src/app exports the router's table, src/tenants the catalogue and offboarding, src/crypto the envelope layer, src/stores the data access) and the tests under tests/ with their fixtures in tests/tenants."
     },
     {
       "id": "req-rls--derives--need",
       "sourceId": "req-rls",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Customer organisations may share this system, and the element keeps their data. No tenant may ever see, change or slow down another: a forgotten tenant filter, a tenant id taken from the request, a shared cache key or file path, or one tenant's heavy job each breaks that promise for everyone. Customers also ask whose keys protect their data, where it is kept, and for proof that it is gone when they leave. If the system serves one organisation only, that has to be a decision too, so a second one is not added on the quiet. The snippets assume the application under src/ (src/app exports the router's table, src/tenants the catalogue and offboarding, src/crypto the envelope layer, src/stores the data access) and the tests under tests/ with their fixtures in tests/tenants."
     },
     {
       "id": "req-schema-onboard--derives--need",
       "sourceId": "req-schema-onboard",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Customer organisations may share this system, and the element keeps their data. No tenant may ever see, change or slow down another: a forgotten tenant filter, a tenant id taken from the request, a shared cache key or file path, or one tenant's heavy job each breaks that promise for everyone. Customers also ask whose keys protect their data, where it is kept, and for proof that it is gone when they leave. If the system serves one organisation only, that has to be a decision too, so a second one is not added on the quiet. The snippets assume the application under src/ (src/app exports the router's table, src/tenants the catalogue and offboarding, src/crypto the envelope layer, src/stores the data access) and the tests under tests/ with their fixtures in tests/tenants."
     },
     {
       "id": "req-database-onboard--derives--need",
       "sourceId": "req-database-onboard",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Customer organisations may share this system, and the element keeps their data. No tenant may ever see, change or slow down another: a forgotten tenant filter, a tenant id taken from the request, a shared cache key or file path, or one tenant's heavy job each breaks that promise for everyone. Customers also ask whose keys protect their data, where it is kept, and for proof that it is gone when they leave. If the system serves one organisation only, that has to be a decision too, so a second one is not added on the quiet. The snippets assume the application under src/ (src/app exports the router's table, src/tenants the catalogue and offboarding, src/crypto the envelope layer, src/stores the data access) and the tests under tests/ with their fixtures in tests/tenants."
     },
     {
       "id": "req-migrate-all--derives--need",
       "sourceId": "req-migrate-all",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Customer organisations may share this system, and the element keeps their data. No tenant may ever see, change or slow down another: a forgotten tenant filter, a tenant id taken from the request, a shared cache key or file path, or one tenant's heavy job each breaks that promise for everyone. Customers also ask whose keys protect their data, where it is kept, and for proof that it is gone when they leave. If the system serves one organisation only, that has to be a decision too, so a second one is not added on the quiet. The snippets assume the application under src/ (src/app exports the router's table, src/tenants the catalogue and offboarding, src/crypto the envelope layer, src/stores the data access) and the tests under tests/ with their fixtures in tests/tenants."
     },
     {
       "id": "req-silo--derives--need",
       "sourceId": "req-silo",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Customer organisations may share this system, and the element keeps their data. No tenant may ever see, change or slow down another: a forgotten tenant filter, a tenant id taken from the request, a shared cache key or file path, or one tenant's heavy job each breaks that promise for everyone. Customers also ask whose keys protect their data, where it is kept, and for proof that it is gone when they leave. If the system serves one organisation only, that has to be a decision too, so a second one is not added on the quiet. The snippets assume the application under src/ (src/app exports the router's table, src/tenants the catalogue and offboarding, src/crypto the envelope layer, src/stores the data access) and the tests under tests/ with their fixtures in tests/tenants."
     },
     {
       "id": "req-quota--derives--need",
       "sourceId": "req-quota",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Customer organisations may share this system, and the element keeps their data. No tenant may ever see, change or slow down another: a forgotten tenant filter, a tenant id taken from the request, a shared cache key or file path, or one tenant's heavy job each breaks that promise for everyone. Customers also ask whose keys protect their data, where it is kept, and for proof that it is gone when they leave. If the system serves one organisation only, that has to be a decision too, so a second one is not added on the quiet. The snippets assume the application under src/ (src/app exports the router's table, src/tenants the catalogue and offboarding, src/crypto the envelope layer, src/stores the data access) and the tests under tests/ with their fixtures in tests/tenants."
     },
     {
       "id": "req-tier-move--derives--need",
       "sourceId": "req-tier-move",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Customer organisations may share this system, and the element keeps their data. No tenant may ever see, change or slow down another: a forgotten tenant filter, a tenant id taken from the request, a shared cache key or file path, or one tenant's heavy job each breaks that promise for everyone. Customers also ask whose keys protect their data, where it is kept, and for proof that it is gone when they leave. If the system serves one organisation only, that has to be a decision too, so a second one is not added on the quiet. The snippets assume the application under src/ (src/app exports the router's table, src/tenants the catalogue and offboarding, src/crypto the envelope layer, src/stores the data access) and the tests under tests/ with their fixtures in tests/tenants."
     },
     {
       "id": "req-tenant-keys--derives--need",
       "sourceId": "req-tenant-keys",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Customer organisations may share this system, and the element keeps their data. No tenant may ever see, change or slow down another: a forgotten tenant filter, a tenant id taken from the request, a shared cache key or file path, or one tenant's heavy job each breaks that promise for everyone. Customers also ask whose keys protect their data, where it is kept, and for proof that it is gone when they leave. If the system serves one organisation only, that has to be a decision too, so a second one is not added on the quiet. The snippets assume the application under src/ (src/app exports the router's table, src/tenants the catalogue and offboarding, src/crypto the envelope layer, src/stores the data access) and the tests under tests/ with their fixtures in tests/tenants."
     },
     {
       "id": "req-byok-revoke--derives--need",
       "sourceId": "req-byok-revoke",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Customer organisations may share this system, and the element keeps their data. No tenant may ever see, change or slow down another: a forgotten tenant filter, a tenant id taken from the request, a shared cache key or file path, or one tenant's heavy job each breaks that promise for everyone. Customers also ask whose keys protect their data, where it is kept, and for proof that it is gone when they leave. If the system serves one organisation only, that has to be a decision too, so a second one is not added on the quiet. The snippets assume the application under src/ (src/app exports the router's table, src/tenants the catalogue and offboarding, src/crypto the envelope layer, src/stores the data access) and the tests under tests/ with their fixtures in tests/tenants."
     },
     {
       "id": "req-offboard--derives--need",
       "sourceId": "req-offboard",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Customer organisations may share this system, and the element keeps their data. No tenant may ever see, change or slow down another: a forgotten tenant filter, a tenant id taken from the request, a shared cache key or file path, or one tenant's heavy job each breaks that promise for everyone. Customers also ask whose keys protect their data, where it is kept, and for proof that it is gone when they leave. If the system serves one organisation only, that has to be a decision too, so a second one is not added on the quiet. The snippets assume the application under src/ (src/app exports the router's table, src/tenants the catalogue and offboarding, src/crypto the envelope layer, src/stores the data access) and the tests under tests/ with their fixtures in tests/tenants."
     },
     {
       "id": "req-single--derives--need",
       "sourceId": "req-single",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Customer organisations may share this system, and the element keeps their data. No tenant may ever see, change or slow down another: a forgotten tenant filter, a tenant id taken from the request, a shared cache key or file path, or one tenant's heavy job each breaks that promise for everyone. Customers also ask whose keys protect their data, where it is kept, and for proof that it is gone when they leave. If the system serves one organisation only, that has to be a decision too, so a second one is not added on the quiet. The snippets assume the application under src/ (src/app exports the router's table, src/tenants the catalogue and offboarding, src/crypto the envelope layer, src/stores the data access) and the tests under tests/ with their fixtures in tests/tenants."
     },
     {
       "id": "sc-tenant-context--verifies--req-tenant-context",

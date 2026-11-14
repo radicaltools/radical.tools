@@ -1054,91 +1054,106 @@
       "id": "req-todo-key--derives--need",
       "sourceId": "req-todo-key",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-debt-record--derives--need",
       "sourceId": "req-debt-record",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-share-reported--derives--need",
       "sourceId": "req-share-reported",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-fixed-share--derives--need",
       "sourceId": "req-fixed-share",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-windows--derives--need",
       "sourceId": "req-windows",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-boy-scout--derives--need",
       "sourceId": "req-boy-scout",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-deprecated-marked--derives--need",
       "sourceId": "req-deprecated-marked",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-sunset--derives--need",
       "sourceId": "req-sunset",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-no-new-callers--derives--need",
       "sourceId": "req-no-new-callers",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-tolerated--derives--need",
       "sourceId": "req-tolerated",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-no-new-debt--derives--need",
       "sourceId": "req-no-new-debt",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-strangler--derives--need",
       "sourceId": "req-strangler",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-rewrite-case--derives--need",
       "sourceId": "req-rewrite-case",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-age--derives--need",
       "sourceId": "req-age",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "req-tool-ratio--derives--need",
       "sourceId": "req-tool-ratio",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "Every shortcut taken in this element charges interest in each later change that touches it. The team needs the debt written down where planning can see it, with an owner, what repaying costs and what leaving it costs; a known share of its time to repay it; deprecated code and endpoints that actually go away; and a way to decide a rewrite that does not stop delivery for a year. Without this the element gets slower to change every quarter and nobody can say why."
     },
     {
       "id": "sc-todo-key--verifies--req-todo-key",

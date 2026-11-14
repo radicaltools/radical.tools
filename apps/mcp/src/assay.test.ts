@@ -15,7 +15,7 @@ async function central(code: () => string = shop) {
   execFileSync('git', ['init', '-q'], { cwd: root })
   const model = await FolderModel.open(join(root, '.radical', 'model'))
   const call = async (name: string, input: unknown = {}) => model.call(name, input)
-  const nodes = async () => JSON.parse((await call('search_model', { query: 'LIST NODES' })).text).rows as Array<{ id: string; type: string; label: string; parentId?: string } & Record<string, unknown>>
+  const nodes = async () => JSON.parse((await call('search_model', { query: 'LIST NODES FULL' })).text).rows as Array<{ id: string; type: string; label: string; parentId?: string } & Record<string, unknown>>
   const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'))
   return { dir, root, call, nodes, json }
 }
@@ -133,7 +133,7 @@ describe('Radical Assay over MCP', () => {
     const all = await nodes()
     const byLabel = (label: string) => all.find((n) => n.label === label)!
     expect(byLabel('pdf').parentId).toBe(byLabel('PDF library').id)
-    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS' })).text).rows as Array<{ relationType: string; sourceLabel: string; targetLabel: string }>
+    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS FULL' })).text).rows as Array<{ relationType: string; sourceLabel: string; targetLabel: string }>
     expect(relations.map((r) => [r.relationType, r.sourceLabel, r.targetLabel]).sort()).toEqual([['interacts', 'App', 'pdf'], ['realises', 'pdf', 'Page']])
   })
 
@@ -167,7 +167,7 @@ describe('Radical Assay over MCP', () => {
       elements: [{ key: 'printing', type: 'domain', label: 'Printing', facts: ['lib:table:ora:pages'], confidence: 'inferred' }],
       entities: [{ key: 'page', label: 'Page', tables: ['lib:table:ora:pages'], parent: 'printing' }],
     } })).ok).toBe(true)
-    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS' })).text).rows as Array<{ relationType: string; sourceLabel: string; targetLabel: string }>
+    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS FULL' })).text).rows as Array<{ relationType: string; sourceLabel: string; targetLabel: string }>
     expect(relations.filter((r) => r.relationType === 'realises').map((r) => r.sourceLabel).sort()).toEqual(['App', 'pdf'])
     // A scenario of the package's code goes to the unit its scripts are in, which has no test framework.
     const pdf = (await nodes()).find((n) => n.label === 'pdf')!.id
@@ -287,7 +287,7 @@ describe('Radical Assay over MCP', () => {
       ['need', 'Found in the code', false], ['requirement', 'Show one order', true], ['scenario', 'Order shown', true],
     ])
     const scenario = all.find((n) => n.label === 'Order shown')!.id
-    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS' })).text).rows.map((r: { relationType: string; sourceLabel?: string; source?: { label: string } }) => r.relationType).sort()
+    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS FULL' })).text).rows.map((r: { relationType: string; sourceLabel?: string; source?: { label: string } }) => r.relationType).sort()
     expect(relations).toEqual(['derives', 'interacts', 'satisfies', 'verifies'])
     expect(json(join(dir, 'storefront/.radical/radical.json')).verifies).toEqual([{ element: scenario, name: 'Order shown', tests: ['apps/web/tests/orders.test.js › orders › shows an order'] }])
     expect((await call('get_issues')).text).toMatch(/^No issues/)
@@ -401,7 +401,7 @@ describe('Radical Assay over MCP', () => {
     expect(need).toMatchObject({ type: 'need', kind: 'brief' })
     expect(adr).toMatchObject({ type: 'adr', status: 'proposed', decision: 'The storefront calls the orders service over HTTP.' })
     expect(all.some((n) => n.label === 'Found in the code')).toBe(false)
-    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS' })).text).rows as Array<{ sourceId: string; targetId: string; relationType: string }>
+    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS FULL' })).text).rows as Array<{ sourceId: string; targetId: string; relationType: string }>
     const web = all.find((n) => n.label === 'Storefront')!.id
     expect(relations).toEqual(expect.arrayContaining([
       expect.objectContaining({ sourceId: req.id, targetId: need.id, relationType: 'derives' }),
@@ -460,7 +460,7 @@ describe('Radical Assay over MCP', () => {
     expect((await call('assay_answer', { proposal: 'P3', accept: true })).text).toMatch(/^P3 added: requirement "See orders" \([\w-]+\) with 0 scenarios/)
     const all = await nodes()
     expect(all.filter((n) => n.type === 'need').map((n) => n.label)).toEqual(['See orders'])
-    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS WHERE relationType = "derives"' })).text).rows as Array<{ sourceId: string; targetId: string }>
+    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS WHERE relationType = "derives" FULL' })).text).rows as Array<{ sourceId: string; targetId: string }>
     expect(relations).toEqual([expect.objectContaining({ sourceId: all.find((n) => n.type === 'requirement')!.id, targetId: all.find((n) => n.type === 'need')!.id })])
   })
 
@@ -504,7 +504,7 @@ describe('Radical Assay over MCP', () => {
     expect((await call('assay_answer', { proposal: 'P3', accept: true, changes: { need: 'P1' } })).ok).toBe(true)
     const all = await nodes()
     const need = all.find((n) => n.label === 'Pay first')!
-    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS' })).text).rows as Array<{ sourceId: string; targetId: string; relationType: string }>
+    const relations = JSON.parse((await call('search_model', { query: 'LIST RELATIONS FULL' })).text).rows as Array<{ sourceId: string; targetId: string; relationType: string }>
     const payReq = all.find((n) => n.label === 'Pay before shipping')!
     const show = all.find((n) => n.label === 'Show an order')!
     expect(relations.filter((r) => r.targetId === payReq.id && r.relationType === 'satisfies')).toEqual([])

@@ -1077,85 +1077,99 @@
       "id": "req-one-framework--derives--need",
       "sourceId": "req-one-framework",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-vitals--derives--need",
       "sourceId": "req-vitals",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-bundle--derives--need",
       "sourceId": "req-bundle",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-a11y--derives--need",
       "sourceId": "req-a11y",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-supported--derives--need",
       "sourceId": "req-supported",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-spa-cache--derives--need",
       "sourceId": "req-spa-cache",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-ssr--derives--need",
       "sourceId": "req-ssr",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-static--derives--need",
       "sourceId": "req-static",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-design-own--derives--need",
       "sourceId": "req-design-own",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-design-library--derives--need",
       "sourceId": "req-design-library",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-design-utility--derives--need",
       "sourceId": "req-design-utility",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-browsers--derives--need",
       "sourceId": "req-browsers",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-unsupported--derives--need",
       "sourceId": "req-unsupported",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "req-old-devices--derives--need",
       "sourceId": "req-old-devices",
       "targetId": "need",
-      "relationType": "derives"
+      "relationType": "derives",
+      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
     },
     {
       "id": "sc-one-framework--verifies--req-one-framework",
