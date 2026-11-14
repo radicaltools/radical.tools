@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type MilestoneView, type Presentation, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, holderOf, isContainerType, trimStepBackward } from './c4'
+import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type MilestoneView, type Presentation, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, holderOf, notedPlacesOnly, isContainerType, trimStepBackward } from './c4'
 import { readPipeline, viewShownNodes, withAncestors } from './viewPipeline'
 import { relationMayJoinHolder, relationRefusal, relationTypeAllows, relationTypesAccepted, type RelationContext } from './relationRules'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
@@ -121,7 +121,7 @@ const PLACE_KEYS = new Set(['x', 'y', 'width', 'height'])
  *  drawn: what reads the model and not the canvas (the Inspector's check)
  *  need not run again when the live layout moves elements every frame. */
 export function samePlacesAside(a: Record<string, C4Node>, b: Record<string, C4Node>): boolean {
-  if (a === b) return true
+  if (notedPlacesOnly(a, b)) return true
   const ids = Object.keys(b)
   if (ids.length !== Object.keys(a).length) return false
   for (const id of ids) {

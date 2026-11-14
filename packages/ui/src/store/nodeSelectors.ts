@@ -4,7 +4,7 @@
 // these so they re-render only when what they show changes.
 
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import type { C4Node } from '@radical/common/c4'
+import { notedPlacesOnly, type C4Node } from '@radical/common/c4'
 import { useDiagramStore } from './diagramStore'
 
 const GEOMETRY = new Set(['x', 'y', 'width', 'height'])
@@ -18,6 +18,14 @@ export function sameContent(a: C4Node | undefined, b: C4Node | undefined): boole
   for (const key in ra) if (!GEOMETRY.has(key) && ra[key] !== rb[key]) return false
   for (const key in rb) if (!GEOMETRY.has(key) && !(key in ra)) return false
   return true
+}
+
+/** The model's elements, kept as they were while the live layout or a glide
+ *  only moves them (notePlacesOnly): for what counts or filters elements,
+ *  which drew again every frame on a model of 21,000 elements. Their
+ *  places may be old. */
+export function useNodesPlacesAside(): Record<string, C4Node> {
+  return useStoreWithEqualityFn(useDiagramStore, (s) => s.c4Nodes, notedPlacesOnly)
 }
 
 /** The model node, ignoring moves and resizes. */

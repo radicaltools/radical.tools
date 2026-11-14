@@ -2,7 +2,7 @@ import React, { ChangeEvent, useState, useMemo, useEffect, useLayoutEffect, useR
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { onExploration, useDiagramStore, viewById, type BranchOverlay } from '../store/diagramStore'
-import { useNodeLabels } from '../store/nodeSelectors'
+import { useNodeLabels, useNodesPlacesAside } from '../store/nodeSelectors'
 import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isBackwardStep } from '@radical/common/c4'
 import { resolveEarsSubject, isReservedPropertyKey, relationDisplayLabel, relationTypeName, requirementStatePhrase, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
@@ -40,7 +40,7 @@ const endTyping = (): void => useDiagramStore.getState().endTyping()
  *  every view's chain takes tens of milliseconds on a large model, so it
  *  waits until the model has stopped changing for a moment. */
 function useViewNodeCounts(views: Record<string, DiagramView>): Record<string, number | undefined> {
-  const nodes = useDiagramStore((s) => s.c4Nodes)
+  const nodes = useNodesPlacesAside()
   const relations = useDiagramStore((s) => s.c4Relations)
   const count = useCallback(() => {
     const out: Record<string, number | undefined> = {}
@@ -1455,7 +1455,9 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
     setActiveView(first?.id ?? id)
     if (onOpenProps) onOpenProps(first?.id ?? id)
   }
-  const totalNodes = useDiagramStore((s) => Object.keys(s.c4Nodes).length)
+  // Counted again only when elements come or go, not as they move.
+  const placedAside = useNodesPlacesAside()
+  const totalNodes = useMemo(() => Object.keys(placedAside).length, [placedAside])
   const counts = useViewNodeCounts(views)
   const branchCounts = useBranchViewCounts(views)
   const branchTotal = useDiagramStore((s) => s.branch ? Object.keys(s.branch.nodes).length : undefined)

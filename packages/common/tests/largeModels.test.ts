@@ -187,7 +187,7 @@ describe('checking a model of 20,000 elements', () => {
   it('is not checked again when a view only places or moves its elements', () => {
     const view = { id: 'v', name: 'V', nodeIds: ['a'], positions: {} } as unknown as DiagramView
     const views = { v: view }
-    expect(sameViewsPlacesAside(views, { v: { ...view, positions: { a: { x: 1, y: 2 } }, viewport: { x: 0, y: 0, zoom: 1 } } as DiagramView })).toBe(true)
+    expect(sameViewsPlacesAside(views, { v: { ...view, positions: { a: { x: 1, y: 2, width: 3, height: 4 } }, viewport: { x: 0, y: 0, zoom: 1 } } as DiagramView })).toBe(true)
     expect(sameViewsPlacesAside(views, { v: { ...view, nodeIds: ['a', 'b'] } })).toBe(false)
     expect(sameViewsPlacesAside(views, { v: { ...view, name: 'W' } })).toBe(false)
     expect(sameViewsPlacesAside(views, { v: view, w: view })).toBe(false)

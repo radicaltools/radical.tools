@@ -890,3 +890,30 @@ export function addToViewList(view: DiagramView, ids: string[]): void {
   for (const id of ids) if (!view.nodeIds.includes(id)) view.nodeIds.push(id)
   if (view.nodeIds.length > 0) delete view.empty
 }
+
+// ─── Elements only moved ─────────────────────────────────────────────────────
+//
+// The live layout and a glide move elements every frame. What reads the
+// model and not the canvas (the Inspector's check, a view's filter, the
+// autosave's "nothing but places") asked each time whether anything else
+// changed, going through all 21,000 elements of a large model every frame.
+// The store notes each such step instead; the answer is then at hand.
+
+const PLACED_FROM = new WeakMap<object, object>()
+const PLACED_ROOT = new WeakMap<object, object>()
+
+/** Notes that the elements `next` are `prev` with some of them only moved or
+ *  resized (x, y, width, height), nothing else changed. */
+export function notePlacesOnly(prev: Record<string, C4Node>, next: Record<string, C4Node>): void {
+  PLACED_FROM.set(next, prev)
+  PLACED_ROOT.set(next, PLACED_ROOT.get(prev) ?? prev)
+}
+
+/** Whether `b` is `a` with elements at most moved or resized, as noted by
+ *  notePlacesOnly, through any number of such steps from one to the other.
+ *  False says only that none was noted. */
+export function notedPlacesOnly(a: Record<string, C4Node>, b: Record<string, C4Node>): boolean {
+  if (a === b || PLACED_FROM.get(b) === a) return true
+  const root = PLACED_ROOT.get(b)
+  return root !== undefined && (root === a || root === PLACED_ROOT.get(a))
+}
