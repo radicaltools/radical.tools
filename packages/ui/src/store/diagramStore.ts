@@ -2827,6 +2827,7 @@ function deriveRFEdges(
   const rfEdges: Edge<C4EdgeRFData>[] = []
   // Track virtual edges already emitted to avoid duplicates
   const seen = new Set<string>()
+  const virtualEdges = new Map<string, Edge<C4EdgeRFData>>()
 
   // Depth-based zIndex — mirrors deriveRFNodes so edges always render above
   // their parent group nodes and are reachable by pointer events.
@@ -2845,12 +2846,21 @@ function deriveRFEdges(
   const typeNameOf = (rel: C4Relation, type: string) => relationTypeName(metamodel, type, true, nodes[rel.sourceId] && nodes[rel.targetId] ? { from: nodes[rel.sourceId].type, to: nodes[rel.targetId].type } : undefined)
   const shownTypeName = (rel: C4Relation) => rel.relationType && rel.relationType !== 'transition' ? typeNameOf(rel, rel.relationType) : undefined
 
+  // Where each element is drawn, worked out once for it rather than for
+  // each relation it has: 40,000 relations at each letter typed on a large model.
+  const visibleAt = new Map<string, string>()
+  const visibleOf = (id: string): string => {
+    let at = visibleAt.get(id)
+    if (at === undefined) visibleAt.set(id, at = getViewVisibleAncestor(id, nodes, viewFilter, viewCollapsedSet, expandedSet))
+    return at
+  }
+
   for (const rel of Object.values(relations)) {
     if (!nodes[rel.sourceId] || !nodes[rel.targetId]) continue
     if (hiddenRelationIds && hiddenRelationIds.has(rel.id)) continue
 
-    const visSource = getViewVisibleAncestor(rel.sourceId, nodes, viewFilter, viewCollapsedSet, expandedSet)
-    const visTarget = getViewVisibleAncestor(rel.targetId, nodes, viewFilter, viewCollapsedSet, expandedSet)
+    const visSource = visibleOf(rel.sourceId)
+    const visTarget = visibleOf(rel.targetId)
 
     if (visSource === visTarget) continue // collapsed to same ancestor → self-loop, skip
 
@@ -2876,7 +2886,7 @@ function deriveRFEdges(
     // all). Relations rolled up onto a collapsed container share one edge,
     // whose label lists them all.
     if (isVirtual && seen.has(key)) {
-      const existing = rfEdges.find((e) => e.id === `virtual-${key}`)
+      const existing = virtualEdges.get(key)
       existing?.data?.relationIds?.push(rel.id)
       // A technology only when they all use it: the first one's alone
       // read as the whole line's.
@@ -2901,7 +2911,7 @@ function deriveRFEdges(
     const tgtDepth = depthOf(visTarget)
     const edgeZIndex = Math.max(srcDepth, tgtDepth) * 10 + 5
 
-    rfEdges.push({
+    const edge: Edge<C4EdgeRFData> = {
       id: isVirtual ? `virtual-${key}` : rel.id,
       source: visSource,
       target: visTarget,
@@ -2921,7 +2931,9 @@ function deriveRFEdges(
         isVirtual,
         ...(isVirtual ? { relationIds: [rel.id] } : {}),
       },
-    })
+    }
+    rfEdges.push(edge)
+    if (isVirtual) virtualEdges.set(key, edge)
   }
 
   // Steps that follow each other: an arrow from each to the next, both shown
@@ -4638,7 +4650,7 @@ export const useDiagramStore = create<DiagramStore>()(
             : undefined
           // Lines end only at elements the view shows, not at its frames.
           const lineEnds = filter && frames.size ? new Set([...filter].filter((id) => !frames.has(id))) : filter
-          const derivedEdges = deriveRFEdges(drawnNodes, mergedRels, lineEnds, vcs, hiddenRels, expandedSet, state.metamodel as Metamodel | undefined)
+          const derivedEdges = deriveRFEdges(drawnNodes, mergedRels, lineEnds, vcs, hiddenRels, expandedSet, s0.metamodel as Metamodel | undefined)
           // The exploration's containment lines: a child and its parent on
           // the next level, joined (it draws them apart). Not relations of
           // the model: drawn only.
