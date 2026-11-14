@@ -188,13 +188,40 @@ const fileMatches = (reportFile: string, idFile: string): boolean =>
  *  (`file › describe`); no title names every test in the file, or under
  *  the directory. */
 export function findTests(id: TestId, cases: TestCase[]): { fileSeen: boolean; matches: TestCase[] } {
+  // Asked for each test a scenario or fitness function names, by each rule
+  // and for each element it is measured on: kept for the cases' list, as a
+  // model of 20,000 elements asked it hundreds of thousands of times.
+  let found = FOUND.get(cases)
+  if (!found) { found = new Map(); FOUND.set(cases, found) }
+  const key = `${id.file}\u0000${id.title.join('\u0000')}`
+  let result = found.get(key)
+  if (!result) { result = findTestsIn(id, cases); found.set(key, result) }
+  return result
+}
+
+const FOUND = new WeakMap<TestCase[], Map<string, { fileSeen: boolean; matches: TestCase[] }>>()
+const BY_NAME = new WeakMap<TestCase[], Map<string, TestCase[]>>()
+const baseName = (file: string): string => file.slice(file.lastIndexOf('/') + 1)
+
+function findTestsIn(id: TestId, cases: TestCase[]): { fileSeen: boolean; matches: TestCase[] } {
   const n = id.title.length
   if (!n) {
     // A file, or a directory: every test under it.
     const under = cases.filter((c) => fileMatches(c.file, id.file) || c.file.includes(`/${id.file.replace(/\/$/, '')}/`) || c.file.startsWith(`${id.file.replace(/\/$/, '')}/`))
     return { fileSeen: under.length > 0, matches: under }
   }
-  const inFile = cases.filter((c) => fileMatches(c.file, id.file))
+  // Paths that end one with the other end with the same name.
+  let byName = BY_NAME.get(cases)
+  if (!byName) {
+    byName = new Map()
+    for (const c of cases) {
+      const name = baseName(c.file)
+      const list = byName.get(name)
+      if (list) list.push(c); else byName.set(name, [c])
+    }
+    BY_NAME.set(cases, byName)
+  }
+  const inFile = (byName.get(baseName(id.file)) ?? []).filter((c) => fileMatches(c.file, id.file))
   const key = id.title.join(' › ')
   const tail = inFile.filter((c) => c.title.length >= n && c.title.slice(-n).join(' › ') === key)
   const matches = tail.length ? tail : inFile.filter((c) => c.title.length > n && c.title.slice(0, n).join(' › ') === key)

@@ -135,6 +135,30 @@ export function samePlacesAside(a: Record<string, C4Node>, b: Record<string, C4N
   return true
 }
 
+// Where a view draws its elements, and where it is looked at from.
+const VIEW_PLACE_KEYS = new Set(['positions', 'viewport'])
+
+/** Whether the views `b` are the views `a`, changed at most in where they
+ *  draw their elements: opening a view places those it had no place for,
+ *  and a drag or the live layout moves them, none of which the Inspector's
+ *  check reads. */
+export function sameViewsPlacesAside(a: Record<string, DiagramView>, b: Record<string, DiagramView>): boolean {
+  if (a === b) return true
+  const ids = Object.keys(b)
+  const before = Object.keys(a)
+  if (ids.length !== before.length) return false
+  for (let i = 0; i < ids.length; i++) {
+    // In the same order: the order of the views is the list's.
+    if (ids[i] !== before[i]) return false
+    const x = a[ids[i]] as unknown as Record<string, unknown>
+    const y = b[ids[i]] as unknown as Record<string, unknown>
+    if (x === y) continue
+    for (const k in y) if (!VIEW_PLACE_KEYS.has(k) && x[k] !== y[k]) return false
+    for (const k in x) if (!VIEW_PLACE_KEYS.has(k) && !(k in y)) return false
+  }
+  return true
+}
+
 /** Each element's children, by its id. Kept for frozen data (Studio's
  *  store): a wiki asked for every page's descendants, and the map of a
  *  model of 21,000 elements was made again each time (0.9 s a view). The

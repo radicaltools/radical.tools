@@ -18,7 +18,7 @@ import { REPOSITORY_FILE, parseRepositoryFile, serializeRepositoryFile, type Rep
 import { historyMark, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
 import { concernPacks, type ConcernPack } from '@radical/common/concerns'
-import { samePlacesAside } from '@radical/common/model'
+import { samePlacesAside, sameViewsPlacesAside } from '@radical/common/model'
 import { documents, useDocumentsStore } from '../store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './autosave'
 import { useBranchStore } from './branchChanges'
@@ -225,8 +225,9 @@ if (typeof window !== 'undefined') {
   /** The user's steps when the active model came in (historyMark). */
   let markAtLoad = historyMark()
   useDiagramStore.subscribe((s, prev) => {
-    // Elements moved (the live layout, every frame) change nothing it checks.
-    if (samePlacesAside(prev.c4Nodes, s.c4Nodes) && s.c4Relations === prev.c4Relations && s.views === prev.views
+    // Elements moved (the live layout, every frame), or placed in a view as it
+    // opens, change nothing it checks.
+    if (samePlacesAside(prev.c4Nodes, s.c4Nodes) && s.c4Relations === prev.c4Relations && sameViewsPlacesAside(prev.views, s.views)
       && s.sequences === prev.sequences && s.presentations === prev.presentations && s.metamodel === prev.metamodel
       && s.liveBackup === prev.liveBackup) return
     // The model changed after an edit since it came in, not as it came in.
