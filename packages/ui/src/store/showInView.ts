@@ -21,6 +21,12 @@ export const useShowRequest = create<{ nodeId: string | null; seq: number }>()((
  *  the page read, and leaves a closed one closed. */
 export const useCardOpen = create<{ open: boolean; requested: boolean }>()(() => ({ open: false, requested: false }))
 
+/** The verification path of an element (the Inspector's, in Studio): the
+ *  host sets `open` and, while it cannot show one (no test results or
+ *  measurements beside the model), why not. The properties card offers
+ *  Path on a need, requirement, scenario, ADR or fitness function. */
+export const useVerificationPath = create<{ open: ((nodeId: string) => void) | null; unavailable: string | null }>()(() => ({ open: null, unavailable: null }))
+
 /** Opens the properties card on what is selected. */
 export function openCard(): void {
   useCardOpen.setState({ requested: true })

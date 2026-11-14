@@ -69,11 +69,59 @@ describe('test reports', () => {
 
   it('reads a JUnit XML report', () => {
     expect(parseTestReport(JUNIT_XML, 'j.xml')).toEqual([
-      { file: 'src/cli.test.ts', title: ['radical check', 'exits 0 & more'], status: 'passed' },
-      { file: 'src/cli.test.ts', title: ['radical check', 'fails'], status: 'failed' },
-      { file: 'src/cli.test.ts', title: ['skipped one'], status: 'skipped' },
+      { file: 'src/cli.test.ts', title: ['radical check', 'exits 0 & more'], status: 'passed', durationMs: 10 },
+      { file: 'src/cli.test.ts', title: ['radical check', 'fails'], status: 'failed', message: 'AssertionError', durationMs: 10 },
+      { file: 'src/cli.test.ts', title: ['skipped one'], status: 'skipped', durationMs: 0 },
       { file: 'tests/x.test.ts', title: ['self closing'], status: 'passed' },
     ])
+  })
+
+  it('keeps why a test failed, how long it ran and its line, from each report', () => {
+    const red = '\u001b[31m'
+    const off = '\u001b[39m'
+    const vitest = parseTestReport(JSON.stringify({
+      testResults: [{ name: '/repo/a.test.ts', assertionResults: [
+        { ancestorTitles: ['sum'], title: 'adds', status: 'failed', duration: 3.6, location: { line: 12, column: 3 },
+          failureMessages: [`${red}AssertionError: expected 3 to be 4${off}\n    at a.test.ts:13:5`] },
+        { ancestorTitles: ['sum'], title: 'zero', status: 'passed', duration: 1.2, location: { line: 20, column: 3 }, failureMessages: [] },
+      ] }],
+    }), 'v.json')
+    expect(vitest).toEqual([
+      { file: '/repo/a.test.ts', title: ['sum', 'adds'], status: 'failed', message: 'AssertionError: expected 3 to be 4\n    at a.test.ts:13:5', durationMs: 4, line: 12 },
+      { file: '/repo/a.test.ts', title: ['sum', 'zero'], status: 'passed', durationMs: 1, line: 20 },
+    ])
+    const playwright = parseTestReport(JSON.stringify({
+      config: { rootDir: '/repo/e2e' },
+      suites: [{ title: 'a.spec.ts', file: 'a.spec.ts', specs: [
+        { title: 'opens', file: 'a.spec.ts', line: 7, tests: [{ status: 'unexpected', results: [
+          { duration: 900, error: { message: 'first try' } },
+          { duration: 1200, error: { message: `${red}Error: expect(locator).toBeVisible()${off}\n\nLocator: getByText('Path')` } },
+        ] }] },
+        { title: 'closes', file: 'a.spec.ts', line: 30, tests: [{ status: 'expected', results: [{ duration: 450, errors: [] }] }] },
+      ] }],
+    }), 'pw.json')
+    expect(playwright).toEqual([
+      { file: '/repo/e2e/a.spec.ts', title: ['opens'], status: 'failed', message: "Error: expect(locator).toBeVisible()\n\nLocator: getByText('Path')", durationMs: 1200, line: 7 },
+      { file: '/repo/e2e/a.spec.ts', title: ['closes'], status: 'passed', durationMs: 450, line: 30 },
+    ])
+    const junit = parseTestReport(`<testsuites><testsuite name="s">
+      <testcase classname="t.test.ts" name="cdata" time="1.5" line="9"><failure message="short"><![CDATA[Expected <a> & got <b>]]></failure></testcase>
+      <testcase classname="t.test.ts" name="attribute only" time="0.25"><error message="boom &amp; bust"/></testcase>
+      <testcase classname="t.test.ts" name="fine" time="0.002"/>
+    </testsuite></testsuites>`, 'j.xml')
+    expect(junit).toEqual([
+      { file: 't.test.ts', title: ['cdata'], status: 'failed', message: 'Expected <a> & got <b>', durationMs: 1500, line: 9 },
+      { file: 't.test.ts', title: ['attribute only'], status: 'failed', message: 'boom & bust', durationMs: 250 },
+      { file: 't.test.ts', title: ['fine'], status: 'passed', durationMs: 2 },
+    ])
+  })
+
+  it('cuts a long failure message to its first lines', () => {
+    const long = Array.from({ length: 40 }, (_, i) => `line ${i}`).join('\n')
+    const [c] = parseTestReport(JSON.stringify({ testResults: [{ name: 'x.test.ts', assertionResults: [{ title: 't', status: 'failed', failureMessages: [`\n\n${long}\n`] }] }] }), 'v.json')
+    expect(c.message!.split('\n')).toHaveLength(13)
+    expect(c.message!.startsWith('line 0\nline 1')).toBe(true)
+    expect(c.message!.endsWith('line 11\n…')).toBe(true)
   })
 
   it('refuses what is no report', () => {

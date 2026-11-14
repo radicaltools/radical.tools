@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/pro
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, testsRanAt, type CheckConfig, type CiSource, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, testsRanAt, formatTrace, traceOf, type CheckConfig, type CiSource, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { DEPS_FILE } from '@radical/common/federation'
 import { STATE_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
@@ -74,6 +74,13 @@ its own ("model": { "repo": … }), it judges that repository's part of the mode
   --alone             check without the models deps.json names; with a
                       deps.json the model is checked composed with them, at
                       their pinned refs (radical federation --help)
+  --trace <id>        print every verification path through one element (a
+                      need, requirement, scenario, ADR or fitness function):
+                      from its need or ADR to the tests and metric conditions
+                      that check it, each with its status and why a test
+                      failed, instead of the check's findings. Without
+                      --report or --from-ci it reads the test results kept
+                      beside the model. With --format json, the paths as JSON
   --verbose           list every warning, not the first five of each rule
   --list-rules        list the rules and their default severity, and the
                       metrics check.json can set goals for ("goals":
@@ -130,6 +137,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
         baseline: { type: 'string', multiple: true },
         trigger: { type: 'string' },
         evidence: { type: 'string' },
+        trace: { type: 'string' },
         ratchet: { type: 'boolean', default: false },
         alone: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
@@ -151,7 +159,8 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
   const fromCi = values['from-ci']
   if (positionals.length > 1 || !['text', 'json', 'github'].includes(values.format) || (fromCi && values.report?.length)
-    || (values.evidence && !values.report?.length && !fromCi && !values.metrics?.length)) {
+    || (values.evidence && !values.report?.length && !fromCi && !values.metrics?.length)
+    || (values.trace !== undefined && (!values.trace.trim() || values.format === 'github' || values.ratchet))) {
     io.err(CHECK_USAGE)
     return 2
   }
@@ -265,6 +274,13 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     }
   }
 
+  // A path asked for without reports: the results the last check kept.
+  let fromKept = false
+  if (values.trace && !tests) {
+    const keptResults = parseTestResults(await readEditorStateFile(root, TEST_RESULTS_FILE) ?? '')
+    if (keptResults) { tests = keptResults.cases; testsReadAt = testsRanAt(keptResults); fromKept = true }
+  }
+
   // What radical sense kept, with the files --metrics names added.
   const kept = await readEditorStateFile(root, MEASUREMENTS_FILE)
   const stored = kept === null ? null : parseMeasurementStore(kept)
@@ -330,7 +346,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   let missingPaths: Record<string, string[]> = {}
   try { missingPaths = await missingCodePaths(await mappingRoot(root), deserializeFromMdFolder(files).data.nodes) } catch { /* the folder's own rules say what is wrong */ }
   const result = runCheck(files, config, { sensors, repository, missingPaths, ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
-  if (tests && (keep || !fromCi)) {
+  if (tests && !fromKept && (keep || !fromCi)) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited; with the commit they were read at, so
     // results of CI never replace those of a later one.
@@ -338,6 +354,14 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
       keep ?? { commit: (await headOf(root)) ?? undefined }))
   }
   if (values.evidence && result.evidence) await writeBeside(resolve(io.cwd, values.evidence), JSON.stringify(result.evidence, null, 2) + '\n')
+  if (values.trace) {
+    const { nodes, relations } = deserializeFromMdFolder(files).data
+    const byId = Object.fromEntries(nodes.map((n) => [n.id, n]))
+    if (!byId[values.trace]) { io.err(`radical check --trace: no element ${values.trace} in ${folder}.`); return 2 }
+    const trace = traceOf({ nodes: byId, relations: Object.fromEntries(relations.map((r) => [r.id, r])), evidence: result.evidence, cases: tests }, values.trace)
+    if (!values.quiet) io.out(values.format === 'json' ? JSON.stringify(trace, null, 2) : formatTrace(trace, byId))
+    return 0
+  }
   const options = { folder, verbose: values.verbose }
   if (repository?.model && values.format !== 'json' && !values.quiet) io.out(`Judged this repository's part of the model of ${repository.model.repo}.`)
   if (federation && values.format !== 'json' && !values.quiet) {

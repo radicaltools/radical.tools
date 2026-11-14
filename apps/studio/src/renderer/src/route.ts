@@ -8,7 +8,7 @@
 //
 // URL grammar (segments are key/value pairs, each value URI-encoded):
 //
-//   #/m/<mode>/v/<viewId>[/t/<tab>][/f/<focusId>][/e/<elementId>][/s/<snapshotId>]
+//   #/m/<mode>/v/<viewId>[/t/<tab>][/tr/<traceId>][/f/<focusId>][/e/<elementId>][/s/<snapshotId>]
 //   #/d/<docId>/m/<mode>/v/<viewId>...[/p/<presId>/play/1/sl/<n>]
 //
 //   <mode>    designer | viewer | presenter | metamodel   (default: designer)
@@ -19,6 +19,8 @@
 //   <viewId>  a view id, or `canvas` for the default Canvas (activeViewId null)
 //   <tab>     the Inspector's tab (inspector mode only): changes | model |
 //             implementation | settings
+//   <traceId> the element whose verification path the Inspector shows
+//             (inspector mode only)
 //   <focusId> a Wiki element node id (only applied for wiki views)
 //   <elementId> the selected element; in the Inspector, the element whose
 //             card is open in Changes
@@ -63,6 +65,8 @@ export interface Route {
   view: string
   /** The Inspector's tab (inspector mode only). */
   tab?: InspectorTab
+  /** The element whose verification path the Inspector shows (inspector mode only). */
+  trace?: string
   /** wiki element node id (only meaningful for wiki views). */
   focus?: string
   /** The selected element; in the Inspector, the element whose card is open. */
@@ -145,6 +149,7 @@ export function parseHash(hash: string): Route | null {
     mode,
     view: map.v && !isAllElements(map.v) ? map.v : ALL_ELEMENTS,
     tab: mode === 'inspector' ? inspectorTabOf(map.t) : undefined,
+    trace: mode === 'inspector' ? map.tr || undefined : undefined,
     focus: map.f || undefined,
     el: map.e || undefined,
     snap: map.s || undefined,
@@ -160,6 +165,7 @@ export function formatRoute(r: Route): string {
   segs.push('m', encodeURIComponent(r.mode))
   segs.push('v', encodeURIComponent(r.view))
   if (r.tab && r.mode === 'inspector') segs.push('t', encodeURIComponent(r.tab))
+  if (r.trace && r.mode === 'inspector') segs.push('tr', encodeURIComponent(r.trace))
   if (r.focus && !isAllElements(r.view)) segs.push('f', encodeURIComponent(r.focus))
   if (r.el) segs.push('e', encodeURIComponent(r.el))
   if (r.snap) segs.push('s', encodeURIComponent(r.snap))
@@ -201,6 +207,7 @@ export function currentRoute(): Route {
     mode: s.appMode,
     view: s.activeViewId ?? ALL_ELEMENTS,
     tab,
+    ...(inspector && nav.trace ? { trace: nav.trace } : {}),
     focus,
     el,
     snap: s.activeSnapshotId ?? undefined,
@@ -305,7 +312,7 @@ function applyViewModeFocus(route: Route): void {
     }
     // The Inspector's tab and card, or the selection: the route is the whole place.
     if (route.mode === 'inspector') {
-      useInspectorNav.setState({ tab: route.tab ?? null, cardId: route.tab === 'branch' ? route.el ?? null : null })
+      useInspectorNav.setState({ tab: route.tab ?? null, cardId: route.tab === 'branch' ? route.el ?? null : null, trace: route.trace ?? null })
     } else {
       const s = useDiagramStore.getState()
       const el = route.el && s.c4Nodes[route.el] ? route.el : null
@@ -362,9 +369,9 @@ export function describeRoute(route: Route, hash = formatRoute(route), at = Date
   const s = useDiagramStore.getState()
   // The exploration too, by its name ("Explore: API"), not its id.
   const view = isAllElements(route.view) ? 'All elements' : viewById(s, route.view)?.name ?? route.view
-  const where = route.mode === 'inspector' ? `Inspector › ${TAB_NAMES[route.tab ?? 'overview']}`
+  const where = route.mode === 'inspector' ? (route.trace ? 'Inspector › Verification path' : `Inspector › ${TAB_NAMES[route.tab ?? 'overview']}`)
     : route.mode === 'metamodel' ? 'Metamodel' : view
-  const id = route.el ?? route.focus
+  const id = route.trace ?? route.el ?? route.focus
   const node = id ? s.c4Nodes[id] : undefined
   const def = node ? s.metamodel?.nodeTypes[node.type] : undefined
   return { hash, where, mode: MODE_NAMES[route.mode], ...(node ? { element: { label: node.label, type: def?.label ?? node.type, color: def?.color } } : {}), at }

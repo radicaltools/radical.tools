@@ -19,6 +19,7 @@ import { FolderModel } from './folderModel'
 import { drawnSize } from '@radical/layout/geometry'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, type C4Node } from '@radical/common/c4'
 import { documentMetamodel } from '@radical/common/model'
+import { serializeTestResults } from '@radical/common/check'
 import { TIDY_BUDGET, costRows, formatPart, runTidyLayout } from '@radical/layout/tidy'
 import { viewLayoutInput } from '@radical/layout/viewInput'
 
@@ -1290,5 +1291,56 @@ describe('test bindings', () => {
     expect((await model.call('update_node', { id: 's-pay', properties: { then: 'paid and receipted' } })).ok).toBe(true)
     expect((await model.call('get_changes', { since: 'HEAD' })).text).toContain('    tests (.radical/radical.json): \n      tests/pay.test.ts › pays\n      tests/pay.test.ts › declines')
     expect((await model.call('set_verification', { id: 's-pay', remove: true })).text).toBe('Took scenario "Pays" (s-pay) out of .radical/radical.json.')
+  })
+})
+
+describe('verification path', () => {
+  it('get_trace goes from a requirement to its need and to every test, with why a test failed', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'radical-mcp-trace-'))
+    folders.push(root)
+    const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
+      ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
+    const folder = join(root, '.radical', 'model')
+    const files = serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes: [
+      node('need', 'need', 'Brief'),
+      node('pay', 'requirement', 'Pay', { ears_type: 'ubiquitous', action: 'The API shall take payments' }),
+      node('s-red', 'scenario', 'Refunds', { given: 'g', when: 'w', then: 't' }),
+      node('s-green', 'scenario', 'Pays', { given: 'g', when: 'w', then: 't' }),
+    ], relations: [
+      { id: 'd', relationType: 'derives', sourceId: 'pay', targetId: 'need' },
+      { id: 'v1', relationType: 'verifies', sourceId: 's-red', targetId: 'pay' },
+      { id: 'v2', relationType: 'verifies', sourceId: 's-green', targetId: 'pay' },
+    ] }, 'shop')
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    await writeFile(join(root, '.radical', 'radical.json'), JSON.stringify({ verifies: [
+      { element: 's-red', name: 'Refunds', tests: ['tests/pay.test.ts › refunds'] },
+      { element: 's-green', name: 'Pays', tests: ['tests/pay.test.ts › pays'] },
+    ] }))
+    const model = await FolderModel.open(folder)
+    // Without results: the path, and how to get them.
+    const bare = (await model.call('get_trace', { id: 'pay' })).text
+    expect(bare).toMatch(/^No test results beside the model: run radical check/)
+    expect(bare).toContain('  ▶ Requirement: Pay [pay] — no results')
+
+    await writeEditorStateFile(folder, '.state/test-results.json', serializeTestResults([
+      { file: `${root}/tests/pay.test.ts`, title: ['pays'], status: 'passed', durationMs: 3 },
+      { file: `${root}/tests/pay.test.ts`, title: ['refunds'], status: 'failed', message: 'AssertionError: expected 0 to be 10', durationMs: 7, line: 12 },
+    ], ['r.json']))
+    const text = (await model.call('get_trace', { id: 'pay' })).text
+    expect(text).toMatch(/^Test results read .* ago \(2 test cases\)\./)
+    expect(text.split('\n').slice(1).join('\n')).toBe([
+      'Verification path of Pay [pay]',
+      '- Need: Brief [need] — broken',
+      '  ▶ Requirement: Pay [pay] — broken',
+      '    - Scenario: Refunds [s-red] — failed',
+      '        · tests/pay.test.ts › refunds — failed',
+      '            AssertionError: expected 0 to be 10',
+      '    - Scenario: Pays [s-green] — passed',
+      '        · tests/pay.test.ts › pays — passed',
+    ].join('\n'))
+    expect(await model.call('get_trace', { id: 'gone' })).toMatchObject({ ok: false, text: 'get_trace: no element gone in the model' })
   })
 })

@@ -28,7 +28,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel, originOf, ownModel } from '@radical/common/model'
 import { REPOSITORY_FILE, builtIn, parseRepositoryFile, serializeRepositoryFile, testsBoundTo, type RepositoryFile } from '@radical/common/repositoryMapping'
-import { conditionsOf, verifiedHere, withBoundTests, type CheckModel } from '@radical/common/check'
+import { MEASUREMENTS_FILE, TEST_RESULTS_FILE, computeEvidence, conditionsOf, formatAge, formatTrace, parseMeasurementStore, parseTestResults, testsRanAt, traceOf, verifiedHere, withBoundTests, type CheckModel } from '@radical/common/check'
 import { mappingRoot } from '@radical/node-files/repositoryLayout'
 import { FEDERATION_FILE, parseFederationFile, withOtherModels } from '@radical/common/federation'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
@@ -39,7 +39,7 @@ import { ASSAY_TOOL_DEFS, ASSAY_TOOLS, Assay, type AssayResult } from './assay'
  *  focus_node drive the canvas, and reset_diagram is too destructive for an
  *  external client. */
 const EXCLUDED_TOOLS = new Set(['set_active_view', 'focus_node', 'reset_diagram'])
-const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'get_changes', 'get_implementation', 'get_verification', 'search_model', 'list_milestones', 'compare_milestones'])
+const READ_ONLY = new Set(['get_model_summary', 'get_selection', 'get_issues', 'get_changes', 'get_implementation', 'get_verification', 'get_trace', 'search_model', 'list_milestones', 'compare_milestones'])
 
 const SERVER_TOOL_DEFS: ToolDef[] = [
   {
@@ -104,6 +104,16 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
     inputSchema: {
       type: 'object',
       properties: { id: { type: 'string', description: 'The scenario or fitness function (an id or a tempId). Omit it for every entry.' } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_trace',
+    description: 'The verification path of one element (a need, requirement, scenario, ADR or fitness function), as the Inspector\'s Verification path panel draws it: every path through it from its need or ADR down to the tests and metric conditions that check it, failing branches first, each element with its status and each test with its outcome and, when it failed, the message the test report holds; a fitness function measured for each element its ADR constrains lists each such element. It reads the test results and measurements the last radical check kept beside the model (.state/), and says how old they are. Call it to find why a requirement or ADR is not verified, or what a failing test takes down. It changes nothing.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'The element (an id or a tempId).' } },
+      required: ['id'],
       additionalProperties: false,
     },
   },
@@ -521,6 +531,37 @@ export class FolderModel {
 
   /** The canvas selection Studio wrote into the folder, resolved against
    *  the model as it is now. */
+  /** get_trace: every verification path through one element, from the
+   *  test results and measurements kept beside the model. */
+  private async trace(input: unknown, data: DiagramData): Promise<CallOutcome> {
+    const { id } = (input ?? {}) as { id?: unknown }
+    if (typeof id !== 'string' || !id.trim()) return { ok: false, text: 'get_trace: id must be an element\'s id' }
+    const nodeId = this.tempIds.get(id) ?? id
+    if (!data.nodes.some((n) => n.id === nodeId)) return { ok: false, text: `get_trace: no element ${id} in the model` }
+    let verifies: RepositoryFile['verifies'] = []
+    try {
+      const text = await readFile(join(await mappingRoot(this.folder), REPOSITORY_FILE), 'utf8').catch((error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return null
+        throw error
+      })
+      if (text !== null) verifies = parseRepositoryFile(text).verifies
+    } catch (error) {
+      return { ok: false, text: `get_trace: ${(error as Error).message}` }
+    }
+    const results = parseTestResults(await readEditorStateFile(this.folder, TEST_RESULTS_FILE) ?? '')
+    const measurementsText = await readEditorStateFile(this.folder, MEASUREMENTS_FILE)
+    const measurements = measurementsText ? parseMeasurementStore(measurementsText) : undefined
+    const nodes = Object.fromEntries(withBoundTests(data.nodes, verifies).map((n) => [n.id, n]))
+    const relations = Object.fromEntries(data.relations.map((r) => [r.id, r]))
+    const evidence = results || measurements
+      ? computeEvidence({ nodes, relations, metamodel: documentMetamodel(data.metamodel, data.nodes), ...(results ? { tests: results.cases } : {}), ...(measurements ? { measurements } : {}) })
+      : null
+    const head = results
+      ? `Test results read ${formatAge(Math.max(0, Date.now() - Date.parse(testsRanAt(results))))} ago (${results.cases.length} test cases)${measurements ? `, ${measurements.length} measurements` : ''}.`
+      : 'No test results beside the model: run radical check <folder> --report <reports> (or --from-ci) for the outcomes.'
+    return { ok: true, text: `${head}\n${formatTrace(traceOf({ nodes, relations, evidence, cases: results?.cases }, nodeId), nodes)}` }
+  }
+
   /** get_verification and set_verification: the tests the repository's
    *  .radical/radical.json binds (ADR Tests are bound outside the model). */
   private async verification(name: string, input: unknown, data: DiagramData): Promise<CallOutcome> {
@@ -736,6 +777,7 @@ export class FolderModel {
       if (name === 'get_selection') return { ok: true, text: await this.selection(facade) }
       if (name === 'get_implementation' || name === 'set_implementation') return await this.implementation(name, input, data)
       if (name === 'get_verification' || name === 'set_verification') return await this.verification(name, input, data)
+      if (name === 'get_trace') return await this.trace(input, data)
       if (name === 'get_changes') {
         const { since } = (input ?? {}) as { since?: unknown }
         if (since !== undefined && typeof since !== 'string') return { ok: false, text: 'get_changes: since must be a git branch, tag or commit' }

@@ -3519,6 +3519,27 @@
       "apps/mcp/src/assayDomain.test.ts › Radical Assay over MCP: the domain, processes and lifecycles › tells Studio where the run stands, its stages inferred from the calls",
       "apps/studio/tests/followAgent.test.ts › follow the agent › follows an agent's Assay run as its Forge run, and stops once neither goes on",
       "apps/e2e/tests/studio/folders.spec.ts › an agent's Assay run on the folder shows an Assay button that pulses and opens read only"
+    ] },
+    { "element": "af9b5707-54fd-4b31-8087-4dcd69925913", "name": "Path from a requirement to a failing test", "tests": [
+      "apps/e2e/tests/studio/tracePath.spec.ts › the verification path goes from a requirement to its need and to the test that fails it",
+      "apps/studio/tests/tracePanel.test.ts"
+    ] },
+    { "element": "9c2382c1-20b5-414e-9e3f-2c062d29c048", "name": "Path from an ADR to its measurements", "tests": [
+      "packages/common/tests/checkTrace.test.ts"
+    ] },
+    { "element": "9a061ac3-f35c-4e21-b688-0beaf8ffd012", "name": "Why a test failed, from each report", "tests": [
+      "packages/common/tests/checkReports.test.ts › test reports › keeps why a test failed, how long it ran and its line, from each report",
+      "packages/common/tests/checkReports.test.ts › test reports › cuts a long failure message to its first lines"
+    ] },
+    { "element": "a26ae694-80ba-4513-9abd-113e73aca870", "name": "Path over MCP and the CLI", "tests": [
+      "apps/mcp/src/folderModel.test.ts › verification path › get_trace goes from a requirement to its need and to every test, with why a test failed",
+      "apps/cli/src/cli.test.ts › radical check › prints the verification path of an element with --trace, from the reports or the results kept"
+    ] },
+    { "element": "31dd713e-0b54-407c-b58b-c610569d7759", "name": "Path from the properties card", "tests": [
+      "apps/e2e/tests/studio/tracePath.spec.ts › the properties card in Viewer opens the verification path in the Inspector"
+    ] },
+    { "element": "5460d9dd-e1ed-4b41-ac58-d486eccd0f25", "name": "Verification on the card everywhere", "tests": [
+      "apps/e2e/tests/studio/cardVerification.spec.ts › the card says in every perspective what the check says of the element, and the Inspector opens the same card"
     ] }
   ]
 }

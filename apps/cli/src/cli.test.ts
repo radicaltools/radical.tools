@@ -226,6 +226,46 @@ describe('radical check', () => {
     expect(bad.err).toContain('bad.json is no radical-metrics/1 file')
   })
 
+  it('prints the verification path of an element with --trace, from the reports or the results kept', async () => {
+    const cwd = await workspace({
+      nodes: [
+        node('need', 'need', 'Brief'),
+        node('req', 'requirement', 'Pay', { action: 'take the payment' }),
+        node('red', 'scenario', 'Refunding', { given: 'g', when: 'w', then: 't', metrics: 'test(src/pay.test.ts › refunds) passed' }),
+        node('green', 'scenario', 'Paying', { given: 'g', when: 'w', then: 't', metrics: 'test(src/pay.test.ts › pays) passed' }),
+      ],
+      relations: [
+        { id: 'd', relationType: 'derives', sourceId: 'req', targetId: 'need' },
+        { id: 'v1', relationType: 'verifies', sourceId: 'red', targetId: 'req' },
+        { id: 'v2', relationType: 'verifies', sourceId: 'green', targetId: 'req' },
+      ],
+    })
+    await writeFile(join(cwd, 'r.json'), JSON.stringify({ testResults: [{ name: `${cwd}/src/pay.test.ts`, assertionResults: [
+      { ancestorTitles: [], title: 'pays', status: 'passed', duration: 2 },
+      { ancestorTitles: [], title: 'refunds', status: 'failed', duration: 5, failureMessages: ['AssertionError: expected 0 to be 10'] },
+    ] }] }))
+    const expected = [
+      'Verification path of Pay [req]',
+      '- Need: Brief [need] — broken',
+      '  ▶ Requirement: Pay [req] — broken',
+      '    - Scenario: Refunding [red] — failed',
+      '        · src/pay.test.ts › refunds — failed',
+      '            AssertionError: expected 0 to be 10',
+      '    - Scenario: Paying [green] — passed',
+      '        · src/pay.test.ts › pays — passed',
+    ].join('\n')
+    const withReport = await run(cwd, 'check', 'model', '--report', 'r.json', '--trace', 'req')
+    expect(withReport).toMatchObject({ code: 0, err: '' })
+    expect(withReport.out.trim()).toBe(expected)
+    // Without --report: the results the check above kept beside the model.
+    expect((await run(cwd, 'check', 'model', '--trace', 'req')).out.trim()).toBe(expected)
+    const json = JSON.parse((await run(cwd, 'check', 'model', '--trace', 'red', '--format', 'json')).out)
+    expect(json.roots[0]).toMatchObject({ id: 'need', children: [{ id: 'req', children: [{ id: 'red', target: true, results: [{ outcome: 'failed', cases: [{ message: 'AssertionError: expected 0 to be 10' }] }] }] }] })
+    const unknown = await run(cwd, 'check', 'model', '--trace', 'nope')
+    expect(unknown.code).toBe(2)
+    expect(unknown.err).toContain('radical check --trace: no element nope in model.')
+  })
+
   it('exits 2 on a report it cannot read, or evidence without a report', async () => {
     const cwd = await workspace()
     await writeFile(join(cwd, 'bad.json'), '{"stats":{}}')

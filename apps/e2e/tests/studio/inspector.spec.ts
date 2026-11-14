@@ -80,10 +80,11 @@ test('the Inspector shows what radical check says, and its links lead to the ele
 
   // What the failure leaves unverified is a link to the element.
   await error.locator('.insp-chain').getByRole('button', { name: /Take card payments/ }).click()
-  const peek = page.getByRole('complementary', { name: 'Element' })
-  await expect(peek.locator('h3')).toHaveText('Take card payments')
-  await expect(peek).toContainText('broken')
-  await expect(peek.locator('.insp-peek-sec').filter({ hasText: 'Checked by' })).toContainText('Paying by card')
+  const peek = page.getByRole('complementary', { name: 'Properties' })
+  await expect(peek.locator('.pp-title')).toHaveText('Take card payments')
+  const verification = peek.getByRole('region', { name: 'Verification' })
+  await expect(verification).toContainText('broken')
+  await expect(verification.getByRole('group', { name: 'Checked by' })).toContainText('Paying by card')
 
   // From there to Designer, on the canvas that shows it, selected.
   await peek.getByRole('button', { name: /^Show on canvas/ }).click()
@@ -170,8 +171,8 @@ test('the Inspector opens on Overview with what needs attention, and each findin
   await undecided.locator('summary').click()
   await expect(undecided.getByRole('button', { name: 'Add fitness function' })).toBeVisible()
   await undecided.getByRole('button', { name: 'Open Card payments only' }).click()
-  const peek = page.getByRole('complementary', { name: 'Element' })
-  await expect(peek.locator('h3')).toHaveText('Card payments only')
+  const peek = page.getByRole('complementary', { name: 'Properties' })
+  await expect(peek.locator('.pp-title')).toHaveText('Card payments only')
   await expect(peek.getByRole('button', { name: /^Show on canvas/ })).toBeVisible()
 
   // Add scenario: the scenario's wizard, the requirement offered as what it verifies.
@@ -182,7 +183,7 @@ test('the Inspector opens on Overview with what needs attention, and each findin
   await wizard.getByRole('textbox').first().fill('Refunding a payment')
   await wizard.getByRole('button', { name: 'Create' }).first().click()
   await expect(wizard).toBeHidden()
-  await expect(peek.locator('h3')).toHaveText('Refunding a payment')
+  await expect(peek.locator('.pp-title')).toHaveText('Refunding a payment')
   // Nothing is left without a scenario; the new one stands beside the requirement.
   await expect(missing).toHaveCount(0, { timeout: 10_000 })
   await peek.getByRole('button', { name: /^Show on canvas/ }).click()
@@ -298,7 +299,7 @@ test('the Overview tells an ADR without a fitness function from one whose fitnes
   // After the rule groups.
   await expect(attention.locator('details.insp-group').last()).toHaveAttribute('data-rule', 'not-run')
   await nightly.getByRole('button', { name: 'Open Open time' }).click()
-  await expect(page.getByRole('complementary', { name: 'Element' }).locator('h3')).toHaveText('Open time')
+  await expect(page.getByRole('complementary', { name: 'Properties' }).locator('.pp-title')).toHaveText('Open time')
 
   // The Measurements chip: what waits for a measurement, and how to measure here.
   const measured = page.locator('.insp-head .insp-age', { hasText: /measurements/i })
@@ -348,11 +349,12 @@ test('the Inspector shows each condition with its measurement', async ({ page, s
   await expect(item).toContainText('a value is off its threshold, nothing measured a value')
   await item.getByRole('button', { name: /Checkout latency/ }).click()
 
-  const checks = page.getByRole('complementary', { name: 'Element' }).locator('.insp-peek-sec').filter({ hasText: 'Checks (2)' })
-  const lines = checks.locator('.insp-test')
+  const checks = page.getByRole('complementary', { name: 'Properties' }).getByRole('list', { name: 'Checks' })
+  const lines = checks.locator('.pp-ver-cond')
+  await expect(lines).toHaveCount(2)
   await expect(lines.nth(0)).toContainText('checkout.latency.p95{env=staging} <= 300 ms')
   await expect(lines.nth(0)).toContainText('failed')
-  await expect(lines.nth(0).locator('.insp-measured')).toHaveText('0.42 s · json · 2 h ago')
+  await expect(lines.nth(0).locator('.pp-ver-measured')).toHaveText('0.42 s · json · 2 h ago')
   await expect(lines.nth(1)).toContainText('checkout.errors.rate{env=staging} < 1 %')
   await expect(lines.nth(1)).toContainText('not measured')
 
@@ -363,7 +365,7 @@ test('the Inspector shows each condition with its measurement', async ({ page, s
     { metric: 'checkout.latency.p95', value: 210, unit: 'ms', labels: { env: 'staging' }, source: 'json', at: now },
   ]))
   await expect(page.locator('.insp-error')).toHaveCount(0, { timeout: 10_000 })
-  await expect(lines.nth(0).locator('.insp-measured')).toHaveText('210 ms · json · 0 min ago')
+  await expect(lines.nth(0).locator('.pp-ver-measured')).toHaveText('210 ms · json · 0 min ago')
   await expect(lines.nth(1)).not.toContainText('not measured')
 })
 

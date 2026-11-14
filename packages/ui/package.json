@@ -13,6 +13,7 @@
     "./store/userCamera": "./src/store/userCamera.ts",
     "./store/viewCameras": "./src/store/viewCameras.ts",
     "./store/showInView": "./src/store/showInView.ts",
+    "./store/verification": "./src/store/verification.ts",
     "./components/Canvas": "./src/components/Canvas.tsx",
     "./components/LargeCanvasNotice": "./src/components/LargeCanvasNotice.tsx",
     "./components/WikiView": "./src/components/WikiView.tsx",
