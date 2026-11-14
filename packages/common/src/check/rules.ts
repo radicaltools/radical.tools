@@ -11,7 +11,7 @@ import type { C4Node, C4Relation } from '../c4'
 import { originOf } from '../model'
 import { builtIn } from '../repositoryMapping'
 import { composeEarsSentence, requirementStatePhrase, validateModel, type Metamodel } from '../metamodel'
-import { BOUND_TESTS, conditionResults, conditionsOf, elementConditions, linkedNodes, measuredElements, testIdsOf, testOutcomes, TESTED_TYPES, type ConditionOutcome, type ConditionResult, type TestOutcome } from './evidence'
+import { BOUND_TESTS, relationsOf, conditionResults, conditionsOf, elementConditions, linkedNodes, measuredElements, testIdsOf, testOutcomes, TESTED_TYPES, type ConditionOutcome, type ConditionResult, type TestOutcome } from './evidence'
 import { formatAge, parseCombine, parseConditions, parseMaxAge, type Measurement } from './metrics'
 import { SENSOR_NAMES, isSensorName, parseMeasure } from './sensors'
 import { findTests, globMatch, type TestCase } from './reports'
@@ -20,6 +20,7 @@ import { concernStatuses, holdsConcerns, questionLine, unboundDecisions, type Co
 import { REFUSAL, SUPERSEDED, answerBlocks, answerKey, currentNeedText, exampleSentences, fragmentWords, needAnswers, needParts, oppositeOrder, plainWords, quoteFound, quoteFragments, readLimits, readOrders, readRoundings, readValues, saysValueOf, wordsAt, type Limit, type Op, type ValueReading } from './words'
 
 export { hardValues, needAnswers, needParts, quoteFragments, readValues } from './words'
+export { relationsOf } from './evidence'
 
 export type CheckSeverity = 'error' | 'warning'
 
@@ -136,18 +137,27 @@ export const prop = (node: C4Node, key: string): string => {
 }
 
 /** Relations of `type` ending (in) or starting (out) at each node. */
-function linked(model: CheckModel, type: string, end: 'in' | 'out'): Map<string, C4Relation[]> {
-  const map = new Map<string, C4Relation[]>()
-  for (const r of Object.values(model.relations)) {
-    if (r.relationType !== type) continue
-    const id = end === 'in' ? r.targetId : r.sourceId
-    map.set(id, [...(map.get(id) ?? []), r])
-  }
-  return map
-}
+const linked = (model: CheckModel, type: string, end: 'in' | 'out'): ReadonlyMap<string, C4Relation[]> =>
+  end === 'in' ? relationsOf(model, type).to : relationsOf(model, type).from
 
-export const nodesOf = (model: CheckModel, type: string): C4Node[] =>
-  model.metamodel.nodeTypes[type] ? Object.values(model.nodes).filter((n) => n.type === type) : []
+const NODES_BY_TYPE = new WeakMap<object, Map<string, C4Node[]>>()
+const NO_NODES: C4Node[] = []
+
+/** The nodes of `type`, in the model's order: grouped once for a model's
+ *  nodes, as every rule asks for one type or another. Read only. */
+export const nodesOf = (model: Pick<CheckModel, 'nodes' | 'metamodel'>, type: string): C4Node[] => {
+  if (!model.metamodel.nodeTypes[type]) return NO_NODES
+  let byType = NODES_BY_TYPE.get(model.nodes)
+  if (!byType) {
+    byType = new Map()
+    for (const n of Object.values(model.nodes)) {
+      const list = byType.get(n.type)
+      if (list) list.push(n); else byType.set(n.type, [n])
+    }
+    NODES_BY_TYPE.set(model.nodes, byType)
+  }
+  return byType.get(type) ?? NO_NODES
+}
 
 const hasRelationType = (model: CheckModel, type: string): boolean =>
   !!model.metamodel.relationTypes[type]
@@ -323,26 +333,6 @@ function invalidChecks(model: CheckModel): RuleFinding[] {
 // (ADR Agents check requirements against the person's words; the reading of
 // the words is in words.ts)
 
-type RelationIndex = { from: Map<string, C4Relation[]>; to: Map<string, C4Relation[]> }
-const RELATION_INDEX = new WeakMap<object, Map<string, RelationIndex>>()
-
-/** The relations of one type by their source and by their target, built once
- *  for a model's relations (rules that walk them per element stay linear). */
-export function relationsOf(model: Pick<CheckModel, 'relations'>, type: string): RelationIndex {
-  let byType = RELATION_INDEX.get(model.relations)
-  if (!byType) { byType = new Map(); RELATION_INDEX.set(model.relations, byType) }
-  let index = byType.get(type)
-  if (!index) {
-    index = { from: new Map(), to: new Map() }
-    for (const r of Object.values(model.relations)) {
-      if (r.relationType !== type) continue
-      const from = index.from.get(r.sourceId); if (from) from.push(r); else index.from.set(r.sourceId, [r])
-      const to = index.to.get(r.targetId); if (to) to.push(r); else index.to.set(r.targetId, [r])
-    }
-    byType.set(type, index)
-  }
-  return index
-}
 
 const READINGS = new Map<string, ValueReading>()
 /** A text's values, read once. */
@@ -755,7 +745,7 @@ export const CHECK_RULES: CheckRule[] = [
       ? unlinked(model, 'adr', 'implements', 'in', ['fitness-fn'])
         .filter((n) => prop(n, 'status') === 'accepted')
         // A waiver says why another model's decision does not apply: nothing to check.
-        .filter((n) => !Object.values(model.relations).some((r) => r.relationType === 'waives' && r.sourceId === n.id))
+        .filter((n) => !relationsOf(model, 'waives').from.has(n.id))
         .map((n) => ({ nodeId: n.id, message: `No fitness function implements accepted ADR ${quote(n)}.` }))
       : [],
   },

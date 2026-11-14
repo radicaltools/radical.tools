@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { migrateChecks } from '@radical/common/formats/checksMigration'
-import { current, isDraft, produce } from 'immer'
+import { castDraft, current, isDraft, original, produce } from 'immer'
 import { immer } from 'zustand/middleware/immer'
 import {
   Node,
@@ -104,7 +104,7 @@ import { isViewerProfile } from '../runtime'
 import { loadStudioSettings, updateStudioSettings } from '../studioSettings'
 import { lowDetailAt } from './canvasDetail'
 import { viewCameras } from './viewCameras'
-import { CANVAS_MAX_ELEMENTS, type EdgeStyle, type ViewPipeline, addToViewList, isBackwardStep, isInViewFolder, keepOtherModelsPlaces, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
+import { CANVAS_MAX_ELEMENTS, notePlacesOnly, type EdgeStyle, type ViewPipeline, addToViewList, isBackwardStep, isInViewFolder, keepOtherModelsPlaces, removeFromViewList, viewCanvasPositions, viewFolderRenameTarget, viewShowsEveryNode, wikiDepthOf, trimStepBackward, withCanvasPositions } from '@radical/common/c4'
 
 // ─── Smart Layout "why this layout" report ───────────────────────────────────
 //
@@ -2827,6 +2827,7 @@ function deriveRFEdges(
   const rfEdges: Edge<C4EdgeRFData>[] = []
   // Track virtual edges already emitted to avoid duplicates
   const seen = new Set<string>()
+  const virtualEdges = new Map<string, Edge<C4EdgeRFData>>()
 
   // Depth-based zIndex — mirrors deriveRFNodes so edges always render above
   // their parent group nodes and are reachable by pointer events.
@@ -2845,12 +2846,21 @@ function deriveRFEdges(
   const typeNameOf = (rel: C4Relation, type: string) => relationTypeName(metamodel, type, true, nodes[rel.sourceId] && nodes[rel.targetId] ? { from: nodes[rel.sourceId].type, to: nodes[rel.targetId].type } : undefined)
   const shownTypeName = (rel: C4Relation) => rel.relationType && rel.relationType !== 'transition' ? typeNameOf(rel, rel.relationType) : undefined
 
+  // Where each element is drawn, worked out once for it rather than for
+  // each relation it has: 40,000 relations at each letter typed on a large model.
+  const visibleAt = new Map<string, string>()
+  const visibleOf = (id: string): string => {
+    let at = visibleAt.get(id)
+    if (at === undefined) visibleAt.set(id, at = getViewVisibleAncestor(id, nodes, viewFilter, viewCollapsedSet, expandedSet))
+    return at
+  }
+
   for (const rel of Object.values(relations)) {
     if (!nodes[rel.sourceId] || !nodes[rel.targetId]) continue
     if (hiddenRelationIds && hiddenRelationIds.has(rel.id)) continue
 
-    const visSource = getViewVisibleAncestor(rel.sourceId, nodes, viewFilter, viewCollapsedSet, expandedSet)
-    const visTarget = getViewVisibleAncestor(rel.targetId, nodes, viewFilter, viewCollapsedSet, expandedSet)
+    const visSource = visibleOf(rel.sourceId)
+    const visTarget = visibleOf(rel.targetId)
 
     if (visSource === visTarget) continue // collapsed to same ancestor → self-loop, skip
 
@@ -2876,7 +2886,7 @@ function deriveRFEdges(
     // all). Relations rolled up onto a collapsed container share one edge,
     // whose label lists them all.
     if (isVirtual && seen.has(key)) {
-      const existing = rfEdges.find((e) => e.id === `virtual-${key}`)
+      const existing = virtualEdges.get(key)
       existing?.data?.relationIds?.push(rel.id)
       // A technology only when they all use it: the first one's alone
       // read as the whole line's.
@@ -2901,7 +2911,7 @@ function deriveRFEdges(
     const tgtDepth = depthOf(visTarget)
     const edgeZIndex = Math.max(srcDepth, tgtDepth) * 10 + 5
 
-    rfEdges.push({
+    const edge: Edge<C4EdgeRFData> = {
       id: isVirtual ? `virtual-${key}` : rel.id,
       source: visSource,
       target: visTarget,
@@ -2921,7 +2931,9 @@ function deriveRFEdges(
         isVirtual,
         ...(isVirtual ? { relationIds: [rel.id] } : {}),
       },
-    })
+    }
+    rfEdges.push(edge)
+    if (isVirtual) virtualEdges.set(key, edge)
   }
 
   // Steps that follow each other: an arrow from each to the next, both shown
@@ -3872,14 +3884,12 @@ function geometryOf(nodes: Record<string, C4Node>, ids: Iterable<string>): Recor
  *  the live layout's frames do: no rebuild of the canvas per frame. Mutates
  *  `state` (inside immer set). */
 function patchGeometry(state: DiagramStore, positions: Record<string, Geometry>): void {
-  for (const [id, pos] of Object.entries(positions)) {
-    const node = state.c4Nodes[id]
-    if (!node) continue
-    node.x = pos.x
-    node.y = pos.y
-    if (pos.width != null) node.width = pos.width
-    if (pos.height != null) node.height = pos.height
-  }
+  // The elements as the store has them (frozen; no step before this one in
+  // the same update changes them): replaced rather than changed in the draft, which copied and walked every element of the
+  // model each frame (immer's finalize), 21,000 of them in a large model.
+  const nodes = (isDraft(state.c4Nodes) ? original(state.c4Nodes) : state.c4Nodes) as Record<string, C4Node>
+  const next = placedNodes(nodes, positions)
+  if (next !== nodes) state.c4Nodes = castDraft(next)
   for (const rfNode of state.rfNodes) {
     const pos = positions[rfNode.id]
     if (!pos) continue
@@ -3902,6 +3912,26 @@ function patchGeometry(state: DiagramStore, positions: Record<string, Geometry>)
       ;(rfNode.style as any).height = pos.height
     }
   }
+}
+
+/** `nodes` with the elements of `positions` moved or resized there: a new
+ *  frozen record, noted as changed only in places (notePlacesOnly), or
+ *  `nodes` when it already has them there. */
+export function placedNodes(nodes: Record<string, C4Node>, positions: Record<string, Geometry>): Record<string, C4Node> {
+  let next: Record<string, C4Node> | null = null
+  for (const [id, pos] of Object.entries(positions)) {
+    const node = nodes[id]
+    if (!node) continue
+    const width = pos.width ?? node.width
+    const height = pos.height ?? node.height
+    if (node.x === pos.x && node.y === pos.y && node.width === width && node.height === height) continue
+    next ??= { ...nodes }
+    next[id] = Object.freeze({ ...node, x: pos.x, y: pos.y, width, height })
+  }
+  if (!next) return nodes
+  Object.freeze(next)
+  notePlacesOnly(nodes, next)
+  return next
 }
 
 /** The glide under way: from where the elements were to where the layout put them. */
@@ -4620,7 +4650,7 @@ export const useDiagramStore = create<DiagramStore>()(
             : undefined
           // Lines end only at elements the view shows, not at its frames.
           const lineEnds = filter && frames.size ? new Set([...filter].filter((id) => !frames.has(id))) : filter
-          const derivedEdges = deriveRFEdges(drawnNodes, mergedRels, lineEnds, vcs, hiddenRels, expandedSet, state.metamodel as Metamodel | undefined)
+          const derivedEdges = deriveRFEdges(drawnNodes, mergedRels, lineEnds, vcs, hiddenRels, expandedSet, s0.metamodel as Metamodel | undefined)
           // The exploration's containment lines: a child and its parent on
           // the next level, joined (it draws them apart). Not relations of
           // the model: drawn only.

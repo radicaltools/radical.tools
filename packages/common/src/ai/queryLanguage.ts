@@ -87,6 +87,10 @@ export interface ModelQueryContext {
   sequences?: Record<string, DiagramSequence>
   /** For FIND: the property names a prefix may use. */
   metamodel?: Metamodel
+  /** LIST NODES and LIST RELATIONS without a LIMIT give their rows in the
+   *  model's order, for a caller that orders them itself (the Inspector's
+   *  concern packs, 33 queries at each check). */
+  unordered?: boolean
 }
 
 export interface ModelQueryResult {
@@ -653,11 +657,10 @@ function runFullQuery(raw: string, ctx: ModelQueryContext): ModelQueryResult {
 
   const listNodes = parseListQuery(raw, 'NODES')
   if (listNodes) {
-    const rows = applyWhere(
-      Object.values(ctx.nodes).sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id)),
-      listNodes.expr,
-      getNodeField,
-    )
+    // Filtered, then sorted: the order is total (ids break ties), and a
+    // model of 21,000 elements took 40 ms to sort for each query.
+    const rows = applyWhere(Object.values(ctx.nodes), listNodes.expr, getNodeField)
+    if (!ctx.unordered || listNodes.limit) rows.sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id))
     const limited = listNodes.limit ? rows.slice(0, listNodes.limit) : rows
     return {
       query: raw,
@@ -668,11 +671,8 @@ function runFullQuery(raw: string, ctx: ModelQueryContext): ModelQueryResult {
 
   const listRelations = parseListQuery(raw, 'RELATIONS')
   if (listRelations) {
-    const rows = applyWhere(
-      relations.slice().sort((a, b) => a.id.localeCompare(b.id)),
-      listRelations.expr,
-      (rel, field) => getRelationField(rel, field, ctx.nodes),
-    )
+    const rows = applyWhere(relations, listRelations.expr, (rel, field) => getRelationField(rel, field, ctx.nodes))
+    if (!ctx.unordered || listRelations.limit) rows.sort((a, b) => a.id.localeCompare(b.id))
     const limited = listRelations.limit ? rows.slice(0, listRelations.limit) : rows
     return {
       query: raw,

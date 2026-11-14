@@ -72,6 +72,10 @@ export function CollapseToggleMirror(): React.ReactElement | null {
   useLayoutEffect(() => {
     if (!domNode || !zoom) return
     const out: Toggle[] = []
+    // Read all, then write: marking a button between two reads made the
+    // browser lay the page out again for each one (250 ms for a click on a
+    // view of 500 elements).
+    const unmarked: HTMLElement[] = []
     for (const button of domNode.querySelectorAll<HTMLElement>('.react-flow__node :is(.c4-node-collapse-btn, .explore-more)')) {
       const nodeEl = button.closest<HTMLElement>('.react-flow__node')
       const id = nodeEl?.dataset.id
@@ -82,7 +86,7 @@ export function CollapseToggleMirror(): React.ReactElement | null {
       // The copy is what shows: the button under it, a fraction of a pixel
       // off, read as a shadow through the copy's see-through background. It
       // stays where it is to be clicked (opacity leaves its colours to read).
-      button.dataset.mirrored = ''
+      if (button.dataset.mirrored === undefined) unmarked.push(button)
       const cs = getComputedStyle(button)
       out.push({
         key: `${id} ${out.filter((t) => t.id === id).length}`,
@@ -103,6 +107,7 @@ export function CollapseToggleMirror(): React.ReactElement | null {
         },
       })
     }
+    for (const button of unmarked) button.dataset.mirrored = ''
     const key = JSON.stringify(out.map((t) => [t.id, Math.round(t.dx), Math.round(t.dy), Math.round(t.width), t.glyph, t.style.color, t.style.background, t.style.fontSize]))
     if (key === last.current) return
     last.current = key

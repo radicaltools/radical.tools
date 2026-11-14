@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { parseSearch, searchFoldCount, searchModel, type SearchData } from '../src/search'
+import { parseSearch, searchFoldCount, searchModel, searchScanCount, type SearchData } from '../src/search'
 import { addChoices, buildViewIndex, modelStructure, presetViewIndex, viewIndexKey, viewShownNodes } from '../src/viewPipeline'
 import { MdFolderSession, readEach, type MdFolderStorage } from '../src/formats/mdFolderSync'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
 import type { C4Node, C4Relation, DiagramView } from '../src/c4'
+import { CHECK_RULES, computeEvidence, type CheckModel } from '../src/check'
+import type { TestCase } from '../src/check/reports'
+import { sameViewsPlacesAside } from '../src/model'
 
 // A model of 20,000 elements, shaped like radical.tools' own: needs, the
 // requirements derived from them and the scenarios verifying those, ADRs,
@@ -62,6 +65,21 @@ describe('a model of 20,000 elements', () => {
     for (const q of ['la', 'lay', 'layout', 'layout s', 'layout sta']) hits = searchModel(data, parseSearch(q, data)).hits.length
     expect(hits).toBeGreaterThan(1000)
     expect(searchFoldCount() - before).toBe(first)
+  })
+
+  it('finds, letter by letter, what a search from scratch finds, going through the model once a word', () => {
+    const typed: SearchData = { metamodel, nodes: MODEL.nodes, relations: MODEL.relations, views: {} }
+    const query = 'layout stays 1'
+    const before = searchScanCount()
+    const narrowed = [...query].map((_, i) => searchModel(typed, parseSearch(query.slice(0, i + 1), typed)).hits)
+    // The first letter, and the letter after the space (a word of its own
+    // narrows too: only its own letters are new).
+    expect(searchScanCount() - before).toBe(1)
+    for (let i = 0; i < query.length; i++) {
+      // From scratch: the same elements in another record, nothing to narrow from.
+      const fresh: SearchData = { metamodel, nodes: Object.freeze({ ...MODEL.nodes }), relations: Object.freeze({ ...MODEL.relations }), views: {} }
+      expect(narrowed[i]).toEqual(searchModel(fresh, parseSearch(query.slice(0, i + 1), fresh)).hits)
+    }
   })
 
   it('works out the + rows of a table of 1,000 rows without going through every element for each', () => {
@@ -153,6 +171,41 @@ describe('the view index', () => {
     const reversed = Object.freeze(Object.fromEntries(Object.entries(MODEL.nodes).reverse()))
     const relations = Object.freeze(Object.fromEntries(Object.entries(MODEL.relations).reverse()))
     expect(modelStructure(reversed, relations)).toBe(modelStructure(MODEL.nodes, MODEL.relations))
+  })
+})
+
+describe('checking a model of 20,000 elements', () => {
+  // How long it takes is measured at night; here, the work. Each rule went
+  // through every relation for each ADR or requirement, and through every
+  // test case for each test a scenario names: radical.tools' own model with
+  // its test results took 2.4 s to check, ×4 with its repository's mapping 20 s.
+  it('goes through the relations and the test cases a few times, not once for each element', () => {
+    let relationWalks = 0
+    const relations = new Proxy(MODEL.relations, { ownKeys(target) { relationWalks++; return Reflect.ownKeys(target) } })
+    // A scenario names a test of its file; every file has its cases.
+    const nodes: Record<string, C4Node> = {}
+    for (const [id, n] of Object.entries(MODEL.nodes)) {
+      nodes[id] = n.type === 'scenario' ? { ...n, metrics: `test(tests/${id.slice(0, 5)}.spec.ts › ${n.label}) passed` } as C4Node : n
+    }
+    const list: TestCase[] = Object.values(nodes).filter((n) => n.type === 'scenario')
+      .map((n) => ({ file: `/repo/tests/${n.id.slice(0, 5)}.spec.ts`, title: [n.label], status: 'passed' }) as TestCase)
+    let caseWalks = 0
+    const tests = new Proxy(list, { get(target, key, receiver) { if (key === 'filter') caseWalks++; return Reflect.get(target, key, receiver) } })
+    const model: CheckModel = { nodes: Object.freeze(nodes), relations, metamodel, tests }
+    for (const rule of CHECK_RULES) rule.run(model)
+    const evidence = computeEvidence(model)
+    expect(Object.values(evidence.nodes).filter((e) => e.status === 'passed').length).toBe(list.length)
+    expect(relationWalks).toBeLessThan(20)
+    expect(caseWalks).toBeLessThan(20)
+  })
+
+  it('is not checked again when a view only places or moves its elements', () => {
+    const view = { id: 'v', name: 'V', nodeIds: ['a'], positions: {} } as unknown as DiagramView
+    const views = { v: view }
+    expect(sameViewsPlacesAside(views, { v: { ...view, positions: { a: { x: 1, y: 2, width: 3, height: 4 } }, viewport: { x: 0, y: 0, zoom: 1 } } as DiagramView })).toBe(true)
+    expect(sameViewsPlacesAside(views, { v: { ...view, nodeIds: ['a', 'b'] } })).toBe(false)
+    expect(sameViewsPlacesAside(views, { v: { ...view, name: 'W' } })).toBe(false)
+    expect(sameViewsPlacesAside(views, { v: view, w: view })).toBe(false)
   })
 })
 

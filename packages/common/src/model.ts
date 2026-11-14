@@ -10,7 +10,7 @@
 // The mutating functions assume the matching check passed, and work on either
 // a plain object or an immer draft.
 
-import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type MilestoneView, type Presentation, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, holderOf, isContainerType, trimStepBackward } from './c4'
+import { type EdgeStyle, type ViewFilter, type ViewPipeline, type ChainLevel, type ChainWay, addToViewList, constraintLines, isInViewFolder, normalizeViewFolder, viewFolderRenameTarget, viewFolderTree, type ViewFolder, wikiDepthOf, pinnedNodeIds, removeFromViewList, type AlignConstraint, type C4Node, type C4Relation, type DiagramSequence, type DiagramSnapshot, type DiagramView, type MilestoneView, type Presentation, type GridConstraint, type LayoutConstraint, type NodePosition, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, holderOf, notedPlacesOnly, isContainerType, trimStepBackward } from './c4'
 import { readPipeline, viewShownNodes, withAncestors } from './viewPipeline'
 import { relationMayJoinHolder, relationRefusal, relationTypeAllows, relationTypesAccepted, type RelationContext } from './relationRules'
 import { canBeSubject, sameChain, scopedChain, subjectViewName, viewpointsOf } from './viewpoints'
@@ -121,7 +121,7 @@ const PLACE_KEYS = new Set(['x', 'y', 'width', 'height'])
  *  drawn: what reads the model and not the canvas (the Inspector's check)
  *  need not run again when the live layout moves elements every frame. */
 export function samePlacesAside(a: Record<string, C4Node>, b: Record<string, C4Node>): boolean {
-  if (a === b) return true
+  if (notedPlacesOnly(a, b)) return true
   const ids = Object.keys(b)
   if (ids.length !== Object.keys(a).length) return false
   for (const id of ids) {
@@ -131,6 +131,54 @@ export function samePlacesAside(a: Record<string, C4Node>, b: Record<string, C4N
     if (!x) return false
     for (const k in y) if (!PLACE_KEYS.has(k) && x[k] !== y[k]) return false
     for (const k in x) if (!PLACE_KEYS.has(k) && !(k in y)) return false
+  }
+  return true
+}
+
+// What an element is called and said to be, and where it is drawn: none of
+// it changes where it may go or what may go in it.
+const TEXT_KEYS = new Set(['label', 'description', 'technology', 'x', 'y', 'width', 'height'])
+
+/** Whether `b` holds the elements of `a`, in the same order, changed at most
+ *  in their names, descriptions, technologies and places: what depends on
+ *  the model's structure alone (which parents an element may move to) need
+ *  not be worked out again at each letter typed in a name. */
+export function sameNodesTextAside(a: Record<string, C4Node>, b: Record<string, C4Node>): boolean {
+  if (notedPlacesOnly(a, b)) return true
+  const ids = Object.keys(b)
+  const before = Object.keys(a)
+  if (ids.length !== before.length) return false
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i] !== before[i]) return false
+    const x = a[ids[i]] as unknown as Record<string, unknown>
+    const y = b[ids[i]] as unknown as Record<string, unknown>
+    if (x === y) continue
+    for (const k in y) if (!TEXT_KEYS.has(k) && x[k] !== y[k]) return false
+    for (const k in x) if (!TEXT_KEYS.has(k) && !(k in y)) return false
+  }
+  return true
+}
+
+// Where a view draws its elements, and where it is looked at from.
+const VIEW_PLACE_KEYS = new Set(['positions', 'viewport'])
+
+/** Whether the views `b` are the views `a`, changed at most in where they
+ *  draw their elements: opening a view places those it had no place for,
+ *  and a drag or the live layout moves them, none of which the Inspector's
+ *  check reads. */
+export function sameViewsPlacesAside(a: Record<string, DiagramView>, b: Record<string, DiagramView>): boolean {
+  if (a === b) return true
+  const ids = Object.keys(b)
+  const before = Object.keys(a)
+  if (ids.length !== before.length) return false
+  for (let i = 0; i < ids.length; i++) {
+    // In the same order: the order of the views is the list's.
+    if (ids[i] !== before[i]) return false
+    const x = a[ids[i]] as unknown as Record<string, unknown>
+    const y = b[ids[i]] as unknown as Record<string, unknown>
+    if (x === y) continue
+    for (const k in y) if (!VIEW_PLACE_KEYS.has(k) && x[k] !== y[k]) return false
+    for (const k in x) if (!VIEW_PLACE_KEYS.has(k) && !(k in y)) return false
   }
   return true
 }
