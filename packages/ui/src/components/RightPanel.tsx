@@ -51,9 +51,31 @@ function useViewNodeCounts(views: Record<string, DiagramView>): Record<string, n
   }, [views, nodes, relations])
   const [counts, setCounts] = useState(count)
   useEffect(() => {
-    const t = setTimeout(() => setCounts(count()), 300)
-    return () => clearTimeout(t)
-  }, [count])
+    // A few views at a time while the app is idle: a model of 21,000
+    // elements opened without its view index held the app 1.4 s for all.
+    const list = Object.values(views)
+    const all = Object.keys(nodes).length
+    const out: Record<string, number | undefined> = {}
+    let i = 0
+    let handle: number | undefined
+    const idleKind = typeof requestIdleCallback === 'function'
+    const idle = (run: (deadline: { timeRemaining(): number }) => void): number => idleKind
+      ? requestIdleCallback(run, { timeout: 500 })
+      : window.setTimeout(() => run({ timeRemaining: () => 10 }), 0)
+    const step = (deadline: { timeRemaining(): number }): void => {
+      do {
+        const v = list[i++]
+        if (v) out[v.id] = viewShownNodes(v, nodes, relations)?.size ?? (viewShowsEveryNode(v) ? all : undefined)
+      } while (i < list.length && deadline.timeRemaining() > 2)
+      if (i < list.length) handle = idle(step)
+      else setCounts(out)
+    }
+    const t = setTimeout(() => { handle = idle(step) }, 300)
+    return () => {
+      clearTimeout(t)
+      if (handle !== undefined) { if (idleKind) cancelIdleCallback(handle); else clearTimeout(handle) }
+    }
+  }, [count]) // eslint-disable-line react-hooks/exhaustive-deps
   return counts
 }
 
