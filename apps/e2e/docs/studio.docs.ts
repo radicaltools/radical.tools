@@ -458,6 +458,10 @@ test('inspector', async ({ page, shot }) => {
   walk(ARCHITECTURE)
   test.skip(!files['.state/test-results.json'], 'run npm run check:architecture first')
   delete files['.state/selection.json']
+  // As in the repository: the model in .radical/model, beside it the
+  // .radical/radical.json that binds the tests to its scenarios.
+  for (const rel of Object.keys(files)) { files[`.radical/model/${rel}`] = files[rel]; delete files[rel] }
+  files['.radical/radical.json'] = readFileSync(join(ARCHITECTURE, '../radical.json'), 'utf8')
 
   await page.addInitScript(() => {
     ;(window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> })
@@ -489,6 +493,16 @@ test('inspector', async ({ page, shot }) => {
   await expect(page.locator('.insp-funnel').first()).toBeVisible()
   await settle(page)
   await shot('inspector-implementation')
+
+  // The verification path of the need it was built for: need, requirements,
+  // scenarios and the tests with their results, in columns.
+  await expect(page).toHaveURL(/\/t\/implementation/)
+  await page.evaluate(() => { location.hash = `${location.hash}/tr/b77fe22f-9dc0-4e07-b355-65cb4647a412` })
+  await expect(page.getByTestId('trace-panel')).toBeVisible()
+  await expect(page.locator('.trace-line').first()).toBeAttached()
+  await settle(page)
+  await shot('inspector-path')
+  await page.getByTestId('trace-panel').getByRole('button', { name: 'Close' }).click()
 
   // Settings with one change that loosens the gate, as the bar and the row show it.
   await page.getByRole('tab', { name: /^Settings/ }).click()

@@ -11,9 +11,9 @@
 // the element's findings, from which Studio shows it on a canvas or its
 // wiki page. The check runs on the model as it is (persistence/inspector.ts).
 
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { changeWork } from '@radical/common/branchChanges'
-import { compareCheckConfig, defaultSeverity, withBoundTests } from '@radical/common/check'
+import { compareCheckConfig, defaultSeverity, testsRanAt, withBoundTests } from '@radical/common/check'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { ElementCard, type CardBranch } from '@radical/ui/components/RightPanel'
@@ -23,13 +23,14 @@ import { useBranchStore } from '../persistence/branchChanges'
 import { ThisBranch } from './inspector/ThisChange'
 import { useDocumentsStore } from '../store/documentStore'
 import { changeTotal } from './BranchChanges'
-import { Errors, OpenWikiPage, Peek, ShowOnCanvas, TabBadge, dimensionOfFinding, dimensionsOf, type Ctx } from './inspector/shared'
+import { Errors, OpenWikiPage, ShowOnCanvas, TabBadge, dimensionOfFinding, dimensionsOf, type Ctx } from './inspector/shared'
 import { OverviewTab } from './inspector/OverviewTab'
 import { ModelTab } from './inspector/ModelTab'
 import { ImplementationTab } from './inspector/ImplementationTab'
 import { SettingsTab } from './inspector/SettingsTab'
 import { FreshnessChips } from './inspector/Freshness'
 import { modelChangedAt, waitingForMeasurement } from './inspector/attention'
+import { TracePanel } from './inspector/TracePanel'
 
 type Tab = InspectorTab
 
@@ -49,6 +50,14 @@ export function Inspector(): React.ReactElement {
   const metamodel = useDiagramStore((s) => s.metamodel)
   const activeDoc = useDocumentsStore((s) => s.docs.find((d) => d.id === s.activeId) ?? null)
   const [peekId, setPeekId] = useState<string | null>(null)
+  // The verification path on screen is part of the place (the route), and
+  // the panel's Back walks the paths opened from it.
+  const traceId = useInspectorNav((s) => s.trace)
+  const setTrace = (id: string | null): void => useInspectorNav.setState({ trace: id })
+  const [traceStack, setTraceStack] = useState<string[]>([])
+  useEffect(() => {
+    setTraceStack((s) => !traceId ? [] : s[s.length - 1] === traceId ? s : s[s.length - 2] === traceId ? s.slice(0, -1) : [...s, traceId])
+  }, [traceId])
   // The verdict asks the Overview to bring Needs attention into view.
   const [attention, setAttention] = useState(0)
   // This branch opens Designer's card of an element instead.
@@ -76,6 +85,12 @@ export function Inspector(): React.ReactElement {
   if (!check) return <div className="insp"><div className="insp-main"><p className="insp-muted">Checking the model…</p></div></div>
 
   const ctx: Ctx = { nodes, metamodel, evidence: check.evidence?.nodes, peek: setPeekId }
+  const tracing = !!traceId && !!nodes[traceId] && traceStack.length > 0
+  // The element's card, as every perspective shows it: This branch's (in the
+  // route, with the branch's changes) or the one a link opened.
+  const card = !tracing && tab === 'branch' && cardId && nodes[cardId]
+    ? { id: cardId, branch: cardBranch, close: () => setCardId(null), go: setCardId, over: true }
+    : peekId && nodes[peekId] ? { id: peekId, branch: null, close: () => setPeekId(null), go: setPeekId, over: false } : null
   const isFolder = activeDoc?.source === 'md'
   // The folder as the commands that read the evidence again name it.
   const folder = activeDoc?.folderPath?.split(/[\\/]/).filter(Boolean).pop() ?? activeDoc?.name ?? '<folder>'
@@ -106,8 +121,15 @@ export function Inspector(): React.ReactElement {
   const showAttention = (): void => { setTab('overview'); setAttention((n) => n + 1) }
 
   return (
-    <div className="insp">
-      <div className="insp-main">
+    // A card a link opened keeps its room, as the Inspector's own panel did;
+    // This branch's card lies over the page (nothing moves).
+    <div className={`insp${card && !card.over ? ' with-card' : ''}`}>
+      {tracing && (
+        <TracePanel stack={traceStack} nodes={nodes} relations={relations} evidence={check.evidence} cases={results?.cases}
+          ranAt={results ? testsRanAt(results) : undefined} folderPath={activeDoc?.folderPath}
+          onTrace={setTrace} onBack={() => setTrace(traceStack[traceStack.length - 2] ?? null)} onClose={() => setTrace(null)} onDetails={setPeekId} />
+      )}
+      <div className="insp-main" hidden={tracing}>
         <header className="insp-head">
           <div>
             <h1>Inspector</h1>
@@ -146,12 +168,11 @@ export function Inspector(): React.ReactElement {
             readOnlyReason="Settings are the check.json beside a model kept in a folder. This model is no folder, so the default rules apply and nothing here can be saved." />}
         </div>
       </div>
-      {peekId && <Peek id={peekId} ctx={ctx} check={check} onClose={() => setPeekId(null)} />}
-      {tab === 'branch' && cardId && nodes[cardId] && (
-        <ElementCard nodeId={cardId} branch={cardBranch} onClose={() => setCardId(null)}
-          onOpenView={(viewId) => revealOnCanvas(cardId, viewId)} actions={<>
-          <ShowOnCanvas id={cardId} className="insp-btn primary" />
-          <OpenWikiPage id={cardId} className="insp-btn" />
+      {card && (
+        <ElementCard nodeId={card.id} branch={card.branch} onClose={card.close} onNavigate={card.go}
+          onOpenView={(viewId) => revealOnCanvas(card.id, viewId)} actions={<>
+          <ShowOnCanvas id={card.id} className="insp-btn primary" />
+          <OpenWikiPage id={card.id} className="insp-btn" />
         </>} />
       )}
     </div>

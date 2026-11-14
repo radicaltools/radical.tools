@@ -99,6 +99,11 @@ describe('route parse/format', () => {
     expect(parseHash('#/m/inspector/v/v-arch/t/changes/e/api')).toMatchObject({ tab: 'branch', el: 'api' })
     expect(parseHash('#/m/inspector/v/v-arch/t/overview')?.tab).toBe('overview')
     expect(parseHash('#/m/designer/v/v-arch/t/model')?.tab).toBeUndefined()
+    // The verification path on screen, after the tab; only in the Inspector.
+    const path: Route = { mode: 'inspector', view: 'v-arch', tab: 'implementation', trace: 'req' }
+    expect(formatRoute(path)).toBe('#/m/inspector/v/v-arch/t/implementation/tr/req')
+    expect(parseHash(formatRoute(path))).toEqual(path)
+    expect(parseHash('#/m/designer/v/v-arch/tr/req')?.trace).toBeUndefined()
   })
 
   it('parses doc + mode + view + focus', () => {

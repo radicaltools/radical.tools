@@ -11,6 +11,7 @@
 // md-folder document, as agentForge.ts polls the Forge run status. The
 // only write is saveCheckConfig, when the Inspector's Settings are saved.
 
+import { findingsByElement, useCardVerification } from '@radical/ui/store/verification'
 import { create } from 'zustand'
 import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults, withoutRepositorySettings } from '@radical/common/check'
 import { REPOSITORY_FILE, parseRepositoryFile, serializeRepositoryFile, type RepositoryFile } from '@radical/common/repositoryMapping'
@@ -159,6 +160,8 @@ function recheck(): void {
     ? Object.fromEntries(Object.entries(check.evidence.nodes).filter(([, e]) => e.tests?.length).map(([id, e]) => [id, e.tests!.map((t) => ({ id: t.id, outcome: t.outcome }))]))
     : null
   useDiagramStore.setState({ testOutcomes })
+  // What the check says of each element, for the card's Verification.
+  useCardVerification.setState({ evidence: check.evidence?.nodes ?? null, findings: findingsByElement(check.findings) })
 }
 
 if (typeof window !== 'undefined') {
@@ -176,6 +179,7 @@ if (typeof window !== 'undefined') {
       lastResults = lastConfig = lastMeasurements = lastReviews = ''
       lastRepository = null
       useDiagramStore.setState({ repository: null, testOutcomes: null })
+      useCardVerification.setState({ evidence: null, findings: {} })
       useInspectorStore.setState({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', editedAt: null })
     }
     if (!id) return

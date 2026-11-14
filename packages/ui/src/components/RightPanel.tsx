@@ -23,6 +23,7 @@ import { applyViewpoint as applyViewpointTo, firstViewOfGroup, groupLossesOf, gr
 import type { ViewpointKind } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { openCard, showNodeInView, useCardOpen } from '../store/showInView'
+import { CardNavigation, ElementVerification, useCardNavigate } from './ElementVerification'
 import { NodeActions, RelationActions } from './SelectionActions'
 import { OPEN_VIEW_PROPERTIES_EVENT } from './LargeCanvasNotice'
 import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
@@ -2416,9 +2417,19 @@ function AttrValue({ def, value, readOnly, onChange }: {
 
 /** Something done to what the card shows rather than written in it: a
  *  button with its icon and `label` on the card's head, as Wizard. */
-type PanelAction = { label: string; title: string; icon: React.ReactNode; onClick: () => void }
+type PanelAction = { label: string; title: string; icon: React.ReactNode; onClick: () => void; disabled?: boolean }
 
 const ActionIcon = {
+  /** A path from a root down to its results (the verification path). */
+  Path: () => (
+    <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="2.5" cy="8" r="1.6"/>
+      <circle cx="8" cy="4" r="1.6"/>
+      <circle cx="13.5" cy="4" r="1.6"/>
+      <circle cx="13.5" cy="12" r="1.6"/>
+      <path d="M4 7 L6.6 4.9 M9.6 4 H11.9 M9.2 5.1 L12.2 10.9"/>
+    </svg>
+  ),
   /** An element with its neighbours, a level below (the Explore view's icon). */
   Explore: () => (
     <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -2495,7 +2506,7 @@ function PanelHeader({ typeLabel, color, iconPath, title, titlePlaceholder, read
             </button>
           )}
           {actions.map((a) => (
-            <button type="button" key={a.label} className="pp-head-btn" title={a.title} onClick={a.onClick}>
+            <button type="button" key={a.label} className="pp-head-btn" title={a.title} onClick={a.onClick} disabled={a.disabled}>
               {a.icon}{a.label}
             </button>
           ))}
@@ -2515,8 +2526,8 @@ function PanelHeader({ typeLabel, color, iconPath, title, titlePlaceholder, read
 
 /** A link to another element in the head (a parent, a relation's end). */
 function NodeLink({ id, label }: { id: string; label: string }) {
-  const selectNode = useDiagramStore((s) => s.selectNode)
-  return <button type="button" className="pp-link" onClick={() => selectNode(id)}>{label}</button>
+  const go = useCardNavigate()
+  return <button type="button" className="pp-link" onClick={() => go(id)}>{label}</button>
 }
 
 /** The words removed from and added to a text since the base. */
@@ -2884,6 +2895,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
         )}
         <div className="pp-foot">
           <div className="pp-foot-scroll">
+            <ElementVerification nodeId={node.id} />
             {node.type === 'scenario' || node.type === 'fitness-fn' ? <ElementTests nodeId={node.id} /> : <ElementBuiltIn nodeId={node.id} />}
             <ElementViews nodeId={node.id} onOpen={onOpenView ?? ((viewId) => showNodeInView(node.id, viewId))} />
             {!readOnly && <NodeActions nodeId={node.id} />}
@@ -3031,18 +3043,22 @@ const PANEL_W_DEFAULT = 340
 
 /** The properties card of one element, outside the canvas (Studio's
  *  Inspector): the same card, read-only, with `actions` under its head. */
-export function ElementCard({ nodeId, branch, onClose, actions, onOpenView }: {
+export function ElementCard({ nodeId, branch, onClose, actions, onOpenView, onNavigate }: {
   nodeId: string; branch?: CardBranch | null; onClose: () => void; actions?: React.ReactNode
   /** Opens one of the views the card lists: the card is outside the canvas. */
   onOpenView: (viewId: string) => void
+  /** Where a link in the card leads (an element it names): else the selection. */
+  onNavigate?: (id: string) => void
 }): React.ReactElement {
   return (
-    <aside className="right-panel open element-card" aria-label="Properties" style={{ width: PANEL_W_DEFAULT }}>
-      <div className="pp-scroll">
-        {actions && <div className="element-card-actions">{actions}</div>}
-        <PropertiesContent readOnly nodeId={nodeId} branch={branch} onClose={onClose} onOpenView={onOpenView} />
-      </div>
-    </aside>
+    <CardNavigation.Provider value={onNavigate ?? null}>
+      <aside className="right-panel open element-card" aria-label="Properties" style={{ width: PANEL_W_DEFAULT }}>
+        <div className="pp-scroll">
+          {actions && <div className="element-card-actions">{actions}</div>}
+          <PropertiesContent readOnly nodeId={nodeId} branch={branch} onClose={onClose} onOpenView={onOpenView} />
+        </div>
+      </aside>
+    </CardNavigation.Provider>
   )
 }
 const PANEL_W_MIN = 280

@@ -25,10 +25,10 @@ export function inspectorTabOf(name: string | undefined): InspectorTab | undefin
   return (INSPECTOR_TABS as readonly string[]).includes(name ?? '') ? (name as InspectorTab) : undefined
 }
 
-/** Where the Inspector is: the tab picked (null: its first, Overview) and
- *  the element whose card is open in This branch. Part of the place the
- *  route names. */
-export const useInspectorNav = create<{ tab: InspectorTab | null; cardId: string | null }>(() => ({ tab: null, cardId: null }))
+/** Where the Inspector is: the tab picked (null: its first, Overview), the
+ *  element whose card is open in This branch and the element whose
+ *  verification path is on screen. Part of the place the route names. */
+export const useInspectorNav = create<{ tab: InspectorTab | null; cardId: string | null; trace: string | null }>(() => ({ tab: null, cardId: null, trace: null }))
 
 /** For each view, the elements it shows (viewShownNodes): what its chain
  *  gives, or those it lists and their ancestors. A view that lists none and

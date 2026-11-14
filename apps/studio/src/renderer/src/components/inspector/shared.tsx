@@ -142,63 +142,6 @@ export const tally = (statuses: Array<string | undefined>): Tally => ({
   none: statuses.filter((s) => !s || (!PASSING.has(s) && !FAILING.has(s))).length,
 })
 
-/** One condition of a scenario or fitness function: its line, its outcome
- *  and, for a measured value, what was measured, by which sensor, how long
- *  ago. */
-export function ConditionLine({ c }: { c: ConditionResult }): React.ReactElement {
-  const m = c.measurement
-  return (
-    <div className="insp-test">
-      <span className={`insp-mark ${tone(c.outcome)}`}>{MARK[c.outcome]}</span>
-      <code>{c.test ?? c.condition}</code>
-      {c.outcome !== 'passed' && <em>{c.outcome === 'not-run' && !c.test ? 'not measured' : c.outcome}</em>}
-      {m && <span className="insp-sub insp-measured">{m.value}{m.unit ? ` ${m.unit}` : ''} · {m.source} · {formatAge(Date.now() - Date.parse(m.at))} ago</span>}
-      {c.detail && !m && <span className="insp-sub">{c.detail}</span>}
-    </div>
-  )
-}
-
-export function Peek({ id, ctx, check, onClose }: { id: string; ctx: Ctx; check: CheckResult; onClose: () => void }): React.ReactElement | null {
-  const node = ctx.nodes[id]
-  if (!node) return null
-  const path: string[] = []
-  for (let p = node.parentId ? ctx.nodes[node.parentId] : undefined; p; p = p.parentId ? ctx.nodes[p.parentId] : undefined) path.unshift(p.label)
-  const own = check.findings.filter((f) => f.nodeId === id || f.relatedIds?.includes(id))
-  const ev = ctx.evidence?.[id]
-  return (
-    <aside className="insp-peek" aria-label="Element">
-      <button type="button" className="insp-peek-close" onClick={onClose}>Close</button>
-      <Chip id={id} ctx={ctx} />
-      <h3>{node.label}</h3>
-      <dl className="insp-kv">
-        <dt>Type</dt><dd>{ctx.metamodel.nodeTypes[node.type]?.label ?? node.type}</dd>
-        {path.length > 0 && <><dt>In</dt><dd>{path.join(' › ')}</dd></>}
-        {ev && <><dt>{ev.conditions ? 'Checks' : 'Status'}</dt><dd><span className={`insp-mark ${tone(ev.status)}`}>{MARK[ev.status]}</span> {ev.status}</dd></>}
-      </dl>
-      <div className="insp-peek-acts">
-        <ShowOnCanvas id={id} className="primary" />
-        <OpenWikiPage id={id} />
-      </div>
-      {ev?.conditions && ev.conditions.length > 0 && (
-        <div className="insp-peek-sec">
-          <span className="insp-label">Checks ({ev.conditions.length})</span>
-          {ev.conditions.map((c, i) => <ConditionLine key={i} c={c} />)}
-        </div>
-      )}
-      {ev?.by && (
-        <div className="insp-peek-sec">
-          <span className="insp-label">Checked by ({ev.by.length})</span>
-          <div className="insp-chips">{ev.by.length ? ev.by.map((b) => <Chip key={b} id={b} ctx={ctx} status={ctx.evidence?.[b]?.status} />) : <span className="insp-muted">Nothing checks it.</span>}</div>
-        </div>
-      )}
-      <div className="insp-peek-sec">
-        <span className="insp-label">Findings ({own.length})</span>
-        {own.length ? own.map((f, i) => <div key={i} className={`insp-peek-finding ${f.severity}`}><Message f={f} ctx={ctx} /></div>) : <span className="insp-muted">Nothing the check reports.</span>}
-      </div>
-    </aside>
-  )
-}
-
 /** What fails the check, each error with what it takes down. */
 export function Errors({ errors, ctx }: { errors: CheckFinding[]; ctx: Ctx }): React.ReactElement | null {
   if (!errors.length) return null

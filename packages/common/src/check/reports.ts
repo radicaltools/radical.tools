@@ -13,6 +13,43 @@ export interface TestCase {
   /** Describe blocks, then the test's own title. */
   title: string[]
   status: TestStatus
+  /** Why it failed, as the runner wrote it: colour codes removed, cut to
+   *  the first lines. */
+  message?: string
+  /** How long it ran, in milliseconds. */
+  durationMs?: number
+  /** Its line in the file. */
+  line?: number
+}
+
+/** The lines of a failure message kept with a test case. */
+export const MESSAGE_LINES = 12
+const MESSAGE_CHARS = 2000
+
+// eslint-disable-next-line no-control-regex
+const ANSI = /\u001b\[[0-9;]*[A-Za-z]/g
+
+/** A failure message as a test case keeps it: without colour codes or
+ *  blank edges, at most MESSAGE_LINES lines; undefined when empty. */
+export function failureMessage(text: unknown): string | undefined {
+  if (typeof text !== 'string') return undefined
+  const lines = text.replace(ANSI, '').replace(/\r\n?/g, '\n').split('\n')
+  while (lines.length && !lines[0].trim()) lines.shift()
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop()
+  if (!lines.length) return undefined
+  let kept = lines.slice(0, MESSAGE_LINES).join('\n')
+  if (kept.length > MESSAGE_CHARS) kept = kept.slice(0, MESSAGE_CHARS)
+  return kept.length < lines.join('\n').length ? `${kept}\n…` : kept
+}
+
+/** The details a report gives of one case, leaving out what it does not. */
+const details = (message: unknown, durationMs: unknown, line: unknown): Pick<TestCase, 'message' | 'durationMs' | 'line'> => {
+  const m = failureMessage(message)
+  return {
+    ...(m ? { message: m } : {}),
+    ...(typeof durationMs === 'number' && Number.isFinite(durationMs) && durationMs >= 0 ? { durationMs: Math.round(durationMs) } : {}),
+    ...(typeof line === 'number' && Number.isInteger(line) && line > 0 ? { line } : {}),
+  }
 }
 
 /** Between a test id's file and titles, as Playwright and Vitest print them. */
@@ -36,12 +73,17 @@ export function parseTestReport(content: string, name: string): TestCase[] {
 
 function parseJestJson(report: Record<string, unknown>): TestCase[] {
   const cases: TestCase[] = []
-  for (const file of report.testResults as Array<{ name: string; assertionResults?: Array<{ ancestorTitles?: string[]; title: string; status: string }> }>) {
+  type Assertion = { ancestorTitles?: string[]; title: string; status: string; failureMessages?: unknown[]; duration?: number; location?: { line?: number } }
+  for (const file of report.testResults as Array<{ name: string; assertionResults?: Assertion[] }>) {
     for (const a of file.assertionResults ?? []) {
+      const status: TestStatus = a.status === 'passed' ? 'passed' : a.status === 'failed' ? 'failed' : 'skipped'
+      const messages = Array.isArray(a.failureMessages) ? a.failureMessages.filter((m): m is string => typeof m === 'string') : []
       cases.push({
         file: normalize(file.name),
         title: [...(a.ancestorTitles ?? []), a.title],
-        status: a.status === 'passed' ? 'passed' : a.status === 'failed' ? 'failed' : 'skipped',
+        status,
+        // Vitest writes the location only with includeTaskLocation.
+        ...details(status === 'failed' ? messages.join('\n') : undefined, a.duration, a.location?.line),
       })
     }
   }
@@ -49,7 +91,8 @@ function parseJestJson(report: Record<string, unknown>): TestCase[] {
 }
 
 interface PwSuite { title: string; file?: string; specs?: PwSpec[]; suites?: PwSuite[] }
-interface PwSpec { title: string; file?: string; tests?: Array<{ status?: string }> }
+interface PwResult { duration?: number; error?: { message?: string }; errors?: Array<{ message?: string }> }
+interface PwSpec { title: string; file?: string; line?: number; tests?: Array<{ status?: string; results?: PwResult[] }> }
 
 function parsePlaywrightJson(report: Record<string, unknown>): TestCase[] {
   const config = report.config as { rootDir?: string } | undefined
@@ -58,12 +101,19 @@ function parsePlaywrightJson(report: Record<string, unknown>): TestCase[] {
   const walk = (suite: PwSuite, titles: string[], file: string): void => {
     for (const spec of suite.specs ?? []) {
       const statuses = (spec.tests ?? []).map((t) => t.status)
+      // One test per project (browser); a spec fails when any of them did.
+      const status: TestStatus = statuses.includes('unexpected') ? 'failed'
+        : statuses.length && statuses.every((s) => s === 'skipped') ? 'skipped' : 'passed'
+      // The last try of each project's test is the one that counts.
+      const last = (spec.tests ?? []).map((t) => t.results?.[t.results.length - 1]).filter((r): r is PwResult => !!r)
+      const failedTry = (spec.tests ?? []).filter((t) => t.status === 'unexpected').map((t) => t.results?.[t.results.length - 1]).find((r) => r)
+      const message = failedTry ? failedTry.error?.message ?? failedTry.errors?.find((e) => e.message)?.message : undefined
+      const durations = last.map((r) => r.duration).filter((d): d is number => typeof d === 'number')
       cases.push({
         file: root ? `${root}/${normalize(spec.file ?? file)}` : normalize(spec.file ?? file),
         title: [...titles, spec.title],
-        // One test per project (browser); a spec fails when any of them did.
-        status: statuses.includes('unexpected') ? 'failed'
-          : statuses.length && statuses.every((s) => s === 'skipped') ? 'skipped' : 'passed',
+        status,
+        ...details(status === 'failed' ? message : undefined, durations.length ? Math.max(...durations) : undefined, spec.line),
       })
     }
     for (const child of suite.suites ?? []) walk(child, [...titles, child.title], file)
@@ -89,10 +139,18 @@ function parseJUnit(xml: string): TestCase[] {
     const body = m[3] ?? ''
     const file = attrs.file ?? attrs.classname ?? ''
     const title = (attrs.name ?? '').split(JUNIT_SEPARATOR)
+    const failure = /<(failure|error)\b([^>]*?)(\/>|>([\s\S]*?)<\/\1>)/.exec(body)
+    // The element's text (escaped, or in CDATA), else its message attribute.
+    const raw = failure?.[4] ?? ''
+    const text = /<!\[CDATA\[/.test(raw) ? raw.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1') : unescapeXml(raw)
+    const message = failure ? (text.trim() ? text : attributes(failure[2]).message) : undefined
+    const seconds = attrs.time !== undefined ? Number(attrs.time) : undefined
+    const line = attrs.line !== undefined ? Number(attrs.line) : undefined
     cases.push({
       file: normalize(file),
       title,
-      status: /<(failure|error)\b/.test(body) ? 'failed' : /<skipped\b/.test(body) ? 'skipped' : 'passed',
+      status: failure ? 'failed' : /<skipped\b/.test(body) ? 'skipped' : 'passed',
+      ...details(message, seconds !== undefined ? seconds * 1000 : undefined, line),
     })
   }
   return cases

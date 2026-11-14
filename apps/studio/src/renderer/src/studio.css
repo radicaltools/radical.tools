@@ -3658,23 +3658,56 @@ div.milestone-option { cursor: default; }
 .insp-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .insp-chip-type { font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 0 5px; border-radius: 3px; line-height: 1.6; }
 .insp-chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.insp-peek { width: 360px; flex-shrink: 0; border-left: 1px solid var(--border-color-strong); background: var(--bg-panel); padding: 14px 16px; overflow-y: auto; display: grid; gap: 12px; align-content: start; box-shadow: var(--shadow-md); }
-.insp-peek h3 { margin: 0; font-size: 15px; }
-.insp-peek-close { justify-self: end; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); border-radius: var(--radius-sm); padding: 2px 9px; cursor: pointer; font-size: 12px; }
-.insp-kv { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); gap: 3px 10px; margin: 0; font-size: 12.5px; }
-.insp-kv dt { color: var(--text-muted); } .insp-kv dd { margin: 0; }
-.insp-peek-acts { display: flex; gap: 8px; flex-wrap: wrap; }
-.insp-peek-acts button { border: 1px solid var(--border-color-strong); background: var(--input-bg); color: var(--text-primary); border-radius: var(--radius-sm); padding: 5px 10px; cursor: pointer; font-size: 12.5px; }
-.insp-peek-acts button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.insp-peek-acts button:disabled { opacity: 0.5; cursor: default; }
-.insp-peek-sec { display: grid; gap: 6px; }
 .insp-test { display: grid; grid-template-columns: 1.2em minmax(0, 1fr) auto; gap: 6px; font-size: 12px; align-items: baseline; }
 .insp-test code { word-break: break-word; color: var(--text-secondary); }
 .insp-test em { color: var(--danger); font-style: normal; font-size: 11.5px; }
 /* What a sensor measured for a metric condition, on its own line under it. */
 .insp-test .insp-sub { grid-column: 2 / -1; font-size: 11.5px; }
-.insp-peek-finding { font-size: 12.5px; color: var(--text-secondary); border-left: 2px solid var(--warning); padding-left: 8px; }
-.insp-peek-finding.error { border-color: var(--danger); }
+
+/* Verification path: every path through one element, in columns from its
+   need or ADR to the tests and measurements, lines drawn between the cards. */
+.insp-main[hidden] { display: none; }
+/* The element's card (340 px, 10 px from the edge) keeps its room. */
+.insp.with-card .insp-main, .insp.with-card .trace { padding-right: 372px; }
+.trace { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 18px 28px 24px; overflow: hidden; font-size: 13px; }
+.trace-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.trace-title { display: flex; gap: 14px; align-items: flex-start; }
+.trace-title h1 { margin: 0; font-size: 18px; }
+.trace-title .insp-meta { margin: 2px 0 0; }
+.trace-tools { display: flex; gap: 12px; align-items: center; }
+.trace-toggle { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--text-secondary); cursor: pointer; }
+.trace-scroll { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md, 8px); background: var(--bg-panel); padding: 12px 18px 24px; }
+.trace-grid { position: relative; display: grid; column-gap: 40px; row-gap: 10px; align-items: start; width: max-content; }
+.trace-lines { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.trace-line { fill: none; stroke: var(--border-color-strong); stroke-width: 1.5; }
+.trace-line.bad { stroke: var(--danger); } .trace-line.ok { stroke: color-mix(in srgb, var(--success) 70%, var(--border-color-strong)); }
+.trace-line.gap { stroke-dasharray: 4 4; }
+.trace-col-head { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); padding: 2px 2px 4px; position: sticky; top: -12px; background: var(--bg-panel); z-index: 1; }
+.trace-card { position: relative; z-index: 1; display: grid; gap: 4px; background: var(--bg-app); border: 1px solid var(--border-color-strong); border-left-width: 3px; border-radius: var(--radius-sm); padding: 7px 10px 8px; min-width: 0; }
+.trace-card.bad { border-left-color: var(--danger); } .trace-card.ok { border-left-color: var(--success); } .trace-card.none { border-left-color: var(--text-muted); }
+.trace-card.target { box-shadow: 0 0 0 2px var(--accent); }
+.trace-card-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); }
+.trace-kind { font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+.trace-status { margin-left: auto; }
+.trace-card.bad .trace-status { color: var(--danger); font-weight: 600; }
+.trace-fold { border: 0; background: none; color: var(--text-muted); cursor: pointer; font-size: 11px; padding: 0 2px; }
+.trace-label { all: unset; cursor: pointer; font-weight: 600; font-size: 13px; line-height: 1.3; color: var(--text-primary); overflow-wrap: anywhere; }
+.trace-label:hover { color: var(--accent); text-decoration: underline; }
+.trace-label:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.trace-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.trace-acts button { border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); border-radius: var(--radius-sm); padding: 1px 7px; font-size: 11px; cursor: pointer; }
+.trace-acts button:disabled { opacity: 0.5; cursor: default; }
+.trace-test-id { display: grid; gap: 1px; font-size: 12px; overflow-wrap: anywhere; }
+.trace-file { font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace); font-size: 11px; color: var(--text-muted); }
+.trace-condition { font-size: 12px; overflow-wrap: anywhere; }
+.trace-measured, .trace-detail { font-size: 11.5px; color: var(--text-secondary); }
+.trace-case { display: grid; gap: 4px; }
+.trace-case-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--text-muted); }
+.trace-open { color: var(--accent); text-decoration: none; }
+.trace-open:hover { text-decoration: underline; }
+.trace-message { margin: 0; max-height: 9.5em; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace); font-size: 11px; line-height: 1.45; color: var(--danger); background: color-mix(in srgb, var(--danger) 7%, transparent); border-radius: var(--radius-xs, 3px); padding: 5px 7px; }
+.trace-sub-case { display: grid; gap: 2px; font-size: 11.5px; border-top: 1px dashed var(--border-color); padding-top: 4px; }
+.trace-gap { border-style: dashed; border-left-width: 1px; color: var(--text-muted); font-size: 12px; font-style: italic; background: transparent; }
 
 /* Toolbar: the Inspector perspective with what the check finds. On the
    active (accent) button the counts sit on chips of their own, so the

@@ -224,7 +224,8 @@ test('the Inspector lists every change since the base, and a click leads to the 
   await expect(card.locator('.pp-title')).toHaveText('Checkout API')
   await expect(card.getByRole('textbox', { name: 'Name' })).toHaveCount(0)
   await expect(card.getByRole('region', { name: 'Changes on branch' }).locator('ins')).toHaveText(['card ', ' and confirms the order'])
-  await expect(page.getByRole('complementary', { name: 'Element' })).toHaveCount(0)
+  // One card: no panel of the Inspector's own beside it.
+  await expect(page.getByRole('complementary')).toHaveCount(1)
   // No wiki view has a page for it: nothing to open there.
   await expect(card.getByRole('button', { name: /^Open wiki page/ })).toBeDisabled()
   // And on to a canvas that holds it.

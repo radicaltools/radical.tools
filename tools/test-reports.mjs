@@ -29,7 +29,7 @@ for (const dir of workspaces) {
   const report = join(REPORTS, `${pkg.name.replace(/^@/, '').replace(/\//g, '-')}.json`)
   console.log(`\n▶ ${pkg.name}`)
   // Arguments after -- go to the end of the test script, which ends in `vitest run`.
-  const run = spawnSync(npm, ['run', 'test', '--', '--reporter=default', '--reporter=json', `--outputFile.json=${report}`], {
+  const run = spawnSync(npm, ['run', 'test', '--', '--reporter=default', '--reporter=json', '--includeTaskLocation', `--outputFile.json=${report}`], {
     cwd: dir,
     stdio: 'inherit',
     shell: process.platform === 'win32',
@@ -40,7 +40,7 @@ for (const dir of workspaces) {
 // The repository's own scripts in tools/ (the release script) and its
 // sensors in .radical/sensors/, run from the root as `npm run test:tools` does.
 console.log('\n▶ tools')
-const tools = spawnSync(npm, ['run', 'test:tools', '--', '--reporter=default', '--reporter=json', `--outputFile.json=${join(REPORTS, 'tools.json')}`], {
+const tools = spawnSync(npm, ['run', 'test:tools', '--', '--reporter=default', '--reporter=json', '--includeTaskLocation', `--outputFile.json=${join(REPORTS, 'tools.json')}`], {
   cwd: ROOT,
   stdio: 'inherit',
   shell: process.platform === 'win32',
