@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import { expect } from '../../support/fixtures'
 import { ModelFolder, test } from '../../support/folder'
@@ -15,6 +15,9 @@ import { repeatModel } from '../../support/repeatModel'
 //   SCALE_CANVAS  the canvas view for zoom, select and rename
 //   SCALE_REOPEN  open the folder again from the cache Studio wrote
 //                 (SCALE_NO_CACHE=1: with the cache deleted first)
+//   SCALE_TESTS   a test-results.json (.radical/model/.state/ after radical
+//                 check --report) put beside the model, so the Inspector
+//                 checks it with its tests as in a repository
 //   SCALE_HEAP    the heap after each view; SCALE_ONLY_OPEN stops after opening
 //   SCALE_OUT     a folder for the results: results.json, metrics.json and CPU
 //                 profiles with SCALE_PROFILE=1
@@ -23,7 +26,7 @@ import { repeatModel } from '../../support/repeatModel'
 //                 stays responsive reads (metrics studio.*)
 
 const MODEL = process.env.SCALE_MODEL
-const VIEWS = (process.env.SCALE_VIEWS ?? 'All elements,Domain model,Components,System context,Traceability,Specification,Container dependencies,Decisions,CLI').split(',')
+const VIEWS = (process.env.SCALE_VIEWS ?? 'All elements,Domain model,Components,System context,Traceability,Specification,Container dependencies,Decisions,Requirement coverage').split(',')
 const CANVAS = process.env.SCALE_CANVAS ?? 'Components'
 const OUT = process.env.SCALE_OUT
 
@@ -124,6 +127,7 @@ test('scale: a large model in Studio', async ({ page, studio }) => {
   await folder.install()
   await page.goto('/')
   const files = repeatModel(await new MdFolderSession(diskFolderStorage(MODEL!), { writeCache: false }).readAll(), Number(process.env.SCALE_COPIES ?? 1))
+  if (process.env.SCALE_TESTS) files['.state/test-results.json'] = readFileSync(process.env.SCALE_TESTS, 'utf8')
   const entries = Object.entries(files)
   for (let i = 0; i < entries.length; i += 500) {
     await page.evaluate(async ([name, chunk]) => {
@@ -253,6 +257,9 @@ test('scale: a large model in Studio', async ({ page, studio }) => {
   if (await name.count()) {
     const before = await name.inputValue()
     await name.click()
+    // Typed at the end of the name, not where the click put the caret (End
+    // does not move it on macOS).
+    await name.evaluate((el: HTMLInputElement) => el.setSelectionRange(el.value.length, el.value.length))
     await arm(page)
     log('rename typing', await profiled('rename typing', async () => { await page.keyboard.type(' x', { delay: 150 }); return settle(page) }))
     await arm(page)
@@ -271,10 +278,13 @@ test('scale: a large model in Studio', async ({ page, studio }) => {
     for (const el of document.querySelectorAll('.react-flow__node')) {
       if (el.querySelector('.react-flow__node')) continue
       const r = el.getBoundingClientRect()
-      const x = r.x + Math.min(30, r.width / 2), y = r.y + Math.min(14, r.height / 2)
-      if (r.width < 40 || x < area.x + 60 || x > area.right - 420 || y < area.y + 80 || y > area.bottom - 140) continue
-      if (!el.contains(document.elementFromPoint(x, y))) continue
-      return { id: el.getAttribute('data-id'), x, y }
+      if (r.width < 40) continue
+      // A point of the element no line or label lies over.
+      for (const [fx, fy] of [[0.5, 0.5], [0.25, 0.6], [0.75, 0.6], [0.5, 0.8], [0.2, 0.2]]) {
+        const x = r.x + r.width * fx, y = r.y + r.height * fy
+        if (x < area.x + 60 || x > area.right - 420 || y < area.y + 80 || y > area.bottom - 140) continue
+        if (el.contains(document.elementFromPoint(x, y))) return { id: el.getAttribute('data-id'), x, y }
+      }
     }
     return null
   })

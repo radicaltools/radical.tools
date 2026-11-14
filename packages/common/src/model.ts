@@ -135,6 +135,30 @@ export function samePlacesAside(a: Record<string, C4Node>, b: Record<string, C4N
   return true
 }
 
+// What an element is called and said to be, and where it is drawn: none of
+// it changes where it may go or what may go in it.
+const TEXT_KEYS = new Set(['label', 'description', 'technology', 'x', 'y', 'width', 'height'])
+
+/** Whether `b` holds the elements of `a`, in the same order, changed at most
+ *  in their names, descriptions, technologies and places: what depends on
+ *  the model's structure alone (which parents an element may move to) need
+ *  not be worked out again at each letter typed in a name. */
+export function sameNodesTextAside(a: Record<string, C4Node>, b: Record<string, C4Node>): boolean {
+  if (notedPlacesOnly(a, b)) return true
+  const ids = Object.keys(b)
+  const before = Object.keys(a)
+  if (ids.length !== before.length) return false
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i] !== before[i]) return false
+    const x = a[ids[i]] as unknown as Record<string, unknown>
+    const y = b[ids[i]] as unknown as Record<string, unknown>
+    if (x === y) continue
+    for (const k in y) if (!TEXT_KEYS.has(k) && x[k] !== y[k]) return false
+    for (const k in x) if (!TEXT_KEYS.has(k) && !(k in y)) return false
+  }
+  return true
+}
+
 // Where a view draws its elements, and where it is looked at from.
 const VIEW_PLACE_KEYS = new Set(['positions', 'viewport'])
 

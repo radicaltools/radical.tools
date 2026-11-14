@@ -2,7 +2,7 @@ import React, { ChangeEvent, useState, useMemo, useEffect, useLayoutEffect, useR
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { onExploration, useDiagramStore, viewById, type BranchOverlay } from '../store/diagramStore'
-import { useNodeLabels, useNodesPlacesAside } from '../store/nodeSelectors'
+import { useNodeLabels, useNodesPlacesAside, useTextAsideMemo } from '../store/nodeSelectors'
 import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isBackwardStep } from '@radical/common/c4'
 import { resolveEarsSubject, isReservedPropertyKey, relationDisplayLabel, relationTypeName, requirementStatePhrase, type PropertyDef } from '@radical/common/metamodel'
 import { EarsQuickEntry } from './EarsQuickEntry'
@@ -2737,6 +2737,17 @@ function ElementViews({ nodeId, onOpen }: { nodeId: string; onOpen: (viewId: str
   )
 }
 
+/** The types the card's Parent picker offers for `node`: the metamodel's
+ *  allowedParents, else the C4 code types' own. */
+function cardParentTypes(metamodel: { nodeTypes: Record<string, { allowedParents?: string[] }> } | undefined, node: C4Node): string[] | undefined {
+  const isCodeType = node.type === 'container' || node.type === 'component' || node.type === 'database' || node.type === 'webapp' || node.type === 'queue'
+  return metamodel?.nodeTypes[node.type]?.allowedParents ?? (
+    isCodeType
+      ? ({ container: ['system'], component: ['container'], database: ['system'], webapp: ['system'], queue: ['system'] } as Record<string, string[]>)[node.type]
+      : undefined
+  )
+}
+
 function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenView }: {
   readOnly?: boolean; onClose: () => void
   /** The element to show instead of the selection (a card opened from outside the canvas). */
@@ -2764,6 +2775,16 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
   const exploreFrom = useDiagramStore((s) => s.exploreFrom)
   // Explore from here: Designer's on the live model, Viewer's on the model it shows.
   const canExplore = useDiagramStore((s) => !s.presentationActive && ((s.appMode === 'designer' && !s.activeSnapshotId) || s.appMode === 'viewer'))
+  // Where the element may move (the Parent picker), by id: worked out again
+  // when the model's structure changes, not at each letter typed in it.
+  const shownNode = selectedNodeId ? c4Nodes[selectedNodeId] : undefined
+  const parentTypes = shownNode ? cardParentTypes(metamodel, shownNode) : undefined
+  const parentChoiceIds = useTextAsideMemo(
+    () => shownNode && parentTypes?.length
+      ? parentCandidates({ c4Nodes, c4Relations, views: {}, activeViewId: null, metamodel }, shownNode.id).filter((n) => parentTypes.includes(n.type)).map((n) => n.id)
+      : [],
+    c4Nodes, [selectedNodeId, c4Relations, metamodel, parentTypes?.join(',')],
+  )
 
   // ── Node ──────────────────────────────────────────────────────────────────
   if (selectedNodeId && c4Nodes[selectedNodeId]) {
@@ -2801,11 +2822,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
     const missing = (p: PropertyDef) => !!p.required && isEmptyValue(record[p.key] ?? p.default)
 
     // Parent selector — driven by metamodel allowedParents when available.
-    const allowedParentTypes = nodeTypeDef?.allowedParents ?? (
-      isCodeType
-        ? ({ container: ['system'], component: ['container'], database: ['system'], webapp: ['system'], queue: ['system'] } as Record<string, string[]>)[node.type]
-        : undefined
-    )
+    const allowedParentTypes = parentTypes
     const parents: { id: string; label: string }[] = []
     for (let p = node.parentId ? c4Nodes[node.parentId] : undefined; p && parents.length < 8; p = p.parentId ? c4Nodes[p.parentId] : undefined) {
       parents.unshift({ id: p.id, label: p.label })
@@ -2860,8 +2877,7 @@ function PropertiesContent({ readOnly = false, onClose, nodeId, branch, onOpenVi
                   onChange={(e) => !locked && reparentNodes([node.id], e.target.value || null)}>
                   <option value="">—</option>
                   {/* Only the ones a move takes (it listed parents it then refused). */}
-                  {parentCandidates({ c4Nodes, c4Relations, views: {}, activeViewId: null, metamodel }, node.id)
-                    .filter((n) => allowedParentTypes.includes(n.type))
+                  {parentChoiceIds.map((id) => c4Nodes[id]).filter(Boolean)
                     .map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
                 </select>
               </AttrRow>

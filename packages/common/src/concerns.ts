@@ -67,9 +67,15 @@ export function questionLine(param: TemplateParam): string {
 }
 
 /** The ids of the elements the pack's trigger finds, by label. */
-export function concernTargets(pack: ConcernPack, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): string[] {
-  const { result } = runModelQuery(pack.concern.trigger, { nodes, relations })
-  const rows = (result as { rows?: Array<Record<string, unknown>> }).rows ?? []
+export function concernTargets(pack: ConcernPack, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, asked?: Map<string, Array<Record<string, unknown>>>): string[] {
+  // In the model's order: they are put in order here. Many packs ask the
+  // same: asked once for all of them (`asked`, by the query).
+  let rows = asked?.get(pack.concern.trigger)
+  if (!rows) {
+    const { result } = runModelQuery(pack.concern.trigger, { nodes, relations, unordered: true })
+    rows = (result as { rows?: Array<Record<string, unknown>> }).rows ?? []
+    asked?.set(pack.concern.trigger, rows)
+  }
   const key = /^\s*LIST\s+RELATIONS/i.test(pack.concern.trigger) ? (pack.concern.applyTo === 'source' ? 'sourceId' : 'targetId') : 'id'
   const ids = new Set(rows.map((row) => row[key]).filter((id): id is string => typeof id === 'string' && !!nodes[id]))
   return [...ids].sort((a, b) => nodes[a].label.localeCompare(nodes[b].label) || a.localeCompare(b))
@@ -93,14 +99,29 @@ export interface ConcernStatus {
 /** Where the model stands on each pack whose trigger finds something. */
 export function concernStatuses(packs: ConcernPack[], nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): ConcernStatus[] {
   const out: ConcernStatus[] = []
+  // The ADRs by the concern they are marked with, and what each constrains:
+  // once for all the packs, not for each.
+  const adrsBy = new Map<string, C4Node[]>()
+  for (const n of Object.values(nodes)) {
+    if (n.type !== 'adr') continue
+    const concern = prop(n, CONCERN_KEY)
+    const list = adrsBy.get(concern)
+    if (list) list.push(n); else adrsBy.set(concern, [n])
+  }
+  const constrained = new Map<string, string[]>()
+  for (const r of Object.values(relations)) {
+    if (r.relationType !== 'constrains') continue
+    const list = constrained.get(r.sourceId)
+    if (list) list.push(r.targetId); else constrained.set(r.sourceId, [r.targetId])
+  }
+  const asked = new Map<string, Array<Record<string, unknown>>>()
   for (const pack of packs) {
-    const targets = concernTargets(pack, nodes, relations)
+    const targets = concernTargets(pack, nodes, relations, asked)
     if (!targets.length) continue
-    const marked = Object.values(nodes).filter((n) => n.type === 'adr' && prop(n, CONCERN_KEY) === pack.concern.id)
-    const accepted = new Set(marked.filter((n) => prop(n, 'status') === 'accepted').map((n) => n.id))
+    const marked = adrsBy.get(pack.concern.id) ?? []
     const settled = new Set<string>()
-    for (const r of Object.values(relations)) {
-      if (r.relationType === 'constrains' && accepted.has(r.sourceId)) settled.add(r.targetId)
+    for (const n of marked) {
+      if (prop(n, 'status') === 'accepted') for (const id of constrained.get(n.id) ?? []) settled.add(id)
     }
     const covered = (id: string): boolean => {
       for (let cur: string | undefined = id; cur; cur = nodes[cur]?.parentId) if (settled.has(cur)) return true

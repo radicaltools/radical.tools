@@ -3,7 +3,9 @@
 // moved node. Components that show content, not positions, subscribe through
 // these so they re-render only when what they show changes.
 
+import { useRef } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { sameNodesTextAside } from '@radical/common/model'
 import { notedPlacesOnly, type C4Node } from '@radical/common/c4'
 import { useDiagramStore } from './diagramStore'
 
@@ -80,4 +82,21 @@ export function useNodeLabels(): Map<string, string> {
     }
     return labels
   }, sameLabels)
+}
+
+/** `compute()` kept while `deps` stay and the elements change only in their
+ *  names, descriptions, technologies or places (sameNodesTextAside): for
+ *  what depends on the model's structure, such as where an element may
+ *  move, which took 50 to 100 ms of each letter typed in a card on a model
+ *  of 21,000 elements. */
+export function useTextAsideMemo<T>(compute: () => T, nodes: Record<string, C4Node>, deps: readonly unknown[]): T {
+  const kept = useRef<{ nodes: Record<string, C4Node>; deps: readonly unknown[]; value: T } | null>(null)
+  const last = kept.current
+  if (last && last.deps.length === deps.length && last.deps.every((d, i) => Object.is(d, deps[i])) && sameNodesTextAside(last.nodes, nodes)) {
+    last.nodes = nodes
+    return last.value
+  }
+  const value = compute()
+  kept.current = { nodes, deps, value }
+  return value
 }
