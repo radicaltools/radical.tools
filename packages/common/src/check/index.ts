@@ -15,7 +15,7 @@ import { MD_FOLDER_JSON_FILES, MD_MANIFEST_FILE, deserializeFromMdFolder, isVali
 import { documentMetamodel, milestoneViews, originOf } from '../model'
 import { repositoryPart } from '../repositoryMapping'
 import { CHECK_RULES, type CheckSeverity, type RepositoryMapping, type RuleFinding } from './rules'
-import { computeEvidence, withBoundTests, type Evidence } from './evidence'
+import { BOUND_TESTS, computeEvidence, withBoundTests, type Evidence } from './evidence'
 import { GOAL_RULE, isMetricId, measureGoals, type CheckDimension, type CheckMetricResult, type GoalSetting } from './goals'
 import type { TestCase } from './reports'
 import type { Measurement } from './metrics'
@@ -330,9 +330,12 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
   const ownModel = theirs.size
     ? { nodes: byId(data.nodes.filter((n) => !theirs.has(n.id))), relations: byId(data.relations.filter((r) => !theirs.has(r.id))), ...settings }
     : model
+  // The tests this repository binds to another model's scenario or fitness
+  // function are its own: what the reports say of them is found here.
+  const boundHere = (rule: { readsReports?: true }, id: string | undefined): boolean => !!rule.readsReports && !!id && BOUND_TESTS in (nodes[id] ?? {})
   for (const rule of CHECK_RULES) {
     rule.run(model).forEach((finding) => {
-      if (!(finding.nodeId && theirs.has(finding.nodeId)) && !(finding.relationId && theirs.has(finding.relationId))) found.push({ rule: rule.id, ...finding })
+      if (!(finding.nodeId && theirs.has(finding.nodeId) && !boundHere(rule, finding.nodeId)) && !(finding.relationId && theirs.has(finding.relationId))) found.push({ rule: rule.id, ...finding })
     })
   }
   // On the whole model: another model's fitness function counts where its

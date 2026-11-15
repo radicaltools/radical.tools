@@ -433,6 +433,11 @@ radical verify "Prints JSON"                     # its tests
 radical verify "Prints JSON" --drop "<test>"     # take one off
 ```
 
+A test may be bound to a scenario or fitness function of another model of
+the federation (a consumer contract test): it is this repository's, so
+`radical check` judges it with the model's own (a failed or missing test is
+an error here), and `--trace` shows that scenario's path.
+
 `radical check` warns about a scenario the repository must verify (an
 element it builds satisfies its requirement) that has no test bound and no
 metric condition (`scenario-not-verified-here`), and about a test still

@@ -209,6 +209,10 @@ function brokenWith(model: CheckModel, node: C4Node): string {
   return ` Not verified now: ${what}${affected.length === 1 ? '' : 's'} ${affected.map(quote).join(', ')}.`
 }
 
+/** A scenario or fitness function as a test finding names it: with the
+ *  model it is of, when it is another's that this repository's tests check. */
+const testedName = (node: C4Node): string => `${TYPE_NAME[node.type]} ${quote(node)}${originOf(node) ? ` of ${originOf(node)}` : ''}`
+
 /** A rule over the outcome of each test id the model names, with reports.
  *  A failing outcome names what it leaves unverified as related. */
 function testRule(outcome: TestOutcome, message: (node: C4Node, id: string, model: CheckModel) => string): (model: CheckModel) => RuleFinding[] {
@@ -957,7 +961,7 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'error',
     dimension: 'tests',
     readsReports: true,
-    run: testRule('failed', (node, id, model) => `${TYPE_NAME[node.type]} ${quote(node)}: test ${id} failed.${brokenWith(model, node)}`),
+    run: testRule('failed', (node, id, model) => `${testedName(node)}: test ${id} failed.${brokenWith(model, node)}`),
   },
   {
     id: 'test-not-found',
@@ -966,8 +970,8 @@ export const CHECK_RULES: CheckRule[] = [
     dimension: 'tests',
     readsReports: true,
     run: (model) => testRule('not-found', (node, id) => model.testsReadAt
-      ? `${TYPE_NAME[node.type]} ${quote(node)}: no test ${id} in the test results read ${model.testsReadAt.slice(0, 10)}, ${formatAge((model.now ?? Date.now()) - Date.parse(model.testsReadAt))} ago; added since, renamed or deleted? radical check --report reads the tests again.`
-      : `${TYPE_NAME[node.type]} ${quote(node)}: no test ${id} in the reports, though its file ran; renamed or deleted?${brokenWith(model, node)}`)(model)
+      ? `${testedName(node)}: no test ${id} in the test results read ${model.testsReadAt.slice(0, 10)}, ${formatAge((model.now ?? Date.now()) - Date.parse(model.testsReadAt))} ago; added since, renamed or deleted? radical check --report reads the tests again.`
+      : `${testedName(node)}: no test ${id} in the reports, though its file ran; renamed or deleted?${brokenWith(model, node)}`)(model)
       .map((f) => (model.testsReadAt ? { ...f, asOf: model.testsReadAt } : f)),
   },
   {
@@ -976,7 +980,7 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'warning',
     dimension: 'tests',
     readsReports: true,
-    run: testRule('skipped', (node, id) => `${TYPE_NAME[node.type]} ${quote(node)}: test ${id} was skipped.`),
+    run: testRule('skipped', (node, id) => `${testedName(node)}: test ${id} was skipped.`),
   },
   {
     id: 'test-not-run',
@@ -984,7 +988,7 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'warning',
     dimension: 'tests',
     readsReports: true,
-    run: testRule('not-run', (node, id) => `${TYPE_NAME[node.type]} ${quote(node)}: no report has the file of test ${id}.`),
+    run: testRule('not-run', (node, id) => `${testedName(node)}: no report has the file of test ${id}.`),
   },
   {
     id: 'metric-failed',

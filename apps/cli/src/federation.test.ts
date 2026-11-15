@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import { promisify } from 'node:util'
-import { builtInC4Metamodel } from '@radical/common/metamodel'
+import { builtInC4Metamodel, builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { deserializeFromMdFolder, serializeToMdFolder, type FolderFiles } from '@radical/common/formats/mdFolder'
 import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 import { otherModelsAt, parseFederationFile, withOtherModels } from '@radical/common/federation'
@@ -163,6 +163,49 @@ describe('radical federation', () => {
     const result = JSON.parse(after.out) as CheckResult & { federation: Array<{ name: string; commit: string }> }
     expect(result.federation).toEqual([{ name: 'orders', ref: moved, commit: moved }])
     expect(result.findings.find((f) => f.code === 'rel-end-missing')).toMatchObject({ severity: 'error', relationId: 'r-reads' })
+  })
+
+  // A consumer contract test: this repository's test of another model's scenario.
+  it('radical check judges a test this repository binds to a scenario of another model, and --trace shows its path', async () => {
+    const { orders, payments, home, deps } = await repos()
+    const files = serializeToMdFolder({
+      metamodel: builtInGovernanceMetamodel(),
+      nodes: [node('ord', 'system', 'Orders'), node('oreq', 'requirement', 'Take orders'), node('oscen', 'scenario', 'Order taken')],
+      relations: [{ id: 'o1', relationType: 'satisfies', sourceId: 'ord', targetId: 'oreq' }, { id: 'o2', relationType: 'verifies', sourceId: 'oscen', targetId: 'oreq' }],
+    }, 'orders')
+    await rm(join(orders, 'architecture'), { recursive: true })
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(orders, 'architecture', path)), { recursive: true })
+      await writeFile(join(orders, 'architecture', path), content)
+    }
+    await git(orders, 'add', '-A')
+    await git(orders, 'commit', '-q', '-m', 'Orders has a scenario')
+    await deps(await head(orders))
+    expect((await run(home, ['federation', 'fetch'])).code).toBe(0)
+    expect((await run(home, ['verify', 'Order taken', '--test', 'tests/orders.contract.test.ts › places an order'])).out).toContain('is checked by 1 test')
+    const report = (status: string, title = 'places an order') => writeFile(join(payments, 'report.json'), JSON.stringify({ testResults: [{
+      name: join(payments, 'tests', 'orders.contract.test.ts'),
+      assertionResults: [{ ancestorTitles: [], title, status, failureMessages: status === 'failed' ? ['expected 201, got 500'] : [] }],
+    }] }))
+
+    await report('failed')
+    const failed = await run(home, ['check', '--report', join(payments, 'report.json'), '--format', 'json'])
+    expect(failed.code).toBe(1)
+    const result = JSON.parse(failed.out) as CheckResult
+    expect(result.findings.filter((f) => f.rule.startsWith('test-'))).toEqual([expect.objectContaining({ rule: 'test-failed', severity: 'error', nodeId: 'oscen' })])
+    expect(result.evidence?.nodes.oscen).toMatchObject({ status: 'failed', tests: [{ id: 'tests/orders.contract.test.ts › places an order', outcome: 'failed' }] })
+    const traced = await run(home, ['check', '--trace', 'oscen'])
+    expect(traced.code).toBe(0)
+    expect(traced.out).toContain('▶ Scenario: Order taken [oscen] — failed\n')
+    expect(traced.out).toContain('· tests/orders.contract.test.ts › places an order — failed\n')
+    expect(traced.out).toContain('expected 201, got 500')
+
+    // A test the report of its file does not have is missing: an error too.
+    await report('passed', 'lists orders')
+    const missing = JSON.parse((await run(home, ['check', '--report', join(payments, 'report.json'), '--format', 'json'])).out) as CheckResult
+    expect(missing.findings.filter((f) => f.rule.startsWith('test-'))).toEqual([expect.objectContaining({ rule: 'test-not-found', severity: 'error', nodeId: 'oscen' })])
+    await report('passed')
+    expect((await run(home, ['check', '--report', join(payments, 'report.json')])).code).toBe(0)
   })
 
   it('fetches the versions of the other models the milestones keep', async () => {

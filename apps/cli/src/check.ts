@@ -85,7 +85,9 @@ its own ("model": { "repo": … }), it judges that repository's part of the mode
                       that check it, each with its status and why a test
                       failed, instead of the check's findings. Without
                       --report or --from-ci it reads the test results kept
-                      beside the model. With --format json, the paths as JSON
+                      beside the model. With --format json, the paths as JSON.
+                      With deps.json, also an element of a model it depends
+                      on (a scenario of theirs this repository's tests check)
   --verbose           list every warning, not the first five of each rule
   --list-rules        list the rules and their default severity, and the
                       metrics check.json can set goals for ("goals":
@@ -373,9 +375,13 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
   if (values.evidence && result.evidence) await writeBeside(resolve(io.cwd, values.evidence), JSON.stringify(result.evidence, null, 2) + '\n')
   if (values.trace) {
-    const { nodes, relations } = deserializeFromMdFolder(files).data
+    // With the models it depends on: a path may go through their elements
+    // (a scenario of theirs this repository's tests check).
+    const own = deserializeFromMdFolder(files).data
+    const nodes = [...own.nodes, ...others?.nodes ?? []]
+    const relations = [...own.relations, ...others?.relations ?? []]
     const byId = Object.fromEntries(nodes.map((n) => [n.id, n]))
-    if (!byId[values.trace]) { io.err(`radical check --trace: no element ${values.trace} in ${folder}.`); return 2 }
+    if (!byId[values.trace]) { io.err(`radical check --trace: no element ${values.trace} in ${folder}${others?.nodes.length ? ' or the models it depends on' : ''}.`); return 2 }
     const trace = traceOf({ nodes: byId, relations: Object.fromEntries(relations.map((r) => [r.id, r])), evidence: result.evidence, cases: tests }, values.trace)
     if (!values.quiet) io.out(values.format === 'json' ? JSON.stringify(trace, null, 2) : formatTrace(trace, byId))
     return 0
