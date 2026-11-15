@@ -388,9 +388,10 @@ groups. Open after the fixes:
 - **Designer edits offered elsewhere** (`editAsDesigner`): an Inspector fix while Designer shows a milestone leaves
   Designer on the live model even when the wizard is cancelled; Viewer → Inspector → an edit → Viewer gives Viewer
   the edited live model back, not the milestone it showed.
-- **Keys:** Esc listeners on `window` other than the canvas's and the hierarchy's (the Delete prompt, popovers) are
-  not behind the dialog gate (`keysHere.ts`). The agent's run panels close when F5 starts a presentation (the
-  Toolbar unmounts while presenting).
+- **Keys:** the Esc listeners of the Inspector's popovers (`Freshness`, `inspector/shared`), Other models and the
+  wiki menu do not ask `keysOnTop` (`keysHere.ts`): under a dialog opened over them, Esc closes them too. The agent's
+  run panels, and Radical Forge put aside for one, close when F5 starts a presentation (the Toolbar unmounts while
+  presenting): Forge's run is lost then.
 - **Electron's `folder:open` refusal** of a folder with no model has no test of its own (only `repositoryModel`).
 
 ### Dogfooding (2026-11-15): Smart Layout over every view of our own model

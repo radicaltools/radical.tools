@@ -212,7 +212,7 @@ npx @radicaltools/cli setup</code></pre>
         <figure class="doc-shot">
           <img class="shot-light" src="screenshots/documents-light.png?v=__BUILD__" alt="Models dialog: one list of browser, file and folder models with search, a filter by place and a menu per row" loading="lazy" />
           <img class="shot-dark" src="screenshots/documents-dark.png?v=__BUILD__" alt="Models dialog: one list of browser, file and folder models with search, a filter by place and a menu per row" loading="lazy" />
-          <figcaption><em>Models → Manage models…</em> lists every model, the last used first. Its row menu renames a model, moves it between browser, file and folder, or removes it from the list.</figcaption>
+          <figcaption><em>Models → Manage models…</em> lists every model, the last used first, as the Welcome screen does: not the empty one Studio starts a first visit on, until you use it. Its row menu renames a model, moves it between browser, file and folder, or removes it from the list.</figcaption>
         </figure>
         <p><em>Open… → Structurizr DSL…</em> converts a <code>.dsl</code> workspace into a new C4 model: its elements, groups, relationships and views, with a dynamic view played as a sequence. A notice lists what the import left out (includes, deployment views, custom elements).</p>
         <div class="doc-tip">
@@ -456,7 +456,7 @@ npx @radicaltools/cli setup</code></pre>
         </figure>
         <p>To see what an element touches without building a view, select it and choose <em>Explore</em> in the head of its card. A temporary view opens with that element alone, and its <em>+</em> menu opens at once.</p>
         <ul>
-          <li><strong>+</strong> on an element's right edge counts the neighbours not shown yet. Its menu lists them by relation, out and in, with the children and the parent last. Pick a row or tick several; what you add goes on the level below, and the whole exploration is laid out again, top-down. A row that would take the exploration past 1,000 elements, what a canvas draws, is greyed out.</li>
+          <li><strong>+</strong> on an element's right edge counts the neighbours not shown yet. Its menu lists them by relation, out and in, with the children and the parent last. Pick a row or tick several; what you add goes on the level below, and the whole exploration is laid out again, top-down. A row that would take the exploration past 1,000 elements, what a canvas draws, is greyed out. <kbd>Esc</kbd> closes the menu.</li>
           <li><strong>−</strong> takes back what that element's <em>+</em> added.</li>
           <li><strong>Save as view…</strong> keeps the exploration as a view of type <em>Explore</em>, with its levels and <em>+</em> buttons still working. <strong>×</strong> closes it.</li>
         </ul>
@@ -861,7 +861,7 @@ npx @radicaltools/cli setup</code></pre>
           <li><strong>Requirements wait for you.</strong> From the tests the agent proposes requirements, each with the scenarios that verify it. You accept, change or leave out each one; only an accepted one is written, derived from a need <em>Found in the code</em>, with its tests bound to its scenarios.</li>
         </ul>
         <p>Ask your agent for Radical Assay, or in Claude Code run <code>/mcp__radical-folder__assay</code>. Without an agent, <code>radical assay extract &lt;directory&gt;…</code> reads the facts and prints them with the links.</p>
-        <p>While the agent runs Assay, Studio open on the central model shows an Assay button beside the Forge button. It pulses blue while the agent works and amber while requirements, needs or decisions wait for your answer, and carries the stage the run is at. Click it for the stages from C4 to Scenarios, the repositories read, the plans the server wrote and refused, and the proposals waiting; <em>Follow on the canvas</em> has Studio open the view that shows what the agent just added, waiting while you type in a field. The server tells the stage from what the agent calls, so a stage the agent passes without a plan shows as skipped. Answer the proposals in the agent's chat. The Forge and Assay panels show one at a time: a click on either button shows its panel in place of the other.</p>
+        <p>While the agent runs Assay, Studio open on the central model shows an Assay button beside the Forge button. It pulses blue while the agent works and amber while requirements, needs or decisions wait for your answer, and carries the stage the run is at. Click it for the stages from C4 to Scenarios, the repositories read, the plans the server wrote and refused, and the proposals waiting; <em>Follow on the canvas</em> has Studio open the view that shows what the agent just added, waiting while you type in a field. The server tells the stage from what the agent calls, so a stage the agent passes without a plan shows as skipped. Answer the proposals in the agent's chat. The Forge and Assay panels show one at a time: a click on either button shows its panel in place of the other. Studio's own Radical Forge, put aside between two stages, comes back on the stage it was at; while a stage generates, its panel stays.</p>
       </section>
 
       <section class="doc-section" id="mcp">

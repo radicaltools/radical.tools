@@ -824,19 +824,26 @@ export function Toolbar(): React.ReactElement {
   // none open. Each had a flag of its own, and the one open hid the others:
   // the Assay button did nothing under the agent's Forge panel, and the Assay
   // panel opened by itself once that closed. Radical Forge generating stays:
-  // closed, its run would be lost.
+  // closed, its run would be lost. Between two stages it is put aside, and
+  // comes back where it was (forgeAside): replaced, it was opened afresh on
+  // an empty Description, and the run could not be continued.
   const [runPanel, setRunPanel] = useState<RunPanel | null>(null)
   const runPanelShown = useRef(runPanel)
   runPanelShown.current = runPanel
   const forgeBusy = useRef(false)
+  const [forgeAside, setForgeAside] = useState(false)
   const showRunPanel = useCallback((panel: RunPanel) => {
-    if (runPanelShown.current === 'forge' && panel !== 'forge' && forgeBusy.current) {
-      useDiagramStore.getState().pushNotification('Radical Forge is generating: its panel stays open until it is done.', 'info')
-      return
+    if (runPanelShown.current === 'forge' && panel !== 'forge') {
+      if (forgeBusy.current) {
+        useDiagramStore.getState().pushNotification('Radical Forge is generating: its panel stays open until it is done.', 'info')
+        return
+      }
+      setForgeAside(true)
     }
     setRunPanel(panel)
   }, [])
   const closeRunPanel = useCallback((panel: RunPanel) => {
+    if (panel === 'forge') setForgeAside(false)
     setRunPanel((open) => (open === panel ? null : open))
   }, [])
   const onForgeBusy = useCallback((busy: boolean) => { forgeBusy.current = busy }, [])
@@ -953,7 +960,7 @@ export function Toolbar(): React.ReactElement {
       <AISettingsModal open={aiSettingsOpen} onClose={handleCloseAISettings} />
       <AboutDialog open={aboutOpen} onClose={handleCloseAbout} />
       <HubImportModal open={hubOpen} onClose={handleCloseHub} preselectedIds={hubPreselectedIds} bindTo={hubBindTo} />
-      <RadicalForgeModal open={runPanel === 'forge'} onClose={handleCloseForge} onBusy={onForgeBusy} />
+      <RadicalForgeModal open={runPanel === 'forge'} resume={forgeAside} onClose={handleCloseForge} onBusy={onForgeBusy} />
       <AgentForgeModal open={runPanel === 'agent-forge'} onClose={closeAgentForge} />
       <AgentAssayModal open={runPanel === 'agent-assay'} onClose={closeAgentAssay} />
       <AppMenu

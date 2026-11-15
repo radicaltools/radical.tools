@@ -1,5 +1,6 @@
-import type { Page, Route } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import { test, expect, fixture } from '../../support/fixtures'
+import { ModelFolder, test as folderTest } from '../../support/folder'
 import { HUB_PORT } from '../../playwright.config'
 
 // Radical Forge asks for the view structure first: the Radical one (views of
@@ -479,4 +480,126 @@ test('Forge asks a concern pack\'s questions and imports it whole', async ({ pag
   // (The prompt is kept as JSON: its quotes are escaped.)
   expect(stagePrompts[0]).toContain('Concerns already decided by Hub concern packs')
   expect(stagePrompts[0]).toContain(`- Authentication: ${adr.id} `)
+})
+
+/** Whether every button of `dialog` is the one a click at its centre hits. */
+const clickable = (dialog: Locator): Promise<string[]> => dialog.getByRole('button').evaluateAll((buttons) => buttons
+  .filter((b) => (b as HTMLElement).offsetParent)
+  .filter((b) => {
+    const r = b.getBoundingClientRect()
+    return !b.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2))
+  })
+  .map((b) => (b as HTMLElement).innerText.split('\n')[0] || b.getAttribute('aria-label') || '?'))
+
+test('a dialog opened over Radical Forge is drawn over its panel, and Esc closes only that dialog', async ({ page, studio }) => {
+  // F-0168: the panel's own layer (z-index 4000) lay over the Delete prompt,
+  // the Models dialog, AI providers and About opened after it: none of their
+  // buttons could be clicked. Esc closed Forge with the dialog over it.
+  await studio.seed()
+  await page.addInitScript(() => {
+    localStorage.setItem('radical-ai-settings', JSON.stringify({ enabled: true, active: 'anthropic', providers: { anthropic: { apiKey: 'e2e', baseUrl: '', model: '' } } }))
+  })
+  await studio.open('v-context')
+  await page.getByRole('button', { name: 'Open Radical Forge' }).click()
+  const forge = page.getByRole('dialog', { name: 'Radical Forge', exact: true })
+  await expect(forge).toBeVisible()
+
+  // The Delete prompt of an element selected beside the panel (the camera
+  // settled first, and the click made again until it selects).
+  await studio.settle()
+  await expect(async () => {
+    const at = await studio.nodes.evaluateAll((nodes) => {
+      const panel = document.querySelector('.forge-panel')!.getBoundingClientRect()
+      for (const node of nodes) {
+        const b = node.getBoundingClientRect()
+        for (const [x, y] of [[b.x + 8, b.y + 8], [b.right - 8, b.y + 8], [b.x + 8, b.bottom - 8], [b.right - 8, b.bottom - 8]]) {
+          const beside = x < panel.left || x > panel.right || y < panel.top || y > panel.bottom
+          if (beside && document.elementFromPoint(x, y)?.closest('.react-flow__node') === node) return { x, y, id: (node as HTMLElement).dataset.id! }
+        }
+      }
+      return null
+    })
+    expect(at, 'an element beside the Forge panel').not.toBeNull()
+    await page.mouse.click(at!.x, at!.y)
+    await expect(studio.node(at!.id)).toHaveClass(/selected/, { timeout: 1000 })
+  }).toPass()
+  await page.keyboard.press('Delete')
+  const prompt = page.locator('.milestone-modal', { has: page.locator('.milestone-modal-title', { hasText: /^Delete / }) })
+  await expect(prompt).toBeVisible()
+  expect(await clickable(prompt)).toEqual([])
+  await page.keyboard.press('Escape')
+  await expect(prompt).toHaveCount(0)
+  await expect(forge).toBeVisible()
+
+  // Models, AI providers and About, from the toolbar and the rail's Settings.
+  for (const { menu, item, name } of [
+    { menu: 'Models', item: /Manage models/, name: 'Models' },
+    { menu: 'Settings', item: 'AI providers…', name: 'AI provider settings' },
+    { menu: 'Settings', item: 'About Radical Studio', name: 'About Radical Studio' },
+  ]) {
+    await page.getByRole('button', { name: menu, exact: true }).click()
+    await page.getByRole('menuitem', { name: item }).click()
+    const dialog = page.getByRole('dialog', { name })
+    await expect(dialog).toBeVisible()
+    expect(await clickable(dialog), name).toEqual([])
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    await expect(forge, name).toBeVisible()
+  }
+})
+
+folderTest('Radical Forge put aside for the agent\'s Assay panel between two stages comes back where it was', async ({ page, studio }) => {
+  // F-0169: the Assay button replaced Forge's panel, and the Forge button
+  // then opened a new run on an empty Description: the run was lost.
+  const folder = new ModelFolder(page)
+  await folder.install()
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  await scriptAnthropic(page, [{ task: /extract its functional requirements/, calls: [1, 2].map(requirement) }])
+  await studio.open('v-context')
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
+  await page.getByRole('menuitem', { name: /Manage models/ }).click()
+  const models = page.getByRole('dialog', { name: 'Models' })
+  await models.getByRole('button', { name: 'Actions for E2E' }).click()
+  await models.getByRole('menuitem', { name: 'Move to a folder…' }).click()
+  await expect(models.locator('.docmgr-badge.md')).toBeVisible()
+  await models.getByRole('button', { name: 'Close' }).click()
+
+  await page.getByRole('button', { name: 'Open Radical Forge' }).click()
+  const forge = page.getByRole('dialog', { name: 'Radical Forge', exact: true })
+  await forge.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
+  await forge.getByRole('group', { name: 'Views' }).getByLabel(/Layer canvases/).check()
+  await forge.getByRole('button', { name: 'Start →' }).click()
+  await forge.getByRole('button', { name: 'Generate requirements' }).click()
+  await expect(forge.getByRole('button', { name: 'Continue →' })).toBeVisible()
+  await expect(forge.locator('.forge-step.active')).toHaveText('Requirements')
+
+  // An agent runs Assay with this folder as its central model.
+  const now = new Date().toISOString()
+  await folder.write('.state/assay-run.json', JSON.stringify({
+    version: 1, client: 'claude-code', repositories: [{ name: 'orders', units: 1, facts: 12 }], sources: 0, startedAt: now, updatedAt: now, state: 'active',
+    stages: ['c4', 'explore', 'documents', 'domain', 'processes', 'states', 'scenarios'].map((id, i) => ({ id, status: i === 0 ? 'working' : 'pending' })),
+    proposals: { waiting: 0, accepted: 0, rejected: 0 },
+  }))
+  const assayButton = page.locator('.qs-assay-toggle')
+  await expect(assayButton).toHaveAttribute('data-agent-phase', 'working', { timeout: 10_000 })
+  await assayButton.click()
+  const assay = page.getByRole('dialog', { name: 'Radical Assay — agent run' })
+  await expect(assay).toBeVisible()
+  await expect(forge).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(assay).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Open Radical Forge' }).click()
+  await expect(forge.locator('.forge-step.active')).toHaveText('Requirements')
+  // The run goes on: the next stage is offered.
+  await forge.getByRole('button', { name: 'Continue →' }).click()
+  await expect(forge.getByRole('button', { name: 'Generate domain model' })).toBeVisible()
+  await expect(forge.locator('.forge-step.done', { hasText: 'Requirements' })).toHaveCount(1)
+  // Closed, it starts afresh, as before.
+  await forge.getByRole('button', { name: 'Close' }).click()
+  await page.getByRole('button', { name: 'Open Radical Forge' }).click()
+  await expect(forge.locator('.forge-step.active')).toHaveText('Description')
+  await expect(forge.locator('.forge-textarea')).toHaveValue('')
 })

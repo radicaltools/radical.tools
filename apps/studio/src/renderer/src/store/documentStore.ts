@@ -250,6 +250,14 @@ export interface DocumentMeta {
   seeded?: boolean
 }
 
+/** The models listed and counted as the user's, wherever models are (the
+ *  Welcome screen's Recent and counts, the Models dialog): every one but the
+ *  one a first visit seeded and nobody has used (DocumentMeta.seeded). The
+ *  Models dialog listed that "Untitled" while the Welcome screen counted 0. */
+export function usersModels(docs: DocumentMeta[]): DocumentMeta[] {
+  return docs.filter((d) => !d.seeded)
+}
+
 interface DocumentsIndex {
   docs: DocumentMeta[]
   activeId: string | null

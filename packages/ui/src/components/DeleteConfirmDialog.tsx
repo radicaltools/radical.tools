@@ -1,5 +1,7 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { hideRefusal, useDiagramStore } from '../store/diagramStore'
+import { keysOnTop } from './keysHere'
 import type { C4Node, C4Relation } from '@radical/common/c4'
 import { descendantIds, sequenceStepsRemovedBy } from '@radical/common/model'
 
@@ -44,11 +46,12 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
   // nothing what its filter gives: nothing is hidden from them.
   const refusal = useDiagramStore((s) => (s.activeViewId ? hideRefusal(s, s.activeViewId) : null))
 
-  // Esc → cancel
+  // Esc → cancel, unless a dialog was opened over the prompt.
+  const backdropRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!pending) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); resolve('cancel') }
+      if (e.key === 'Escape' && keysOnTop(backdropRef.current, e)) { e.preventDefault(); resolve('cancel') }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -75,9 +78,12 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
   // does (hiddenRelationIds), whatever the view shows of elements.
   const canHide = !!activeViewId && (nodeCount > 0 ? !refusal : edgeCount > 0)
 
-  return (
-    <div className="milestone-modal-backdrop" onClick={() => resolve('cancel')}>
-      <div className="milestone-modal" onClick={(e) => e.stopPropagation()}>
+  // A modal dialog (the keys are its own: keysHere.ts), on the dialogs'
+  // layer in the body: drawn inside the canvas, it opened under Radical
+  // Forge's panel and none of its buttons could be clicked.
+  return createPortal(
+    <div className="milestone-modal-backdrop" ref={backdropRef} onClick={() => resolve('cancel')}>
+      <div className="milestone-modal" role="dialog" aria-modal="true" aria-label={deletePromptTitle(pending, c4Nodes, c4Relations)} onClick={(e) => e.stopPropagation()}>
         <h3 className="milestone-modal-title">{deletePromptTitle(pending, c4Nodes, c4Relations)}</h3>
         <p className="milestone-modal-text">
           Choose how to handle this delete request.
@@ -118,6 +124,7 @@ export function DeleteConfirmDialog(): React.ReactElement | null {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

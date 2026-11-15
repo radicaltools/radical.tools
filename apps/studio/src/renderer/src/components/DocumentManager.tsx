@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { documents, useDocumentsStore, type DocumentMeta, type DocumentSource } from '../store/documentStore'
+import { documents, useDocumentsStore, usersModels, type DocumentMeta, type DocumentSource } from '../store/documentStore'
 import { confirmForeignFolder } from './confirmForeignFolder'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
@@ -8,6 +8,7 @@ import { host } from '../platform/host'
 import { reloadActiveDocument } from '../persistence/autosave'
 import { NewModelStep, OpenSources, SourceIcon, fileSupported, folderSupported, shortDate } from './ModelSteps'
 import { useDialogFocus } from './dialogKeys'
+import { keysOnTop } from '@radical/ui/components/keysHere'
 
 interface Props {
   open: boolean
@@ -140,7 +141,9 @@ function ModelMenu({ doc, onRename }: { doc: DocumentMeta; onRename: () => void 
 }
 
 export function DocumentManagerModal({ open, onClose }: Props): React.ReactElement | null {
-  const docs = useDocumentsStore((s) => s.docs)
+  // The user's models, as the Welcome screen lists them (usersModels).
+  const allDocs = useDocumentsStore((s) => s.docs)
+  const docs = useMemo(() => usersModels(allDocs), [allDocs])
   const activeId = useDocumentsStore((s) => s.activeId)
   const [view, setView] = useState<'list' | 'new' | 'open'>('list')
   const [filter, setFilter] = useState<Filter>('all')
@@ -159,7 +162,7 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape' || renamingId) return
+      if (e.key !== 'Escape' || renamingId || !keysOnTop(dialogRef.current, e)) return
       if (view === 'list') onClose()
       else setView('list')
     }

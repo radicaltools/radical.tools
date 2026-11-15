@@ -37,7 +37,7 @@ import { CanvasControls } from './CanvasControls'
 import { ExploreBar } from './ExploreBar'
 import { ExploreMenu } from './ExploreMenu'
 import { NodeDiscussionBadges } from './NodeDiscussionBadges'
-import { canvasKeysOff, keepKeysHere } from './keysHere'
+import { canvasKeysOff, keepKeysHere, keysOnTop } from './keysHere'
 import { editingControl } from './editingControl'
 import type { NodeDiscussionCounts } from '@radical/common/discussions'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
@@ -2207,7 +2207,7 @@ function RelationTypeMenu({ containerRef }: { containerRef: React.RefObject<HTML
   useEffect(() => {
     if (!choice) return
     menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') choose(null) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && keysOnTop(menuRef.current, e)) choose(null) }
     const onDown = (e: MouseEvent) => { if (!menuRef.current?.contains(e.target as Node)) choose(null) }
     window.addEventListener('keydown', onKey)
     window.addEventListener('mousedown', onDown, true)

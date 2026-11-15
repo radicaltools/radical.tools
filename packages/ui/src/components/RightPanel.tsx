@@ -26,6 +26,7 @@ import { openCard, showNodeInView, useCardOpen } from '../store/showInView'
 import { CardNavigation, ElementVerification, useCardNavigate } from './ElementVerification'
 import { NodeActions, RelationActions } from './SelectionActions'
 import { OPEN_VIEW_PROPERTIES_EVENT } from './LargeCanvasNotice'
+import { keysOnTop } from './keysHere'
 import { CANVAS_MAX_ELEMENTS, viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
 
 /** A text field got or lost focus: what is typed into it in between (each
@@ -1467,7 +1468,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
   }, [newMenuOpen, placeNewMenu])
   useEffect(() => {
     if (!newMenuOpen) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNewMenuOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && keysOnTop(newMenuPopRef.current, e)) setNewMenuOpen(false) }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [newMenuOpen])
