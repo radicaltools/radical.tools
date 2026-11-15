@@ -144,6 +144,11 @@ describe("reading the person's words", () => {
     expect(needAnswers('Q: How many? A: At most 20.\nQ1: Where?\nA1: Here.\nQuestion: When?\n> Answer: **Now.**')).toEqual(['At most 20.', 'Here.', '**Now.**'])
   })
 
+  it('leads each finding about a quote to its requirement, the source of the relation, as the Inspector opens it', () => {
+    const about = (data: DiagramData) => checkModel(data).findings.filter((f) => f.relationId).map((f) => [f.rule, f.relationId, f.nodeId])
+    expect(about(model())).toEqual([['derives-quote-not-in-need', 'd2', 'worth'], ['quote-value-missing', 'd1', 'value']])
+  })
+
   it('reads values in their forms (Values read in their forms)', () => {
     const need = node('n', 'need', 'Rules', { description: 'Q: Discount?\nA: 20 percent off.\nQ: Size?\nA: Twenty-five at most.\nQ: Warehouses?\nA: Only one warehouse for now.\nQ: Basket?\nA: Kept for 15 minutes.\nQ: Payment?\nA: It times out after 30s.' })
     const data = governance(
