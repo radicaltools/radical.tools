@@ -209,6 +209,10 @@ function brokenWith(model: CheckModel, node: C4Node): string {
   return ` Not verified now: ${what}${affected.length === 1 ? '' : 's'} ${affected.map(quote).join(', ')}.`
 }
 
+/** A scenario or fitness function as a test finding names it: with the
+ *  model it is of, when it is another's that this repository's tests check. */
+const testedName = (node: C4Node): string => `${TYPE_NAME[node.type]} ${quote(node)}${originOf(node) ? ` of ${originOf(node)}` : ''}`
+
 /** A rule over the outcome of each test id the model names, with reports.
  *  A failing outcome names what it leaves unverified as related. */
 function testRule(outcome: TestOutcome, message: (node: C4Node, id: string, model: CheckModel) => string): (model: CheckModel) => RuleFinding[] {
@@ -492,14 +496,16 @@ function unquotedBlocks(answer: string, fragments: string[][]): string[] {
 }
 
 /** The requirements a need leads to: those that derive from it, and those
- *  that derive from them. */
+ *  that derive from them, and those of the needs inside it (a need that
+ *  derives from it, Part of). */
 function requirementsOfNeed(model: CheckModel, needId: string): C4Node[] {
   const derives = relationsOf(model, 'derives')
-  const found = new Map<string, C4Node>(); const queue = [needId]
+  const found = new Map<string, C4Node>(); const parts = new Set([needId]); const queue = [needId]
   while (queue.length) {
     for (const r of derives.to.get(queue.shift()!) ?? []) {
       const n = model.nodes[r.sourceId]
       if (n?.type === 'requirement' && !found.has(n.id)) { found.set(n.id, n); queue.push(n.id) }
+      else if (n?.type === 'need' && !parts.has(n.id) && model.nodes[r.targetId]?.type === 'need') { parts.add(n.id); queue.push(n.id) }
     }
   }
   return [...found.values()]
@@ -573,10 +579,11 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'need-without-requirement',
-    description: 'Every need has at least one requirement derived from it.',
+    description: 'Every need has at least one requirement derived from it, or from a need inside it (a need that derives from it, Part of).',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => unlinked(model, 'need', 'derives', 'in', ['requirement'])
+      .filter((n) => !requirementsOfNeed(model, n.id).length)
       .map((n) => ({ nodeId: n.id, message: `No requirement derives from need ${quote(n)}.` })),
   },
   {
@@ -957,7 +964,7 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'error',
     dimension: 'tests',
     readsReports: true,
-    run: testRule('failed', (node, id, model) => `${TYPE_NAME[node.type]} ${quote(node)}: test ${id} failed.${brokenWith(model, node)}`),
+    run: testRule('failed', (node, id, model) => `${testedName(node)}: test ${id} failed.${brokenWith(model, node)}`),
   },
   {
     id: 'test-not-found',
@@ -966,8 +973,8 @@ export const CHECK_RULES: CheckRule[] = [
     dimension: 'tests',
     readsReports: true,
     run: (model) => testRule('not-found', (node, id) => model.testsReadAt
-      ? `${TYPE_NAME[node.type]} ${quote(node)}: no test ${id} in the test results read ${model.testsReadAt.slice(0, 10)}, ${formatAge((model.now ?? Date.now()) - Date.parse(model.testsReadAt))} ago; added since, renamed or deleted? radical check --report reads the tests again.`
-      : `${TYPE_NAME[node.type]} ${quote(node)}: no test ${id} in the reports, though its file ran; renamed or deleted?${brokenWith(model, node)}`)(model)
+      ? `${testedName(node)}: no test ${id} in the test results read ${model.testsReadAt.slice(0, 10)}, ${formatAge((model.now ?? Date.now()) - Date.parse(model.testsReadAt))} ago; added since, renamed or deleted? radical check --report reads the tests again.`
+      : `${testedName(node)}: no test ${id} in the reports, though its file ran; renamed or deleted?${brokenWith(model, node)}`)(model)
       .map((f) => (model.testsReadAt ? { ...f, asOf: model.testsReadAt } : f)),
   },
   {
@@ -976,7 +983,7 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'warning',
     dimension: 'tests',
     readsReports: true,
-    run: testRule('skipped', (node, id) => `${TYPE_NAME[node.type]} ${quote(node)}: test ${id} was skipped.`),
+    run: testRule('skipped', (node, id) => `${testedName(node)}: test ${id} was skipped.`),
   },
   {
     id: 'test-not-run',
@@ -984,7 +991,7 @@ export const CHECK_RULES: CheckRule[] = [
     severity: 'warning',
     dimension: 'tests',
     readsReports: true,
-    run: testRule('not-run', (node, id) => `${TYPE_NAME[node.type]} ${quote(node)}: no report has the file of test ${id}.`),
+    run: testRule('not-run', (node, id) => `${testedName(node)}: no report has the file of test ${id}.`),
   },
   {
     id: 'metric-failed',
@@ -1065,9 +1072,10 @@ export function testBinding(model: CheckModel): Map<string, { total: number; unb
  *  requirements against the person's words). */
 export const WORD_RULES: ReadonlySet<string> = new Set(['derives-quote-not-in-need', 'quote-value-missing', 'quote-value-differs', 'requirement-value-unquoted', 'scenario-value-missing', 'example-not-in-scenario', 'need-answer-unquoted'])
 
-/** What the word rules find in a model, each with its rule and severity;
- *  `off`, the rules check.json turns off. */
-export function wordFindings(model: CheckModel, off: ReadonlySet<string> = new Set()): Array<{ rule: string; severity: CheckSeverity; message: string }> {
+/** What the word rules find in a model, each with its rule, severity and
+ *  the element or relation it is about; `off`, the rules check.json turns
+ *  off. */
+export function wordFindings(model: CheckModel, off: ReadonlySet<string> = new Set()): Array<{ rule: string; severity: CheckSeverity; message: string; nodeId?: string; relationId?: string }> {
   return CHECK_RULES.filter((r) => WORD_RULES.has(r.id) && !off.has(r.id))
-    .flatMap((rule) => rule.run(model).map((f) => ({ rule: rule.id, severity: f.severity ?? rule.severity, message: f.message })))
+    .flatMap((rule) => rule.run(model).map((f) => ({ rule: rule.id, severity: f.severity ?? rule.severity, message: f.message, ...(f.nodeId ? { nodeId: f.nodeId } : {}), ...(f.relationId ? { relationId: f.relationId } : {}) })))
 }

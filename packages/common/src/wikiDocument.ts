@@ -3,7 +3,7 @@
 import { TYPE_LABELS, viewShowsEveryNode, type C4Node, type C4Relation, type DiagramView } from './c4'
 import { isMarkdownField } from './markdown'
 import { composeEarsSentence, isPropertyVisible, propertyText, refIds, relationDetails, relationSentences, relationTypeForProse, requirementStatePhrase, resolveEarsSubject, typeNoun, type Metamodel, type PropertyDef, type RelationSentence } from './metamodel'
-import { pipelineOf, runPipeline, type ChainRow } from './viewPipeline'
+import { pipelineOf, runPipeline, viewShownNodes, type ChainRow } from './viewPipeline'
 import { fitnessResult } from './check/metrics'
 
 export const WIKI_ROOT = '__root__'
@@ -174,6 +174,9 @@ export function createWikiDocument(view: DiagramView | null | undefined, context
       const seen = new Set<string>()
       for (let id: string | undefined = first; id && nodes[id] && !seen.has(id); id = nodes[id].parentId) { seen.add(id); visibleSet.add(id) }
     }
+  } else if (view?.originScope) {
+    // Another model's wiki of every element: its models' elements only.
+    visibleSet = viewShownNodes(view, nodes, relations) ?? null
   }
   const chain = view && pipelineOf(view)?.levels?.length ? runPipeline(view, { ...context, metamodel: metamodel ?? NO_METAMODEL }) : null
   if (chain) visibleSet = new Set(chain.nodes.map((n) => n.id))

@@ -8,7 +8,9 @@
 //   "implements": [{ "element", "name", "paths" }],
 //   "verifies": [{ "element", "name", "tests" }] },
 // paths and test ids from the repository's root. Read by the CLI on disk and
-// by Studio beside the model; what both need of it is here.
+// by Studio beside the model; what both need of it is here. A key this
+// version does not know ($schema, an owner, a newer version's) is kept as it
+// is, top-level and on an entry, so a write changes only what it changes.
 
 /** The file, from the repository's root. */
 export const REPOSITORY_FILE = '.radical/radical.json'
@@ -19,6 +21,7 @@ export interface MappedElement {
   element: string
   name?: string
   paths: string[]
+  [key: string]: unknown
 }
 
 /** One scenario or fitness function the repository's tests check: its id,
@@ -28,6 +31,7 @@ export interface VerifiedElement {
   element: string
   name?: string
   tests: string[]
+  [key: string]: unknown
 }
 
 /** The model of a system built in several repositories, when it lives in a
@@ -35,6 +39,7 @@ export interface VerifiedElement {
 export interface ExternalModel {
   repo: string
   ref?: string
+  [key: string]: unknown
 }
 
 /** What a .radical/radical.json says: besides the mapping, the repository's
@@ -46,9 +51,16 @@ export interface RepositoryFile {
   model?: ExternalModel
   implements: MappedElement[]
   verifies: VerifiedElement[]
-  tests?: { include?: string[]; exclude?: string[] }
-  ci?: { artifacts?: string[] }
+  tests?: { include?: string[]; exclude?: string[]; [key: string]: unknown }
+  ci?: { artifacts?: string[]; [key: string]: unknown }
+  [key: string]: unknown
 }
+
+/** The keys of `value` other than `known`, as they are. */
+const others = (value: unknown, known: string[]): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).filter(([k]) => !known.includes(k))) : {}
+
+const TOP_KEYS = ['model', 'tests', 'ci', 'implements', 'verifies']
 
 /** A list of strings, or one string as a list of one. */
 const strings = (v: unknown): string[] | null =>
@@ -64,11 +76,11 @@ export function parseRepositoryFile(text: string, file = REPOSITORY_FILE): Repos
     return value as Array<Record<string, unknown>>
   }
   const name = (e: Record<string, unknown>) => (typeof e?.name === 'string' ? { name: e.name } : {})
-  const settings = (key: string, lists: string[]): Record<string, string[]> | undefined => {
+  const settings = (key: string, lists: string[]): Record<string, unknown> | undefined => {
     const value = (raw as Record<string, unknown>)?.[key]
     if (value === undefined) return undefined
     if (!value || typeof value !== 'object') throw new Error(`${file}: "${key}" is no object`)
-    const out: Record<string, string[]> = {}
+    const out: Record<string, unknown> = others(value, lists)
     for (const list of lists) {
       const v = (value as Record<string, unknown>)[list]
       if (v === undefined) continue
@@ -85,18 +97,19 @@ export function parseRepositoryFile(text: string, file = REPOSITORY_FILE): Repos
     throw new Error(`${file}: "model" needs "repo" (the address of the model's repository), and "ref" is a branch or tag`)
   }
   return {
-    ...(model ? { model: { repo: model.repo as string, ...(model.ref ? { ref: model.ref as string } : {}) } } : {}),
+    ...others(raw, TOP_KEYS),
+    ...(model ? { model: { repo: model.repo as string, ...(model.ref ? { ref: model.ref as string } : {}), ...others(model, ['repo', 'ref']) } } : {}),
     ...(tests ? { tests } : {}),
     ...(ci ? { ci } : {}),
     implements: list('implements').map((e, i): MappedElement => {
       const paths = strings(e?.paths)
       if (typeof e?.element !== 'string' || !e.element || !paths) throw new Error(`${file}: implements[${i}] needs "element" (an id) and "paths" (a list of folders)`)
-      return { element: e.element, ...name(e), paths }
+      return { element: e.element, ...name(e), paths, ...others(e, ['element', 'name', 'paths']) }
     }),
     verifies: list('verifies').map((e, i): VerifiedElement => {
       const tests = strings(e?.tests)
       if (typeof e?.element !== 'string' || !e.element || !tests) throw new Error(`${file}: verifies[${i}] needs "element" (an id) and "tests" (a list of test ids)`)
-      return { element: e.element, ...name(e), tests }
+      return { element: e.element, ...name(e), tests, ...others(e, ['element', 'name', 'tests']) }
     }),
   }
 }
@@ -107,15 +120,20 @@ export function parseRepositoryMapping(text: string, file = REPOSITORY_FILE): Ma
 }
 
 /** The file as radical implement and radical verify write it: an element of
- *  "implements" a line, a test of "verifies" a line. */
+ *  "implements" a line, a test of "verifies" a line; keys it does not know
+ *  first at the top and last on an entry. */
 export function serializeRepositoryFile(file: RepositoryFile): string {
+  const inline = (v: unknown): string => Array.isArray(v) ? `[${v.map(inline).join(', ')}]`
+    : v && typeof v === 'object' ? (Object.keys(v).length ? `{ ${Object.entries(v).filter(([, x]) => x !== undefined).map(([k, x]) => `${JSON.stringify(k)}: ${inline(x)}`).join(', ')} }` : '{}')
+      : JSON.stringify(v)
+  const more = (v: object, known: string[]) => Object.entries(others(v, known)).filter(([, x]) => x !== undefined).map(([k, x]) => `, ${JSON.stringify(k)}: ${inline(x)}`).join('')
   const head = (m: { element: string; name?: string }) => `"element": ${JSON.stringify(m.element)}${m.name !== undefined ? `, "name": ${JSON.stringify(m.name)}` : ''}`
-  const implemented = file.implements.map((m) => `    { ${head(m)}, "paths": [${m.paths.map((p) => JSON.stringify(p)).join(', ')}] }`)
-  const verified = file.verifies.map((v) => `    { ${head(v)}, "tests": [${v.tests.length ? `\n${v.tests.map((t) => `      ${JSON.stringify(t)}`).join(',\n')}\n    ` : ''}] }`)
+  const implemented = file.implements.map((m) => `    { ${head(m)}, "paths": [${m.paths.map((p) => JSON.stringify(p)).join(', ')}]${more(m, ['element', 'name', 'paths'])} }`)
+  const verified = file.verifies.map((v) => `    { ${head(v)}, "tests": [${v.tests.length ? `\n${v.tests.map((t) => `      ${JSON.stringify(t)}`).join(',\n')}\n    ` : ''}]${more(v, ['element', 'name', 'tests'])} }`)
   const section = (key: string, lines: string[]) => `  "${key}": [${lines.length ? `\n${lines.join(',\n')}\n  ` : ''}]`
-  const inline = (v: object) => `{ ${Object.entries(v).map(([k, list]) => `${JSON.stringify(k)}: [${(list as string[]).map((x) => JSON.stringify(x)).join(', ')}]`).join(', ')} }`
   const settings = [
-    ...(file.model ? [`  "model": { ${Object.entries(file.model).map(([k, v]) => `${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(', ')} }`] : []),
+    ...Object.entries(others(file, TOP_KEYS)).filter(([, v]) => v !== undefined).map(([k, v]) => `  ${JSON.stringify(k)}: ${inline(v)}`),
+    ...(file.model ? [`  "model": ${inline(file.model)}`] : []),
     ...(file.tests ? [`  "tests": ${inline(file.tests)}`] : []),
     ...(file.ci ? [`  "ci": ${inline(file.ci)}`] : []),
   ]

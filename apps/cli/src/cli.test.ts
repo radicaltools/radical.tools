@@ -106,6 +106,32 @@ describe('radical check', () => {
     expect(JSON.parse(await readFile(join(cwd, 'gate.json'), 'utf8'))).toEqual({ rules: { 'requirement-without-scenario': { severity: 'error', max: 1 } } })
   })
 
+  it('leaves the model\'s baselines alone in a repository that judges its part of a model kept elsewhere', async () => {
+    // Two requirements no scenario verifies; the repository builds what satisfies one.
+    const cwd = await workspace({
+      nodes: [
+        node('sys', 'system', 'Shop'), node('web', 'container', 'Web', { parentId: 'sys' }), node('api', 'container', 'API', { parentId: 'sys' }),
+        node('need', 'need', 'Brief', { description: 'Shoppers see a basket and pay by card.' }),
+        node('basket', 'requirement', 'Basket', { action: 'show the basket' }), node('pay', 'requirement', 'Pay', { action: 'take the payment' }),
+      ],
+      relations: [
+        { id: 'r1', relationType: 'derives', sourceId: 'basket', targetId: 'need' }, { id: 'r2', relationType: 'derives', sourceId: 'pay', targetId: 'need' },
+        { id: 'r3', relationType: 'satisfies', sourceId: 'web', targetId: 'basket' }, { id: 'r4', relationType: 'satisfies', sourceId: 'api', targetId: 'pay' },
+      ],
+    })
+    const config = JSON.stringify({ rules: { 'requirement-without-scenario': { severity: 'error', max: 2 }, 'concern-unaddressed': 'off' } })
+    await writeFile(join(cwd, 'model', 'check.json'), config)
+    await mkdir(join(cwd, '.radical'))
+    await writeFile(join(cwd, '.radical', 'radical.json'), JSON.stringify({ model: { repo: '../central' }, implements: [{ element: 'web', paths: ['.'] }] }))
+    const ratchet = await run(cwd, 'check', 'model', '--ratchet')
+    expect(ratchet.code).toBe(2)
+    expect(ratchet.err).toContain('baselines of the whole model of ../central')
+    expect(await readFile(join(cwd, 'model', 'check.json'), 'utf8')).toBe(config)
+    // A config of the repository's own may follow its part.
+    await writeFile(join(cwd, 'web.json'), config)
+    expect((await run(cwd, 'check', 'model', '--config', 'web.json', '--ratchet')).err).toContain('requirement-without-scenario 2 → 1')
+  })
+
   it('exits 1 on a folder that is no model', async () => {
     const cwd = await workspace()
     await rm(join(cwd, 'model/radical.md'))
@@ -377,5 +403,31 @@ describe('radical', () => {
     const unknown = await run(cwd, 'lint')
     expect(unknown.code).toBe(2)
     expect(unknown.err).toContain('Unknown command: lint')
+  })
+
+  it('answers --help for every command and subcommand its usage lists', async () => {
+    const cwd = await workspace()
+    const usage = (await run(cwd, '--help')).out
+    // "  explore prepare|verify|record" and "  federation fetch [folder]":
+    // the words up to the first argument, each choice of a|b|c on its own.
+    const commands = usage.split('\n').filter((line) => /^ {2}[a-z]/.test(line)).flatMap((line) => {
+      let lists: string[][] = [[]]
+      for (const word of line.trim().split(/\s{2,}/)[0].split(' ')) {
+        if (/^[[<"-]/.test(word) && !/^<[\w-]+(\|[\w-]+)+>$/.test(word)) break
+        lists = lists.flatMap((list) => word.replace(/^<|>$/g, '').split('|').map((choice) => [...list, choice]))
+      }
+      return lists
+    })
+    for (const command of commands) {
+      const help = await run(cwd, ...command, '--help')
+      expect({ command, code: help.code, err: help.err }).toEqual({ command, code: 0, err: '' })
+      // Its usage, the lines before the first blank one, has that command.
+      const forms = help.out.split('\n\n')[0].split('\n').map((line) => line.replace(/^(Usage:)?\s*radical\s+/, '').split(' '))
+      const named = forms.some((form) => command.every((word, i) => form[i]?.split('|').includes(word)))
+      expect({ command, named }).toEqual({ command, named: true })
+    }
+    expect(commands.map((c) => c.join(' '))).toEqual(expect.arrayContaining(['check', 'federation fetch', 'explore verify']))
+    // radical sense --help names the file a review is written to.
+    expect((await run(cwd, 'sense', '--help')).out).toContain('.radical/reviews.json')
   })
 })

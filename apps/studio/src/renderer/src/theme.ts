@@ -3,9 +3,10 @@
 // changes), kept in this browser's localStorage under `radical-theme`. The
 // Settings menu and the Setup wizard both write it; every reader hears the
 // change through THEME_CHANGED_EVENT. Inside VS Code the editor's theme wins
-// (Toolbar), and nothing is stored.
+// (useDrawnTheme), and nothing is stored.
 
 import { useEffect, useState } from 'react'
+import { host } from './platform/host'
 
 export type ThemePref = 'light' | 'dark' | 'system'
 export type Theme = 'light' | 'dark'
@@ -49,4 +50,34 @@ export function useThemePref(): { pref: ThemePref; theme: Theme } {
     }
   }, [])
   return { pref, theme: pref === 'system' ? system : pref }
+}
+
+/** VS Code's theme, from the classes it gives the webview's body. */
+function vscodeTheme(): Theme {
+  return document.body.classList.contains('vscode-light') ? 'light' : 'dark'
+}
+
+/** The theme Studio draws now: the editor's inside VS Code, which follows
+ *  it as it changes, else the one chosen in this browser. */
+export function useDrawnTheme(): Theme {
+  const isVSCode = host().kind === 'vscode'
+  const { theme: chosen } = useThemePref()
+  const [editor, setEditor] = useState<Theme>(() => (isVSCode ? vscodeTheme() : 'dark'))
+  useEffect(() => {
+    if (!isVSCode) return
+    const obs = new MutationObserver(() => setEditor(vscodeTheme()))
+    obs.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-vscode-theme-kind'] })
+    return () => obs.disconnect()
+  }, [isVSCode])
+  return isVSCode ? editor : chosen
+}
+
+/** Draws Studio in its theme (html[data-theme]). App's own: it stays mounted
+ *  while a presentation plays, where the toolbar, which set it before, is
+ *  gone, and Studio stayed dark though the system had turned light. */
+export function useApplyTheme(): void {
+  const theme = useDrawnTheme()
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
 }

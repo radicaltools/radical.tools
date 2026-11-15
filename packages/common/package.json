@@ -12,6 +12,7 @@
     "./model": "./src/model.ts",
     "./modelChanges": "./src/modelChanges.ts",
     "./modelMerge": "./src/modelMerge.ts",
+    "./modelFolders": "./src/modelFolders.ts",
     "./federation": "./src/federation.ts",
     "./repositoryMapping": "./src/repositoryMapping.ts",
     "./branchChanges": "./src/branchChanges.ts",

@@ -167,11 +167,14 @@ const CENTS = /^(?:cents?|ct|grosz[ey]?|pence|p)$/
 const MONEY_BEFORE = /(?:€|\$|£|eur|usd|pln|gbp|chf)\s?$/
 
 /** A number as a value: thousands separators out, a decimal comma a point,
- *  trailing zeros of the fraction dropped. */
+ *  trailing zeros of the fraction dropped, a minus sign ("-18", "−18",
+ *  "minus 18") kept. */
 const numberValue = (raw: string): string => {
-  let n = /^\d{1,3}(,\d{3})+$/.test(raw) ? raw.replace(/,/g, '') : raw.replace(',', '.')
+  const sign = /^(?:[-−]|minus\s+)/i.exec(raw)?.[0] ?? ''
+  const digits = raw.slice(sign.length)
+  let n = /^\d{1,3}(,\d{3})+$/.test(digits) ? digits.replace(/,/g, '') : digits.replace(',', '.')
   if (/^\d+\.\d+$/.test(n)) n = n.replace(/0+$/, '').replace(/\.$/, '')
-  return n
+  return sign && Number(n) !== 0 ? `-${n}` : n
 }
 const fmt = (n: number): string => String(Math.round(n * 1000) / 1000)
 
@@ -205,12 +208,13 @@ function valuesOf(text: string): ValueReading {
   t = t.replace(/\b(\d{4}-\d{2}-\d{2})(?:[t ](\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?z?)?\b/gi, (_, date: string, time?: string) => { values.add(date); if (time) values.add(time); return ' ' })
   t = t.replace(/(?<![\d:])(\d{1,2}:\d{2})(?![\d:])/g, (_, time: string) => { values.add(time.padStart(5, '0')); return ' ' })
   t = numerals(t)
-  // Not the number inside a code such as MUG-BLUE-01.
-  for (const m of t.matchAll(/(?<![\w.,]|\w-)(\d{1,3}(?:,\d{3})+|\d+(?:[.,]\d+)?)(?:\s?(%|percent\b|per cent\b)|(st|nd|rd|th)\b|\s?([a-zżł€$£]+\b|€|\$|£))?(?![\w])/gi)) {
+  // Not the number inside a code such as MUG-BLUE-01; a minus sign before a
+  // number ("-18 °C", "minus 18"), not a dash between two or a list marker.
+  for (const m of t.matchAll(/((?:(?<![\w.,)\]])[-−]|\bminus\s+)?(?<![\w.,]|\w-)(?:\d{1,3}(?:,\d{3})+|\d+(?:[.,]\d+)?))(?:\s?(%|percent\b|per cent\b)|(st|nd|rd|th)\b|\s?([a-zżł€$£]+\b|€|\$|£))?(?![\w])/gi)) {
     const raw = m[1]; const n = numberValue(raw)
     if (m[2]) { values.add(`${n}%`); alias(`${n}%`, n); continue }
     values.add(n)
-    if (/[.,]\d\d$/.test(raw) && !/^\d{1,3}(,\d{3})+$/.test(raw)) alias(n, fmt(Number(n) * 100))
+    if (/[.,]\d\d$/.test(raw) && !/^\D*\d{1,3}(,\d{3})+$/.test(raw)) alias(n, fmt(Number(n) * 100))
     if (!/%$/.test(n)) alias(n, `${n}%`)
     const unit = (m[4] ?? '').toLowerCase()
     const before = t.slice(Math.max(0, (m.index ?? 0) - 4), m.index ?? 0).toLowerCase()
@@ -243,15 +247,15 @@ export const saysValueOf = (from: ValueReading, value: string, to: ValueReading)
 export type Op = '<=' | '<' | '>=' | '>'
 export type Limit = { value: string; op: Op; text: string }
 const COMPLEMENT: Record<Op, Op> = { '<=': '>', '<': '>=', '>=': '<', '>': '<=' }
-const N = String.raw`(\d+(?:[.,]\d+)?)`
+const N = String.raw`((?:(?<![\w.,])-|minus )?\d+(?:[.,]\d+)?)`
 const LIMIT_BEFORE: Array<[RegExp, Op]> = [
   [new RegExp(String.raw`\b(?:at most|no more than|not more than|up to|maximum of|a maximum of|max(?:imum)?\.?|no longer than|not over)\s+${N}`, 'g'), '<='],
   [new RegExp(String.raw`(?:≤|<=)\s*${N}`, 'g'), '<='],
   [new RegExp(String.raw`\b(?:at least|no less than|no fewer than|not less than|not fewer than|minimum of|a minimum of|min(?:imum)?\.?)\s+${N}`, 'g'), '>='],
   [new RegExp(String.raw`(?:≥|>=)\s*${N}`, 'g'), '>='],
-  [new RegExp(String.raw`(?<!\b(?:no|not) )\b(?:more than|greater than|longer than|larger than|higher than|over|above|exceeds?|exceeding|beyond)\s+${N}`, 'g'), '>'],
+  [new RegExp(String.raw`\b(?:more than|greater than|longer than|larger than|higher than|over|above|exceeds?|exceeding|beyond)\s+${N}`, 'g'), '>'],
   [new RegExp(String.raw`(?<![<>=-])>\s*${N}`, 'g'), '>'],
-  [new RegExp(String.raw`(?<!\b(?:no|not) )\b(?:less than|fewer than|shorter than|smaller than|lower than|below|under)\s+${N}`, 'g'), '<'],
+  [new RegExp(String.raw`\b(?:less than|fewer than|shorter than|smaller than|lower than|below|under)\s+${N}`, 'g'), '<'],
   [new RegExp(String.raw`(?<![<>=-])<\s*${N}(?![\d=])`, 'g'), '<'],
 ]
 const LIMIT_AFTER: Array<[RegExp, Op]> = [
@@ -259,6 +263,11 @@ const LIMIT_AFTER: Array<[RegExp, Op]> = [
   [new RegExp(String.raw`${N}(?:\s*[a-z%€$£]+)?\s+or\s+(?:more|above|over|higher|greater|larger|longer)\b`, 'g'), '>='],
 ]
 const RANGE = new RegExp(String.raw`\b(?:from|between)\s+${N}\s+(?:to|and)\s+${N}|(?<![\d.,-])${N}\s?(?:-|to)\s?${N}(?![\d.,-])`, 'g')
+// Words that turn what follows round: "not", "never", "cannot" and the n't
+// forms ("can't", "doesn't", "won't"); "no" only right before the limit ("no
+// greater than 20"). The "not" of a refusal ("not allowed") is the refusal's.
+const NEGATION = /\b(?:not|never|neither|nor|cannot|\w+n't)\b/
+const negates = (before: string): boolean => NEGATION.test(before.replace(/\bnot (?:allowed|accepted|permitted)\b/g, ' ')) || /\bno\s*$/.test(before)
 export const REFUSAL = /\b(?:refus\w*|reject\w*|declin\w*|den(?:y|ies|ied)|invalid|not (?:allowed|accepted|permitted)|forbidden|disallow\w*|error|too (?:long|short|many|few|high|low|big|small))\b/
 
 /** The limits a text puts on numbers, each as the side that is allowed: "at
@@ -275,10 +284,15 @@ function limitsOf(text: string, refusing: boolean): Limit[] {
     const clauses = sentence.split(/,|;|\s(?:and|but|so|then|otherwise)\s/).filter((c) => c.trim())
     clauses.forEach((clause, i) => {
       const refused = refusing || REFUSAL.test(clause) || /^\s*(?:if|when|whenever|where|once|should)\b/.test(clause) && REFUSAL.test(clauses[i + 1] ?? '')
+      // A limit inside one read already ("more than 20" in "no more than 20") is that one.
+      const read: Array<[number, number]> = []
       for (const [re, op] of [...LIMIT_BEFORE, ...LIMIT_AFTER]) {
         for (const m of clause.matchAll(re)) {
+          const start = m.index ?? 0; const end = start + m[0].length
+          if (read.some(([from, to]) => from <= start && end <= to)) continue
+          read.push([start, end])
           // "a cost that is not above zero": the negation turns the limit round once more.
-          const negated = /\b(?:not|never|isn't|aren't|neither|nor)\b/.test(clause.slice(0, m.index))
+          const negated = negates(clause.slice(0, start))
           limits.push({ value: numberValue(m[1]), op: refused !== negated ? COMPLEMENT[op] : op, text: m[0].trim() })
         }
       }

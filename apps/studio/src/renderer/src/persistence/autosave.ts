@@ -386,6 +386,19 @@ if (typeof window !== 'undefined') {
   // (the user switched again meanwhile) is dropped, so a slow folder read can
   // never land in — and then be auto-saved into — another document.
   let _loadSeq = 0
+  /** The edits a reload of the document shown (`keepUi`, `keepView`)
+   *  merges into what it read, as the store has them when the read is back:
+   *  those not saved when it began (`editedBefore`), and those made while
+   *  it read, which the store took while saves were suspended. */
+  const unsavedEdits = (
+    opts: { keepUi?: boolean; keepView?: boolean } | undefined,
+    editedBefore: boolean,
+    atStart: StoreState,
+  ): { base: DiagramData; ours: DiagramData } | null => {
+    if (!(opts?.keepUi || opts?.keepView) || !_baseModel || presenting()) return null
+    if (!editedBefore && placesOnlyChange(useDiagramStore.getState(), atStart)) return null
+    return { base: _baseModel, ours: buildPersistData() }
+  }
   const loadActive = (
     id: string,
     source: DocumentSource | undefined,
@@ -395,10 +408,11 @@ if (typeof window !== 'undefined') {
     _changedWhilePresenting = null
     // Edits not saved yet when the folder changed outside Studio: merged
     // into what is on disk now, from the model they were made on. Without
-    // them the disk's model is loaded as it is.
-    const unsaved = opts?.keepUi && _unsaved && _baseModel && !presenting()
-      ? { base: _baseModel, ours: buildPersistData() }
-      : null
+    // them the disk's model is loaded as it is. Taken once the read is back
+    // (unsavedEdits): taken before it, the letters typed while a large
+    // folder was read were not in them, and the load replaced them (F-0142).
+    const editedBefore = !!opts?.keepUi && _unsaved
+    const atStart = useDiagramStore.getState()
     if (!opts?.keepUi) _unsaved = false
     _suspended = true
     _loadingId = id
@@ -421,13 +435,14 @@ if (typeof window !== 'undefined') {
     documents.loadDocument(id).then((data) => {
       if (seq !== _loadSeq || documents.getActiveId() !== id) return
       if (data) {
+        const unsaved = unsavedEdits(opts, editedBefore, atStart)
         const store = useDiagramStore.getState()
         const { activeViewId, selectedNodeId } = store
         // Kept apart from the store, which may fill in what it loads.
         _baseModel = structuredClone(data)
         // An outside change to the model shown keeps the user's undo steps,
         // which then make their change on the model with it.
-        const outsideChange = !!opts?.keepUi
+        const outsideChange = !!opts?.keepUi || !!unsaved
         // Edits the page had not written when it went away (keepEdits).
         const kept = !opts?.keepUi && source === 'md' ? takeKeptEdits(id) : null
         // The edits are merged into the model's own elements, and the other

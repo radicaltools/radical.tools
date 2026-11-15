@@ -13,6 +13,7 @@ import ReactFlow, {
   useStore,
   useStoreApi,
   useUpdateNodeInternals,
+  useReactFlow,
   getNodesBounds,
   getViewportForBounds,
   type Node as RFNode,
@@ -36,7 +37,7 @@ import { CanvasControls } from './CanvasControls'
 import { ExploreBar } from './ExploreBar'
 import { ExploreMenu } from './ExploreMenu'
 import { NodeDiscussionBadges } from './NodeDiscussionBadges'
-import { keepKeysHere } from './keysHere'
+import { canvasKeysOff, keepKeysHere } from './keysHere'
 import { editingControl } from './editingControl'
 import type { NodeDiscussionCounts } from '@radical/common/discussions'
 import { C4ElementType, NODE_SIZES, COLLAPSED_HEIGHT, nodeTypeSize, type C4Node } from '@radical/common/c4'
@@ -360,6 +361,29 @@ function ConnectionPreviewLine({
 
 interface DiscussionCanvasProps { onDiscuss?: (nodeId: string) => void; nodeDiscussions?: NodeDiscussionCounts }
 
+/** Delete asks to delete what is selected on the canvas, as React Flow's
+ *  `deleteKeyCode` did, with the gate every canvas key has (canvasKeysOff):
+ *  React Flow's key knew no dialogs, and Delete pressed in Setup…, About or
+ *  the Models dialog opened the delete prompt behind it. `on`: in Designer
+ *  only, and not while a presentation plays (there it hid the element from
+ *  the view for good while the model kept it). */
+function useDeleteKey(on: boolean): void {
+  const rfStore = useStoreApi()
+  const { deleteElements } = useReactFlow()
+  useEffect(() => {
+    if (!on) return
+    const onKey = (e: KeyboardEvent): void => {
+      // Delete alone, as React Flow matched it: not with a modifier held.
+      if (e.key !== 'Delete' || e.repeat || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || canvasKeysOff(e)) return
+      const { edges, getNodes } = rfStore.getState()
+      deleteElements({ nodes: getNodes().filter((n) => n.selected), edges: edges.filter((edge) => edge.selected) })
+      rfStore.setState({ nodesSelectionActive: false })
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [on, rfStore, deleteElements])
+}
+
 function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps): React.ReactElement {
   const rfInstanceRef = useRef<ReactFlowInstance | null>(null)
   const [discussionMenu, setDiscussionMenu] = useState<{ nodeId: string; x: number; y: number; trigger: HTMLElement | null } | null>(null)
@@ -489,6 +513,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
   // accurate. A subscription, not useViewport(): that re-rendered the whole
   // canvas on every camera frame (Smart fit, pan, zoom).
   const rfStore = useStoreApi()
+  useDeleteKey(!isViewMode && !presentationActive)
   useEffect(() => {
     const record = (transform: [number, number, number]): void => {
       ;(window as any).__rfCurrentViewport = { x: transform[0], y: transform[1], zoom: transform[2] }
@@ -1655,7 +1680,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
         && (el.isContentEditable || el.closest('input, textarea, select, [role="dialog"], [role="menu"]'))) return
       const s = useDiagramStore.getState()
       if (s.presentationActive || (!s.selectedNodeId && !s.selectedEdgeId && !s.selectedNodeIds.length)) return
-      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
+      if (canvasKeysOff(e)) return
       onPaneClick()
     }
     window.addEventListener('keydown', onKey)
@@ -2041,12 +2066,10 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
         isValidConnection={isValidConnection}
         minZoom={0.05}
         maxZoom={3}
-        // Delete edits the model: in Designer only, and not while a
-        // presentation plays (there it hid the element from the view for
-        // good while the model kept it). The arrow keys moved the selected
-        // element on screen only (nothing saved, no undo, out of its
-        // container): React Flow's keyboard moves are off.
-        deleteKeyCode={isViewMode || presentationActive ? null : 'Delete'}
+        // Delete is the canvas's own (useDeleteKey). The arrow keys moved
+        // the selected element on screen only (nothing saved, no undo, out
+        // of its container): React Flow's keyboard moves are off.
+        deleteKeyCode={null}
         disableKeyboardA11y
         // The special key picks several: a click adds or takes out (the
         // mouseup above), a drag over the empty canvas draws a box.

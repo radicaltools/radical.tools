@@ -18,7 +18,7 @@ export function chainHiddenRelations(view: DiagramView | undefined, nodes: Recor
   if (!chain?.relationIds) return []
   return Object.keys(relations).filter((id) => !chain.relationIds!.has(id))
 }
-import { fittedParentSize, projectToVisibleGraph } from './geometry'
+import { fittedParentSize, placeUnplaced, projectToVisibleGraph } from './geometry'
 
 /** The elements a canvas puts on React Flow for a view: those it shows
  *  (viewShownNodes: its chain's, or its list) and the containers they sit
@@ -209,6 +209,35 @@ export function viewLayoutInput(
 }
 
 /**
+ * The canvas a view opens with, from the places it has (`positions` already
+ * on `nodes`: the view's own, or All elements' for a view never laid out):
+ * what it has no place for, or what lies mostly outside its parent there,
+ * placed in its parent beside its siblings (placeUnplaced), as the view
+ * folds and frames it. Studio opens a view on it, and the MCP server lays a
+ * view never laid out out from it, so both start from the same canvas.
+ * Mutates `nodes`; returns the ids placed.
+ */
+export function placeOnViewCanvas(
+  nodes: Record<string, C4Node>,
+  positions: Record<string, unknown>,
+  view: DiagramView | undefined,
+  relations: Record<string, C4Relation>,
+  wrap?: { ids: ReadonlySet<string>; wrapped: string[] },
+): string[] {
+  const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
+  // Folded as the view draws it: its own folds over the model's, and a
+  // container none of whose children it shows.
+  const childless = computeViewCollapsedSet(shown, nodes)
+  const folded = view
+    ? (n: C4Node): boolean => (n.collapsed && !(view.expandedNodeIds?.includes(n.id) ?? false)) || (view.collapsedNodeIds?.includes(n.id) ?? false) || childless.has(n.id)
+    : undefined
+  // The containers the view draws only to hold what it shows: a new one
+  // goes tightly round what it holds there, and nothing is astray in one.
+  const frames = viewFrames(view, nodes, relations)
+  return placeUnplaced(nodes, positions, shown, folded, { frames, wrap: wrap?.ids, wrapped: wrap?.wrapped })
+}
+
+/**
  * Write a layout result into the model. Collapsed nodes keep their stored
  * size: the canvas draws them at the collapsed size anyway, and the stored
  * one is what they expand back to.
@@ -243,13 +272,51 @@ export function applyAlignments(c4Nodes: Record<string, C4Node>, input: LayoutIn
 }
 
 /**
+ * The frames a Tidy that keeps something (round a selection, or with pins)
+ * hands back as it found them (`drawn`, the layout's input nodes), with
+ * everything they hold: a pinned frame, or one Tidy round a selection did
+ * not reach. The refit after the layout leaves them at their size; only a
+ * frame round something that moved is fitted. Not the frames a view draws
+ * only to hold what it shows (`tight`): they are refitted as always.
+ */
+export function keptFrames(drawn: Record<string, C4Node>, positions: PositionMap, tight: ReadonlySet<string>): Set<string> {
+  const near = (a: number | undefined, b: number | undefined): boolean => a === undefined || b === undefined || Math.abs(a - b) < 0.5
+  // Where it stands on the canvas: a frame round it refitted moves its place in it, not on the canvas.
+  const at = (id: string, after: boolean): { x: number; y: number } => {
+    let x = 0, y = 0
+    for (let c: string | undefined = id; c && drawn[c]; c = drawn[c].parentId) {
+      const p = (after && positions[c]) || drawn[c]
+      x += p.x; y += p.y
+    }
+    return { x, y }
+  }
+  const same = (id: string): boolean => {
+    const n = drawn[id], p = positions[id]
+    if (!p) return true
+    const was = at(id, false), now = at(id, true)
+    return near(was.x, now.x) && near(was.y, now.y) && near(n.width, p.width) && near(n.height, p.height)
+  }
+  const children = new Map<string, string[]>()
+  for (const n of Object.values(drawn)) if (n.parentId && drawn[n.parentId]) children.set(n.parentId, [...(children.get(n.parentId) ?? []), n.id])
+  const kept = new Map<string, boolean>()
+  const keeps = (id: string): boolean => {
+    let hit = kept.get(id)
+    if (hit === undefined) { hit = same(id) && (children.get(id) ?? []).every(keeps); kept.set(id, hit) }
+    return hit
+  }
+  return new Set([...children.keys()].filter((id) => !tight.has(id) && keeps(id)))
+}
+
+/**
  * Refits every compound node that has children in the view, deepest first,
  * to wrap those children at their effective (view-collapsed) size — what
- * Studio's store does after a layout run. Mutates `nodes`.
+ * Studio's store does after a layout run. Mutates `nodes`. Frames in `keep`
+ * (keptFrames) stay as they are.
  */
 export function resizeParentsBottomUp(
   nodes: Record<string, C4Node>,
   input: Pick<LayoutInput, 'viewFilter' | 'viewCollapsedSet' | 'expandedSet'>,
+  keep?: ReadonlySet<string>,
 ): void {
   const { viewFilter, viewCollapsedSet, expandedSet } = input
   const inView = (n: C4Node): boolean => !viewFilter || viewFilter.has(n.id)
@@ -267,7 +334,7 @@ export function resizeParentsBottomUp(
   parentIds.sort((a, b) => depth(b) - depth(a))
   for (const id of parentIds) {
     const parent = nodes[id]
-    if (!parent || !isContainerType(parent.type) || isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet)) continue
+    if (!parent || keep?.has(id) || !isContainerType(parent.type) || isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet)) continue
     const children = Object.values(nodes).filter((c) => c.parentId === id && inView(c))
     if (!children.length) continue
     const fitted = fittedParentSize(parent, children.map((c) => ({ x: c.x, y: c.y, ...size(c) })))

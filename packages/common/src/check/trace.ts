@@ -1,8 +1,8 @@
 // ─── radical check: verification path ───────────────────────────────────────
 //
 // Every path through one element of the model from its root to what the
-// tests and measurements say: need → requirement (→ derived requirement) →
-// scenario → its tests, or ADR → fitness function → its tests and metric
+// tests and measurements say: need (→ need inside it) → requirement (→
+// derived requirement) → scenario → its tests, or ADR → fitness function → its tests and metric
 // conditions (for each element it is measured for). Above the element the
 // path keeps only the elements that lead to it; below it, everything. The
 // Inspector draws it, `radical check --trace` and the MCP tool get_trace
@@ -20,6 +20,8 @@ export const TRACE_TYPES = ['need', 'requirement', 'scenario', 'adr', 'fitness-f
  *  the higher one (target), each between these types. */
 const UP: ReadonlyArray<{ relationType: string; from: string; to: readonly string[] }> = [
   { relationType: 'derives', from: 'requirement', to: ['need', 'requirement'] },
+  // A need inside a broader one (Part of): the path goes up to the broadest.
+  { relationType: 'derives', from: 'need', to: ['need'] },
   { relationType: 'verifies', from: 'scenario', to: ['requirement'] },
   { relationType: 'implements', from: 'fitness-fn', to: ['adr'] },
 ]
@@ -86,8 +88,8 @@ const RANK: Record<string, number> = {
 }
 export const rankOf = (status: string | undefined): number => (status ? RANK[status] ?? 3 : 3)
 
-/** A need's status from its requirements': broken when one is, verified
- *  when all are, otherwise unverified. */
+/** A need's status from its requirements' and the needs' inside it: broken
+ *  when one is, verified when all are, otherwise unverified. */
 function rollUp(children: TraceNode[]): string | undefined {
   const statuses = children.map((c) => c.status).filter((s): s is string => !!s)
   if (!statuses.length) return children.length ? undefined : 'unverified'

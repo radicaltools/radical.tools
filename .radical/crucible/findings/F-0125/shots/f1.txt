@@ -1,0 +1,31 @@
+
+[cannot exceed] "The system shall ensure that a basket cannot exceed 20 items."
+  MCP add_relation says: The person's words, as radical check reads them, after this change (correct the requirement, its quote or its scenario; review_requirements shows them side by side):
+- Requirement "Requirement" allows above 20 ("exceed 20") where the words it quotes from "Brief" allow up to and with 20 ("at most 20"): check on which side of 20 the limit is.
+  radical check: quote-value-differs: Requirement "Requirement" allows above 20 ("exceed 20") where the words it quotes from "Brief" allow up to and with 20 ("at most 20"): check on which side of 20 the limit is.
+
+[can't exceed] "The system shall ensure that a basket can't exceed 20 items."
+  MCP add_relation says: The person's words, as radical check reads them, after this change (correct the requirement, its quote or its scenario; review_requirements shows them side by side):
+- Requirement "Requirement" allows above 20 ("exceed 20") where the words it quotes from "Brief" allow up to and with 20 ("at most 20"): check on which side of 20 the limit is.
+  radical check: quote-value-differs: Requirement "Requirement" allows above 20 ("exceed 20") where the words it quotes from "Brief" allow up to and with 20 ("at most 20"): check on which side of 20 the limit is.
+
+[doesn't exceed] "The system shall ensure that a basket doesn't exceed 20 items."
+  MCP add_relation says: The person's words, as radical check reads them, after this change (correct the requirement, its quote or its scenario; review_requirements shows them side by side):
+- Requirement "Requirement" allows above 20 ("exceed 20") where the words it quotes from "Brief" allow up to and with 20 ("at most 20"): check on which side of 20 the limit is.
+  radical check: quote-value-differs: Requirement "Requirement" allows above 20 ("exceed 20") where the words it quotes from "Brief" allow up to and with 20 ("at most 20"): check on which side of 20 the limit is.
+
+[cannot hold more than] "The system shall ensure that a basket cannot hold more than 20 items."
+  MCP add_relation says: The person's words, as radical check reads them, after this change (correct the requirement, its quote or its scenario; review_requirements shows them side by side):
+- Requirement "Requirement" allows above 20 ("more than 20") where the words it quotes from "Brief" allow up to and with 20 ("at most 20"): check on which side of 20 the limit is.
+  radical check: quote-value-differs: Requirement "Requirement" allows above 20 ("more than 20") where the words it quotes from "Brief" allow up to and with 20 ("at most 20"): check on which side of 20 the limit is.
+
+[control: holds at most] "The system shall ensure that a basket holds at most 20 items."
+  MCP add_relation says: (nothing)
+  radical check: no quote-value-differs
+
+[control: holds more than (a real error)] "The system shall let a basket hold more than 20 items."
+  MCP add_relation says: The person's words, as radical check reads them, after this change (correct the requirement, its quote or its scenario; review_requirements shows them side by side):
+- Requirement "Requirement" allows above 20 ("more than 20") where the words it quotes from "Brief" allow up to and with 20 ("at most 20"): check on which side of 20 the limit is.
+  radical check: quote-value-differs: Requirement "Requirement" allows above 20 ("more than 20") where the words it quotes from "Brief" allow up to and with 20 ("at most 20"): check on which side of 20 the limit is.
+
+4 of 4 requirements that keep the limit are reported as turning it round

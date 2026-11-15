@@ -25,6 +25,7 @@ import { useRegisterCommands } from './commands'
 import { WelcomeScreen } from './components/WelcomeScreen'
 import { SetupWizard, OPEN_SETUP_EVENT } from './components/SetupWizard'
 import { firstStart } from './firstStart'
+import { useApplyTheme } from './theme'
 import { MilestoneEditOverlay } from './components/MilestoneEditOverlay'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useRouteSync, useShownMode, parseHash } from './route'
@@ -32,10 +33,23 @@ import { useDocumentsStore } from './store/documentStore'
 import { DiscussionPanel, type DiscussionTarget } from './components/DiscussionPanel'
 import { webFolderSupported } from './persist/webFolder'
 import { useNodeDiscussions } from './discussions/useNodeDiscussions'
+import { OPEN_HUB_EVENT } from './persistence/inspector'
 
 const LS_LEFT = 'radical-leftpanel-collapsed'
 
+/** The Hub's packs a link asks to import (`?hub=id1,id2`, its Open in
+ *  Studio), taken out of the address so a reload does not ask again. */
+let hubLinkIds: string[] | null | undefined
+function takeHubLink(): string[] | null {
+  if (hubLinkIds !== undefined) return hubLinkIds
+  const ids = (new URLSearchParams(window.location.search).get('hub') ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  hubLinkIds = ids.length ? ids : null
+  if (hubLinkIds) window.history.replaceState(null, '', window.location.pathname + window.location.hash)
+  return hubLinkIds
+}
+
 function AppInner(): React.ReactElement {
+  useApplyTheme()
   const activeDocument = useDocumentsStore((s) => s.docs.find((d) => d.id === s.activeId))
   const h = host()
   const discussionDocumentId = activeDocument?.source === 'md' && (
@@ -97,6 +111,16 @@ function AppInner(): React.ReactElement {
   // hasn't chosen a model, so a clean URL must stay clean. A deep link skips
   // the splash (showWelcome starts false), so sync runs immediately.
   useRouteSync(!showWelcome)
+  // A Hub link's packs: the import opens over the model, once there is one.
+  // Opened at once, it lay under the Welcome screen, where nothing in it
+  // could be clicked and Escape closed it unseen; the Welcome screen names
+  // the packs that wait instead.
+  const [hubLink, setHubLink] = useState(takeHubLink)
+  useEffect(() => {
+    if (showWelcome || !hubLink) return
+    window.dispatchEvent(new CustomEvent(OPEN_HUB_EVENT, { detail: { ids: hubLink } }))
+    setHubLink(null)
+  }, [showWelcome, hubLink])
   // The Setup wizard: over the Welcome screen on the first start, and from
   // Settings → Setup… later.
   const [setupOpen, setSetupOpen] = useState(firstStart)
@@ -173,7 +197,7 @@ function AppInner(): React.ReactElement {
       <MilestoneEditOverlay />
       {!isPresenting && discussionTarget && discussionTarget.documentId === discussionDocumentId && <DiscussionPanel key={`${discussionTarget.documentId}:${discussionTarget.nodeId}`} target={discussionTarget} onClose={closeDiscussion} />}
       {isMetamodel && !isPresenting && <MetamodelEditor />}
-      {showWelcome && <WelcomeScreen onDismiss={() => setShowWelcome(false)} />}
+      {showWelcome && <WelcomeScreen onDismiss={() => setShowWelcome(false)} hubWaits={hubLink} />}
       <SetupWizard open={setupOpen} onClose={closeSetup} />
     </div>
   )

@@ -160,6 +160,40 @@ describe('follow the agent', () => {
     useAgentForgeStore.setState({ status: run('finished') })
   })
 
+  it('waits while the user types into a field, and follows once it lets the focus go (F-0131)', async () => {
+    const focus = vi.fn()
+    ;(globalThis as any).window.__rfFocusNodes = focus
+    const nodes = [sys('sys1', 'Customer'), sys('sys2', 'Ledger', 500)]
+    const views = (b: string[]) => [view('a', 'Customers', ['sys1']), view('b', 'Shop', b)]
+    const edit = await openFolder({ nodes, relations: [], views: views(['sys2']) })
+    const store = useDiagramStore.getState
+    store().setAppMode('designer')
+    store().setActiveView('a')
+    store().selectNode('sys1')
+    useAgentAssayStore.setState({ status: assay('active') })
+    setFollowAgent(true)
+
+    // The user types the name in the card while the agent adds Shop's elements.
+    store().beginTyping()
+    store().updateNode('sys1', { label: 'Customer (online)' })
+    const shop = sys('sys3', 'Shop', 1000)
+    await edit({ nodes: [{ ...nodes[0], label: 'Customer (online)' }, nodes[1], shop], relations: [], views: views(['sys2', 'sys3']) })
+    await wait(150)
+    expect(store().activeViewId).toBe('a')
+    expect(store().selectedNodeId).toBe('sys1')
+    expect(focus).not.toHaveBeenCalled()
+    store().updateNode('sys1', { label: 'Customer (online) shopper' })
+    expect(store().c4Nodes.sys1.label).toBe('Customer (online) shopper')
+
+    // The field lets the focus go: what the agent did is followed then.
+    store().endTyping()
+    window.dispatchEvent(new Event('focusout'))
+    await wait(150)
+    expect(store().activeViewId).toBe('b')
+    expect(focus).toHaveBeenLastCalledWith(['sys3'], { duration: 600 })
+    useAgentAssayStore.setState({ status: null })
+  })
+
   it('follows an agent\'s Assay run as its Forge run, and stops once neither goes on', () => {
     useAgentForgeStore.setState({ status: null })
     useAgentAssayStore.setState({ status: assay('active') })

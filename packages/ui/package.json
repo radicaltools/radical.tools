@@ -8,6 +8,7 @@
     "./viewer": "./src/viewer.ts",
     "./styles.css": "./src/index.css",
     "./store/diagramStore": "./src/store/diagramStore.ts",
+    "./store/designerEdit": "./src/store/designerEdit.ts",
     "./store/hubStore": "./src/store/hubStore.ts",
     "./store/documentBackend": "./src/store/documentBackend.ts",
     "./store/userCamera": "./src/store/userCamera.ts",

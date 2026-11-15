@@ -23,13 +23,13 @@ import { bindSuggestions, concernStatuses, holdsConcerns, suggestedCover, unboun
 import { fitShown, growFrameLeftUp, growWithRoom, makeRoomAround, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
 import { TIDY_BUDGET, runTidyLayout, tidySummary, type TidyReport } from '@radical/layout/tidy'
-import { computeViewNodeSet, viewFrames, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
+import { computeViewNodeSet, viewFrames, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, keptFrames, placeOnViewCanvas, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel, originOf, ownModel } from '@radical/common/model'
 import { REPOSITORY_FILE, builtIn, parseRepositoryFile, serializeRepositoryFile, testsBoundTo, type RepositoryFile } from '@radical/common/repositoryMapping'
-import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, WORD_RULES, computeEvidence, conditionsOf, formatAge, formatTrace, parseCheckConfig, parseMeasurementStore, parseTestResults, quoteValueGaps, testsRanAt, traceOf, verifiedHere, withBoundTests, wordFindings, type CheckModel } from '@radical/common/check'
-import { mappingRoot } from '@radical/node-files/repositoryLayout'
+import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, WORD_RULES, canonicalTestId, computeEvidence, conditionsOf, formatAge, formatTrace, parseCheckConfig, parseMeasurementStore, parseTestResults, quoteValueGaps, testsRanAt, traceOf, verifiedHere, withBoundTests, wordFindings, type CheckModel } from '@radical/common/check'
+import { mappingRoot, repositoryFileOf } from '@radical/node-files/repositoryLayout'
 import { FEDERATION_FILE, parseFederationFile, withOtherModels } from '@radical/common/federation'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
 import { FORGE_READ_ONLY, FORGE_TOOL_DEFS, FORGE_TOOLS, Forge, type ForgeResult } from './forge'
@@ -83,7 +83,7 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'review_requirements',
-    description: 'Check requirements against the words of the needs they derive from (ADR Agents check requirements against the person\'s words). Lists each requirement added or changed since the model\'s version in git, and each one a need changed since then leads to, with its sentence next to the whole text of every need it derives from, directly or through other requirements; names those that derive from no need, and the needs that hold no question asked of a person. Call it after you change requirements and before you write their code; confirm each, or correct it with update_node where it adds, drops or changes a value, a number, a range, a state or who may do what, and where the need does not settle a point, ask the person and add the question and answer to the need word for word. It writes nothing.',
+    description: 'Check requirements against the words of the needs they derive from (ADR Agents check requirements against the person\'s words). Lists each requirement added or changed since the model\'s version in git (a derives relation of it added, removed or quoting other words too), and each one a need changed since then leads to, with its sentence next to the whole text of every need it derives from, directly or through other requirements; names those that derive from no need, and the needs that hold no question asked of a person. Call it after you change requirements and before you write their code; confirm each, or correct it with update_node where it adds, drops or changes a value, a number, a range, a state or who may do what, and where the need does not settle a point, ask the person and add the question and answer to the need word for word. It writes nothing.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -104,7 +104,7 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'set_implementation',
-    description: 'Says where the repository builds an element of the model, in its .radical/radical.json, which the repository\'s sensors, radical check and Studio\'s element card read: paths, folders from the repository\'s root, replace its entry; remove: true takes the entry out. Map the containers, and the components that have folders of their own: one without an entry is built where its parent is. Look at the repository\'s folders first; radical check warns about an entry that drifts from the model or the repository. It changes no model file.',
+    description: 'Says where the repository builds an element of the model, in its .radical/radical.json, which the repository\'s sensors, radical check and Studio\'s element card read: paths, folders from the repository\'s root, replace its entry; remove: true takes the entry out, also one whose element the model no longer has (delete_node takes out the entries of what it deletes). Map the containers, and the components that have folders of their own: one without an entry is built where its parent is. Look at the repository\'s folders first; radical check warns about an entry that drifts from the model or the repository. It changes no model file.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -137,12 +137,13 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'set_verification',
-    description: 'Binds tests of the repository to a scenario or fitness function of the model, in its .radical/radical.json, which radical check, the Inspector and Studio read: it passes when every test bound to it passed and its metric conditions hold. tests (ids as "<file> › <describe> › <title>", or "<file>" for every test in it, from the repository\'s root) replace its tests; remove: true takes the entry out. Call it for each test you write for a scenario. It changes no model file.',
+    description: 'Binds tests of the repository to a scenario or fitness function of the model, in its .radical/radical.json, which radical check, the Inspector and Studio read: it passes when every test bound to it passed and its metric conditions hold. tests (ids as "<file> › <describe> › <title>" (Vitest\'s "<file> > <describe> > <title>" is kept with ›), or "<file>" for every test in it, from the repository\'s root) are bound beside those it has, as radical verify --test does; drop unbinds tests (with tests, it replaces one test by another); remove: true takes the entry out, also one whose element the model no longer has. Call it for each test you write for a scenario. It changes no model file.',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'string', description: 'The scenario or fitness function (an id or a tempId).' },
-        tests: { type: 'array', items: { type: 'string' }, description: 'The tests that check it.' },
+        tests: { type: 'array', items: { type: 'string' }, description: 'Tests that check it, bound beside those it has.' },
+        drop: { type: 'array', items: { type: 'string' }, description: 'Tests to unbind.' },
         remove: { type: 'boolean', description: 'Take its entry out instead.' },
       },
       required: ['id'],
@@ -558,7 +559,7 @@ export class FolderModel {
     if (!data.nodes.some((n) => n.id === nodeId)) return { ok: false, text: `get_trace: no element ${id} in the model` }
     let verifies: RepositoryFile['verifies'] = []
     try {
-      const text = await readFile(join(await mappingRoot(this.folder), REPOSITORY_FILE), 'utf8').catch((error: NodeJS.ErrnoException) => {
+      const text = await readFile((await repositoryFileOf(this.folder)).file, 'utf8').catch((error: NodeJS.ErrnoException) => {
         if (error.code === 'ENOENT') return null
         throw error
       })
@@ -583,10 +584,10 @@ export class FolderModel {
   /** get_verification and set_verification: the tests the repository's
    *  .radical/radical.json binds (ADR Tests are bound outside the model). */
   private async verification(name: string, input: unknown, data: DiagramData): Promise<CallOutcome> {
-    const { id, tests, remove } = (input ?? {}) as { id?: unknown; tests?: unknown; remove?: unknown }
+    const { id, tests, drop, remove } = (input ?? {}) as { id?: unknown; tests?: unknown; drop?: unknown; remove?: unknown }
     const nodes = new Map(data.nodes.map((n) => [n.id, n]))
     const named = (n: C4Node) => `${n.type} "${n.label}" (${n.id})`
-    const file = join(await mappingRoot(this.folder), REPOSITORY_FILE)
+    const { file } = await repositoryFileOf(this.folder)
     let repository: RepositoryFile
     try {
       repository = await readFile(file, 'utf8').then((text) => parseRepositoryFile(text), (error: NodeJS.ErrnoException) => {
@@ -598,6 +599,7 @@ export class FolderModel {
     }
     if (id !== undefined && typeof id !== 'string') return { ok: false, text: `${name}: id must be a scenario's or fitness function's id` }
     const node = typeof id === 'string' ? nodes.get(this.tempIds.get(id) ?? id) : undefined
+    if (name === 'set_verification' && typeof id === 'string' && !node && remove === true) return await this.removeOrphan(name, file, repository, repository.verifies, this.tempIds.get(id) ?? id)
     if (id !== undefined && !node) return { ok: false, text: `${name}: no element ${id} in the model` }
     if (node && node.type !== 'scenario' && node.type !== 'fitness-fn') return { ok: false, text: `${name}: ${named(node)} is no scenario or fitness function; only those are checked by tests` }
 
@@ -623,19 +625,29 @@ export class FolderModel {
     if (!node) return { ok: false, text: 'set_verification: id is required' }
     const at = repository.verifies.findIndex((v) => v.element === node.id)
     if (remove === true) {
+      if (tests !== undefined || drop !== undefined) return { ok: false, text: 'set_verification: remove: true takes the whole entry out; give it without tests or drop' }
       if (at < 0) return { ok: true, text: `${REPOSITORY_FILE} has no entry for ${named(node)}.` }
       repository.verifies.splice(at, 1)
     } else {
-      if (!Array.isArray(tests) || !tests.length || !tests.every((t) => typeof t === 'string' && t.trim())) {
-        return { ok: false, text: 'set_verification: tests must be a list of test ids ("<file> › <title>"), or remove: true' }
+      const testIds = (v: unknown) => v === undefined ? [] : Array.isArray(v) && v.length && v.every((t) => typeof t === 'string' && t.trim()) ? (v as string[]).map((t) => t.trim()) : null
+      const adds = testIds(tests)
+      const drops = testIds(drop)
+      if (!adds || !drops || (!adds.length && !drops.length)) {
+        return { ok: false, text: 'set_verification: tests and drop must be lists of test ids ("<file> › <title>"), one of them given, or remove: true alone' }
       }
-      const entry = { element: node.id, name: node.label, tests: [...new Set((tests as string[]).map((t) => t.trim()))] }
-      if (at < 0) repository.verifies.push(entry)
-      else repository.verifies[at] = entry
+      // Added beside those bound, as radical verify --test does, and kept with ›,
+      // also when written as Vitest prints them (with >).
+      const dropped = drops.map(canonicalTestId)
+      const bound = testsBoundTo(repository.verifies, node.id).filter((t) => !dropped.includes(canonicalTestId(t)))
+      const entry = { element: node.id, name: node.label, tests: [...new Set([...bound, ...adds.map(canonicalTestId)])] }
+      if (!entry.tests.length) { if (at >= 0) repository.verifies.splice(at, 1) }
+      else if (at < 0) repository.verifies.push(entry)
+      else repository.verifies[at] = { ...repository.verifies[at], ...entry }
     }
     await mkdir(dirname(file), { recursive: true })
     await writeFile(file, serializeRepositoryFile(repository))
-    return { ok: true, text: remove === true ? `Took ${named(node)} out of ${REPOSITORY_FILE}.` : `${named(node)} is checked by ${testsBoundTo(repository.verifies, node.id).length} test(s) (${REPOSITORY_FILE}).` }
+    const count = testsBoundTo(repository.verifies, node.id).length
+    return { ok: true, text: remove === true ? `Took ${named(node)} out of ${REPOSITORY_FILE}.` : `${named(node)} is checked by ${count ? `${count} test(s)` : 'no test'} (${REPOSITORY_FILE}).` }
   }
 
   /** get_implementation and set_implementation: the repository's
@@ -645,8 +657,7 @@ export class FolderModel {
     const nodes = new Map(data.nodes.map((n) => [n.id, n]))
     const parentOf = (at: string) => nodes.get(at)?.parentId
     const named = (n: C4Node) => `${n.type} "${n.label}" (${n.id})`
-    const root = await mappingRoot(this.folder)
-    const file = join(root, REPOSITORY_FILE)
+    const { file, root } = await repositoryFileOf(this.folder)
     let repository: RepositoryFile
     try {
       repository = await readFile(file, 'utf8').then((text) => parseRepositoryFile(text), (error: NodeJS.ErrnoException) => {
@@ -659,6 +670,7 @@ export class FolderModel {
     const mapped = repository.implements
     if (id !== undefined && typeof id !== 'string') return { ok: false, text: `${name}: id must be an element's id` }
     const node = typeof id === 'string' ? nodes.get(this.tempIds.get(id) ?? id) : undefined
+    if (name === 'set_implementation' && typeof id === 'string' && !node && remove === true) return await this.removeOrphan(name, file, repository, mapped, this.tempIds.get(id) ?? id)
     if (id !== undefined && !node) return { ok: false, text: `${name}: no element ${id} in the model` }
 
     if (name === 'get_implementation') {
@@ -692,11 +704,43 @@ export class FolderModel {
     if (outside.length) return { ok: false, text: `set_implementation: ${outside.join(', ')} ${outside.length === 1 ? 'is' : 'are'} outside the repository` }
     const entry = { element: node.id, name: node.label, paths: clean }
     if (at < 0) mapped.push(entry)
-    else mapped[at] = entry
+    else mapped[at] = { ...mapped[at], ...entry }
     await mkdir(dirname(file), { recursive: true })
     await writeFile(file, serializeRepositoryFile(repository))
     const missing = (await Promise.all(clean.map(async (p) => (await stat(join(root, p)).then(() => true, () => false)) ? null : p))).filter((p): p is string => p !== null)
     return { ok: true, text: `${named(node)} is built in ${clean.join(', ')} (${REPOSITORY_FILE}).${missing.length ? ` Not in the repository yet: ${missing.join(', ')}; radical check warns until they are.` : ''}` }
+  }
+
+  /** set_implementation and set_verification with remove: true on an id the
+   *  model no longer has: its entry of `entries`, if the file has one. */
+  private async removeOrphan(name: string, file: string, repository: RepositoryFile, entries: Array<{ element: string; name?: string }>, id: string): Promise<CallOutcome> {
+    const at = entries.findIndex((e) => e.element === id)
+    if (at < 0) return { ok: false, text: `${name}: no element ${id} in the model` }
+    const [entry] = entries.splice(at, 1)
+    await writeFile(file, serializeRepositoryFile(repository))
+    return { ok: true, text: `Took ${entry.name !== undefined ? `"${entry.name}" (${entry.element})` : entry.element}, no element of the model, out of ${REPOSITORY_FILE}.` }
+  }
+
+  /** After a write that deleted elements: their entries taken out of the
+   *  repository's .radical/radical.json, said in a sentence ('' for none). */
+  private async removeMappingsOf(deleted: C4Node[]): Promise<string> {
+    if (!deleted.length) return ''
+    try {
+      const { file } = await repositoryFileOf(this.folder)
+      const text = await readFile(file, 'utf8').catch(() => null)
+      if (text === null) return ''
+      const repository = parseRepositoryFile(text)
+      const gone = new Set(deleted.map((n) => n.id))
+      const taken = new Set([...repository.implements, ...repository.verifies].filter((e) => gone.has(e.element)).map((e) => e.element))
+      if (!taken.size) return ''
+      repository.implements = repository.implements.filter((e) => !taken.has(e.element))
+      repository.verifies = repository.verifies.filter((e) => !taken.has(e.element))
+      await writeFile(file, serializeRepositoryFile(repository))
+      const named = deleted.filter((n) => taken.has(n.id)).map((n) => `${n.type} "${n.label}" (${n.id})`)
+      return ` Took the ${named.length === 1 ? 'entry' : 'entries'} of ${named.join(', ')} out of ${REPOSITORY_FILE}.`
+    } catch (error) {
+      return ` ${REPOSITORY_FILE} still names what was deleted: ${(error as Error).message}.`
+    }
   }
 
   private async selection(facade: ReturnType<typeof createModelFacade>): Promise<string> {
@@ -780,8 +824,11 @@ export class FolderModel {
         return { ok: false, text: `review_requirements: ${(err as Error).message}; name the requirements with ids instead` }
       }
       const changed = new Set([...changes.report.elements.added, ...changes.report.elements.changed].map((c) => c.id))
+      // A requirement whose derives relation was added, changed (its quote) or removed rests on other words.
+      const { relations: rels } = changes.report
+      for (const r of [...rels.added, ...rels.changed, ...rels.removed]) if (r.relationType === 'derives' && r.source.type === 'requirement') changed.add(r.source.id)
       chosen = own.nodes.filter((n) => n.type === 'requirement' && (changed.has(n.id) || needsOf(n.id).some((need) => changed.has(need.id))))
-      scope = `the requirements added or changed since ${changes.base.described}, and those a need changed since then leads to`
+      scope = `the requirements added or changed since ${changes.base.described}, with their derives relations, and those a need changed since then leads to`
     }
     if (!chosen.length) return { ok: true, text: `Nothing to review: no requirement among ${scope}.` }
     const props = (n: C4Node) => n as unknown as Record<string, unknown>
@@ -940,6 +987,9 @@ export class FolderModel {
         return outcome
       }
       result.commit?.()
+      // What the write deleted is built and tested nowhere any more.
+      const kept = new Set(changed.nodes.map((n) => n.id))
+      outcome.text += await this.removeMappingsOf(data.nodes.filter((n) => !kept.has(n.id) && !originOf(n)))
       // Assay's files beside the model, once the model is on disk.
       if (result.afterWrite) outcome.text += await result.afterWrite()
       if (FORGE_TOOLS.has(name)) await this.writeForgeStatus()
@@ -964,7 +1014,7 @@ export class FolderModel {
     const changed = JSON.parse(JSON.stringify(data)) as DiagramData
     const view = viewId === undefined ? undefined : changed.views?.find((v) => v.id === viewId)
     if (viewId !== undefined && !view) return { ok: false, text: `smart_layout: unknown view id "${viewId}"` }
-    const refused = view ? noCanvasLayout('smart_layout', view) : null
+    const refused = view ? noCanvasLayout('smart_layout', view, byId(changed.nodes), byId(changed.relations)) : null
     if (refused) return { ok: false, text: `${refused}.` }
     // The canvas the view shows: its saved positions over the model's.
     const nodes = byId(view ? (JSON.parse(JSON.stringify(changed.nodes)) as C4Node[]) : changed.nodes)
@@ -972,6 +1022,10 @@ export class FolderModel {
       const node = nodes[id]
       if (node) Object.assign(node, { x: pos.x, y: pos.y, width: pos.width, height: pos.height })
     }
+    // A view never laid out opens on All elements' places, with what lies
+    // outside its parent there placed in it, as Studio opens it: both lay
+    // it out from the same canvas.
+    if (view && (view.kind ?? 'static') === 'static' && !Object.keys(view.positions ?? {}).length) placeOnViewCanvas(nodes, positionsOf(nodes), view, byId(changed.relations))
     const constraints = view ? view.layoutConstraints : changed.defaultLayoutConstraints
     const input = viewLayoutInput(view, nodes, byId(changed.relations), constraints)
     if (!Object.keys(input.nodes).length) return { ok: true, text: 'Smart Layout: there are no nodes to lay out.' }
@@ -1010,7 +1064,8 @@ export class FolderModel {
       return { ok: true, text: ensemble ? `Smart Layout${where}: the current layout already scores best; nothing changed.` : `Smart Layout${where}: nothing left to tidy.` }
     }
     applyLayoutPositions(nodes, result.winner.positions, input)
-    resizeParentsBottomUp(nodes, input)
+    // Round a selection, a frame Tidy kept as it was (pinned, or out of its reach) keeps its size too.
+    resizeParentsBottomUp(nodes, input, !ensemble && options.around?.length ? keptFrames(input.nodes, result.winner.positions, input.frames) : undefined)
     // The whole view was arranged: pins (elements a Studio user dropped
     // after a drag) go with the old places. Round a selection the pinned
     // elements stayed where they are, so their pins stay.
@@ -1126,8 +1181,12 @@ export class FolderModel {
       off = new Set(Object.entries(config.rules ?? {}).filter(([id, setting]) => WORD_RULES.has(id) && (setting === 'off' || (typeof setting === 'object' && setting !== null && (setting as { severity?: unknown }).severity === 'off'))).map(([id]) => id))
     } catch { /* no check.json: every rule on */ }
     const findings = (d: DiagramData) => wordFindings({ nodes: byId(d.nodes), relations: byId(d.relations), metamodel }, off)
-    const before = new Set(findings(data).map((f) => `${f.rule}\0${f.message}`))
-    return findings(changed).filter((f) => !before.has(`${f.rule}\0${f.message}`))
+    // A finding is the same one by its rule, what it is about and what it
+    // says; the model before is read with the names the change gives, so a
+    // rename brings in nothing.
+    const key = (f: { rule: string; message: string; nodeId?: string; relationId?: string }) => `${f.rule}\0${f.nodeId ?? ''}\0${f.relationId ?? ''}\0${f.message}`
+    const before = new Set(findings(withLabelsOf(data, changed)).map(key))
+    return findings(changed).filter((f) => !before.has(key(f)))
   }
 
   /** Tell Studio, open on the folder, that an agent is writing it: it holds
@@ -1150,4 +1209,10 @@ export class FolderModel {
 function positionsOf(nodes: Record<string, C4Node>): Record<string, NodePosition> {
   return Object.fromEntries(Object.values(nodes).map((node): [string, NodePosition] =>
     [node.id, { x: node.x, y: node.y, width: node.width, height: node.height }]))
+}
+
+/** A model with the labels another version gives its elements. */
+function withLabelsOf(data: DiagramData, named: DiagramData): DiagramData {
+  const labels = new Map(named.nodes.map((n) => [n.id, n.label]))
+  return { ...data, nodes: data.nodes.map((n) => labels.has(n.id) && labels.get(n.id) !== n.label ? { ...n, label: labels.get(n.id)! } : n) }
 }

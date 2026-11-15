@@ -38,9 +38,9 @@ Commands:
                    (radical export confluence --help)
   discussions confluence connect|sync|status [folder]
                    preview or sync managed wiki footer discussions
-  federation <open|sync|watch> [folder]
-                   compose the model with the models its deps.json names,
-                   and carry its own changes back (radical federation --help)
+  federation fetch [folder]
+                   fetch the models its deps.json names, to show and check
+                   beside it, read-only (radical federation --help)
   fuzz [plan]      run the fuzz files .radical/crucible/crucible.json lists (Radical Crucible;
                    radical fuzz --help)
   harden <finding> turn a finding into a test, and gate a test: it fails

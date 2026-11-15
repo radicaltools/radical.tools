@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeEvidence, formatTrace, parseTestReport, traceGap, traceOf, withBoundTests, type TestCase, type TraceNode } from '../src/check'
+import { checkModel, computeEvidence, formatTrace, parseTestReport, traceGap, traceOf, withBoundTests, type TestCase, type TraceNode } from '../src/check'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
 import type { C4Node, C4Relation } from '../src/c4'
 
@@ -142,5 +142,26 @@ describe('verification path', () => {
       '          · a.test.ts › sum › zero — passed',
     ].join('\n'))
     expect(formatTrace(traceOf(f, 'ff'), f.nodes, NOW)).toContain('      for CLI [c2] — failed\n        · deps.cycles <= 0 — failed · 2 cycles by madge, 2 h ago')
+  })
+
+  it('goes up through a need inside a broader one (Part of) to the broadest need, its status rolled up', () => {
+    const f = fixture()
+    // Sell online ⊃ Pay online ⊃ Take card payments, and a part of it with nothing yet.
+    f.nodes.sell = node('sell', 'need', 'Sell online')
+    f.nodes.pay = node('pay', 'need', 'Pay online')
+    f.nodes.ship = node('ship', 'need', 'Ship orders')
+    f.relations.p1 = rel('p1', 'derives', 'pay', 'sell')
+    f.relations.p2 = rel('p2', 'derives', 'ship', 'sell')
+    f.relations.p3 = rel('p3', 'derives', 'need', 'pay')
+    const evidence = computeEvidence({ nodes: f.nodes, relations: f.relations, metamodel: builtInGovernanceMetamodel(), tests: f.cases, measurements: [], now: NOW })
+    const input = { ...f, evidence }
+    expect(traceOf(input, 'sub').roots.map(shape)).toEqual([
+      ['sell', 'broken', [['pay', 'broken', [['need', 'broken', [['req', 'broken', [['sub', 'verified', '◀', [['s-sub', 'passed', []]]]]]]]]]]],
+    ])
+    const sell = traceOf(input, 'sell').roots[0]
+    expect(sell.children.map((c) => [c.id, c.status, traceGap(c)])).toEqual([['pay', 'broken', null], ['ship', 'unverified', 'no requirement derives from it']])
+    // The broader need has requirements through its parts; the empty part has none.
+    const data = { metamodel: builtInGovernanceMetamodel(), nodes: Object.values(f.nodes), relations: Object.values(f.relations) }
+    expect(checkModel(data).findings.filter((x) => x.rule === 'need-without-requirement').map((x) => x.nodeId)).toEqual(['ship'])
   })
 })

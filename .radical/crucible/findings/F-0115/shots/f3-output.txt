@@ -1,0 +1,75 @@
+radical --help: "federation <open|sync|watch> [folder]"
+$ (repo) radical federation open  → exit 2
+    [stderr] Usage: radical federation fetch [folder] [options]
+    
+    Fetches the models a model folder's deps.json names, and theirs, and writes
+    their elements and relations into .state/federation.json in the model folder (out
+    of git), each marked with its origin (<name>@<commit>). Studio and the MCP
+    server open the model folder itself and show them beside its own, read-only;
+    they never write them into the folder. A model pinned twice is fetched at the
+    nearest pin: the folder's own deps.json first, then its dependencies'.
+    radical hooks install runs it after a checkout, a commit, a pull and a rebase.
+    
+      folder              the model folder (default: the working directory); with
+                          no deps.json there is nothing to fetch
+      --quiet             print nothing
+      --detach            fetch in the background and return at once (the hooks)
+    
+    deps.json: { "name": "<this model>", "dependencies": [ { "name": "orders",
+    "repo": "<git address, or a path relative to the model folder>", "path":
+    "<the model folder in that repository>", "ref": "<branch, tag, commit, or
+    latest: the newest version tag, else the default branch, at each fetch>" } ] }
+    
+    Exit status: 0 fetched (or nothing to fetch), 2 it could not run.
+$ (repo) radical federation sync  → exit 2
+    [stderr] Usage: radical federation fetch [folder] [options]
+    
+    Fetches the models a model folder's deps.json names, and theirs, and writes
+    their elements and relations into .state/federation.json in the model folder (out
+    of git), each marked with its origin (<name>@<commit>). Studio and the MCP
+    server open the model folder itself and show them beside its own, read-only;
+    they never write them into the folder. A model pinned twice is fetched at the
+    nearest pin: the folder's own deps.json first, then its dependencies'.
+    radical hooks install runs it after a checkout, a commit, a pull and a rebase.
+    
+      folder              the model folder (default: the working directory); with
+                          no deps.json there is nothing to fetch
+      --quiet             print nothing
+      --detach            fetch in the background and return at once (the hooks)
+    
+    deps.json: { "name": "<this model>", "dependencies": [ { "name": "orders",
+    "repo": "<git address, or a path relative to the model folder>", "path":
+    "<the model folder in that repository>", "ref": "<branch, tag, commit, or
+    latest: the newest version tag, else the default branch, at each fetch>" } ] }
+    
+    Exit status: 0 fetched (or nothing to fetch), 2 it could not run.
+$ (repo) radical federation watch  → exit 2
+    [stderr] Usage: radical federation fetch [folder] [options]
+    
+    Fetches the models a model folder's deps.json names, and theirs, and writes
+    their elements and relations into .state/federation.json in the model folder (out
+    of git), each marked with its origin (<name>@<commit>). Studio and the MCP
+    server open the model folder itself and show them beside its own, read-only;
+    they never write them into the folder. A model pinned twice is fetched at the
+    nearest pin: the folder's own deps.json first, then its dependencies'.
+    radical hooks install runs it after a checkout, a commit, a pull and a rebase.
+    
+      folder              the model folder (default: the working directory); with
+                          no deps.json there is nothing to fetch
+      --quiet             print nothing
+      --detach            fetch in the background and return at once (the hooks)
+    
+    deps.json: { "name": "<this model>", "dependencies": [ { "name": "orders",
+    "repo": "<git address, or a path relative to the model folder>", "path":
+    "<the model folder in that repository>", "ref": "<branch, tag, commit, or
+    latest: the newest version tag, else the default branch, at each fetch>" } ] }
+    
+    Exit status: 0 fetched (or nothing to fetch), 2 it could not run.
+radical sense --help: "review records a person's review of a manual fitness function in the model folder's reviews.json, kept in git; its `review(<name>) passed` condition"
+$ (repo) radical sense review security --passed --by alice  → exit 0
+    Recorded in .radical/reviews.json: security passed, by alice. Commit it.
+reviews.json in the model folder: false; .radical/reviews.json: true
+
+Expected: the help names the commands there are (federation fetch) and the file a review goes to.
+Actual: --help lists federation open|sync|watch; refused: open, sync, watch; sense help says the model folder's reviews.json, the review went to .radical/reviews.json.
+REPRODUCED: yes

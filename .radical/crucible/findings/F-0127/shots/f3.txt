@@ -1,0 +1,18 @@
+add_relation (brings in): [
+  '- Requirement "Basket limit" does not say "20", which the words it quotes from "Basket brief" say.',
+  `- Requirement "Basket limit" says "25", which none of the words it quotes say: correct it to what the person said, or say in its rationale that it is the model's decision.`
+]
+
+update_node label of the requirement only: [
+  '- Requirement "Basket size" does not say "20", which the words it quotes from "Basket brief" say.',
+  `- Requirement "Basket size" says "25", which none of the words it quotes say: correct it to what the person said, or say in its rationale that it is the model's decision.`
+]
+
+update_node label of the need only: [
+  '- Requirement "Basket size" does not say "20", which the words it quotes from "Shop brief" say.',
+  `- No requirement quotes this answer in need "Shop brief": "An idle basket is kept for 30 days." Quote it on a requirement's derives relation, or mark it (no requirement).`
+]
+
+control, update_node rationale (no label): []
+
+4 findings reported as brought in by two renames that change no word, value or quote

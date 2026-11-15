@@ -3,16 +3,22 @@
 // the facade runs it: Studio through its store, the MCP server headlessly.
 // Alignments are layout constraints every later layout keeps.
 
-import { defaultGridColumns, type AlignConstraint, type LayoutConstraint } from '../../c4'
+import { CANVAS_MAX_ELEMENTS, defaultGridColumns, type AlignConstraint, type C4Node, type C4Relation, type DiagramView, type LayoutConstraint } from '../../c4'
+import { canvasOverflow } from '../../viewPipeline'
 import { fail, type AsyncToolHandler, type ToolDef, type ToolHandler, type ToolRunContext } from './types'
 
 const AXIS_ENUM = ['horizontal', 'vertical'] as const
 
 /** Why `view` has no canvas layout, or null: only a static view is drawn
  *  on a canvas. A dynamic (flow) view plays its sequence, and keeps no
- *  positions (viewCanvasPositions); a table, wiki and the rest draw none. */
-export function noCanvasLayout(tool: string, view: { name: string; kind?: string }): string | null {
-  if (!view.kind || view.kind === 'static') return null
+ *  positions (viewCanvasPositions); a table, wiki and the rest draw none.
+ *  Nor has a view with more elements than a canvas draws (canvasOverflow):
+ *  Studio shows a notice in its place, and lays nothing out. */
+export function noCanvasLayout(tool: string, view: DiagramView, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): string | null {
+  if (!view.kind || view.kind === 'static') {
+    const count = canvasOverflow(view, nodes, relations)
+    return count === null ? null : `${tool}: "${view.name}" shows ${count.toLocaleString('en')} elements; a canvas draws up to ${CANVAS_MAX_ELEMENTS.toLocaleString('en')}, and Studio neither draws nor lays out a larger view. Show it as a table (update_view with kind "table"), which shows any number, or narrow its filter`
+  }
   if (view.kind === 'explore') return `${tool}: "${view.name}" is an explore view, laid out by Studio level by level from its start element; only static views have a canvas layout`
   return `${tool}: "${view.name}" is a ${view.kind} view; only static views have a canvas layout${view.kind === 'dynamic' ? ' (a dynamic view plays its sequence, drawn in order, with no positions of its own)' : ''}`
 }
@@ -26,7 +32,7 @@ function canvasFor(ctx: ToolRunContext, tool: string, raw: unknown, removing = f
   const viewId = ctx.resolveId(raw)
   const view = ctx.diagram.getViews?.()[viewId]
   if (!view) return { error: `${tool}: unknown view id "${raw}"` }
-  const refused = removing ? null : noCanvasLayout(tool, view)
+  const refused = removing ? null : noCanvasLayout(tool, view, ctx.diagram.getNodes(), ctx.diagram.getRelations())
   if (refused) return { error: refused }
   return { viewId }
 }
@@ -41,7 +47,7 @@ export function buildLayoutToolDefs(): ToolDef[] {
   return [
     {
       name: 'smart_layout',
-      description: "Run Smart Layout and keep the new positions and container sizes. Without viewId it arranges the All elements canvas; with the id of a static view it arranges that view's own positions (a dynamic view plays its sequence and has no canvas layout, nor has a table, wiki or other kind); a view whose layout mode is a hierarchical nested tree is laid out as a tree, as Studio does. Alignments and grids hold; the canvas's pins (elements a Studio user dropped after a drag) are removed, since every element gets a new place. A large view gets as much work as one Smart Layout in Studio, the same layout, and the result says 'run it again for more' when more would help. Call it after adding or moving several nodes.",
+      description: `Run Smart Layout and keep the new positions and container sizes. Without viewId it arranges the All elements canvas; with the id of a static view it arranges that view's own positions (a dynamic view plays its sequence and has no canvas layout, nor has a table, wiki or other kind); a view whose layout mode is a hierarchical nested tree is laid out as a tree, as Studio does; a view that shows more than ${CANVAS_MAX_ELEMENTS.toLocaleString('en')} elements, more than a canvas draws, is refused, as Studio neither draws nor lays it out. Alignments and grids hold; the canvas's pins (elements a Studio user dropped after a drag) are removed, since every element gets a new place. A large view gets as much work as one Smart Layout in Studio, the same layout, and the result says 'run it again for more' when more would help. Call it after adding or moving several nodes.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -53,7 +59,7 @@ export function buildLayoutToolDefs(): ToolDef[] {
     },
     {
       name: 'align_nodes',
-      description: "Keep two or more elements on one line on a canvas: a row (axis 'horizontal', equal centre y) or a column (axis 'vertical', equal centre x). Every later layout keeps it: drags and the live physics in Studio, Smart Layout. Without viewId it applies to the All elements canvas; with the id of a static view, to that view only (other kinds have no canvas). Elements hidden on the canvas are skipped until shown. Studio lines them up when it shows the canvas; smart_layout does too.",
+      description: "Keep two or more elements on one line on a canvas: a row (axis 'horizontal', equal centre y) or a column (axis 'vertical', equal centre x). Every later layout keeps it: drags and the live physics in Studio, Smart Layout. Without viewId it applies to the All elements canvas; with the id of a static view, to that view only (other kinds have no canvas, nor has a view of more elements than a canvas draws). Elements hidden on the canvas are skipped until shown. Studio lines them up when it shows the canvas; smart_layout does too.",
       inputSchema: {
         type: 'object',
         properties: {
@@ -68,7 +74,7 @@ export function buildLayoutToolDefs(): ToolDef[] {
     },
     {
       name: 'grid_nodes',
-      description: "Keep elements in a grid on a canvas: `columns` columns, filled row by row in the order of nodeIds (left to right, then the next row). Every row stays a row and every column a column, in that order, through every later layout. Without viewId it applies to the All elements canvas; with the id of a static view, to that view only (other kinds have no canvas). Studio arranges them when it shows the canvas; smart_layout keeps the grid. Remove it with remove_alignment.",
+      description: "Keep elements in a grid on a canvas: `columns` columns, filled row by row in the order of nodeIds (left to right, then the next row). Every row stays a row and every column a column, in that order, through every later layout. Without viewId it applies to the All elements canvas; with the id of a static view, to that view only (other kinds have no canvas, nor has a view of more elements than a canvas draws). Studio arranges them when it shows the canvas; smart_layout keeps the grid. Remove it with remove_alignment.",
       inputSchema: {
         type: 'object',
         properties: {
@@ -166,7 +172,7 @@ export function buildLayoutToolHandlers(): Record<string, AsyncToolHandler> {
         viewId = ctx.resolveId(input.viewId)
         const view = ctx.diagram.getViews?.()[viewId]
         if (!view) return fail(`smart_layout: unknown view id "${input.viewId}"`)
-        const refused = noCanvasLayout('smart_layout', view)
+        const refused = noCanvasLayout('smart_layout', view, ctx.diagram.getNodes(), ctx.diagram.getRelations())
         if (refused) return fail(refused)
       }
       const outcome = await ctx.diagram.runLayout(viewId, around)

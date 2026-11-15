@@ -2748,6 +2748,17 @@ div.milestone-option { cursor: default; }
 .welcome-start-recent {
   margin-top: 16px;
 }
+/* A Hub link's packs, waiting for the model picked or created here. */
+.welcome-hub-waits {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid rgba(59, 111, 230, 0.3);
+  border-radius: 8px;
+  background: rgba(59, 111, 230, 0.07);
+  font-size: 12px;
+  line-height: 1.45;
+  color: #374151;
+}
 .welcome-sample-link {
   align-self: center;
   display: inline-flex;

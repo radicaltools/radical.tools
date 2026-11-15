@@ -1,0 +1,32 @@
+$ (model repository) radical check  → exit 0
+    radical check: . (7 elements, 6 relations)
+    
+    ⚠ requirement-without-scenario  3 (max 3)
+        warning  nodes/req1.md  No scenario verifies requirement "Show the basket".
+        warning  nodes/req2.md  No scenario verifies requirement "Take card payments".
+        warning  nodes/req3.md  No scenario verifies requirement "Refund payments".
+    
+    ✓ 0 errors, 3 warnings
+$ (web repository) radical check --ratchet  → exit 0
+    Judged this repository's part of the model of ../central.
+    radical check: .radical/model (3 elements, 2 relations)
+    
+    ⚠ requirement-without-scenario  1 (max 3)
+        warning  .radical/model/nodes/req1.md  No scenario verifies requirement "Show the basket".
+    
+    ✓ 0 errors, 1 warning
+    [stderr] Ratchet: requirement-without-scenario 3 → 1 (written to /private/var/folders/pn/fh62qrjd1xx840kyv7dyk4tw0000gn/T/radical-209-ratchet-bZnMEt/web/.radical/model/check.json).
+check.json of the model checkout: requirement-without-scenario max = 1; git status there: M check.json
+$ (model repository, with the ratcheted check.json) radical check  → exit 1
+    radical check: . (7 elements, 6 relations)
+    
+    ✖ requirement-without-scenario  3 (max 1)
+        error    nodes/req1.md  No scenario verifies requirement "Show the basket".
+        error    nodes/req2.md  No scenario verifies requirement "Take card payments".
+        error    nodes/req3.md  No scenario verifies requirement "Refund payments".
+    
+    ✖ 3 errors, 0 warnings
+
+Expected: the baseline is the whole model's; --ratchet in a repository's part leaves it at 3 (the model still has 3), and the model's own check stays at exit 0.
+Actual: max 3 → 1; the model's own check exits 1 with 3 errors.
+REPRODUCED: yes

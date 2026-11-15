@@ -1,0 +1,19 @@
+$ (shop) radical federation fetch  → exit 0
+    Fetched orders@d771b9a (v1.0.0): 4 elements into .radical/model/.state/federation.json.
+$ (shop) radical verify "Order taken" --test "tests/orders.contract.test.ts › places an order"  → exit 0
+    scenario "Order taken" (oscen) of orders is checked by 1 test (.radical/radical.json):
+      tests/orders.contract.test.ts › places an order
+$ (shop) radical check --report report.json  → exit 0
+    Checked with orders@d771b9a (v1.0.0) (deps.json).
+    radical check: .radical/model (2 elements, 1 relation)
+    
+    
+    Test reports: 1 test case
+    
+    ✓ 0 errors, 0 warnings
+$ (shop) radical check --trace oscen  → exit 2
+    [stderr] radical check --trace: no element oscen in .radical/model.
+
+Question: should a failed test this repository binds to another model's scenario show in its check (and --trace), or should radical verify refuse the binding?
+Actual: verify took it; check exit 0, says nothing of it; --trace exit 2.
+REPRODUCED: yes

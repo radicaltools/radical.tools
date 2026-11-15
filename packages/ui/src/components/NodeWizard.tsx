@@ -20,6 +20,7 @@ import {
 import { NODE_COLORS, NODE_FG, TYPE_ICON_PATHS, TYPE_LABELS, type C4Node, type C4Relation } from '@radical/common/c4'
 import { wizardLinkCandidates } from '@radical/common/relationRules'
 import { useDiagramStore, type NodeWizardSession } from '../store/diagramStore'
+import { editAsDesigner } from '../store/designerEdit'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { RefPicker } from './RefPicker'
 
@@ -132,7 +133,8 @@ function WizardDialog({ session, wizard, typeDef, type }: {
   }
   const done = (): void => {
     if (missing.length) return
-    finish(values, links)
+    // Opened in the Inspector (a fix of one step), it edits Designer's model.
+    editAsDesigner(() => finish(values, links))
   }
   const next = (): void => (isLast ? done() : goTo(stepIndex + 1))
 

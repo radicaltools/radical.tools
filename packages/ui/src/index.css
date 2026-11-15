@@ -1422,6 +1422,8 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
 .view-kind-btn:hover { border-color: rgba(var(--accent-rgb), 0.6); background: rgba(var(--accent-rgb), 0.08); }
 .view-kind-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .view-kind-btn.active svg { color: #fff; }
+.view-kind-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.view-kind-btn:disabled:hover { border-color: var(--border-color); background: var(--bg-panel); }
 
 /* A view's viewpoint: a list of the metamodel's, with what the picked one is. */
 .props-section-note { margin-left: 4px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--text-muted); opacity: .8; }

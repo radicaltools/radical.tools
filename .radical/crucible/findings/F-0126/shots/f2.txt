@@ -1,0 +1,16 @@
+
+[sign dropped] "The system shall sound the freezer alarm when the temperature rises above 18 °C."
+  MCP add_relation says: (nothing)
+  radical check: (no finding)
+
+[control: minus as a word (the same value)] "The system shall sound the freezer alarm when the temperature rises above minus 18 °C."
+  MCP add_relation says: (nothing)
+  radical check: (no finding)
+
+[control: another number] "The system shall sound the freezer alarm when the temperature rises above -17 °C."
+  MCP add_relation says: The person's words, as radical check reads them, after this change (correct the requirement, its quote or its scenario; review_requirements shows them side by side):
+- Requirement "Requirement" does not say "18", which the words it quotes from "Brief" say.
+- Requirement "Requirement" says "17", which none of the words it quotes say: correct it to what the person said, or say in its rationale that it is the model's decision.
+  radical check: quote-value-missing: Requirement "Requirement" does not say "18", which the words it quotes from "Brief" say. | requirement-value-unquoted: Requirement "Requirement" says "17", which none of the words it quotes say: correct it to what the person said, or say in its rationale that it is the model's decision.
+
+The person said -18 °C; a requirement that says 18 °C gets no finding

@@ -7,7 +7,9 @@ import {
   copyOtherModelView, originModel, originOf, otherModelFolder, ownModel, viewFolderRefusal, viewRefusal, type ModelState,
 } from '../src/model'
 import { composeFederation, otherModelView, otherModelsAt, parseDeps, parseFederationFile, serializeFederationFile, withOtherModels, type FetchedDependency } from '../src/federation'
-import { viewShownNodes } from '../src/viewPipeline'
+import { chainDrawn, structureRows, viewShownNodes } from '../src/viewPipeline'
+import { createWikiDocument } from '../src/wikiDocument'
+import { warnierRows } from '../src/warnier'
 import { serializeToMdFolder } from '../src/formats/mdFolder'
 
 const node = (id: string, type: string, label: string, extra: Partial<C4Node> = {}): C4Node =>
@@ -158,6 +160,32 @@ describe('federation', () => {
     expect(viewRefusal(data.views![0])).toBeNull()
     // Nothing of theirs is saved.
     expect(JSON.parse(serializeToMdFolder(data, 'payments')['views.json']).map((v: DiagramView) => v.id)).toEqual(['v-own'])
+  })
+
+  it("shows only that model's elements in its table, wiki, Warnier view and matrix (F-0119)", () => {
+    const own = { ...payments(), nodes: [...payments().nodes, node('clerk', 'person', 'Clerk')] }
+    const data = withOtherModels(own, parseFederationFile(serializeFederationFile({
+      version: 2, name: 'payments', fetchedAt: '2026-11-01T10:00:00Z', notes: [],
+      dependencies: [{ name: 'orders', repo: '../orders', path: 'architecture', ref: 'main', commit: COMMIT }],
+      nodes: [node('ord', 'system', 'Orders', { origin: 'orders@abc1234' }), node('cust', 'person', 'Customer', { origin: 'orders@abc1234' })],
+      relations: [],
+      views: (['table', 'wiki', 'warnier', 'matrix'] as const).map((kind) => ({ id: `v-${kind}`, name: kind, kind, nodeIds: [], positions: {}, origin: 'orders@abc1234' }) as DiagramView),
+    }))!)
+    const nodes = Object.fromEntries(data.nodes.map((n) => [n.id, n]))
+    const relations = Object.fromEntries(data.relations.map((r) => [r.id, r]))
+    const ctx = { nodes, relations, metamodel }
+    const theirs = (kind: string) => data.views!.find((v) => v.kind === kind)!
+    const chained = (kind: string) => ({ ...theirs(kind), pipeline: { levels: [{ ways: [{ types: ['person'] }] }] } }) as DiagramView
+    const ids = (list: { id: string }[]) => list.map((n) => n.id).sort()
+    // Every element of orders, none of payments' (Payments, Clerk): as the card counts.
+    expect([...viewShownNodes(theirs('table'), nodes, relations)!].sort()).toEqual(['cust', 'ord'])
+    expect(ids(structureRows(theirs('table'), ctx).map((r) => r.node))).toEqual(['cust', 'ord'])
+    expect(ids(createWikiDocument(theirs('wiki'), ctx).nodeList)).toEqual(['cust', 'ord'])
+    expect(ids(warnierRows(theirs('warnier'), ctx).map((r) => r.node))).toEqual(['cust', 'ord'])
+    // With a chain, what it gives of orders' elements only.
+    expect(ids(structureRows(chained('table'), ctx).map((r) => r.node))).toEqual(['cust'])
+    expect([...chainDrawn(chained('matrix'), ctx)!.nodeIds]).toEqual(['cust'])
+    expect(ids(createWikiDocument(chained('wiki'), ctx).nodeList)).toEqual(['cust'])
   })
 
   it("copies another model's view into the model, named apart when the name is taken", () => {

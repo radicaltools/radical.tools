@@ -11,6 +11,7 @@ import type { C4ElementType, C4Node } from '@radical/common/c4'
 import { nodeTypeSize } from '@radical/common/c4'
 import { isPlacementAllowed } from '@radical/common/metamodel'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { editAsDesigner } from '@radical/ui/store/designerEdit'
 
 /** By rule: the element that settles its finding, and how it links to it. */
 export const ONE_STEP_FIXES: Record<string, { type: 'scenario' | 'fitness-fn'; relationType: string; label: string }> = {
@@ -33,7 +34,9 @@ export function placeBeside(id: string, besideId: string): void {
 }
 
 /** Starts the element `rule`'s fix makes for `targetId`; `onCreated` gets
- *  its id once it is in the model (after its wizard, when it has one). */
+ *  its id once it is in the model (after its wizard, when it has one). The
+ *  Inspector shows a model it does not save: the element is Designer's edit
+ *  (editAsDesigner), made at once or by the wizard. */
 export function startFix(rule: string, targetId: string, onCreated: (id: string) => void): void {
   const fix = ONE_STEP_FIXES[rule]
   const s = useDiagramStore.getState()
@@ -43,7 +46,7 @@ export function startFix(rule: string, targetId: string, onCreated: (id: string)
   // Beside it, in its group, where the metamodel lets it go there.
   const parent = target.parentId ? s.c4Nodes[target.parentId] : undefined
   const parentId = parent && isPlacementAllowed(s.metamodel, fix.type, parent, s.c4Nodes) ? parent.id : undefined
-  s.requestCreateNode({
+  editAsDesigner(() => s.requestCreateNode({
     type: fix.type as C4ElementType,
     label: `New ${def?.label ?? fix.type}`,
     description: '',
@@ -57,5 +60,5 @@ export function startFix(rule: string, targetId: string, onCreated: (id: string)
   } as Omit<C4Node, 'id'>, {
     links: [{ relationType: fix.relationType, direction: 'out', otherId: targetId }],
     onCreated: (id) => { placeBeside(id, targetId); onCreated(id) },
-  })
+  }))
 }

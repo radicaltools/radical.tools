@@ -684,7 +684,7 @@ describe('Radical Forge over MCP', () => {
       expect(await refused(client, 'forge_import_hub_concept', { conceptId: 'nope' })).toContain('no Hub concern pack')
 
       const finish = await call(client, 'forge_finish', {})
-      expect(finish).toContain('- Requirements: skipped')
+      expect(finish).toContain('- Requirements: not run')
       expect(finish).toContain('Feature:')
       const dir = join(folder, '..', `${basename(folder)}-features`)
       folders.push(dir)
@@ -924,9 +924,33 @@ describe('concern packs in a Forge run', () => {
       const finished = await call(client, 'forge_finish', {})
       expect(finished).toContain(`- Fitness functions: skipped (${reason})`)
       expect(finished).toContain('- Gherkin scenarios: skipped (scenarios come with the code)')
-      expect(finished).toContain('- Domain model: skipped\n')
+      expect(finished).toContain('- Domain model: not run\n')
     } finally {
       await client.close()
     }
   }, 90_000)
+
+  it('finishes naming as skipped only the stages left out, the others not run, as the run status Studio shows (F-0112)', async () => {
+    const { client, folder } = await connect()
+    try {
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
+      await call(client, 'forge_skip_stage', { stages: ['mockups', 'states'], reason: 'a back end, no lifecycles' })
+      await call(client, 'forge_clarify', { stage: 'requirements' })
+      const finished = await call(client, 'forge_finish', {})
+      const said = Object.fromEntries([...finished.matchAll(/^- ([^:\n]+): (.+)$/gm)].map((m) => [m[1], m[2]]))
+      expect(said).toEqual({
+        'Requirements': 'not run', 'Domain model': 'not run', 'Fitness functions': 'not run', 'Gherkin scenarios': 'not run',
+        'State machines': 'skipped (a back end, no lifecycles)', 'Processes': 'not run', 'Mockups': 'skipped (a back end, no lifecycles)',
+        'C4 model': 'not run', 'Review': 'not run',
+      })
+      // The run status says the same: in a finished run no stage still asks questions.
+      const status = parseForgeRun(await readFile(join(folder, '.state/forge-run.json'), 'utf8'))!
+      expect(status.state).toBe('finished')
+      expect(status.stages.map((s) => `${s.id}: ${s.status}`)).toEqual([
+        'requirements: pending', 'domain: pending', 'fitness: pending', 'scenarios: pending', 'states: skipped', 'processes: pending', 'mockups: skipped', 'c4: pending', 'review: pending',
+      ])
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
 })

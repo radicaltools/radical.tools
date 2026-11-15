@@ -29,10 +29,10 @@
 // Studio's wizard and the MCP server's forge_* tools both go through the
 // facade here, so they file and arrange the same way.
 
-import { landscapeGridColumns, WIKI_DEPTH_MAX, type C4Node, type DiagramView } from '../../c4'
+import { CANVAS_MAX_ELEMENTS, landscapeGridColumns, WIKI_DEPTH_MAX, type C4Node, type DiagramView } from '../../c4'
 import type { Metamodel, ViewpointDef } from '../../metamodel'
 import { canBeSubject } from '../../viewpoints'
-import { runChain, runPipeline, type PipelineContext } from '../../viewPipeline'
+import { canvasOverflow, runChain, runPipeline, type PipelineContext } from '../../viewPipeline'
 import type { DiagramFacade } from '../diagramFacade'
 import type { ForgeStageId } from './prompts'
 
@@ -520,6 +520,9 @@ export function arrangeForgeGroup(
 ): { ok: true; text: string } | { ok: false; text: string } {
   const count = group.nodeIds.length
   if (count < 2) return { ok: false, text: `${group.viewName}: only one new element, nothing to arrange.` }
+  // A view too large for a canvas is neither drawn nor laid out (noCanvasLayout).
+  const shown = canvasOverflow(facade.getViews?.()[group.viewId], facade.getNodes(), facade.getRelations())
+  if (shown !== null) return { ok: false, text: `${group.viewName}: shows ${shown.toLocaleString('en')} elements; a canvas draws up to ${CANVAS_MAX_ELEMENTS.toLocaleString('en')}.` }
   if (arrangement === 'grid') {
     if (!facade.addGrid) return { ok: false, text: 'Grids are not editable here.' }
     const columns = landscapeGridColumns(count)

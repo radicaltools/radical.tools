@@ -1772,13 +1772,13 @@ export class Assay {
           const at = repository.implements.findIndex((m) => m.element === element)
           const next = { element, name: nodes[element]?.label, paths: at < 0 ? paths : [...new Set([...repository.implements[at].paths, ...paths])] }
           if (at < 0) repository.implements.push(next)
-          else repository.implements[at] = next
+          else repository.implements[at] = { ...repository.implements[at], ...next }
         }
         for (const [element, tests] of changes.verifies) {
           const at = repository.verifies.findIndex((v) => v.element === element)
           const next = { element, name: nodes[element]?.label, tests: at < 0 ? tests : [...new Set([...repository.verifies[at].tests, ...tests])] }
           if (at < 0) repository.verifies.push(next)
-          else repository.verifies[at] = next
+          else repository.verifies[at] = { ...repository.verifies[at], ...next }
         }
         // The central model's repository by its address (ADR One system model across repositories): its origin, else its path from here.
         if (dir !== run.root) repository.model = { ...repository.model, repo: centralAddress(run.root) ?? (posix(relative(dir, run.root)) || '.') }

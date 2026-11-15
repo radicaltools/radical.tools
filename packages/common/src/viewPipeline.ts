@@ -11,7 +11,7 @@
 // the steps that fit, with how many elements each concerns.
 
 import type { C4Node, C4Relation, ChainLevel, ChainVia, ChainWay, DiagramView, ViewFilter, ViewPipeline, ViewSort } from './c4'
-import { holderOf, notedPlacesOnly, viewShowsEveryNode } from './c4'
+import { CANVAS_MAX_ELEMENTS, holderOf, notedPlacesOnly, viewShowsEveryNode } from './c4'
 import type { Metamodel, PropertyDef } from './metamodel/types'
 import type { WizardLink } from './metamodel/wizard'
 import { inferRelationType, isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypesFitting } from './metamodel/lookup'
@@ -448,11 +448,17 @@ function nodeList(nodes: Record<string, C4Node>): C4Node[] {
 
 const nodeLists = new WeakMap<object, C4Node[]>()
 
+/** The elements a view's chain starts from: every element, or those it
+ *  lists; for another model's view (a federation), of its models only, as
+ *  viewShownNodes counts them. Its table, wiki, Warnier view and matrix
+ *  listed this model's elements too (F-0119). */
 export function pipelineSource(view: DiagramView | undefined, ctx: PipelineContext): C4Node[] {
   const all = nodeList(ctx.nodes)
-  if (!view || viewShowsEveryNode(view)) return all
+  const scope = view?.originScope
+  const ofScope = scope ? all.filter((n) => inOriginScope(scope, n)) : all
+  if (!view || viewShowsEveryNode(view)) return ofScope
   const ids = new Set(view.nodeIds)
-  return all.filter((n) => ids.has(n.id))
+  return ofScope.filter((n) => ids.has(n.id))
 }
 
 /** `pipeline` run from `source`. */
@@ -658,11 +664,16 @@ export function viewShownNodes(view: DiagramView | undefined, nodes: Record<stri
 
 /** The elements and relations of the models named (by their origin). */
 function scopedTo(scope: string[], nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): [Record<string, C4Node>, Record<string, C4Relation>] {
-  const inScope = (item: { origin?: string }) => !!item.origin && scope.includes(item.origin.slice(0, item.origin.lastIndexOf('@')))
+  const inScope = (item: { origin?: string }) => inOriginScope(scope, item)
   return [
     Object.fromEntries(Object.entries(nodes).filter(([, n]) => inScope(n))),
     Object.fromEntries(Object.entries(relations).filter(([, r]) => inScope(r))),
   ]
+}
+
+/** An element or relation of one of the models named (by its origin). */
+function inOriginScope(scope: string[], item: { origin?: string }): boolean {
+  return !!item.origin && scope.includes(item.origin.slice(0, item.origin.lastIndexOf('@')))
 }
 
 /** What viewShownNodes answered for a view's node list, and from what. */
@@ -863,6 +874,27 @@ function computeShownNodes(view: DiagramView, nodes: Record<string, C4Node>, rel
 export function viewDrawnIds(view: DiagramView | undefined, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Set<string> | undefined {
   if (!view || !pipelineOf(view)?.levels?.length || view.kind === 'dynamic') return undefined
   return viewShownNodes(view, nodes, relations)
+}
+
+/** How many elements `view` draws on a canvas: those it lists when it is
+ *  of type Explore (an exploration draws them flat, each on its own), else
+ *  those it shows (viewShownNodes), every element of the model when it
+ *  shows every one. Also what a view turned into an exploration lists. */
+export function canvasCount(view: DiagramView, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): number {
+  if (view.kind === 'explore') return view.nodeIds.filter((id) => id in nodes).length
+  return viewShownNodes(view, nodes, relations)?.size ?? Object.keys(nodes).length
+}
+
+/** How many elements the canvas of `view` would draw, when that is more
+ *  than a canvas draws (CANVAS_MAX_ELEMENTS): such a view is neither drawn
+ *  nor laid out, by Studio or by an agent's layout tools. Null for a view
+ *  within the limit, and for one of a kind that draws no canvas (a table,
+ *  a wiki, a flow, …). A view's filter grows with the model, so a view
+ *  drawn once may be too large now. */
+export function canvasOverflow(view: DiagramView | undefined, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): number | null {
+  if (!view || ((view.kind ?? 'static') !== 'static' && view.kind !== 'explore')) return null
+  const count = canvasCount(view, nodes, relations)
+  return count > CANVAS_MAX_ELEMENTS ? count : null
 }
 
 /** `ids` and every container they sit in. */

@@ -64,7 +64,7 @@ import * as model from '@radical/common/model'
 import { originFor, otherModelsAt, type FederationFile } from '@radical/common/federation'
 import type { RepositoryFile } from '@radical/common/repositoryMapping'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
-import { chainRelationFor, pipelineOf, viewDrawnIds, viewShownNodes } from '@radical/common/viewPipeline'
+import { canvasCount, canvasOverflow, chainRelationFor, pipelineOf, viewDrawnIds, viewShownNodes } from '@radical/common/viewPipeline'
 import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { mergeModels, mergeNotices, mergeSteps } from '@radical/common/modelMerge'
 import { markdownToPlain } from '@radical/common/markdown'
@@ -90,6 +90,8 @@ import {
   viewExpandedSet,
   fitAndSeparateBottomUp,
   isEffectivelyCollapsed,
+  keptFrames,
+  placeOnViewCanvas,
   viewLayoutInput,
   type LayoutInput,
 } from '@radical/layout/viewInput'
@@ -891,6 +893,11 @@ let _typing: { key: string; step: HistoryItem | null } | null = null
  *  was typed before and after the question were two steps. */
 let _typingAtQuestion: { key: string; step: HistoryItem | null } | null = null
 
+/** A text field has the focus now (beginTyping, until endTyping). */
+export function typingInField(): boolean {
+  return _typing !== null
+}
+
 /** The undo step of an edit of `key` ("node:<id>:label"), unless it goes on
  *  what is being typed into a focused field (_typing). A step made before an
  *  outside change (StepChange) that the typing goes on gets the edit
@@ -1001,6 +1008,35 @@ function parkDesigner(state: DiagramStore): ParkedDesigner {
     hubTemplates: state.hubTemplates,
     milestoneHubBase: _milestoneHubBase,
   }
+}
+
+/** What the Inspector set aside to show the live model: the milestone shown
+ *  where it was opened from, put back on the way to Viewer or Presenter
+ *  (Designer gets its parked model back). */
+let _inspectorAside: ParkedDesigner | null = null
+
+/** The Inspector is about the live model: its lists read it, and so do the
+ *  card it opens and the edits it offers. A milestone shown is set aside
+ *  while it is open; its card showed the milestone's element, or nothing. */
+function _liveInInspector(): void {
+  const s = useDiagramStore.getState()
+  const backup = s.liveBackup
+  if (!s.activeSnapshotId || !backup) return
+  _inspectorAside = parkDesigner(s)
+  useDiagramStore.setState((state) => {
+    state.c4Nodes = backup.nodes as any
+    state.c4Relations = backup.relations as any
+    if (backup.sequences) state.sequences = backup.sequences as any
+    if (backup.hubTemplates) state.hubTemplates = backup.hubTemplates as any
+    unparkLiveViews(state as DiagramStore, backup)
+    state.activeSnapshotId = null
+    state.liveBackup = null
+    state.milestoneDirty = false
+    state.diffHighlight = {} as any
+    state.diffBaseSnapshotId = null
+    state.diffGhostNodes = {} as any
+    state.diffGhostRelations = {} as any
+  })
 }
 
 /** The live model of a parked Designer: its nodes, unless it was showing a
@@ -1595,21 +1631,14 @@ function showCanvasPositions(
   // Only a canvas draws positions: a table, wiki, matrix, hierarchy or flow
   // view keeps what it was given.
   if (view && view.kind && view.kind !== 'static') return []
-  const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
-  // Folded as the view draws it: its own folds over the model's, and a
-  // container none of whose children it shows.
-  const childless = computeViewCollapsedSet(shown, nodes)
-  const folded = view ? (n: C4Node): boolean => nodeEffectivelyCollapsedInView(n, view.id, view) || childless.has(n.id) : undefined
-  // The containers the view draws only to hold what it shows: a new one
-  // goes tightly round what it holds there, and nothing is astray in one.
-  const frames = viewFrames(view, nodes, relations)
-  const placed = placeUnplaced(nodes, positions, shown, folded, { frames, wrap: wrap?.ids, wrapped: wrap?.wrapped })
+  // The MCP server lays a view never laid out out from this canvas too.
+  const placed = placeOnViewCanvas(nodes, positions, view, relations, wrap)
   // One whose parent got a place of its own too moved with it, at a place
   // that was not its own in it: it is placed in it now.
   const left = own.filter((id) => nodes[id] && !placed.includes(id))
   if (!left.length) return placed
   const known = Object.fromEntries(Object.keys(nodes).filter((id) => !left.includes(id)).map((id) => [id, true]))
-  return [...placed, ...placeUnplaced(nodes, known, shown, folded, { frames })]
+  return [...placed, ...placeOnViewCanvas(nodes, known, view, relations)]
 }
 
 /**
@@ -1738,6 +1767,15 @@ function firstCanvasPositions(
   if (isExploration(view) && !Object.keys(view.positions ?? {}).length) return {}
   if (!view || (view.kind ?? 'static') !== 'static' || Object.keys(view.positions ?? {}).length > 0) return undefined
   return milestoneAllPositions ?? defaultPositions
+}
+
+/** What a canvas just opened leaves to the live layout to settle: what it
+ *  placed (showCanvasPositions, placeUnplaced) settles with its
+ *  surroundings in Designer; Viewer and Presenter show the canvas as it
+ *  opens, still (a view never laid out glided there for seconds, nothing
+ *  touched). */
+function settlesOnOpen(placed: string[]): string[] {
+  return useDiagramStore.getState().appMode === 'designer' ? placed : []
 }
 
 /** The page a slide of a wiki view shows: the element whose page it is
@@ -3627,7 +3665,7 @@ interface DiagramStore {
    *  an edit of the milestone: marks it, and parks the live version first
    *  (liveBackup.views). No-op on the live model. */
   _milestoneViewEdit: (viewId: string | null | 'every') => void
-  _resizeParentsBottomUp: (viewFilter?: Set<string>, viewCollapsedSet?: Set<string>, expandedSet?: Set<string>) => void
+  _resizeParentsBottomUp: (viewFilter?: Set<string>, viewCollapsedSet?: Set<string>, expandedSet?: Set<string>, keep?: ReadonlySet<string>) => void
   /** Moves the active canvas's elements so its layout constraints hold
    *  (no undo step of its own). */
   _enforceLayoutConstraints: () => void
@@ -3809,14 +3847,22 @@ const _continuousHeld = new Set<string>()
 
 /** The shape of the canvas shown, or null when it does not keep itself tidied. */
 /** The canvas view shown and how many elements it shows, when that is
- *  more than a canvas draws (CANVAS_MAX_ELEMENTS): it is neither drawn nor
- *  laid out. A view's filter grows with the model, so a view drawn once may
- *  be too large now. Null for any other view. */
-export function oversizedCanvas(s: Pick<DiagramStore, 'activeViewId' | 'views' | 'c4Nodes' | 'c4Relations'>): { view: DiagramView; count: number } | null {
-  const view = s.activeViewId ? s.views[s.activeViewId] : undefined
-  if (!view || (view.kind ?? 'static') !== 'static' || isExploration(view)) return null
-  const count = viewShownNodes(view, s.c4Nodes, s.c4Relations)?.size ?? Object.keys(s.c4Nodes).length
-  return count > CANVAS_MAX_ELEMENTS ? { view, count } : null
+ *  more than a canvas draws (CANVAS_MAX_ELEMENTS, canvasOverflow): it is
+ *  neither drawn nor laid out. A view's filter grows with the model, so a
+ *  view drawn once may be too large now; an exploration counts the
+ *  elements it lists. Null for any other view. */
+export function oversizedCanvas(s: Pick<DiagramStore, 'activeViewId' | 'views' | 'c4Nodes' | 'c4Relations'> & Partial<Pick<DiagramStore, 'exploration'>>): { view: DiagramView; count: number } | null {
+  const view = viewById({ views: s.views, exploration: s.exploration ?? null }, s.activeViewId)
+  const count = canvasOverflow(view, s.c4Nodes, s.c4Relations)
+  return view && count !== null ? { view, count } : null
+}
+
+/** Whether the view `viewId`, turned into an exploration, would list more
+ *  elements than a canvas draws: it is not turned (setViewKind), and its
+ *  notice stays. */
+export function tooLargeToExplore(s: Pick<DiagramStore, 'views' | 'c4Nodes' | 'c4Relations'>, viewId: string): boolean {
+  const view = s.views[viewId]
+  return !!view && view.kind !== 'explore' && canvasCount(view, s.c4Nodes, s.c4Relations) > CANVAS_MAX_ELEMENTS
 }
 
 function continuousShape(s: DiagramStore): string | null {
@@ -6029,7 +6075,7 @@ export const useDiagramStore = create<DiagramStore>()(
           arrangeOnFirstOpen()
           const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
           ;(window as any).__rfPlaceCamera?.(incomingViewport, shown)
-          _liveLayout?.reset(placed)
+          _liveLayout?.reset(settlesOnOpen(placed))
           return
         }
 
@@ -6151,7 +6197,8 @@ export const useDiagramStore = create<DiagramStore>()(
         const links = explorationLinks(x, s.c4Nodes, s.c4Relations).get(nodeId) ?? []
         const expansion = uid()
         const next = grown(x, nodeId, links, choice, expansion)
-        if (!next) return
+        // Nor does a + take it past what a canvas draws.
+        if (!next || canvasOverflow(next, s.c4Nodes, s.c4Relations) !== null) return
         _reshapeExploration(next, next.nodeIds.filter((id) => !x.nodeIds.includes(id)), [nodeId], true, expansion)
       },
 
@@ -6505,6 +6552,9 @@ export const useDiagramStore = create<DiagramStore>()(
         if (!view || setByGroup(get(), viewId)) return
         // Nothing changes: no undo step.
         if ((view.kind ?? 'static') === kind && !view.viewpoint && !view.subject) return
+        // An exploration is a canvas: one of more elements than a canvas
+        // draws is not made.
+        if (kind === 'explore' && tooLargeToExplore(get(), viewId)) return
         get()._pushUndo()
         get()._milestoneViewEdit(viewId)
         let placed: string[] | null = null
@@ -7251,7 +7301,7 @@ export const useDiagramStore = create<DiagramStore>()(
       // ── layout ───────────────────────────────────────────────────────────
 
       /** Resize every parent container bottom-up after children have moved. */
-      _resizeParentsBottomUp(viewFilter, viewCollapsedSet, expandedSet) {
+      _resizeParentsBottomUp(viewFilter, viewCollapsedSet, expandedSet, keep) {
         const allNodes = Object.values(get().c4Nodes)
         // Only process parents that are in the view (or all if no filter)
         const relevantNodes = viewFilter
@@ -7266,6 +7316,7 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         parentIds.sort((a, b) => nodeDepth(b) - nodeDepth(a)) // deepest first
         for (const pid of parentIds) {
+          if (keep?.has(pid)) continue
           get().fitParentToChildren(pid, viewFilter, viewCollapsedSet, expandedSet)
         }
       },
@@ -7532,7 +7583,13 @@ export const useDiagramStore = create<DiagramStore>()(
             const settled = settleMoveOnShownCanvas(get(), reparented, oldParents)
             set((state) => { writeGeometry(state, settled) })
           }
-          get()._resizeParentsBottomUp(vf, vcs, expandedSet)
+          // A frame Tidy kept as it was (pinned, or out of its reach round a
+          // selection) keeps its size too; one that gained or lost an
+          // element meanwhile is fitted.
+          const kept = ensemble || unpins ? new Set<string>() : keptFrames(input.nodes, result.winner.positions, input.frames)
+          for (const id of changed) for (let p = get().c4Nodes[id]?.parentId; p; p = get().c4Nodes[p]?.parentId) kept.delete(p)
+          for (const id of reparented) for (let p = present.get(id); p; p = get().c4Nodes[p]?.parentId) kept.delete(p)
+          get()._resizeParentsBottomUp(vf, vcs, expandedSet, kept)
 
           // Final collision-safety pass at root level (same as ELK/Radical
           // paths) for the ensemble, and for what was added or moved while
@@ -8754,11 +8811,13 @@ export const useDiagramStore = create<DiagramStore>()(
           // Edits of a milestone not yet kept or dropped stay Designer's
           // question: Viewer and Presenter browse without being asked.
           set((state) => { state.milestoneDirty = false; state.milestonePromptOpen = false })
-        } else if (!editing(prevMode) && (editing(mode) || prevMode === 'presenter') && W.__preModeLayout) {
+        } else if (!editing(prevMode) && (editing(mode) || prevMode === 'presenter' || (prevMode === 'inspector' && _inspectorAside)) && W.__preModeLayout) {
           // Back to Designer: its parked model. From Presenter to Viewer as
           // well, kept parked: what the last slide showed (its places, its
-          // folds, its model) stayed in Viewer until a view switch.
-          const pre = W.__preModeLayout as ParkedDesigner
+          // folds, its model) stayed in Viewer until a view switch. From the
+          // Inspector to Viewer or Presenter, the milestone it set aside.
+          const pre = (!editing(mode) && _inspectorAside) || W.__preModeLayout as ParkedDesigner
+          _inspectorAside = null
           set((state) => {
             state.c4Nodes = pre.c4Nodes as any
             state.c4Relations = pre.c4Relations as any
@@ -8819,6 +8878,7 @@ export const useDiagramStore = create<DiagramStore>()(
         } else {
           get().startLiveLayout()
         }
+        if (mode === 'inspector') _liveInInspector()
         set((state) => { state.appMode = mode as any; state.slideTreemapFocus = null; state.slideWikiPage = null })
         // Rebuild rfNodes so per-node draggable/selectable flags reflect
         // the new mode (designer = editable, viewer/presenter = locked).
@@ -9776,7 +9836,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // skipBulk=true: the loaded positions stand, the live layout only
         // moves what is added or dragged from here on.
         get().startLiveLayout({ skipBulk: true })
-        if (placedOnLoad.length > 0) _liveLayout?.reset(placedOnLoad)
+        if (settlesOnOpen(placedOnLoad).length > 0) _liveLayout?.reset(placedOnLoad)
         suggestSmartLayoutIfUnarranged(true)
         // Apply restored camera (loaded as activeViewId=null → default view).
         // The camera of the canvas shown now: one switched to during the load

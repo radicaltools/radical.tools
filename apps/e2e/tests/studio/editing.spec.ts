@@ -637,6 +637,33 @@ test('a dialog keeps the keys: Tab stays in it, Ctrl+Z and F5 leave the model be
   await expect(studio.nodes).toHaveCount(4)
 })
 
+test('Delete pressed in a dialog leaves the element selected behind it alone', async ({ page, studio }) => {
+  // F-0122: with an element selected, Delete pressed in Setup…, About, AI
+  // providers… or the Models dialog opened the canvas's delete prompt
+  // behind the dialog, there when it closed.
+  const dialogs = [
+    { menu: 'Settings', item: 'Setup…', name: 'Set up Radical Studio' },
+    { menu: 'Settings', item: 'About Radical Studio', name: 'About Radical Studio' },
+    { menu: 'Settings', item: 'AI providers…', name: 'AI provider settings' },
+    { menu: 'Models', item: /Manage models/, name: 'Models' },
+  ]
+  const prompt = page.locator('.milestone-modal-title', { hasText: /^Delete / })
+  for (const d of dialogs) {
+    await studio.nodeByLabel('Payment Provider').click()
+    await page.getByRole('button', { name: d.menu, exact: true }).click()
+    await page.getByRole('menuitem', { name: d.item, exact: typeof d.item === 'string' }).click()
+    const dialog = page.getByRole('dialog', { name: d.name })
+    await expect(dialog).toBeVisible()
+    await page.keyboard.press('Delete')
+    await page.waitForTimeout(300)
+    // Escape would cancel the prompt as well: it is looked for first.
+    await expect(prompt, d.name).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+  }
+  await expect(studio.nodes).toHaveCount(3)
+})
+
 test('the activity rail keeps the app\'s menus in the metamodel editor, without the panel\'s sections', async ({ page }) => {
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('menuitemcheckbox', { name: /Metamodel editor/ }).click()

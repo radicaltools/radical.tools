@@ -1,7 +1,7 @@
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { ELEMENT_LABEL, MEASUREMENTS_FILE, REVIEWS_FILE, addReview, appliedElements, isSensorName, mergeMeasurements, metricsFileProblems, parseMeasure, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile } from '@radical/common/check'
+import { ELEMENT_LABEL, MEASUREMENTS_FILE, addReview, appliedElements, isSensorName, mergeMeasurements, metricsFileProblems, parseMeasure, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile } from '@radical/common/check'
 import type { C4Node, DiagramData } from '@radical/common/c4'
 import { MD_MANIFEST_FILE, deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
 import { originModel, originOf } from '@radical/common/model'
@@ -44,9 +44,9 @@ ADR, the element with its paths from .radical/radical.json, metricsOut: a
 file it may write radical-metrics/1 measurements to), measured as
 <sensor>.exit_code and <sensor>.duration labelled element=<id>.
 
-review records a person's review of a manual fitness function in the model
-folder's reviews.json, kept in git; its \`review(<name>) passed\` condition
-reads the latest review of <name>.
+review records a person's review of a manual fitness function in the
+repository's .radical/reviews.json, kept in git; its \`review(<name>)
+passed\` condition reads the latest review of <name>.
 
 Adapters:
 ${SENSOR_ADAPTERS.map((a) => `  ${a.name.padEnd(18)}${a.description}`).join('\n')}
@@ -228,7 +228,7 @@ async function runCommand(args: string[], io: Io, now: () => Date): Promise<numb
   return failed ? 2 : 0
 }
 
-/** `radical sense review`: a person's review, added to reviews.json. */
+/** `radical sense review`: a person's review, added to .radical/reviews.json. */
 async function reviewCommand(args: string[], io: Io, now: () => Date): Promise<number> {
   let parsed
   try {
@@ -256,7 +256,7 @@ async function reviewCommand(args: string[], io: Io, now: () => Date): Promise<n
   try {
     text = addReview(existing, { name, result, by: values.by.trim(), at: now().toISOString(), ...(values.note?.trim() ? { note: values.note.trim() } : {}) })
   } catch (error) {
-    io.err(`Cannot read ${REVIEWS_FILE}: ${(error as Error).message}`)
+    io.err(`Cannot read ${REPOSITORY_REVIEWS}: ${(error as Error).message}`)
     return 2
   }
   await mkdir(dirname(path), { recursive: true })

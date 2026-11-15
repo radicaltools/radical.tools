@@ -100,12 +100,28 @@ export function answerDelta(concept: HubConcept, answers: Record<string, string>
   return { added, removed }
 }
 
+/** Each of `views` stays where it was looking (`was`): the wiki on its page
+ *  while that element is still in the pack, in its page mode, the table on
+ *  its tab. An answer reloads the pack, and the wiki went back to the pack's
+ *  first page, also for an answer that changed nothing. */
+function lookingAt(views: DiagramView[], was: Record<string, DiagramView>, ids: Set<string>): void {
+  for (const v of views) {
+    const before = was[v.id]
+    if (!before) continue
+    if (before.wikiFocusId === null || (before.wikiFocusId && ids.has(before.wikiFocusId))) v.wikiFocusId = before.wikiFocusId
+    if (before.wikiPageMode) v.wikiPageMode = before.wikiPageMode
+    if (before.tableActiveTab) v.tableActiveTab = before.tableActiveTab
+  }
+}
+
 /** `answers`: a concern pack's answers, to show only what they bring in
  *  (null or absent: every variant at once). `layoutFrom`: id of one of the
  *  concept's views whose stored positions replace the node coordinates — the Hub viewer runs in explore mode, where
  *  switching the active view deliberately keeps the current layout, so it
- *  reloads the concept laid out for the chosen view instead. */
-export function conceptToDiagramData(concept: HubConcept, opts: { layoutFrom?: string | null; answers?: Record<string, string> | null } = {}): DiagramData {
+ *  reloads the concept laid out for the chosen view instead. `lookingAt`:
+ *  the views as shown now, when other answers reload the pack: each stays
+ *  on its page (lookingAt). */
+export function conceptToDiagramData(concept: HubConcept, opts: { layoutFrom?: string | null; answers?: Record<string, string> | null; lookingAt?: Record<string, DiagramView> | null } = {}): DiagramData {
   if (opts.answers) concept = answeredConcept(concept, opts.answers)
   const ids = new Set(concept.nodes.map((n) => String(n.id)))
   const params = concept.templateParams
@@ -168,6 +184,8 @@ export function conceptToDiagramData(concept: HubConcept, opts: { layoutFrom?: s
     { id: HUB_WIKI_VIEW_ID, name: 'Wiki', kind: 'wiki', nodeIds: allIds, positions: {}, wikiFocusId: firstRoot },
     { id: HUB_TABLE_VIEW_ID, name: 'Table', kind: 'table', nodeIds: allIds, positions: {} },
   ]
+
+  if (opts.lookingAt) lookingAt(views, opts.lookingAt, ids)
 
   const layout = opts.layoutFrom ? views.find((v) => v.id === opts.layoutFrom)?.positions : undefined
   if (layout) {

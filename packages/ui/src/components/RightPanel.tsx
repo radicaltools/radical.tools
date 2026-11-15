@@ -1,7 +1,7 @@
 import React, { ChangeEvent, useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
-import { onExploration, useDiagramStore, viewById, type BranchOverlay } from '../store/diagramStore'
+import { onExploration, tooLargeToExplore, useDiagramStore, viewById, type BranchOverlay } from '../store/diagramStore'
 import { useNodeLabels, useNodesPlacesAside, useTextAsideMemo } from '../store/nodeSelectors'
 import { type C4Node, type C4Relation, NODE_COLORS, TYPE_LABELS, TYPE_ICON_PATHS, NODE_FG, isBackwardStep } from '@radical/common/c4'
 import { resolveEarsSubject, isReservedPropertyKey, relationDisplayLabel, relationTypeName, requirementStatePhrase, type PropertyDef } from '@radical/common/metamodel'
@@ -26,7 +26,7 @@ import { openCard, showNodeInView, useCardOpen } from '../store/showInView'
 import { CardNavigation, ElementVerification, useCardNavigate } from './ElementVerification'
 import { NodeActions, RelationActions } from './SelectionActions'
 import { OPEN_VIEW_PROPERTIES_EVENT } from './LargeCanvasNotice'
-import { viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
+import { CANVAS_MAX_ELEMENTS, viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
 
 /** A text field got or lost focus: what is typed into it in between (each
  *  letter an edit of the model) is one undo step. */
@@ -838,6 +838,8 @@ function ViewPropertiesContent({ viewId, readOnly: panelReadOnly = false, onClos
   const detachViewpoint = useDiagramStore((s) => s.detachViewpoint)
   const viewpoints = useMemo(() => viewpointsOf(metamodel), [metamodel])
   const allNodes = useDiagramStore((s) => s.c4Nodes)
+  // An exploration is a canvas: a view of more elements than one draws is not made one.
+  const noExplore = useDiagramStore((s) => tooLargeToExplore(s, viewId))
 
   if (!view) return null
   // Another model's view (a federation): shown, not changed; a copy is.
@@ -1022,7 +1024,8 @@ function ViewPropertiesContent({ viewId, readOnly: panelReadOnly = false, onClos
               <Icon.Warnier /> Warnier
             </button>
             <button className={`view-kind-btn${isExplore ? ' active' : ''}`} aria-pressed={isExplore} onClick={() => setViewKind(view.id, 'explore')}
-              title="Grown level by level from one element: the one selected on it, else its first">
+              disabled={noExplore}
+              title={noExplore ? `The view shows more elements than a canvas draws (${CANVAS_MAX_ELEMENTS.toLocaleString('en')})` : 'Grown level by level from one element: the one selected on it, else its first'}>
               <Icon.Explore /> Explore
             </button>
           </div>

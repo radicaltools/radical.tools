@@ -52,8 +52,10 @@ const details = (message: unknown, durationMs: unknown, line: unknown): Pick<Tes
   }
 }
 
-/** Between a test id's file and titles, as Playwright and Vitest print them. */
+/** Between a test id's file and titles, as Playwright prints them. */
 const SEPARATOR = /\s+›\s+/
+/** The same as Vitest prints it, read in an id without a ›. */
+const ASCII_SEPARATOR = /\s+>\s+/
 /** Between the describe blocks in a JUnit test name: Vitest writes >. */
 const JUNIT_SEPARATOR = /\s+[›>]\s+/
 
@@ -163,6 +165,17 @@ export interface TestId {
   title: string[]
 }
 
+/** A test id's file and titles. An id is written as Playwright prints it
+ *  (`a.test.ts › suite › title`) or as Vitest does (`a.test.ts > suite >
+ *  title`); an id with a › splits only on ›, so a title may hold " > ". */
+export function testIdParts(raw: string): string[] {
+  return raw.split(SEPARATOR.test(raw) ? SEPARATOR : ASCII_SEPARATOR).map((part) => part.trim())
+}
+
+/** A test id as it is kept (in .radical/radical.json): its parts joined by
+ *  ›, however it was written. */
+export const canonicalTestId = (raw: string): string => testIdParts(raw.trim()).filter(Boolean).join(' › ')
+
 /** The test ids in a list, one per line (a title may hold
  *  "; "). Blank lines and lines starting with # are left out. */
 export function parseTestIds(text: unknown): TestId[] {
@@ -171,7 +184,7 @@ export function parseTestIds(text: unknown): TestId[] {
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith('#'))
     .map((raw) => {
-      const [file, ...title] = raw.split(SEPARATOR)
+      const [file, ...title] = testIdParts(raw)
       return { raw, file: normalize(file), title }
     })
 }
