@@ -774,14 +774,16 @@ ports (`<ports>+NN`, `+100+NN`, `+200+NN`) and a `PROMPT.md` with its area;
 `BRIEF.md` names the commit, the commits and the model elements changed since
 the last round (by area), the open findings, the setup, the rules and the
 report's JSON form. `--since`, `--from` and `--no-build` change what it
-counts from, the first run's number and whether it builds. The brief asks
+counts from, the first run's number and whether it builds; a run number an
+earlier round has is refused (exit 2). The brief asks
 that scripts name no absolute path (they find the repository by walking up to
 `.radical/crucible/crucible.json`), since a finding's script is copied out of the round.
 `verify` serves a run's build on its ports (each server `serve` lists, on the
 run's port it names: `app`, `hub` or `other`), runs its scripts from its
-folder and stops the servers. A script shows the bug when it exits 1, and
+folder and stops the servers; a script not in the folder stops it before
+anything runs (exit 2). A script shows the bug when it exits 1, and
 says so in a line of its own (`REPRODUCED: yes` or `REPRODUCED: no`; `BUG: …`
-and `FINDING: …` count as yes): `verify` prints those lines and whether the
+and `FINDING: …` count as yes, whatever they say): `verify` prints those lines and whether the
 bug shows for each script (the line wins, as a script that throws exits 1
 too, and it says when exit and line disagree), keeps both in `round.json`, and
 ends with the scripts that show the bug and those that do not. A run's folder

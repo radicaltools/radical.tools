@@ -196,6 +196,44 @@ describe('radical explore verify, what a script says', () => {
   })
 })
 
+describe('radical explore verify, what a bug line says', () => {
+  // A BUG or FINDING line says the bug shows, whatever its words: 'no …' and '0 of …' describe it.
+  it('takes every BUG and FINDING line as saying the bug shows; only REPRODUCED says it does not (F-0146)', async () => {
+    const { cwd } = await project({ serve: [] })
+    await run(cwd, 'prepare', '--runs', '1')
+    const folder = join(cwd, 'rounds', 'round-5-5', 'run-5')
+    const lines = ['BUG: no undo step is made for the drag', 'FINDING: 0 of 3 elements keep their place', 'BUG: none of the pins hold', 'FINDING = false start of the drag', 'BUG: the drag made two undo steps']
+    for (const [i, line] of lines.entries()) await writeFile(join(folder, `b${i}.mjs`), `console.log(${JSON.stringify(line)})\nprocess.exit(1)\n`)
+    await writeFile(join(folder, 'no.mjs'), "console.log('REPRODUCED: no')\n")
+    const { out } = await run(cwd, 'verify', '5', ...lines.map((_, i) => `b${i}.mjs`), 'no.mjs')
+    for (const [i, line] of lines.entries()) expect(out, line).toContain(`=== b${i}.mjs\n  ${line}\n  (exit 1)\n  says: ${line}\n  → the bug shows\n`)
+    const journal = JSON.parse(await readFile(join(cwd, 'rounds', 'round-5-5', 'round.json'), 'utf8'))
+    expect(journal.runs[0].verified.map((v: { script: string; shown: boolean }) => [v.script, v.shown])).toEqual([...lines.map((_, i) => [`b${i}.mjs`, true]), ['no.mjs', false]])
+  })
+})
+
+describe('radical explore verify, a script that is not there', () => {
+  it('runs no script that is not in the run\'s folder and records nothing; prepare refuses a run an earlier round has (F-0147)', async () => {
+    const { cwd } = await project({ serve: [] })
+    await run(cwd, 'prepare', '--runs', '1')
+    const folder = join(cwd, 'rounds', 'round-5-5', 'run-5')
+    await writeFile(join(folder, 'f1-drag.mjs'), "console.log('REPRODUCED: yes')\nprocess.exit(1)\n")
+    const missing = await run(cwd, 'verify', '5', 'f1-drag.mjs', 'f1-dragg.mjs 4505')
+    expect(missing.code).toBe(2)
+    expect(missing.err).toContain('No script f1-dragg.mjs in rounds/round-5-5/run-5')
+    expect(missing.out).not.toContain('=== ')
+    expect(JSON.parse(await readFile(join(cwd, 'rounds', 'round-5-5', 'round.json'), 'utf8')).runs[0].verified).toEqual([])
+    // round-3-4 has runs 3 and 4: a round from 4 (or 3) would give run 4 two folders.
+    for (const from of ['4', '3', '5']) {
+      const prepared = await run(cwd, 'prepare', '--runs', '2', '--from', from, '--no-build')
+      expect(prepared.code, from).toBe(2)
+      expect(prepared.err, from).toMatch(/^Run [345] is in round-[345]-[45] already: give --from \d+ or more\.\n$/)
+    }
+    expect(existsSync(join(cwd, 'rounds', 'round-4-5'))).toBe(false)
+    expect((await run(cwd, 'prepare', '--runs', '1', '--from', '6', '--no-build')).code).toBe(0)
+  })
+})
+
 describe('radical explore verify with several servers', () => {
   it('serves each server on its port of the run, and stops them all', async () => {
     const { cwd } = await project({
