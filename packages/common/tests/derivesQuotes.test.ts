@@ -234,6 +234,22 @@ describe("reading the person's words", () => {
     ])
   })
 
+  it('reads a range as one limit before a sentence is cut into clauses: between 8 and 64, 1,000 to 5,000 (Limits, units and order kept)', () => {
+    const limits = (text: string) => readLimits(text).map((l) => `${l.op}${l.value}`)
+    const cases: Array<[string, string[]]> = [
+      ['A password has between 8 and 64 characters.', ['>=8', '<=64']],
+      ['A password has from 8 to 64 characters.', ['>=8', '<=64']],
+      ['A password has 8 to 64 characters.', ['>=8', '<=64']],
+      ['An order holds between 1,000 and 5,000 items.', ['>=1000', '<=5000']],
+      ['An order holds at most 1,000 items.', ['<=1000']],
+      ['A password has between 8 and 64 characters and at most 3 digits.', ['>=8', '<=64', '<=3']],
+    ]
+    for (const [text, want] of cases) expect(limits(text).sort(), text).toEqual([...want].sort())
+    const need = node('n', 'need', 'Brief', { description: 'Q: How long is a password?\nA: A password has between 8 and 64 characters.' })
+    const data = governance([need, req('r', 'accept a password of at most 8 characters')], [derives('d', 'r', 'n', 'A password has between 8 and 64 characters.')])
+    expect(findings(data, ['quote-value-differs']).map((f) => f[1])).toEqual(['d'])
+  })
+
   it("asks a scenario for the person's example (Example missing from scenarios)", () => {
     const need = node('n', 'need', 'Cost of goods', { description: 'Q: How is the average worked out?\nA: A moving average. For example, 4 on hand at 4.00 € and 12 received at 6.00 € gives 5.50 €.' })
     const sc = node('sc', 'scenario', 'Average over a delivery', { given: '4 on hand', when: '12 are received', then: 'the average changes' })

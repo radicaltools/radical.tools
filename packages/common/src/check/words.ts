@@ -266,6 +266,10 @@ const LIMIT_AFTER: Array<[RegExp, Op]> = [
   [new RegExp(String.raw`${N}(?:\s*[a-z%€$£]+)?\s+or\s+(?:less|fewer|below|under|lower|smaller|shorter)\b`, 'g'), '<='],
   [new RegExp(String.raw`${N}(?:\s*[a-z%€$£]+)?\s+or\s+(?:more|above|over|higher|greater|larger|longer)\b`, 'g'), '>='],
 ]
+// Where a sentence is cut into clauses: not at the "and" of a range ("between
+// 8 and 64") nor at a comma inside a number ("1,000"), so that a range is read
+// whole.
+const CLAUSE = /(?<!\d),|,(?!\d)|;|(?<!\bbetween (?:-|minus )?\d+(?:[.,]\d+)?)\s(?:and|but|so|then|otherwise)\s/
 const RANGE = new RegExp(String.raw`\b(?:from|between)\s+${N}\s+(?:to|and)\s+${N}|(?<![\d.,-])${N}\s?(?:-|to)\s?${N}(?![\d.,-])`, 'g')
 // Words that turn what follows round: "not", "never", "cannot" and the n't
 // forms ("can't", "doesn't", "won't"); "no" only right before the limit ("no
@@ -285,7 +289,7 @@ function limitsOf(text: string, refusing: boolean): Limit[] {
   const limits: Limit[] = []
   const plain = numerals(plainWords(text)).replace(/\b\d{4}-\d{2}-\d{2}\S*|\b\d{1,2}:\d{2}\b/g, ' ')
   for (const sentence of plain.split(/(?<=[.;!?])\s+(?=\D)/)) {
-    const clauses = sentence.split(/,|;|\s(?:and|but|so|then|otherwise)\s/).filter((c) => c.trim())
+    const clauses = sentence.split(CLAUSE).filter((c) => c.trim())
     clauses.forEach((clause, i) => {
       const refused = refusing || REFUSAL.test(clause) || /^\s*(?:if|when|whenever|where|once|should)\b/.test(clause) && REFUSAL.test(clauses[i + 1] ?? '')
       // A limit inside one read already ("more than 20" in "no more than 20") is that one.
