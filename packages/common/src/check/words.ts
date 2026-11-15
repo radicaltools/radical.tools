@@ -161,10 +161,17 @@ export function numerals(text: string): string {
 const DURATION: Array<[RegExp, number]> = [
   [/^(?:ms|msecs?|milliseconds?)$/, 0.001], [/^(?:s|secs?|seconds?)$/, 1], [/^(?:mins?|minutes?)$/, 60],
   [/^(?:h|hrs?|hours?)$/, 3600], [/^(?:d|days?)$/, 86400], [/^(?:weeks?|wks?)$/, 604800],
+  [/^(?:months?|mos?)$/, 2628000], [/^(?:years?|yrs?)$/, 31536000],
 ]
 const MONEY_AFTER = /^(?:€|eur|euros?|zł|zl|pln|usd|\$|£|gbp|chf|dollars?|pounds?)$/
 const CENTS = /^(?:cents?|ct|grosz[ey]?|pence|p)$/
 const MONEY_BEFORE = /(?:€|\$|£|eur|usd|pln|gbp|chf)\s?$/
+/** The currency a sign or a name gives an amount: 5 € is not 5 USD. */
+const CURRENCIES: Array<[RegExp, string]> = [
+  [/€|\beur\b|\beuros?\b/, 'EUR'], [/zł|\bzl\b|\bpln\b/, 'PLN'], [/\$|\busd\b|\bdollars?\b/, 'USD'],
+  [/£|\bgbp\b|\bpounds?\b/, 'GBP'], [/\bchf\b/, 'CHF'],
+]
+const currencyOf = (text: string): string | undefined => CURRENCIES.find(([re]) => re.test(text))?.[1]
 /** The minus signs typography gives ("−18", "–18 °C", a figure dash or a
  *  hyphen of another kind) as the hyphen-minus, as plainWords gives them to
  *  the limits: a value keeps its sign however it is written. */
@@ -182,7 +189,9 @@ const numberValue = (raw: string): string => {
 }
 const fmt = (n: number): string => String(Math.round(n * 1000) / 1000)
 
-export type Quantity = { value: string; dimension: 'time' | 'money'; base: string; text: string }
+/** A value with a unit of time or money: `base` the value in seconds or
+ *  cents, `currency` the money's when the text names it. */
+export type Quantity = { value: string; dimension: 'time' | 'money'; base: string; text: string; currency?: string }
 
 export interface ValueReading {
   /** The values the text states. */
@@ -224,7 +233,11 @@ function valuesOf(text: string): ValueReading {
     const before = t.slice(Math.max(0, (m.index ?? 0) - 4), m.index ?? 0).toLowerCase()
     const duration = DURATION.find(([re]) => re.test(unit))
     if (duration) { const base = `${fmt(Number(n) * duration[1])}s`; alias(n, base); quantities.push({ value: n, dimension: 'time', base, text: `${raw} ${unit}` }) }
-    else if (MONEY_AFTER.test(unit) || MONEY_BEFORE.test(before)) { const cents = fmt(Number(n) * 100); alias(n, `${cents}¢`, cents); quantities.push({ value: n, dimension: 'money', base: `${cents}¢`, text: `${raw} ${unit}`.trim() }) }
+    else if (MONEY_AFTER.test(unit) || MONEY_BEFORE.test(before)) {
+      const cents = fmt(Number(n) * 100); alias(n, `${cents}¢`, cents)
+      const sign = MONEY_AFTER.test(unit) ? unit : MONEY_BEFORE.exec(before)![0].trim()
+      quantities.push({ value: n, dimension: 'money', base: `${cents}¢`, text: sign === unit ? `${raw} ${unit}` : `${sign}${/\w$/.test(sign) ? ' ' : ''}${raw}`, currency: currencyOf(sign) })
+    }
     else if (CENTS.test(unit)) { alias(n, `${n}¢`); quantities.push({ value: n, dimension: 'money', base: `${n}¢`, text: `${raw} ${unit}` }) }
   }
   const lower = t.toLowerCase()

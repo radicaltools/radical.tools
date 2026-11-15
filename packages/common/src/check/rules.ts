@@ -17,7 +17,7 @@ import { SENSOR_NAMES, isSensorName, parseMeasure } from './sensors'
 import { findTests, globMatch, type TestCase } from './reports'
 import type { CheckDimension } from './goals'
 import { concernStatuses, holdsConcerns, questionLine, unboundDecisions, type ConcernPack } from '../concerns'
-import { REFUSAL, SUPERSEDED, answerBlocks, answerKey, currentNeedText, exampleSentences, fragmentWords, needAnswers, needParts, oppositeOrder, plainWords, quoteFound, quoteFragments, readLimits, readOrders, readRoundings, readValues, saysValueOf, wordsAt, type Limit, type Op, type ValueReading } from './words'
+import { REFUSAL, SUPERSEDED, answerBlocks, answerKey, currentNeedText, exampleSentences, fragmentWords, needAnswers, needParts, oppositeOrder, plainWords, quoteFound, quoteFragments, readLimits, readOrders, readRoundings, readValues, saysValueOf, wordsAt, type Limit, type Op, type Quantity, type ValueReading } from './words'
 
 export { hardValues, needAnswers, needParts, quoteFragments, readValues } from './words'
 export { relationsOf } from './evidence'
@@ -461,7 +461,7 @@ export function quoteSenseGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, r
       }
     }
     for (const qty of reading(q).quantities) {
-      if (own.quantities.some((m) => m.dimension === qty.dimension && m.base === qty.base)) continue
+      if (own.quantities.some((m) => m.dimension === qty.dimension && m.base === qty.base && sameCurrency(m, qty))) continue
       const other = own.quantities.find((m) => m.dimension === qty.dimension && m.value === qty.value)
       if (other) out.push({ relationId: r.id, about: [`unit ${qty.text}`], message: `Requirement ${quoteLabel(req)} says "${other.text}" where the words it quotes from ${need} say "${qty.text}".` })
     }
@@ -477,6 +477,9 @@ export function quoteSenseGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, r
 }
 
 const quoteLabel = (n: C4Node): string => `"${n.label}"`
+/** Whether two amounts are in one currency, as far as their texts say (an
+ *  amount in cents names none). */
+const sameCurrency = (a: Quantity, b: Quantity): boolean => !a.currency || !b.currency || a.currency === b.currency
 
 /** The paragraphs and list items of an answer no quoted piece falls in (a
  *  piece across two of them counts for both); the whole answer when it has

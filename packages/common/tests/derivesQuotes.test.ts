@@ -272,6 +272,24 @@ describe("reading the person's words", () => {
     expect(findings(data, ['quote-value-differs'])).toEqual([])
   })
 
+  it('compares the unit of a value in years, months and currencies: 10 years is not 10 days, 5 € not 5 USD (Limits, units and order kept)', () => {
+    const cases: Array<[string, string, boolean]> = [
+      ['Invoices are kept for 10 years.', 'keep invoices for 10 days', true],
+      ['A login is kept for 6 months.', 'keep a login for 6 weeks', true],
+      ['A guest pays 5 € for delivery.', 'charge a guest 5 USD for delivery', true],
+      ['A guest pays $5 for delivery.', 'charge a guest 5 PLN for delivery', true],
+      ['Invoices are kept for 10 years.', 'keep invoices for 120 months', false],
+      ['Invoices are kept for 1 year.', 'keep invoices for 365 days', false],
+      ['A guest pays 5 € for delivery.', 'charge a guest 5 euros for delivery', false],
+      ['A guest pays 5 € for delivery.', 'charge a guest 500 cents for delivery', false],
+    ]
+    for (const [answer, action, differs] of cases) {
+      const need = node('n', 'need', 'Brief', { description: `Q: What?\nA: ${answer}` })
+      const data = governance([need, req('r', action)], [derives('d', 'r', 'n', answer)])
+      expect(findings(data, ['quote-value-differs', 'quote-value-missing', 'requirement-value-unquoted']).map((f) => f[0]), `${answer} → ${action}`).toEqual(differs ? ['quote-value-differs'] : [])
+    }
+  })
+
   it("asks a scenario for the person's example (Example missing from scenarios)", () => {
     const need = node('n', 'need', 'Cost of goods', { description: 'Q: How is the average worked out?\nA: A moving average. For example, 4 on hand at 4.00 € and 12 received at 6.00 € gives 5.50 €.' })
     const sc = node('sc', 'scenario', 'Average over a delivery', { given: '4 on hand', when: '12 are received', then: 'the average changes' })
