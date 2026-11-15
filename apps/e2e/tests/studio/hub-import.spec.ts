@@ -73,7 +73,6 @@ test('a Hub link with no model open waits on the Welcome screen, and its import 
   await expect(welcome.getByRole('status')).toContainText('From Radical Hub: Authentication waits to be imported.')
   await page.waitForTimeout(500)
   await expect(page.getByRole('dialog')).toHaveCount(0)
-  expect(new URL(page.url()).search).toBe('')
 
   await welcome.locator('.welcome-start-recent .msteps-row').first().click()
   await expect(welcome).toHaveCount(0)
@@ -82,6 +81,28 @@ test('a Hub link with no model open waits on the Welcome screen, and its import 
   // On top: a click in it reaches it.
   const box = (await wizard.boundingBox())!
   expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('[data-testid="concern-wizard"]'), [box.x + box.width / 2, box.y + 20])).toBe(true)
+})
+
+test('a Hub link waits across a reload of the Welcome screen until its import opens, and after that a reload asks nothing', async ({ page, studio }) => {
+  // F-0170: the link was taken out of the address at once, so a reload of
+  // the Welcome screen that said the pack waits forgot it.
+  await studio.seed()
+  await page.goto('/?hub=concern-authentication')
+  const welcome = page.locator('.welcome-overlay')
+  await expect(welcome.getByRole('status')).toContainText('Authentication waits to be imported.')
+  await page.reload()
+  await expect(welcome.getByRole('status')).toContainText('From Radical Hub: Authentication waits to be imported.')
+
+  await welcome.locator('.welcome-start-recent .msteps-row').first().click()
+  const wizard = page.getByTestId('concern-wizard')
+  await expect(wizard).toBeVisible()
+  // Opened: the link is done with, and a reload does not ask again.
+  await expect.poll(() => new URL(page.url()).searchParams.has('hub')).toBe(false)
+  await page.reload()
+  await studio.ready()
+  await page.waitForTimeout(500)
+  await expect(wizard).toHaveCount(0)
+  await expect(welcome).toHaveCount(0)
 })
 
 test('a concern pack is imported with its answers and bound to the element in one undo step', async ({ page, studio }) => {

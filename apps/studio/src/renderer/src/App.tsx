@@ -38,14 +38,23 @@ import { OPEN_HUB_EVENT } from './persistence/inspector'
 const LS_LEFT = 'radical-leftpanel-collapsed'
 
 /** The Hub's packs a link asks to import (`?hub=id1,id2`, its Open in
- *  Studio), taken out of the address so a reload does not ask again. */
+ *  Studio). The link stays in the address until its import opens, so a
+ *  reload of the Welcome screen still has the packs wait (doneWithHubLink). */
 let hubLinkIds: string[] | null | undefined
 function takeHubLink(): string[] | null {
   if (hubLinkIds !== undefined) return hubLinkIds
   const ids = (new URLSearchParams(window.location.search).get('hub') ?? '').split(',').map((s) => s.trim()).filter(Boolean)
   hubLinkIds = ids.length ? ids : null
-  if (hubLinkIds) window.history.replaceState(null, '', window.location.pathname + window.location.hash)
   return hubLinkIds
+}
+
+/** The link's import has opened: out of the address, so a reload does not
+ *  ask again. */
+function doneWithHubLink(): void {
+  const params = new URLSearchParams(window.location.search)
+  params.delete('hub')
+  const search = params.toString()
+  window.history.replaceState(window.history.state, '', window.location.pathname + (search ? `?${search}` : '') + window.location.hash)
 }
 
 function AppInner(): React.ReactElement {
@@ -119,6 +128,7 @@ function AppInner(): React.ReactElement {
   useEffect(() => {
     if (showWelcome || !hubLink) return
     window.dispatchEvent(new CustomEvent(OPEN_HUB_EVENT, { detail: { ids: hubLink } }))
+    doneWithHubLink()
     setHubLink(null)
   }, [showWelcome, hubLink])
   // The Setup wizard: over the Welcome screen on the first start, and from
