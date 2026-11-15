@@ -399,7 +399,7 @@ function HubAppInner(): React.ReactElement {
     const viewId = useDiagramStore.getState().activeViewId
     const layoutFrom = viewId && !isSyntheticViewId(viewId) && kindForViewId(viewId, useDiagramStore.getState().views) === 'canvas' ? viewId : null
     setAnswers(next)
-    loadDiagram(conceptToDiagramData(concept, { layoutFrom, answers: next }))
+    loadDiagram(conceptToDiagramData(concept, { layoutFrom, answers: next, lookingAt: useDiagramStore.getState().views }))
     setActiveView(viewId)
     const after = Object.keys(useDiagramStore.getState().c4Nodes)
     const added = after.filter((id) => !before.has(id))

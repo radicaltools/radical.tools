@@ -248,4 +248,19 @@ describe('a concern pack\'s answers', () => {
     expect(answerDelta(pack, { MODE: 'a' }, 'MODE', 'b')).toEqual({ added: 2, removed: 1 })
     expect(answerDelta(pack, { MODE: 'a' }, 'MODE', 'a')).toEqual({ added: 0, removed: 0 })
   })
+
+  // F-0137: an answer threw the wiki back to the pack's first page, also one
+  // that changed nothing.
+  it('keeps the wiki on its page and the table on its tab while that element stays in the pack', () => {
+    const shown = Object.fromEntries(conceptToDiagramData(pack, { answers: { MODE: 'b' } }).views!.map((v) => [v.id, v]))
+    shown[HUB_WIKI_VIEW_ID] = { ...shown[HUB_WIKI_VIEW_ID], wikiFocusId: 'ff-b', wikiPageMode: 'multi' }
+    shown[HUB_TABLE_VIEW_ID] = { ...shown[HUB_TABLE_VIEW_ID], tableActiveTab: 'adr' }
+    const view = (data: ReturnType<typeof conceptToDiagramData>, id: string) => data.views!.find((v) => v.id === id)
+    const same = conceptToDiagramData(pack, { answers: { MODE: 'b' }, lookingAt: shown })
+    expect(view(same, HUB_WIKI_VIEW_ID)).toMatchObject({ wikiFocusId: 'ff-b', wikiPageMode: 'multi' })
+    expect(view(same, HUB_TABLE_VIEW_ID)).toMatchObject({ tableActiveTab: 'adr' })
+    // An answer that takes the page's element out: the pack's first page.
+    const other = conceptToDiagramData(pack, { answers: { MODE: 'a' }, lookingAt: shown })
+    expect(view(other, HUB_WIKI_VIEW_ID)).toMatchObject({ wikiFocusId: 'need', wikiPageMode: 'multi' })
+  })
 })

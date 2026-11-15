@@ -625,6 +625,47 @@ test('an agent\'s Assay run on the folder shows an Assay button that pulses and 
   await expect(panel).toHaveCount(0)
 })
 
+test('the Forge and Assay buttons show their own run panel, one at a time, and closing it leaves none open', async ({ page }) => {
+  // F-0130: under the agent's Forge panel the Assay button did nothing, and
+  // the Assay panel opened by itself once the Forge panel closed.
+  await saveAsFolder(page)
+  const now = new Date().toISOString()
+  await folder.write('.state/forge-run.json', JSON.stringify({
+    version: 1, client: 'claude-code', startedAt: now, updatedAt: now, state: 'finished',
+    stages: ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups', 'c4', 'review']
+      .map((id) => ({ id, status: 'done', summary: `${id} done`, added: { nodes: 1, relations: 0 } })),
+  }))
+  await folder.write('.state/assay-run.json', JSON.stringify({
+    version: 1, client: 'claude-code', repositories: [{ name: 'orders', units: 1, facts: 12 }], sources: 0, startedAt: now, updatedAt: now, state: 'active',
+    stages: ['c4', 'explore', 'documents', 'domain', 'processes', 'states', 'scenarios'].map((id, i) => ({ id, status: i === 0 ? 'working' : 'pending' })),
+    proposals: { waiting: 0, accepted: 0, rejected: 0 },
+  }))
+  const forgeButton = page.locator('.qs-forge-toggle:not(.qs-assay-toggle)')
+  const assayButton = page.locator('.qs-assay-toggle')
+  await expect(forgeButton).toHaveAttribute('data-agent-phase', 'done', { timeout: 10_000 })
+  await expect(assayButton).toHaveAttribute('data-agent-phase', 'working', { timeout: 10_000 })
+  const forge = page.getByRole('dialog', { name: 'Radical Forge — agent run' })
+  const assay = page.getByRole('dialog', { name: 'Radical Assay — agent run' })
+
+  await forgeButton.click()
+  await expect(forge).toBeVisible()
+  await assayButton.click()
+  await expect(assay).toBeVisible()
+  await expect(forge).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(assay).toHaveCount(0)
+  await expect(forge).toHaveCount(0)
+
+  await assayButton.click()
+  await forgeButton.click()
+  await expect(forge).toBeVisible()
+  await expect(assay).toHaveCount(0)
+  await forge.getByRole('button', { name: 'Close' }).click()
+  await expect(forge).toHaveCount(0)
+  await page.waitForTimeout(300)
+  await expect(assay).toHaveCount(0)
+})
+
 // Item 189: an agent's write closed the card of a selected relation while it
 // was typed in (the focus went, the next keys were lost); an element's card
 // stayed open. The reload took the document opened at boot for another, and

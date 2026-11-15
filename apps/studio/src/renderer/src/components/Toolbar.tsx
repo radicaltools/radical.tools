@@ -25,7 +25,7 @@ import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { useExport } from '../hooks/useExport'
 import { keysTakenByDialog } from './dialogKeys'
 import { FORGE_NEEDS_AI, aiReady, loadAISettings } from '../ai/settings'
-import { saveThemePref, useThemePref, type Theme, type ThemePref } from '../theme'
+import { saveThemePref, useDrawnTheme, useThemePref, type ThemePref } from '../theme'
 import { openSetup } from './SetupWizard'
 import { useMenuKeys } from '@radical/ui/hooks/menuKeys'
 import {
@@ -602,6 +602,9 @@ function AppMenu({
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
+/** The panels that show a run, in one place over the canvas (Toolbar). */
+type RunPanel = 'forge' | 'agent-forge' | 'agent-assay'
+
 /** Input kinds that hold no text: Ctrl/Cmd+Z there is not about typing. */
 const NOT_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file', 'image'])
 
@@ -758,25 +761,9 @@ export function Toolbar(): React.ReactElement {
   const isVSCode = host().kind === 'vscode'
 
   // The theme chosen in this browser (Light, Dark or System), unless VS Code
-  // sets it.
-  const { pref: themePref, theme: chosenTheme } = useThemePref()
-  const [vscodeTheme, setVSCodeTheme] = useState<Theme>(() =>
-    document.body.classList.contains('vscode-light') ? 'light' : 'dark')
-  const theme = isVSCode ? vscodeTheme : chosenTheme
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-  }, [theme])
-
-  // In VS Code: follow the editor theme automatically
-  useEffect(() => {
-    if (!isVSCode) return
-    const obs = new MutationObserver(() => {
-      setVSCodeTheme(document.body.classList.contains('vscode-light') ? 'light' : 'dark')
-    })
-    obs.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-vscode-theme-kind'] })
-    return () => obs.disconnect()
-  }, [isVSCode])
+  // sets it. App draws it (useApplyTheme).
+  const { pref: themePref } = useThemePref()
+  const theme = useDrawnTheme()
 
   const toggleTheme = useCallback(() => {
     saveThemePref(theme === 'dark' ? 'light' : 'dark')
@@ -838,15 +825,35 @@ export function Toolbar(): React.ReactElement {
   const handleOpenAbout = useCallback(() => { setAboutOpen(true) }, [])
   const handleCloseAbout = useCallback(() => { setAboutOpen(false) }, [])
 
-  const [forgeOpen, setForgeOpen] = useState(false)
+  // Radical Forge, an agent's Forge run and an agent's Assay run show in one
+  // place, one at a time: the one last asked for shows, and closing it leaves
+  // none open. Each had a flag of its own, and the one open hid the others:
+  // the Assay button did nothing under the agent's Forge panel, and the Assay
+  // panel opened by itself once that closed. Radical Forge generating stays:
+  // closed, its run would be lost.
+  const [runPanel, setRunPanel] = useState<RunPanel | null>(null)
+  const runPanelShown = useRef(runPanel)
+  runPanelShown.current = runPanel
+  const forgeBusy = useRef(false)
+  const showRunPanel = useCallback((panel: RunPanel) => {
+    if (runPanelShown.current === 'forge' && panel !== 'forge' && forgeBusy.current) {
+      useDiagramStore.getState().pushNotification('Radical Forge is generating: its panel stays open until it is done.', 'info')
+      return
+    }
+    setRunPanel(panel)
+  }, [])
+  const closeRunPanel = useCallback((panel: RunPanel) => {
+    setRunPanel((open) => (open === panel ? null : open))
+  }, [])
+  const onForgeBusy = useCallback((busy: boolean) => { forgeBusy.current = busy }, [])
   const handleOpenForge = useCallback(() => {
     if (!aiReady(loadAISettings())) {
       useDiagramStore.getState().pushNotification(FORGE_NEEDS_AI, 'info')
       return
     }
-    setForgeOpen(true)
-  }, [])
-  const handleCloseForge = useCallback(() => { setForgeOpen(false) }, [])
+    showRunPanel('forge')
+  }, [showRunPanel])
+  const handleCloseForge = useCallback(() => closeRunPanel('forge'), [closeRunPanel])
 
   const [hubOpen, setHubOpen] = useState(false)
   const [hubPreselectedIds, setHubPreselectedIds] = useState<string[] | undefined>(undefined)
@@ -862,7 +869,8 @@ export function Toolbar(): React.ReactElement {
     setHubBindTo(undefined)
   }, [])
   // The Inspector's concern finding opens the modal on its pack, bound to
-  // the element the concern applies to (persistence/inspector.ts, openConcern).
+  // the element the concern applies to (persistence/inspector.ts, openConcern),
+  // and a Hub link (?hub=id1,id2) on its packs once a model is open (App).
   useEffect(() => {
     const onOpen = (e: Event): void => {
       const { ids, bindTo } = (e as CustomEvent<{ ids: string[]; bindTo?: string }>).detail
@@ -872,22 +880,6 @@ export function Toolbar(): React.ReactElement {
     }
     window.addEventListener(OPEN_HUB_EVENT, onOpen)
     return () => window.removeEventListener(OPEN_HUB_EVENT, onOpen)
-  }, [])
-
-  // Detect ?hub=id1,id2 query param and open modal pre-filtered.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const hubParam = params.get('hub')
-    if (hubParam) {
-      const ids = hubParam.split(',').map((s) => s.trim()).filter(Boolean)
-      if (ids.length > 0) {
-        setHubPreselectedIds(ids)
-        setHubOpen(true)
-        // Clean the URL without triggering a reload.
-        const clean = window.location.pathname + window.location.hash
-        window.history.replaceState(null, '', clean)
-      }
-    }
   }, [])
 
   const { exportBusy, exportAs, copyToClipboard } = useExport()
@@ -912,23 +904,21 @@ export function Toolbar(): React.ReactElement {
 
   // The Forge button opens a read-only view instead while an agent runs
   // Forge on this folder over MCP (see persistence/agentForge).
-  const [agentForgeOpen, setAgentForgeOpen] = useState(false)
-  const closeAgentForge = useCallback(() => setAgentForgeOpen(false), [])
+  const closeAgentForge = useCallback(() => closeRunPanel('agent-forge'), [closeRunPanel])
   useEffect(() => {
-    const onOpen = () => setAgentForgeOpen(true)
+    const onOpen = () => showRunPanel('agent-forge')
     window.addEventListener('radical:open-agent-forge', onOpen as EventListener)
     return () => window.removeEventListener('radical:open-agent-forge', onOpen as EventListener)
-  }, [])
+  }, [showRunPanel])
 
   // The Assay button, shown only while an agent runs Assay with this folder
   // as its central model, opens a read-only view of that run (persistence/agentAssay).
-  const [agentAssayOpen, setAgentAssayOpen] = useState(false)
-  const closeAgentAssay = useCallback(() => setAgentAssayOpen(false), [])
+  const closeAgentAssay = useCallback(() => closeRunPanel('agent-assay'), [closeRunPanel])
   useEffect(() => {
-    const onOpen = () => setAgentAssayOpen(true)
+    const onOpen = () => showRunPanel('agent-assay')
     window.addEventListener('radical:open-agent-assay', onOpen as EventListener)
     return () => window.removeEventListener('radical:open-agent-assay', onOpen as EventListener)
-  }, [])
+  }, [showRunPanel])
 
   const bar = useRef<HTMLDivElement>(null)
   const compact = useMiddleRoom(bar, appMode !== 'inspector', appMode)
@@ -969,9 +959,9 @@ export function Toolbar(): React.ReactElement {
       <AISettingsModal open={aiSettingsOpen} onClose={handleCloseAISettings} />
       <AboutDialog open={aboutOpen} onClose={handleCloseAbout} />
       <HubImportModal open={hubOpen} onClose={handleCloseHub} preselectedIds={hubPreselectedIds} bindTo={hubBindTo} />
-      <RadicalForgeModal open={forgeOpen} onClose={handleCloseForge} />
-      <AgentForgeModal open={agentForgeOpen && !forgeOpen} onClose={closeAgentForge} />
-      <AgentAssayModal open={agentAssayOpen && !forgeOpen && !agentForgeOpen} onClose={closeAgentAssay} />
+      <RadicalForgeModal open={runPanel === 'forge'} onClose={handleCloseForge} onBusy={onForgeBusy} />
+      <AgentForgeModal open={runPanel === 'agent-forge'} onClose={closeAgentForge} />
+      <AgentAssayModal open={runPanel === 'agent-assay'} onClose={closeAgentAssay} />
       <AppMenu
         onManage={handleManage}
         activeDocLabel={activeDoc?.name ?? null}

@@ -62,6 +62,28 @@ test('a concept added from a Hub link in Presenter reaches the model, as from Vi
   expect((await studio.storedDoc()).nodes.length).toBe(before + 20)
 })
 
+test('a Hub link with no model open waits on the Welcome screen, and its import opens over the model picked', async ({ page, studio }) => {
+  // F-0124: the Hub's Open in Studio link (no route) opened the import under
+  // the Welcome screen, where it could not be clicked, and Escape closed it
+  // unseen.
+  await studio.seed()
+  await page.goto('/?hub=concern-authentication')
+  const welcome = page.locator('.welcome-overlay')
+  await expect(welcome).toBeVisible()
+  await expect(welcome.getByRole('status')).toContainText('From Radical Hub: Authentication waits to be imported.')
+  await page.waitForTimeout(500)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(new URL(page.url()).search).toBe('')
+
+  await welcome.locator('.welcome-start-recent .msteps-row').first().click()
+  await expect(welcome).toHaveCount(0)
+  const wizard = page.getByTestId('concern-wizard')
+  await expect(wizard).toBeVisible()
+  // On top: a click in it reaches it.
+  const box = (await wizard.boundingBox())!
+  expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('[data-testid="concern-wizard"]'), [box.x + box.width / 2, box.y + 20])).toBe(true)
+})
+
 test('a concern pack is imported with its answers and bound to the element in one undo step', async ({ page, studio }) => {
   const box = { x: 0, y: 0, width: 200, height: 100, collapsed: false }
   await studio.seedDocument(JSON.stringify({

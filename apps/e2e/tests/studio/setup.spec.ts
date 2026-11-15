@@ -90,3 +90,17 @@ test('the System theme follows the operating system', async ({ page, studio }) =
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Theme' })).toHaveValue('system')
 })
+
+test('the System theme follows the operating system while a presentation plays', async ({ page, studio }) => {
+  // F-0123: the toolbar drew the theme, and it is gone while a presentation
+  // plays: Studio stayed dark until the presentation stopped.
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await studio.seed()
+  await studio.open('v-context')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await page.keyboard.press('F5')
+  await expect(page.locator('.mode-presenting')).toBeVisible()
+  await page.emulateMedia({ colorScheme: 'light' })
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await expect(page.locator('.mode-presenting')).toBeVisible()
+})
