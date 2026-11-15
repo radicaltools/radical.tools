@@ -50,6 +50,12 @@ export class Layout {
   /** Containers the canvas draws only to hold what a view shows: tight round it, no padding, no header, no size of their own. */
   private tight = new Set<string>()
 
+  /** The frames the canvas drew otherwise than fitted round what the view
+   *  shows (the tight ones aside: they are drawn invisible). A view showing
+   *  part of what a frame holds opens on All elements' places: the frame as
+   *  wide as all it holds there, the part shown wherever it stood in it. */
+  readonly refitted: string[] = []
+
   constructor(readonly nodes: Record<string, C4Node>, readonly metamodel?: Metamodel | null, pinned: Iterable<string> = [], frames: Iterable<string> = []) {
     for (const id of frames) this.tight.add(id)
     const abs = new Map<string, { x: number; y: number }>()
@@ -86,7 +92,12 @@ export class Layout {
       for (const d of this.descendants(id)) this.fixedIds.add(d)
       for (const a of this.ancestorSets.get(id)!) this.holdsFixed.add(a)
     }
+    const drawn = new Map(this.boxes)
     this.fitAll()
+    for (const [id, b] of this.boxes) {
+      const was = drawn.get(id)!
+      if (!this.tight.has(id) && (Math.abs(b.x - was.x) > 1 || Math.abs(b.y - was.y) > 1 || Math.abs(b.w - was.w) > 1 || Math.abs(b.h - was.h) > 1)) this.refitted.push(id)
+    }
   }
 
   /** Whether no move may take the element: it is pinned, held by one, or holds one. */

@@ -3637,6 +3637,10 @@
     ] },
     { "element": "e61d543b-8618-41ea-8bdf-f7797a06d73c", "name": "Benchmark runs off git", "tests": [
       "apps/bench/tests/layout.test.ts"
+    ] },
+    { "element": "5871fb0d-bcf4-41e4-910e-8444da1df46c", "name": "A frame round the part a view shows", "tests": [
+      "packages/layout/tests/tidy/frames.test.ts › a frame the view shows part of › is fitted round what the view shows, though no move was left to make",
+      "packages/layout/tests/tidy/frames.test.ts › a frame the view shows part of › a canvas whose frames already wrap what it shows is kept as it is"
     ] }
   ]
 }

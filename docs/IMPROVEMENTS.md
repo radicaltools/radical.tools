@@ -367,37 +367,19 @@ feat/assay-syntax (2026-11-09, which does not touch Studio) and once in 4
 runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main.
 
-### Dogfooding (2026-11-14): a second round on large models
+### Dogfooding (2026-11-15): Smart Layout over every view of our own model
 
-Measured with `apps/e2e/tests/studio/scale.spec.ts` on radical.tools' own
-model ×14 (28,000 elements, 53,000 relations), on main and on the branch:
+Laying out each canvas of `.radical/model` through the worktree's own MCP server, after the view Crucible of
+Entities of a domain opened with its two entities at the far end of a 2840 px frame. Open:
 
-- The nightly benchmark missed the worst of it: it puts the model in a
-  folder with no test results and no `.radical/radical.json`, so the
-  Inspector checked the model without tests, concern packs or a repository
-  mapping. With the test results beside it (`SCALE_TESTS`), every step on
-  main waited 75 to 90 s for the check. Studio's own repository has them
-  after every `radical check --report`. The nightly run could put a test
-  report beside the model; the repository mapping needs the folder's
-  repository, which a browser folder reaches only with a second grant.
-- `apps/e2e/support/repeatModel.ts` keeps the views as they were, so the
-  copies have no places in them and Components lays 450 elements out from
-  nothing when it opens (8.6 s, most of it React Flow drawing each frame).
-  A view of that size that keeps its places opens in under a second.
-- The Inspector's check still runs on the main thread: about 1 s at 21,000
-  elements with test results and concern packs (`checkModel` in Node:
-  0.58 s without them, 1.15 s with), 400 ms after the last edit. A worker,
-  or a check of only what an edit touched, would take it off the canvas.
-- A letter typed in a card while a table is shown: the table runs its
-  chain again and works out the + of every row (`structureRows`,
-  `addChoices`, about 160 ms at 21,000 elements). The rows are sorted by
-  name, so a rename may move them; the + could be kept while only names
-  change.
-- A click on an element: React Flow's selection of 500 elements and the
-  card's Views (every view's chain, once per model) take about 0.8 s.
-- Profiling `checkModel` in Node with tsx gives no source lines (every
-  frame is line 70): a harness that bundles first, or `--enable-source-maps`
-  with the transpiled files, would point at lines.
+- **No "lay out every view" call.** It took a stdio script with one `smart_layout` per view from `LIST VIEWS`,
+  the table, wiki, matrix and Warnier views picked out by hand; `smart_layout` with no `viewId` arranges All
+  elements, which Studio shows as a table now, and on 1600 elements it ran for minutes.
+- **`smart_layout` on a group of views per element says it moved things and writes nothing**: "Components of a
+  container: 90 moves … No files changed". A group keeps no canvas; it should refuse, or lay out each of its views.
+- **Older views of a group keep their subject folded, newer ones open**: Agent access (no `expandedNodeIds`) draws
+  its domain folded, Assay and Benchmark (made later, subject expanded) draw an empty 520×360 frame. A view per
+  element of an element with nothing to show might say so instead of drawing an empty frame.
 
 ### Dogfooding (2026-11-12): the Radical benchmark and the person's words
 

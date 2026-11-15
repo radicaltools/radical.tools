@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Agents model as they work by default. The MCP server's instructions tell an agent to write into the model what it learns and decides as it goes, before the code, and to run Radical Forge only when the user asks for it. In the Radical benchmark, Forge for every new system cost three times as much for no better result.
 - radical.tools shows Radical Assay: a card on the home page's map (finds the model in code), a section below the hero (what it reads, how it is measured, what to ask your agent), a seventh use case, A system found in its code, and the manual's list of the stacks and tests it reads brought up to date.
 
+### Fixed
+- A frame a view shows part of is laid out round that part. A view of a group of views per element (Entities of a domain, say) opens on All elements' places, where the elements it shows can stand at the far end of a frame as wide as everything the element holds; when Smart Layout found no move to make, it kept that canvas, and the view kept a 2840 px frame with its two entities in the right corner. Smart Layout now hands the frames back fitted round what the view shows, as the first step of its report.
+
 ## [0.4.0] - 2026-11-10
 
 ### Added

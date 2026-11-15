@@ -13,7 +13,7 @@ import { COMFORT, type Line, STRAIGHT_TOLERANCE, againstFlow, anchorOf, kinApart
 import type { Layout } from './layout'
 
 export interface Move {
-  kind: 'rough' | 'untangle' | 'gather' | 'pull-out' | 'actor-up' | 'end-down' | 'external-out' | 'between' | 'swap' | 'align' | 'balance' | 'closer' | 'row' | 'flow' | 'follow' | 'even' | 'order' | 'snap' | 'kin' | 'clear' | 'room'
+  kind: 'rough' | 'untangle' | 'gather' | 'pull-out' | 'actor-up' | 'end-down' | 'external-out' | 'between' | 'swap' | 'align' | 'balance' | 'closer' | 'row' | 'flow' | 'follow' | 'even' | 'order' | 'snap' | 'kin' | 'clear' | 'room' | 'fit'
   ids: string[]
   description: string
   /** Tells apart moves of one kind on the same elements with the same description (the two axes of a slide). */
