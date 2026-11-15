@@ -324,8 +324,9 @@ function tidyOnce(
           off = true
           const moved = ds.filter((m) => Math.abs(m.d) >= 0.01)
           // The members left behind follow, unless one of them may not move
-          // (pinned, or out of reach round a selection): then the move is undone.
-          const follows = ds.every((m) => Math.abs(m.d) >= 0.01 || !l.fixed(m.id))
+          // (pinned, or out of reach round a selection): then the move is
+          // undone. So is one that shifted none of them by a hair (unevenly).
+          const follows = moved.length > 0 && ds.every((m) => Math.abs(m.d) >= 0.01 || !l.fixed(m.id))
           if (follow && follows && level(moved)) { for (const m of ds) if (Math.abs(m.d) < 0.01) shift(a, m.id, moved[0].d) }
           else for (const m of moved) shift(a, m.id, -m.d)
         }

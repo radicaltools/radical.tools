@@ -257,6 +257,16 @@ describe('Tidy, the finer points', () => {
     }
   })
 
+  it('a move that shifts a line by less than a hair, its members unevenly, is taken back rather than fail', () => {
+    // Found by the fuzzer (nested world, seed 1611204325): Customer kept in a column with System 0, whose containers are folded.
+    const c = (id: string, x: number, width: number) => node(id, 'container', x, 120, 's0', { collapsed: true, width, height: 280 })
+    const nodes = [c('s0c0', 40, 760), c('s0c1', 840, 520), c('s0c2', 1400, 1000), node('s0', 'system', -472.5, 400, undefined, { width: 2440, height: 440 }), node('p0', 'person', 672.5, 0, undefined, { width: 150, height: 170 })]
+    const relations = [rel('p0', 's0c0', 'uses'), rel('s0c0', 's0c1', 'calls')]
+    const alignments = resolveAlignments([{ id: 'col', type: 'align', axis: 'vertical', nodeIds: ['p0', 's0'] }], byId(nodes))
+    const result = runTidyLayout(byId(nodes), byId(relations), { alignments, budget: 424500, metamodel: builtInGovernanceMetamodel() })
+    expect(alignmentError(byId(nodes), result.winner.positions, alignments)).toBeLessThanOrEqual(0.5)
+  })
+
   it('a frame holding a pinned element is not moved', () => {
     // s holds the pinned x and y; y relates to z far off. Moving s would carry x along.
     const nodes = [node('s', 'system', 0, 0), node('x', 'container', 40, 120, 's'), node('y', 'container', 340, 120, 's'), node('z', 'container', 2400, 1600)]
