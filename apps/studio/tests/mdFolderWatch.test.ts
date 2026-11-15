@@ -158,6 +158,35 @@ describe('md-folder documents follow outside edits', () => {
     expect(labels(folder.model())).toEqual({ sys1: 'Payments hub', sys2: 'General ledger', sys3: 'Fraud' })
   })
 
+  it('keeps what is typed while an outside edit is read (F-0142)', async () => {
+    const folder = installFolderApi(serializeToMdFolder(SAMPLE, 'model'))
+    documents.createMdDocument('/tmp/model')
+    await settle()
+    const store = useDiagramStore.getState
+    store().setAppMode('designer')
+    store().updateNode('sys2', { label: 'L' })
+    await wait(500) // saved: nothing waits to be saved when the change comes
+
+    // The read of the folder takes a while (a large model); the user goes on typing.
+    let release: () => void = () => {}
+    const read = folder.api.readFolder.getMockImplementation()!
+    folder.api.readFolder.mockImplementationOnce(async () => {
+      await new Promise<void>((r) => { release = r })
+      return read()
+    })
+    folder.setDisk(serializeToMdFolder({ ...SAMPLE, nodes: [sys('sys1', 'Payments hub'), sys('sys2', 'L')] }, 'model'))
+    folder.emit({ folderPath: '/tmp/model', paths: ['nodes/payments-hub/_index.md'] })
+    await settle()
+    store().updateNode('sys2', { label: 'Le' })
+    store().updateNode('sys2', { label: 'Led' })
+    release()
+    await settle()
+
+    expect([store().c4Nodes.sys1.label, store().c4Nodes.sys2.label]).toEqual(['Payments hub', 'Led'])
+    await wait(500)
+    expect(labels(folder.model())).toEqual({ sys1: 'Payments hub', sys2: 'Led' })
+  })
+
   it('lets a presentation play on through an outside edit, and reads the edit once it stops (item 136)', async () => {
     const slide = (id: string) => ({ id, name: id, snapshotId: null, viewport: { x: 0, y: 0, zoom: 1 } })
     const withDecks: DiagramData = {
