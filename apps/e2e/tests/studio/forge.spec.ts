@@ -504,20 +504,25 @@ test('a dialog opened over Radical Forge is drawn over its panel, and Esc closes
   const forge = page.getByRole('dialog', { name: 'Radical Forge', exact: true })
   await expect(forge).toBeVisible()
 
-  // The Delete prompt of an element selected beside the panel.
-  const at = await studio.nodes.evaluateAll((nodes) => {
-    const panel = document.querySelector('.forge-panel')!.getBoundingClientRect()
-    for (const node of nodes) {
-      const b = node.getBoundingClientRect()
-      for (const [x, y] of [[b.x + 8, b.y + 8], [b.right - 8, b.y + 8], [b.x + 8, b.bottom - 8], [b.right - 8, b.bottom - 8]]) {
-        const beside = x < panel.left || x > panel.right || y < panel.top || y > panel.bottom
-        if (beside && document.elementFromPoint(x, y)?.closest('.react-flow__node') === node) return { x, y }
+  // The Delete prompt of an element selected beside the panel (the camera
+  // settled first, and the click made again until it selects).
+  await studio.settle()
+  await expect(async () => {
+    const at = await studio.nodes.evaluateAll((nodes) => {
+      const panel = document.querySelector('.forge-panel')!.getBoundingClientRect()
+      for (const node of nodes) {
+        const b = node.getBoundingClientRect()
+        for (const [x, y] of [[b.x + 8, b.y + 8], [b.right - 8, b.y + 8], [b.x + 8, b.bottom - 8], [b.right - 8, b.bottom - 8]]) {
+          const beside = x < panel.left || x > panel.right || y < panel.top || y > panel.bottom
+          if (beside && document.elementFromPoint(x, y)?.closest('.react-flow__node') === node) return { x, y, id: (node as HTMLElement).dataset.id! }
+        }
       }
-    }
-    return null
-  })
-  expect(at, 'an element beside the Forge panel').not.toBeNull()
-  await page.mouse.click(at!.x, at!.y)
+      return null
+    })
+    expect(at, 'an element beside the Forge panel').not.toBeNull()
+    await page.mouse.click(at!.x, at!.y)
+    await expect(studio.node(at!.id)).toHaveClass(/selected/, { timeout: 1000 })
+  }).toPass()
   await page.keyboard.press('Delete')
   const prompt = page.locator('.milestone-modal', { has: page.locator('.milestone-modal-title', { hasText: /^Delete / }) })
   await expect(prompt).toBeVisible()
