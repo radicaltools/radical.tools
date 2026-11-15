@@ -64,7 +64,7 @@ import * as model from '@radical/common/model'
 import { originFor, otherModelsAt, type FederationFile } from '@radical/common/federation'
 import type { RepositoryFile } from '@radical/common/repositoryMapping'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
-import { chainRelationFor, pipelineOf, viewDrawnIds, viewShownNodes } from '@radical/common/viewPipeline'
+import { canvasCount, canvasOverflow, chainRelationFor, pipelineOf, viewDrawnIds, viewShownNodes } from '@radical/common/viewPipeline'
 import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { mergeModels, mergeNotices, mergeSteps } from '@radical/common/modelMerge'
 import { markdownToPlain } from '@radical/common/markdown'
@@ -3809,14 +3809,22 @@ const _continuousHeld = new Set<string>()
 
 /** The shape of the canvas shown, or null when it does not keep itself tidied. */
 /** The canvas view shown and how many elements it shows, when that is
- *  more than a canvas draws (CANVAS_MAX_ELEMENTS): it is neither drawn nor
- *  laid out. A view's filter grows with the model, so a view drawn once may
- *  be too large now. Null for any other view. */
-export function oversizedCanvas(s: Pick<DiagramStore, 'activeViewId' | 'views' | 'c4Nodes' | 'c4Relations'>): { view: DiagramView; count: number } | null {
-  const view = s.activeViewId ? s.views[s.activeViewId] : undefined
-  if (!view || (view.kind ?? 'static') !== 'static' || isExploration(view)) return null
-  const count = viewShownNodes(view, s.c4Nodes, s.c4Relations)?.size ?? Object.keys(s.c4Nodes).length
-  return count > CANVAS_MAX_ELEMENTS ? { view, count } : null
+ *  more than a canvas draws (CANVAS_MAX_ELEMENTS, canvasOverflow): it is
+ *  neither drawn nor laid out. A view's filter grows with the model, so a
+ *  view drawn once may be too large now; an exploration counts the
+ *  elements it lists. Null for any other view. */
+export function oversizedCanvas(s: Pick<DiagramStore, 'activeViewId' | 'views' | 'c4Nodes' | 'c4Relations'> & Partial<Pick<DiagramStore, 'exploration'>>): { view: DiagramView; count: number } | null {
+  const view = viewById({ views: s.views, exploration: s.exploration ?? null }, s.activeViewId)
+  const count = canvasOverflow(view, s.c4Nodes, s.c4Relations)
+  return view && count !== null ? { view, count } : null
+}
+
+/** Whether the view `viewId`, turned into an exploration, would list more
+ *  elements than a canvas draws: it is not turned (setViewKind), and its
+ *  notice stays. */
+export function tooLargeToExplore(s: Pick<DiagramStore, 'views' | 'c4Nodes' | 'c4Relations'>, viewId: string): boolean {
+  const view = s.views[viewId]
+  return !!view && view.kind !== 'explore' && canvasCount(view, s.c4Nodes, s.c4Relations) > CANVAS_MAX_ELEMENTS
 }
 
 function continuousShape(s: DiagramStore): string | null {
@@ -6151,7 +6159,8 @@ export const useDiagramStore = create<DiagramStore>()(
         const links = explorationLinks(x, s.c4Nodes, s.c4Relations).get(nodeId) ?? []
         const expansion = uid()
         const next = grown(x, nodeId, links, choice, expansion)
-        if (!next) return
+        // Nor does a + take it past what a canvas draws.
+        if (!next || canvasOverflow(next, s.c4Nodes, s.c4Relations) !== null) return
         _reshapeExploration(next, next.nodeIds.filter((id) => !x.nodeIds.includes(id)), [nodeId], true, expansion)
       },
 
@@ -6505,6 +6514,9 @@ export const useDiagramStore = create<DiagramStore>()(
         if (!view || setByGroup(get(), viewId)) return
         // Nothing changes: no undo step.
         if ((view.kind ?? 'static') === kind && !view.viewpoint && !view.subject) return
+        // An exploration is a canvas: one of more elements than a canvas
+        // draws is not made.
+        if (kind === 'explore' && tooLargeToExplore(get(), viewId)) return
         get()._pushUndo()
         get()._milestoneViewEdit(viewId)
         let placed: string[] | null = null
