@@ -194,6 +194,53 @@ describe('follow the agent', () => {
     useAgentAssayStore.setState({ status: null })
   })
 
+  it('waits only while the focus is in a field typed in: a drop-down, a checkbox or a button with the focus does not hold it back (F-0178)', async () => {
+    // A type picked in the card's drop-down kept the focus there, and the
+    // agent's writes were followed only once the user clicked elsewhere.
+    const field = (tagName: string, extra: Record<string, unknown> = {}) => ({ tagName, nodeName: tagName, isContentEditable: false, type: '', ...extra })
+    const cases: Array<[string, Record<string, unknown>, boolean]> = [
+      ['a drop-down', field('SELECT'), false],
+      ['a checkbox', field('INPUT', { type: 'checkbox' }), false],
+      ['a radio button', field('INPUT', { type: 'radio' }), false],
+      ['a button', field('BUTTON', { type: 'button' }), false],
+      ['a text input', field('INPUT', { type: 'text' }), true],
+      ['a number input', field('INPUT', { type: 'number' }), true],
+      ['a text area', field('TEXTAREA', { type: 'textarea' }), true],
+      ['editable text', field('DIV', { isContentEditable: true }), true],
+    ]
+    const doc = (globalThis as any).document
+    const blank = { activeElement: null, querySelector: () => null, querySelectorAll: () => [] }
+    try {
+      ;(globalThis as any).document = blank
+      const focus = vi.fn()
+      ;(globalThis as any).window.__rfFocusNodes = focus
+      let nodes = [sys('sys1', 'Customer'), sys('sys2', 'Ledger', 500)]
+      const views = () => [view('a', 'Customers', ['sys1']), view('b', 'Shop', nodes.slice(1).map((n) => n.id))]
+      const edit = await openFolder({ nodes, relations: [], views: views() })
+      const store = useDiagramStore.getState
+      store().setAppMode('designer')
+      useAgentAssayStore.setState({ status: assay('active') })
+      setFollowAgent(true)
+      for (const [i, [what, active, waits]] of cases.entries()) {
+        store().setActiveView('a')
+        await wait(350)
+        ;(globalThis as any).document = { ...blank, activeElement: active }
+        nodes = [...nodes, sys(`shop${i}`, `Shop ${i}`, 1000 + 500 * i)]
+        await edit({ nodes, relations: [], views: views() })
+        await wait(150)
+        expect(store().activeViewId, what).toBe(waits ? 'a' : 'b')
+        // The field lets the focus go: what waited is followed then.
+        ;(globalThis as any).document = blank
+        window.dispatchEvent(new Event('focusout'))
+        await wait(150)
+        expect(store().activeViewId, what).toBe('b')
+      }
+      useAgentAssayStore.setState({ status: null })
+    } finally {
+      ;(globalThis as any).document = doc
+    }
+  }, 15_000)
+
   it('follows an agent\'s Assay run as its Forge run, and stops once neither goes on', () => {
     useAgentForgeStore.setState({ status: null })
     useAgentAssayStore.setState({ status: assay('active') })

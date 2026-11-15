@@ -39,3 +39,16 @@ export function canvasKeysOff(e: { target: EventTarget | null }): boolean {
   if (!el || typeof el.closest !== 'function') return false
   return ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.nodeName) || el.hasAttribute('contenteditable') || !!el.closest('.nokey')
 }
+
+/** Input kinds that hold no text: a click or a pick, nothing typed. */
+const NOT_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file', 'image'])
+
+/** Whether `target` is a field the user types text into: a text input, a
+ *  text area or editable text. A drop-down, a checkbox or a button is not
+ *  one: following the agent waited on a type picked in a card (F-0178). */
+export function isTypedField(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null
+  if (!el || typeof el.tagName !== 'string') return false
+  if (el.isContentEditable || el.tagName === 'TEXTAREA') return true
+  return el.tagName === 'INPUT' && !NOT_TEXT_INPUTS.has((el as HTMLInputElement).type)
+}

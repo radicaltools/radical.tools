@@ -28,6 +28,7 @@ import { FORGE_NEEDS_AI, aiReady, loadAISettings } from '../ai/settings'
 import { saveThemePref, useDrawnTheme, useThemePref, type ThemePref } from '../theme'
 import { openSetup } from './SetupWizard'
 import { useMenuKeys } from '@radical/ui/hooks/menuKeys'
+import { isTypedField } from '@radical/ui/components/keysHere'
 import {
   loadStudioSettings,
   updateStudioSettings,
@@ -605,16 +606,9 @@ function AppMenu({
 /** The panels that show a run, in one place over the canvas (Toolbar). */
 type RunPanel = 'forge' | 'agent-forge' | 'agent-assay'
 
-/** Input kinds that hold no text: Ctrl/Cmd+Z there is not about typing. */
-const NOT_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file', 'image'])
-
-/** Whether the key event comes from a field the user types text into. */
-function typingInTextField(target: EventTarget | null): boolean {
-  const el = target as HTMLElement | null
-  if (!el || typeof el.tagName !== 'string') return false
-  if (el.isContentEditable || el.tagName === 'TEXTAREA') return true
-  return el.tagName === 'INPUT' && !NOT_TEXT_INPUTS.has((el as HTMLInputElement).type)
-}
+/** Whether the key event comes from a field the user types text into: not
+ *  a checkbox or a drop-down, where Ctrl/Cmd+Z is not about typing. */
+const typingInTextField = isTypedField
 
 /** Before a presentation starts from F5, the focus leaves what has it, as a
  *  click elsewhere would take it: a name being typed (the table's F2, a

@@ -18,6 +18,7 @@ import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
 import { AGENT_ACTIVE_MS } from '@radical/common/formats/agentActivity'
 import { viewShownNodes } from '@radical/common/viewPipeline'
 import { computeSnapDiff, typingInField, useDiagramStore } from '@radical/ui/store/diagramStore'
+import { isTypedField } from '@radical/ui/components/keysHere'
 import { onUserCamera } from '@radical/ui/store/userCamera'
 import { loadingDocumentId, onOutsideEditLoaded } from './autosave'
 import { agentForgePhase, useAgentForgeStore } from './agentForge'
@@ -168,13 +169,12 @@ function follow(ends: Set<string>, touched: string[]): void {
   }, 120)
 }
 
-/** A text field has the focus: the card's Name (typingInField), or any
- *  other input, text area or editable text on the page. */
+/** A field typed in has the focus: the card's Name (typingInField), or any
+ *  other text input, text area or editable text on the page (isTypedField).
+ *  A drop-down or a checkbox with the focus does not count (F-0178). */
 function fieldHasFocus(): boolean {
   if (typingInField()) return true
-  const el = typeof document !== 'undefined' ? document.activeElement as HTMLElement | null : null
-  if (!el) return false
-  return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable
+  return isTypedField(typeof document !== 'undefined' ? document.activeElement : null)
 }
 
 /** Once the field has let the focus go (and no other field took it), what
