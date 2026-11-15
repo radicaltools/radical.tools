@@ -75,7 +75,8 @@ its own ("model": { "repo": … }), it judges that repository's part of the mode
                       do not run and keep their baselines). Where only this
                       repository's part of a model is judged, it lowers no
                       baseline of the model's check.json (exit 2): only one
-                      --config names
+                      --config names. With --alone or --trigger, which leave
+                      part of the model out, it lowers none (exit 2)
   --alone             check without the models deps.json names; with a
                       deps.json the model is checked composed with them, at
                       their pinned refs (radical federation --help)
@@ -169,6 +170,14 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     || (values.evidence && !values.report?.length && !fromCi && !values.metrics?.length)
     || (values.trace !== undefined && (!values.trace.trim() || values.format === 'github' || values.ratchet))) {
     io.err(CHECK_USAGE)
+    return 2
+  }
+
+  // A baseline is the whole model's: a check that leaves part of it out
+  // (the models deps.json names, the conditions of other events) finds less.
+  const partial = values.alone ? '--alone' : values.trigger !== undefined ? '--trigger' : null
+  if (values.ratchet && partial) {
+    io.err(`radical check --ratchet: with ${partial} the check leaves part of the model out (${partial === '--alone' ? 'the models deps.json names' : 'the metric conditions of other events'}), and a baseline counts the whole model. Ratchet with a check of all of it.`)
     return 2
   }
 

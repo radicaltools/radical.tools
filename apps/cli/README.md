@@ -380,7 +380,9 @@ that judges only its part of a model kept in a repository of its own
 (`"model": { "repo": … }` in `.radical/radical.json`), the model's
 `check.json` holds the whole model's baselines: `--ratchet` refuses to lower
 them (exit 2), and lowers only a config of the repository's own named with
-`--config`.
+`--config`. With `--alone` or `--trigger`, which leave part of the model out
+(the models `deps.json` names, the metric conditions of other events),
+`--ratchet` lowers no baseline (exit 2).
 
 ### Goals
 
