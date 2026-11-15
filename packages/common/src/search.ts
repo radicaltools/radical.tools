@@ -496,40 +496,35 @@ export function searchModel(data: SearchData, query: string | ParsedSearch): Sea
 
   const scope = parsed.scope
   const inScope = (id: string): boolean => !scope?.nodes || scope.nodes.has(id)
+  // A letter typed after the last query: only what that one found can match.
+  const narrow = narrowing(data, parsed)
+  if (!narrow) fullScans++
+  const foundElements: C4Node[] = []
+  const foundRelations: C4Relation[] = []
   if (wants(parsed, 'element')) {
-    for (const n of Object.values(data.nodes)) {
+    for (const n of narrow?.elements ?? Object.values(data.nodes)) {
       if (!inScope(n.id)) continue
       if (parsed.types && !parsed.types.includes(n.type)) continue
       const props = propertyFields(n, mm)
       if (parsed.properties.length && !parsed.properties.every((p) => props.some((f) => f.key === p.key && foldText(f.text).includes(p.value)))) continue
-      const hit = hitFor([
-        { text: n.label || typeName(n.type), weight: 3, label: true },
-        { text: typeName(n.type), weight: 1.2 },
-        { text: n.technology ?? '', weight: 1.5, name: 'Technology' },
-        { text: n.description ?? '', weight: 1, name: 'Description', snippet: true },
-        ...props.map((p): Field => ({ text: p.text, weight: 1, name: p.name, snippet: true })),
-      ], parsed, true)
+      const hit = hitFor(elementFields(n, mm, props), parsed, true)
       if (!hit) continue
+      foundElements.push(n)
       const path = pathOf(data.nodes, n.id)
       push({ kind: 'element', id: n.id, label: n.label || typeName(n.type), detail: [typeName(n.type), path].filter(Boolean).join(' · '), type: n.type, ...hit })
     }
   }
 
   if (wants(parsed, 'relation') && !parsed.types && !parsed.properties.length) {
-    for (const r of Object.values(data.relations)) {
+    for (const r of narrow?.relations ?? Object.values(data.relations)) {
       const src = data.nodes[r.sourceId]
       const tgt = data.nodes[r.targetId]
       if (!src || !tgt || !inScope(r.sourceId) || !inScope(r.targetId)) continue
       const label = r.label || `${src.label} → ${tgt.label}`
       const kindName = r.relationType ? (mm?.relationTypes[r.relationType]?.label ?? r.relationType) : ''
-      const hit = hitFor([
-        { text: label, weight: 3, label: true },
-        { text: src.label, weight: 1.5 },
-        { text: tgt.label, weight: 1.5 },
-        { text: r.technology ?? '', weight: 1.5, name: 'Technology' },
-        { text: kindName, weight: 1 },
-      ], parsed, false)
+      const hit = hitFor(relationFields(r, src, tgt, mm), parsed, false)
       if (!hit) continue
+      foundRelations.push(r)
       push({ kind: 'relation', id: r.id, label, detail: [kindName, `${src.label} → ${tgt.label}`].filter(Boolean).join(' · '), ...hit, score: hit.score - 2 })
     }
   }
@@ -567,7 +562,92 @@ export function searchModel(data: SearchData, query: string | ParsedSearch): Sea
   }
 
   result.hits.sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
+  lastSearch = Object.isFrozen(data.nodes) && Object.isFrozen(data.relations)
+    ? { nodes: data.nodes, relations: data.relations, metamodel: data.metamodel, filters: filtersOf(parsed), scopeNodes: parsed.scope?.nodes ?? null, words: parsed.words, elements: foundElements, relationsFound: foundRelations }
+    : null
   return result
+}
+
+/** What a search reads of an element: its name first. */
+function elementFields(n: C4Node, mm: Metamodel | null | undefined, props = propertyFields(n, mm)): Field[] {
+  const typeName = mm?.nodeTypes[n.type]?.label ?? n.type
+  return [
+    { text: n.label || typeName, weight: 3, label: true },
+    { text: typeName, weight: 1.2 },
+    { text: n.technology ?? '', weight: 1.5, name: 'Technology' },
+    { text: n.description ?? '', weight: 1, name: 'Description', snippet: true },
+    ...props.map((p): Field => ({ text: p.text, weight: 1, name: p.name, snippet: true })),
+  ]
+}
+
+/** What a search reads of a relation: its name (else its ends) first. */
+function relationFields(r: C4Relation, src: C4Node, tgt: C4Node, mm: Metamodel | null | undefined): Field[] {
+  return [
+    { text: r.label || `${src.label} → ${tgt.label}`, weight: 3, label: true },
+    { text: src.label, weight: 1.5 },
+    { text: tgt.label, weight: 1.5 },
+    { text: r.technology ?? '', weight: 1.5, name: 'Technology' },
+    { text: r.relationType ? (mm?.relationTypes[r.relationType]?.label ?? r.relationType) : '', weight: 1 },
+  ]
+}
+
+/** Folds the texts a search reads of the model's elements and relations,
+ *  a few at a time while `more()` says there is time: the first letter
+ *  typed folded them all (0.4 s at 21,000 elements). Gives a step to call
+ *  again, which says whether texts are left. */
+export function searchWarmUp(data: Pick<SearchData, 'nodes' | 'relations' | 'metamodel'>): (more: () => boolean) => boolean {
+  const nodes = Object.values(data.nodes)
+  const relations = Object.values(data.relations)
+  let i = 0
+  let j = 0
+  return (more) => {
+    while (more()) {
+      if (i < nodes.length) for (const f of elementFields(nodes[i++], data.metamodel)) foldedOf(f.text)
+      else if (j < relations.length) {
+        const r = relations[j++]
+        const src = data.nodes[r.sourceId]
+        const tgt = data.nodes[r.targetId]
+        if (src && tgt) for (const f of relationFields(r, src, tgt, data.metamodel)) foldedOf(f.text)
+      } else return false
+    }
+    return true
+  }
+}
+
+// ── Narrowing while a query is typed ─────────────────────────────────────────
+//
+// Each letter typed went through every element and relation of the model
+// again (125 ms a letter at 21,000 elements). A query that only adds letters
+// to the last one's words, or words after them, with the same filters,
+// matches nothing the last one did not: a word that holds the longer one
+// holds the shorter, and initials that start with it start with its start.
+// So only what the last one found is gone through, in the model's order, and
+// the hits come out the same. Only for frozen data (Studio's store): the MCP
+// server's model changes in place.
+
+let fullScans = 0
+
+/** How many searches went through every element and relation (not
+ *  narrowed), which a test counts instead of timing the search. */
+export function searchScanCount(): number {
+  return fullScans
+}
+
+let lastSearch: {
+  nodes: Record<string, C4Node>; relations: Record<string, C4Relation>; metamodel: SearchData['metamodel']
+  filters: string; scopeNodes: ReadonlySet<string> | null; words: string[]; elements: C4Node[]; relationsFound: C4Relation[]
+} | null = null
+
+const filtersOf = (p: ParsedSearch): string =>
+  JSON.stringify([p.command, p.kinds, p.scope?.viewId ?? null, p.scope?.name ?? null, p.missingView ?? null, p.types, p.properties])
+
+function narrowing(data: SearchData, parsed: ParsedSearch): { elements: C4Node[]; relations: C4Relation[] } | null {
+  const last = lastSearch
+  if (!last || last.nodes !== data.nodes || last.relations !== data.relations || last.metamodel !== data.metamodel) return null
+  if (last.scopeNodes !== (parsed.scope?.nodes ?? null) || last.filters !== filtersOf(parsed)) return null
+  if (!last.words.length || parsed.words.length < last.words.length) return null
+  if (!last.words.every((w, i) => parsed.words[i].startsWith(w))) return null
+  return { elements: last.elements, relations: last.relationsFound }
 }
 
 // ── Suggestions ──────────────────────────────────────────────────────────────

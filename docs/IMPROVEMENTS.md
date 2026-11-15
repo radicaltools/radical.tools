@@ -1110,8 +1110,9 @@ Still open after it (measured on radical.tools' own model ×14, see
 - A save serializes the whole model and works out every file's path (about
   0.4 s at 20,000); a save that serializes only the elements that changed
   would not.
-- Quick Search: the first letter folds every text (0.4 s); an idle warm-up
-  after opening would hide it.
+- ~~Quick Search: the first letter folds every text (0.4 s); an idle warm-up
+  after opening would hide it.~~ Done 2026-11-14: folded while the app is
+  idle, and each letter narrowed to what the letter before found.
 - Opening from the cache now shows the model before the files are listed
   (3.2 s at 21,000 elements). What is left is drawing: `_sync` runs three
   times while a model opens (the load, the perspective, the first view),
