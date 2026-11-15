@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { checkModel } from '../src/check'
 import { hardValues, needAnswers, quoteFragments } from '../src/check/rules'
+import { readLimits } from '../src/check/words'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
 import type { C4Node, C4Relation, DiagramData } from '../src/c4'
 
@@ -173,6 +174,40 @@ describe("reading the person's words", () => {
     expect(result[2][2]).toBe('Requirement "refuse a return after 30 minutes" says "30 minutes" where the words it quotes from "Rules" say "30 days".')
     expect(result[3][2]).toBe('Requirement "list the history newest first" lists newest first where the words it quotes from "Rules" say oldest first.')
     expect(result[4][2]).toBe('Requirement "round each line down" rounds down where the words it quotes from "Rules" say half up.')
+  })
+
+  it("reads a negated limit as the side it allows: cannot, can't, doesn't, must not exceed (Limits, units and order kept)", () => {
+    const limits = (text: string) => readLimits(text).map((l) => `${l.op}${l.value}`)
+    for (const text of ['cannot exceed 20 items', "can't exceed 20 items", 'can\u2019t exceed 20 items', "doesn't exceed 20", "won't go over 20", "mustn't exceed 20", "shouldn't be above 20", 'must not exceed 20', 'never exceeds 20', 'cannot hold more than 20 items', 'no greater than 20']) {
+      expect(limits(text), text).toEqual(['<=20'])
+    }
+    expect(limits('not below 5')).toEqual(['>=5'])
+    expect(limits('no more than 20')).toEqual(['<=20'])
+    expect(limits('it is not allowed to hold more than 20 items')).toEqual(['<=20'])
+    expect(limits('refuses more than 20 items')).toEqual(['<=20'])
+    const need = node('n', 'need', 'Brief', { description: 'Q: What did you say?\nA: A basket holds at most 20 items.' })
+    const data = governance(
+      [need, req('a', 'ensure that a basket cannot exceed 20 items'), req('b', "ensure that a basket can't exceed 20 items"), req('c', 'ensure that a basket cannot hold more than 20 items'), req('d', 'let a basket hold more than 20 items')],
+      ['a', 'b', 'c', 'd'].map((id) => derives(`d${id}`, id, 'n', 'A basket holds at most 20 items.')),
+    )
+    expect(findings(data, ['quote-value-differs']).map((f) => f[1])).toEqual(['dd'])
+  })
+
+  it('keeps the sign of a value: -18, \u221218 and minus 18 are not 18 (Values read in their forms)', () => {
+    expect([...hardValues('above -18 °C, below \u221225 °C, at minus 4 degrees, a delta of -0.50 €')].sort()).toEqual(['-18', '-25', '-4', '-0.5'].sort())
+    // A list marker, a range and a code are no signs.
+    expect([...hardValues('- 18 items\nMUG-01 on 2026-03-14 (-4)')].sort()).toEqual(['18', '2026-03-14', '-4'].sort())
+    expect([...hardValues('10-20 items')]).not.toContain('-20')
+    expect(readLimits('rises above -18 °C').map((l) => `${l.op}${l.value}`)).toEqual(['>-18'])
+    const need = node('n', 'need', 'Freezer', { description: 'Q: When does the alarm sound?\nA: The freezer alarm sounds when the temperature rises above -18 °C.' })
+    const data = governance(
+      [need, req('r', 'sound the freezer alarm when the temperature rises above 18 °C'), req('ok', 'sound the freezer alarm when the temperature rises above \u221218 °C')],
+      [derives('d', 'r', 'n', 'The freezer alarm sounds when the temperature rises above -18 °C.'), derives('dok', 'ok', 'n', 'The freezer alarm sounds when the temperature rises above -18 °C.')],
+    )
+    expect(findings(data, ['quote-value-missing', 'requirement-value-unquoted', 'quote-value-differs']).map((f) => [f[0], f[1]])).toEqual([
+      ['quote-value-missing', 'd'],
+      ['requirement-value-unquoted', 'r'],
+    ])
   })
 
   it("asks a scenario for the person's example (Example missing from scenarios)", () => {
