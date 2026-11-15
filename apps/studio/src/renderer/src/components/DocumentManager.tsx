@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { documents, useDocumentsStore, type DocumentMeta, type DocumentSource } from '../store/documentStore'
+import { documents, useDocumentsStore, usersModels, type DocumentMeta, type DocumentSource } from '../store/documentStore'
 import { confirmForeignFolder } from './confirmForeignFolder'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
@@ -136,7 +136,9 @@ function ModelMenu({ doc, onRename }: { doc: DocumentMeta; onRename: () => void 
 }
 
 export function DocumentManagerModal({ open, onClose }: Props): React.ReactElement | null {
-  const docs = useDocumentsStore((s) => s.docs)
+  // The user's models, as the Welcome screen lists them (usersModels).
+  const allDocs = useDocumentsStore((s) => s.docs)
+  const docs = useMemo(() => usersModels(allDocs), [allDocs])
   const activeId = useDocumentsStore((s) => s.activeId)
   const [view, setView] = useState<'list' | 'new' | 'open'>('list')
   const [filter, setFilter] = useState<Filter>('all')

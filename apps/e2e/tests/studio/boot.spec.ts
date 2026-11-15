@@ -63,6 +63,26 @@ test.describe('first visit', () => {
     await expect(page).toHaveScreenshot('sample-context.png')
   })
 
+  test('the model a first visit seeds is listed nowhere: not in Open, nor in the Models dialog', async ({ page, studio }) => {
+    // F-0172: the Welcome screen left the seeded Untitled out (0 models in
+    // this browser), and the Models dialog listed it beside the sample.
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Open', exact: true }).click()
+    await expect(page.getByRole('button', { name: /In this browser/ })).toContainText('0 models')
+    await page.getByRole('button', { name: /Sample model/ }).click()
+    await expect(page).toHaveURL(/\/v\/view-ctx$/)
+    await studio.ready()
+    await page.reload()
+    await studio.ready()
+    await page.getByRole('button', { name: 'Models', exact: true }).click()
+    await page.getByRole('menuitem', { name: /Manage models/ }).click()
+    const models = page.getByRole('dialog', { name: 'Models' })
+    await expect(models.locator('.docmgr-item')).toHaveCount(1)
+    await expect(models.locator('.docmgr-item')).not.toContainText('Untitled')
+    await expect(models.getByRole('radio', { name: /^All/ })).toHaveText('All1')
+    await expect(models.getByRole('radio', { name: /^Browser/ })).toHaveText('Browser1')
+  })
+
   test('a new model starts empty', async ({ page, studio }) => {
     await page.goto('/')
     await page.getByRole('button', { name: 'New model' }).click()
