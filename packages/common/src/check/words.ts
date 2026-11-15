@@ -172,6 +172,11 @@ const CURRENCIES: Array<[RegExp, string]> = [
   [/£|\bgbp\b|\bpounds?\b/, 'GBP'], [/\bchf\b/, 'CHF'],
 ]
 const currencyOf = (text: string): string | undefined => CURRENCIES.find(([re]) => re.test(text))?.[1]
+// "minus" after a verb, a preposition or a limit is the sign of a value ("is
+// minus 18", "at minus 4 degrees", "a balance of minus 50 €", "above minus
+// 5"); after a value or a noun ("the total minus 5 €", "8 hours minus 30
+// minutes") it subtracts, and the value has no sign.
+const SIGN_AFTER = /(?:^|[^\w\s%€$£)\]]|\b(?:is|are|was|were|be|been|becomes?|became|reach(?:es|ed)?|show(?:s|n|ed)?|reads?|equals?|stays?|remains?|falls?|fell|drops?|dropped|sinks?|goes|went|gets?|of|at|to|from|in|on|by|as|than|above|below|under|over|between|and|or|until|till|down|least|most|minimum|maximum|around|about|approximately|only|still|with))\s*$/i
 /** The minus signs typography gives ("−18", "–18 °C", a figure dash or a
  *  hyphen of another kind) as the hyphen-minus, as plainWords gives them to
  *  the limits: a value keeps its sign however it is written. */
@@ -224,8 +229,11 @@ function valuesOf(text: string): ValueReading {
   // Not the number inside a code such as MUG-BLUE-01; a minus sign before a
   // number ("-18 °C", "minus 18"), not a dash between two or a list marker.
   for (const m of t.matchAll(/((?:(?<![\w.,)\]])-|\bminus\s+)?(?<![\w.,]|[a-z]-)(?:\d{1,3}(?:,\d{3})+|\d+(?:[.,]\d+)?))(?:\s?(%|percent\b|per cent\b)|(st|nd|rd|th)\b|\s?([a-zżł€$£]+\b|€|\$|£))?(?![\w])/gi)) {
-    const raw = m[1]; const n = numberValue(raw)
-    if (m[2]) { values.add(`${n}%`); alias(`${n}%`, n); continue }
+    // "the total minus 5 €" subtracts: no sign of the value.
+    const raw = /^minus/i.test(m[1]) && !SIGN_AFTER.test(t.slice(Math.max(0, (m.index ?? 0) - 40), m.index ?? 0)) ? m[1].replace(/^minus\s+/i, '') : m[1]
+    const n = numberValue(raw)
+    // A minus before a percentage is a discount ("-10% on every basket"): 10% says it too.
+    if (m[2]) { values.add(`${n}%`); alias(`${n}%`, n, ...(n.startsWith('-') ? [`${n.slice(1)}%`] : [])); continue }
     values.add(n)
     if (/[.,]\d\d$/.test(raw) && !/^\D*\d{1,3}(,\d{3})+$/.test(raw)) alias(n, fmt(Number(n) * 100))
     if (!/%$/.test(n)) alias(n, `${n}%`)

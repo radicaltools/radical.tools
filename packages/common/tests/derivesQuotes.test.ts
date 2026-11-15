@@ -290,6 +290,22 @@ describe("reading the person's words", () => {
     }
   })
 
+  it('reads a discount and a subtraction without a sign: -10% off and total minus 5 € are 10% and 5 €; a balance of minus 50 € keeps it (Values read in their forms)', () => {
+    const cases: Array<[string, string, string[]]> = [
+      ['Members get -10% on every basket.', 'give members a discount of 10% on every basket', []],
+      ['Members get -10% on every basket.', 'give members -10% on every basket', []],
+      ['A member pays the basket total minus 5 € delivery.', 'subtract 5 € delivery from the basket total of a member', []],
+      ['A shift lasts 8 hours minus 30 minutes for lunch.', 'count a shift as 8 hours less 30 minutes for lunch', []],
+      ['An account may reach a balance of minus 50 €.', 'let an account reach a balance of 50 €', ['quote-value-missing', 'requirement-value-unquoted']],
+      ['The freezer is kept at minus 18 degrees.', 'keep the freezer at 18 degrees', ['quote-value-missing', 'requirement-value-unquoted']],
+    ]
+    for (const [answer, action, want] of cases) {
+      const need = node('n', 'need', 'Brief', { description: `Q: What?\nA: ${answer}` })
+      const data = governance([need, req('r', action)], [derives('d', 'r', 'n', answer)])
+      expect(findings(data, ['quote-value-missing', 'requirement-value-unquoted', 'quote-value-differs']).map((f) => f[0]), `${answer} → ${action}`).toEqual(want)
+    }
+  })
+
   it("asks a scenario for the person's example (Example missing from scenarios)", () => {
     const need = node('n', 'need', 'Cost of goods', { description: 'Q: How is the average worked out?\nA: A moving average. For example, 4 on hand at 4.00 € and 12 received at 6.00 € gives 5.50 €.' })
     const sc = node('sc', 'scenario', 'Average over a delivery', { given: '4 on hand', when: '12 are received', then: 'the average changes' })
