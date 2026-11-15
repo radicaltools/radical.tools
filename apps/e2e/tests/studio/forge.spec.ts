@@ -519,7 +519,7 @@ test('a dialog opened over Radical Forge is drawn over its panel, and Esc closes
   expect(at, 'an element beside the Forge panel').not.toBeNull()
   await page.mouse.click(at!.x, at!.y)
   await page.keyboard.press('Delete')
-  const prompt = page.getByRole('dialog', { name: /^Delete / })
+  const prompt = page.locator('.milestone-modal', { has: page.locator('.milestone-modal-title', { hasText: /^Delete / }) })
   await expect(prompt).toBeVisible()
   expect(await clickable(prompt)).toEqual([])
   await page.keyboard.press('Escape')
@@ -588,7 +588,10 @@ folderTest('Radical Forge put aside for the agent\'s Assay panel between two sta
 
   await page.getByRole('button', { name: 'Open Radical Forge' }).click()
   await expect(forge.locator('.forge-step.active')).toHaveText('Requirements')
-  await expect(forge.getByRole('button', { name: 'Continue →' })).toBeVisible()
+  // The run goes on: the next stage is offered.
+  await forge.getByRole('button', { name: 'Continue →' }).click()
+  await expect(forge.getByRole('button', { name: 'Generate domain model' })).toBeVisible()
+  await expect(forge.locator('.forge-step.done', { hasText: 'Requirements' })).toHaveCount(1)
   // Closed, it starts afresh, as before.
   await forge.getByRole('button', { name: 'Close' }).click()
   await page.getByRole('button', { name: 'Open Radical Forge' }).click()
