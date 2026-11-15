@@ -1741,6 +1741,15 @@ function firstCanvasPositions(
   return milestoneAllPositions ?? defaultPositions
 }
 
+/** What a canvas just opened leaves to the live layout to settle: what it
+ *  placed (showCanvasPositions, placeUnplaced) settles with its
+ *  surroundings in Designer; Viewer and Presenter show the canvas as it
+ *  opens, still (a view never laid out glided there for seconds, nothing
+ *  touched). */
+function settlesOnOpen(placed: string[]): string[] {
+  return useDiagramStore.getState().appMode === 'designer' ? placed : []
+}
+
 /** The page a slide of a wiki view shows: the element whose page it is
  *  (null: the Overview) and the page mode. */
 export interface SlideWikiPage { viewId: string; focusId: string | null; pageMode: 'single' | 'multi' }
@@ -6030,7 +6039,7 @@ export const useDiagramStore = create<DiagramStore>()(
           arrangeOnFirstOpen()
           const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
           ;(window as any).__rfPlaceCamera?.(incomingViewport, shown)
-          _liveLayout?.reset(placed)
+          _liveLayout?.reset(settlesOnOpen(placed))
           return
         }
 
@@ -9784,7 +9793,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // skipBulk=true: the loaded positions stand, the live layout only
         // moves what is added or dragged from here on.
         get().startLiveLayout({ skipBulk: true })
-        if (placedOnLoad.length > 0) _liveLayout?.reset(placedOnLoad)
+        if (settlesOnOpen(placedOnLoad).length > 0) _liveLayout?.reset(placedOnLoad)
         suggestSmartLayoutIfUnarranged(true)
         // Apply restored camera (loaded as activeViewId=null → default view).
         // The camera of the canvas shown now: one switched to during the load
