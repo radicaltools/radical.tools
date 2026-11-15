@@ -72,6 +72,16 @@ describe('radical verify', () => {
     expect(none.err).toContain('No scenario or fitness-fn named "Refunds" in the model.')
   })
 
+  it('takes out the entry of a scenario the model no longer has, and drops nothing of another entry', async () => {
+    const root = await repository()
+    const file = join(root, '.radical', 'radical.json')
+    await writeFile(file, JSON.stringify({ implements: [], verifies: [{ element: 'pay', tests: ['tests/pay.test.ts › pays'] }, { element: 'gone', name: 'Refunds', tests: ['tests/refund.test.ts'] }] }))
+    // A test dropped from a scenario without an entry leaves the others' entries alone.
+    expect((await run(root, 'verify', 'No cycles', '--drop', 'tests/deps.test.ts')).out).toContain('is checked by no test')
+    expect((await run(root, 'verify', 'refunds', '--remove')).out).toContain('- "Refunds" (gone), no element of the model, taken out of .radical/radical.json')
+    expect(JSON.parse(await readFile(file, 'utf8')).verifies).toEqual([{ element: 'pay', tests: ['tests/pay.test.ts › pays'] }])
+  })
+
   it('in a model checked out in the repository, writes the repository\'s file and reads the model\'s history', async () => {
     const root = await repository()
     const model = join(root, '.radical', 'model')

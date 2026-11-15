@@ -9,7 +9,7 @@ import { ASSAY_RUN_FILE } from '@radical/common/formats/assayRunStatus'
 import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE } from '@radical/common/check'
 import { DEPS_FILE, FEDERATION_FILE } from '@radical/common/federation'
 import { REPOSITORY_FILE } from '@radical/common/repositoryMapping'
-import { REVIEWS_FILE as REPOSITORY_REVIEWS, findRepositoryFile, mappingRoot } from './repositoryLayout'
+import { REVIEWS_FILE as REPOSITORY_REVIEWS, findRepositoryFile, mappingRoot, repositoryFileOf } from './repositoryLayout'
 
 /** Refuses a symlinked `.state` (or old `.radical`), which could redirect
  *  the write elsewhere. */
@@ -127,8 +127,7 @@ export async function readFederationFiles(root: string): Promise<{ deps: string 
  *  the one readCheckFiles reads, else a new one in the repository's
  *  .radical/. Refuses a symlink, which could redirect the write. */
 export async function writeRepositoryFile(root: string, content: string): Promise<void> {
-  const found = await findRepositoryFile(root, REPOSITORY_FILE, REPOSITORY_FILE)
-  const path = found?.path ?? join(await mappingRoot(root), REPOSITORY_FILE)
+  const path = (await repositoryFileOf(root)).file
   if (await lstat(path).then((s) => s.isSymbolicLink(), () => false)) throw new Error(`symlink: ${path}`)
   await mkdir(dirname(path), { recursive: true })
   await writeFile(path, content, 'utf-8')

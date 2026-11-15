@@ -1299,6 +1299,77 @@ describe('test bindings', () => {
     expect((await model.call('get_changes', { since: 'HEAD' })).text).toContain('    tests (.radical/radical.json): \n      tests/pay.test.ts › pays\n      tests/pay.test.ts › declines')
     expect((await model.call('set_verification', { id: 's-pay', remove: true })).text).toBe('Took scenario "Pays" (s-pay) out of .radical/radical.json.')
   })
+
+  it('binds each test it is given beside those bound, as radical verify --test does, and drops one (F-0111)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'radical-mcp-verify-'))
+    folders.push(root)
+    await promisify(execFile)('git', ['init', '-q'], { cwd: root })
+    const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
+      ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
+    const folder = join(root, '.radical', 'model')
+    const files = serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), relations: [], nodes: [node('s-pay', 'scenario', 'Pays', { given: 'a cart', when: 'paying', then: 'paid' })] }, 'shop')
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const bound = async () => (JSON.parse(await readFile(join(root, '.radical', 'radical.json'), 'utf8')).verifies ?? []).map((v: { tests: string[] }) => v.tests)
+
+    expect((await model.call('set_verification', { id: 's-pay', tests: ['tests/pay.test.ts › pays by card'] })).text).toBe('scenario "Pays" (s-pay) is checked by 1 test(s) (.radical/radical.json).')
+    expect((await model.call('set_verification', { id: 's-pay', tests: ['tests/pay.test.ts › declines an expired card', 'tests/pay.test.ts › pays by card'] })).text).toBe('scenario "Pays" (s-pay) is checked by 2 test(s) (.radical/radical.json).')
+    expect(await bound()).toEqual([['tests/pay.test.ts › pays by card', 'tests/pay.test.ts › declines an expired card']])
+    // drop takes one off; tests and drop together replace one test by another.
+    expect((await model.call('set_verification', { id: 's-pay', drop: ['tests/pay.test.ts › pays by card'], tests: ['tests/pay.test.ts › pays by card twice'] })).ok).toBe(true)
+    expect(await bound()).toEqual([['tests/pay.test.ts › declines an expired card', 'tests/pay.test.ts › pays by card twice']])
+    // Dropping the last test takes the entry out.
+    expect((await model.call('set_verification', { id: 's-pay', drop: ['tests/pay.test.ts › declines an expired card', 'tests/pay.test.ts › pays by card twice'] })).text).toBe('scenario "Pays" (s-pay) is checked by no test (.radical/radical.json).')
+    expect(await bound()).toEqual([])
+    expect(await model.call('set_verification', { id: 's-pay', tests: [] })).toMatchObject({ ok: false })
+    expect(await model.call('set_verification', { id: 's-pay', tests: ['x'], remove: true })).toMatchObject({ ok: false })
+  })
+})
+
+describe('entries of deleted elements', () => {
+  it('delete_node takes them out of .radical/radical.json, and remove: true takes out one whose element is gone (F-0110)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'radical-mcp-orphans-'))
+    folders.push(root)
+    await promisify(execFile)('git', ['init', '-q'], { cwd: root })
+    const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
+      ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
+    const folder = join(root, '.radical', 'model')
+    const files = serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), relations: [], nodes: [
+      node('shop', 'system', 'Shop'), node('api', 'container', 'API', { parentId: 'shop' }), node('core', 'component', 'Core', { parentId: 'api' }),
+      node('web', 'container', 'Web', { parentId: 'shop' }), node('s-pay', 'scenario', 'Pays', { given: 'a cart', when: 'paying', then: 'paid' }),
+    ] }, 'shop')
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const file = join(root, '.radical', 'radical.json')
+    await writeFile(file, JSON.stringify({
+      owner: 'team-shop',
+      implements: [{ element: 'api', name: 'API', paths: ['apps/api'] }, { element: 'core', name: 'Core', paths: ['apps/api/core'] }, { element: 'web', name: 'Web', paths: ['apps/web'], owner: 'team-web' }, { element: 'old', name: 'Old', paths: ['apps/old'] }],
+      verifies: [{ element: 's-pay', name: 'Pays', tests: ['apps/api/pay.test.ts › pays'] }, { element: 's-old', name: 'Old', tests: ['old.test.ts'] }],
+    }))
+    const model = await FolderModel.open(folder)
+    const read = async () => JSON.parse(await readFile(file, 'utf8'))
+
+    // Deleting a container takes its entry and its component's out.
+    const deleted = await model.call('delete_node', { id: 'api' })
+    expect(deleted.ok).toBe(true)
+    expect(deleted.text).toContain('Took the entries of container "API" (api), component "Core" (core) out of .radical/radical.json')
+    expect((await model.call('delete_node', { id: 's-pay' })).text).toContain('Took the entry of scenario "Pays" (s-pay) out of .radical/radical.json')
+    expect(await read()).toEqual({ owner: 'team-shop', implements: [{ element: 'web', name: 'Web', paths: ['apps/web'], owner: 'team-web' }, { element: 'old', name: 'Old', paths: ['apps/old'] }], verifies: [{ element: 's-old', name: 'Old', tests: ['old.test.ts'] }] })
+
+    // An entry left by an element deleted elsewhere: remove: true takes it out.
+    expect(await model.call('set_implementation', { id: 'old', remove: true })).toMatchObject({ ok: true, text: 'Took "Old" (old), no element of the model, out of .radical/radical.json.' })
+    expect(await model.call('set_verification', { id: 's-old', remove: true })).toMatchObject({ ok: true, text: 'Took "Old" (s-old), no element of the model, out of .radical/radical.json.' })
+    expect(await read()).toEqual({ owner: 'team-shop', implements: [{ element: 'web', name: 'Web', paths: ['apps/web'], owner: 'team-web' }] })
+    // Still refused: mapping or binding an element the model lacks.
+    expect(await model.call('set_implementation', { id: 'old', paths: ['apps/old'] })).toMatchObject({ ok: false, text: 'set_implementation: no element old in the model' })
+    expect(await model.call('set_implementation', { id: 'never', remove: true })).toMatchObject({ ok: false, text: 'set_implementation: no element never in the model' })
+    expect(await model.call('set_verification', { id: 'never', remove: true })).toMatchObject({ ok: false, text: 'set_verification: no element never in the model' })
+  })
 })
 
 describe('verification path', () => {

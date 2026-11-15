@@ -9,7 +9,7 @@ import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { originModel, originOf } from '@radical/common/model'
 import { REPOSITORY_FILE, builtIn, parseRepositoryFile, serializeRepositoryFile, type RepositoryFile } from '@radical/common/repositoryMapping'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
-import { repositoryRoot } from '@radical/node-files/repositoryLayout'
+import { repositoryFileOf } from '@radical/node-files/repositoryLayout'
 import { readEditorStateFile } from '@radical/node-files/selectionFile'
 import type { Io } from './check'
 import { modelFolderArg } from './modelFolder'
@@ -25,7 +25,8 @@ two elements share needs the id.
   --path <folder>  a folder that builds the element, from the working
                    directory; more than once for several. Replaces the
                    element's paths
-  --remove         takes the element out of the file
+  --remove         takes the element out of the file; an element the model
+                   no longer has too, by its id or name
   --folder <dir>   the model folder (default: the working directory when it
                    is one, else the repository's .radical/model)
 
@@ -39,10 +40,12 @@ export const shown = (node: C4Node): string => `${node.type} "${node.label}" (${
 /** The model's element named `wanted` (its id or its name; of `types`
  *  when given) and the repository's .radical/radical.json, for radical
  *  implement and radical verify; an exit status when either cannot be had,
- *  said on io.err. */
-export async function openElement(io: Io, folderArg: string | undefined, wanted: string, types?: string[]): Promise<number | {
-  node: C4Node; byId: Map<string, C4Node>; root: string; file: string; where: string; repository: RepositoryFile
-}> {
+ *  said on io.err. With `orphans`, an entry of that list of the file whose
+ *  element the model no longer has, named by its id or name, when no
+ *  element is: what --remove takes out. */
+export async function openElement(io: Io, folderArg: string | undefined, wanted: string, types?: string[], orphans?: 'implements' | 'verifies'): Promise<number | ({
+  byId: Map<string, C4Node>; root: string; file: string; where: string; repository: RepositoryFile
+} & ({ node: C4Node; orphan?: undefined } | { node?: undefined; orphan: { element: string; name?: string } }))> {
   const folder = resolve(io.cwd, await modelFolderArg(folderArg, io.cwd))
   let nodes: C4Node[]
   try {
@@ -55,8 +58,21 @@ export async function openElement(io: Io, folderArg: string | undefined, wanted:
     return 2
   }
   const byId = new Map(nodes.map((n) => [n.id, n]))
+  const { file, root } = await repositoryFileOf(folder)
+  const where = relative(io.cwd, file) || REPOSITORY_FILE
+  let repository: RepositoryFile
+  try {
+    repository = existsSync(file) ? parseRepositoryFile(await readFile(file, 'utf8'), where) : { implements: [], verifies: [] }
+  } catch (error) {
+    io.err((error as Error).message)
+    return 2
+  }
   const kinds = types ? nodes.filter((n) => types.includes(n.type)) : nodes
   const named = byId.get(wanted) && (!types || types.includes(byId.get(wanted)!.type)) ? [byId.get(wanted)!] : kinds.filter((n) => n.label.trim().toLowerCase() === wanted.toLowerCase())
+  const gone = orphans && !named.length
+    ? (repository[orphans] as Array<{ element: string; name?: string }>).filter((e) => !byId.has(e.element) && (e.element === wanted || e.name?.trim().toLowerCase() === wanted.toLowerCase()))
+    : []
+  if (gone.length === 1) return { orphan: gone[0], byId, root, file, where, repository }
   if (named.length !== 1) {
     const near = named.length ? named : kinds.filter((n) => n.label.toLowerCase().includes(wanted.toLowerCase())).slice(0, 8)
     const what = types ? types.join(' or ') : 'element'
@@ -65,17 +81,11 @@ export async function openElement(io: Io, folderArg: string | undefined, wanted:
       : `No ${what} named "${wanted}" in the model.${near.length ? ` Did you mean:\n${near.map((n) => `  ${shown(n)}`).join('\n')}` : ''}`)
     return 2
   }
-  const root = await repositoryRoot(folder) ?? await repositoryRoot(io.cwd) ?? dirname(dirname(folder))
-  const file = join(root, REPOSITORY_FILE)
-  const where = relative(io.cwd, file) || REPOSITORY_FILE
-  try {
-    const repository = existsSync(file) ? parseRepositoryFile(await readFile(file, 'utf8'), where) : { implements: [], verifies: [] }
-    return { node: named[0], byId, root, file, where, repository }
-  } catch (error) {
-    io.err((error as Error).message)
-    return 2
-  }
+  return { node: named[0], byId, root, file, where, repository }
 }
+
+/** An entry of the file whose element the model no longer has, for people. */
+export const shownOrphan = (entry: { element: string; name?: string }): string => `${entry.name !== undefined ? `"${entry.name}" (${entry.element})` : entry.element}, no element of the model,`
 
 /** `radical implement`: an entry of the repository's .radical/radical.json. */
 export async function implementCommand(args: string[], io: Io): Promise<number> {
@@ -91,10 +101,17 @@ export async function implementCommand(args: string[], io: Io): Promise<number> 
   const wanted = positionals.join(' ').trim()
   if (!wanted || (values.remove && values.path?.length)) { io.err(IMPLEMENT_USAGE); return 2 }
 
-  const opened = await openElement(io, values.folder, wanted)
+  const opened = await openElement(io, values.folder, wanted, undefined, values.remove ? 'implements' : undefined)
   if (typeof opened === 'number') return opened
-  const { node, byId, root, file, where, repository } = opened
+  const { byId, root, file, where, repository } = opened
   const mapped = repository.implements
+  if (opened.orphan) {
+    mapped.splice(mapped.findIndex((m) => m.element === opened.orphan.element), 1)
+    await writeFile(file, serializeRepositoryFile(repository))
+    io.out(`- ${shownOrphan(opened.orphan)} taken out of ${where}`)
+    return 0
+  }
+  const node = opened.node
   const parentOf = (id: string) => byId.get(id)?.parentId
 
   if (!values.remove && !values.path?.length) {
@@ -119,7 +136,7 @@ export async function implementCommand(args: string[], io: Io): Promise<number> 
   for (const p of paths) if (!existsSync(join(root, p))) io.err(`! ${p} is not in the repository yet; radical check warns about it until it is.`)
   const entry = { element: node.id, name: node.label, paths }
   if (at < 0) mapped.push(entry)
-  else mapped[at] = entry
+  else mapped[at] = { ...mapped[at], ...entry }
   await mkdir(dirname(file), { recursive: true })
   await writeFile(file, serializeRepositoryFile(repository))
   io.out(`+ ${shown(node)} is built in ${paths.join(', ')} (${where})`)
