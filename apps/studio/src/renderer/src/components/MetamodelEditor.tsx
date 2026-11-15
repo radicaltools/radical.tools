@@ -7,6 +7,7 @@ import { chainSummary, VIEW_KIND_LABELS, VIEWPOINT_KINDS, viewpointsOf, withView
 import { DEFAULT_SUMMARIES, nodeSummary, summaryTokens } from '@radical/common/nodeSummary'
 import { markdownToPlain } from '@radical/common/markdown'
 import { MarkdownText } from '@radical/ui/components/MarkdownText'
+import { isTypedField } from '@radical/ui/components/keysHere'
 import type {
   NodeTypeDef,
   RelationTypeDef,
@@ -959,9 +960,8 @@ function readTab(): EditorTab {
   }
 }
 
-/** A field typed into: a text input or a text area. */
-const isTextField = (el: EventTarget): boolean =>
-  el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && ['text', 'number', 'search', ''].includes(el.type))
+/** A field typed into: a text input, a text area or editable text. */
+const isTextField = (el: EventTarget): boolean => isTypedField(el)
 
 export function MetamodelEditor(): React.ReactElement {
   const metamodel = useDiagramStore((s) => s.metamodel)

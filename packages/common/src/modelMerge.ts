@@ -557,9 +557,15 @@ function dropStrays(merged: DiagramData, base: DiagramData, ours: DiagramData, t
   merged.relations = merged.relations.filter((r) => {
     const end = [r.sourceId, r.targetId].find((id) => !nodes.has(id) && hadNode(id))
     if (end === undefined) return true
-    // The side that still has the element drew the relation to it.
-    const by = ours.nodes?.some((n) => n.id === end) ? 'ours' : 'theirs'
-    ctx.dropped.push({ name: label(end), by, change: `the relation ${label(r.sourceId)} → ${label(r.targetId)} made to it` })
+    // The side that still has the element drew the relation to it, when it
+    // added or changed it since base; one it held as base had it was left
+    // behind by the delete (a file deleted by hand, relations.json kept).
+    const by = ours.nodes?.some((n) => n.id === end) ? 'ours' : theirs.nodes?.some((n) => n.id === end) ? 'theirs' : null
+    const drawn = by && (by === 'ours' ? ours : theirs).relations?.find((x) => x.id === r.id)
+    const was = base.relations?.find((x) => x.id === r.id)
+    if (by && drawn && !(was && sameApartFromLayout(was, drawn))) {
+      ctx.dropped.push({ name: label(end), by, change: `the relation ${label(r.sourceId)} → ${label(r.targetId)} made to it` })
+    }
     gone.add(r.id)
     return false
   })

@@ -689,6 +689,47 @@ test('an outside write keeps the selected relation\'s card open, and what is typ
   await expect(technology).toHaveValue('SQL v2.1')
 })
 
+// F-0176: a part of a requirement's sentence being typed in its card closed
+// when another program changed any element of the folder: the reload
+// re-rendered the card, its slots were declared inside the render and came
+// back new, and what was typed was lost.
+test('an outside write keeps a requirement\'s sentence part open in its card, and what is typed in it', async ({ page, studio }) => {
+  await studio.openSample('view-register')
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
+  await page.getByRole('menuitem', { name: /Manage models/ }).click()
+  const models = page.getByRole('dialog', { name: 'Models' })
+  await models.getByRole('button', { name: /^Actions for / }).first().click()
+  await page.getByRole('menuitem', { name: 'Move to a folder…' }).click()
+  await expect(models.locator('.docmgr-badge.md').first()).toBeVisible()
+  await models.getByRole('button', { name: 'Close' }).click()
+  await expect.poll(async () => Object.keys(await folder.files()).some((p) => p.startsWith('nodes/'))).toBe(true)
+
+  await page.locator('tr[data-node-id="req-dual-approval"]').first().dblclick()
+  const card = page.locator('.right-panel.open')
+  const action = card.locator('.ears-slot-sm', { hasText: 'second authorised signatory' })
+  const before = await action.innerText()
+  await action.click()
+  const input = card.locator('.ears-slot-input-sm')
+  await expect(input).toBeFocused()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' abc')
+
+  // Another program renames another element.
+  const files = await folder.files()
+  const [path, text] = Object.entries(files).find(([p, t]) => p.startsWith('nodes/') && /^id: "need-corporate-feedback"/m.test(t))!
+  await folder.write(path, text.replace(/^label: "(.*)"$/m, 'label: "$1 (renamed)"'))
+  await expect(page.locator('tr[data-node-id="need-corporate-feedback"]').first()).toContainText('(renamed)', { timeout: 15_000 })
+
+  await expect(input).toBeFocused()
+  await page.keyboard.type(' def')
+  await expect(input).toHaveValue(`${before} abc def`)
+  await page.keyboard.press('Enter')
+  await expect.poll(async () => {
+    const saved = Object.entries(await folder.files()).find(([p, t]) => p.startsWith('nodes/') && /^id: "req-dual-approval"/m.test(t))?.[1] ?? ''
+    return /^action:\s*(.*)$/m.exec(saved)?.[1]
+  }, { timeout: 10_000 }).toContain(`${before} abc def`)
+})
+
 // F-0026: an agent's write that arrived while an element was held in a drag
 // reloaded the canvas under the held mouse: the element jumped back to where
 // the drag began, and the drop landed short by what was dragged before the
