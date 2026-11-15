@@ -250,6 +250,28 @@ describe("reading the person's words", () => {
     expect(findings(data, ['quote-value-differs']).map((f) => f[1])).toEqual(['d'])
   })
 
+  it('turns a limit round only by a negation of its own verb, not of a verb in a clause before it (Limits, units and order kept)', () => {
+    const limits = (text: string) => readLimits(text).map((l) => `${l.op}${l.value}`)
+    const cases: Array<[string, string]> = [
+      ["A guest who can't pay yet keeps at most 20 items in the basket.", '<=20'],
+      ["A guest who doesn't log in keeps at most 20 items in the basket.", '<=20'],
+      ['A guest who cannot pay yet keeps at most 20 items in the basket.', '<=20'],
+      ["A guest that isn't logged in can keep at most 20 items.", '<=20'],
+      ['When the guest does not log in the basket keeps at most 20 items.', '<=20'],
+      // The negation of the limit's own verb still turns it round.
+      ['A basket cannot exceed 20 items.', '<=20'],
+      ['A basket that cannot hold more than 20 items.', '<=20'],
+      ['A shop which does not accept baskets with more than 20 items.', '<=20'],
+      ['A guest who is not allowed to pay keeps at most 20 items.', '<=20'],
+      ['A cost that is not above 0.', '<=0'],
+      ['A basket must never hold more than 20 items.', '<=20'],
+    ]
+    for (const [text, want] of cases) expect(limits(text), text).toEqual([want])
+    const need = node('n', 'need', 'Brief', { description: "Q: And a guest?\nA: A guest who can't pay yet keeps at most 20 items in the basket." })
+    const data = governance([need, req('r', 'keep at most 20 items in the basket of a guest')], [derives('d', 'r', 'n', "A guest who can't pay yet keeps at most 20 items in the basket.")])
+    expect(findings(data, ['quote-value-differs'])).toEqual([])
+  })
+
   it("asks a scenario for the person's example (Example missing from scenarios)", () => {
     const need = node('n', 'need', 'Cost of goods', { description: 'Q: How is the average worked out?\nA: A moving average. For example, 4 on hand at 4.00 € and 12 received at 6.00 € gives 5.50 €.' })
     const sc = node('sc', 'scenario', 'Average over a delivery', { given: '4 on hand', when: '12 are received', then: 'the average changes' })

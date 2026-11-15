@@ -274,9 +274,40 @@ const RANGE = new RegExp(String.raw`\b(?:from|between)\s+${N}\s+(?:to|and)\s+${N
 // Words that turn what follows round: "not", "never", "cannot" and the n't
 // forms ("can't", "doesn't", "won't"); "no" only right before the limit ("no
 // greater than 20"). The "not" of a refusal ("not allowed") is the refusal's.
-const NEGATION = /\b(?:not|never|neither|nor|cannot|\w+n't)\b/
-const negates = (before: string): boolean => NEGATION.test(before.replace(/\bnot (?:allowed|accepted|permitted)\b/g, ' ')) || /\bno\s*$/.test(before)
+const NEGATION = /\b(?:not|never|neither|nor|cannot|\w+n't)\b/g
+const negates = (before: string): boolean => {
+  const text = before.replace(/\bnot (?:allowed|accepted|permitted)\b/g, ' ')
+  if (/\bno\s*$/.test(text)) return true
+  const last = [...text.matchAll(NEGATION)].pop()
+  return !!last && !ownClause(text.slice(0, last.index), text.slice((last.index ?? 0) + last[0].length))
+}
+// A negation in a clause of its own before the limit ("a guest who can't pay
+// yet keeps at most 20", "when the guest does not log in the basket keeps
+// …") is of that clause's verb: the limit's verb comes after it, a word in -s
+// or one after a modal, with another word between ("cannot hold more than
+// 20" is one verb; "is not a whole number above 0" has no second).
+const OPENER = /\b(?:who|which|that|whose|whom|where|when|whenever|if|while|until|unless|because|since|once)\b/
+const MODAL = new Set(['can', 'could', 'may', 'might', 'must', 'shall', 'should', 'will', 'would', 'to'])
+const CARRIER = new Set([...MODAL, 'a', 'an', 'the', 'its', 'their', 'his', 'her', 'my', 'our', 'your', 'this', 'that', 'these', 'those', 'each', 'every', 'any', 'some',
+  'be', 'been', 'being', 'is', 'are', 'was', 'were', 'am', 'do', 'does', 'did', 'have', 'has', 'had',
+  'yet', 'ever', 'always', 'still', 'also', 'even', 'just', 'only', 'already', 'again', 'now', 'later', 'really',
+  'in', 'on', 'at', 'of', 'with', 'for', 'by', 'from', 'into', 'out', 'up', 'off'])
+function ownClause(before: string, after: string): boolean {
+  if (!OPENER.test(before)) return false
+  const words = after.split(/[^\p{L}\p{N}']+/u).filter(Boolean)
+  const verb = words[words.length - 1]
+  if (!verb || CARRIER.has(verb) || words.filter((w) => !CARRIER.has(w)).length < 2) return false
+  return MODAL.has(words[words.length - 2]) || /[^s']s$/.test(verb)
+}
 export const REFUSAL = /\b(?:refus\w*|reject\w*|declin\w*|den(?:y|ies|ied)|invalid|not (?:allowed|accepted|permitted)|forbidden|disallow\w*|error|too (?:long|short|many|few|high|low|big|small))\b/
+/** Whether every refusal of a clause comes before the limit at `at`, the last
+ *  in a clause of its own (as a negation can be, ownClause). */
+function refusalBefore(clause: string, at: number): boolean {
+  const last = [...clause.matchAll(new RegExp(REFUSAL.source, 'g'))].pop()
+  if (!last) return false
+  const end = (last.index ?? 0) + last[0].length
+  return end <= at && ownClause(clause.slice(0, last.index), clause.slice(end, at))
+}
 
 /** The limits a text puts on numbers, each as the side that is allowed: "at
  *  most 20" and "refuses more than 20" both allow `<= 20`. A clause that
@@ -301,7 +332,9 @@ function limitsOf(text: string, refusing: boolean): Limit[] {
           read.push([start, end])
           // "a cost that is not above zero": the negation turns the limit round once more.
           const negated = negates(clause.slice(0, start))
-          limits.push({ value: numberValue(m[1]), op: refused !== negated ? COMPLEMENT[op] : op, text: m[0].trim() })
+          // "a guest who is not allowed to pay keeps at most 20": that refusal is of its own clause.
+          const turned = refused && !(!refusing && refusalBefore(clause, start))
+          limits.push({ value: numberValue(m[1]), op: turned !== negated ? COMPLEMENT[op] : op, text: m[0].trim() })
         }
       }
       // A range is what is allowed; one in a refusal is too often "not 2 to 10" to read.
