@@ -283,7 +283,7 @@ installs the hooks for `.radical/model/` and saves its base once.
 ## radical federation
 
 ```sh
-node apps/cli/dist/index.js federation open|sync|watch path/to/model [--force]
+node apps/cli/dist/index.js federation fetch [path/to/model] [--quiet] [--detach]
 ```
 
 One model across many repositories. A model folder names the models it
@@ -299,27 +299,22 @@ depends on in `deps.json`:
 ```
 
 `repo` is a git address or a path relative to the model folder, `path` the
-model folder in that repository, `ref` a branch, tag or commit.
+model folder in that repository, `ref` a branch, tag or commit, or `latest`
+(the newest version tag, else the default branch, at each fetch).
 
-- `open` fetches each dependency at its ref into the cache (`$RADICAL_CACHE`,
-  else the user's cache directory; one bare partial clone per repository, so
-  only the model files are downloaded) and composes one model folder in
-  `.radical/federation/`: the folder's own elements, relations, views and
-  metamodel as they are, and every dependency's elements and relations with
-  `origin: "<name>@<commit>"`. Studio and the MCP server open that folder;
-  they draw elements with an origin dashed and refuse every change to them
-  but their place. The composed folder gets a base composed the same way
-  (Changes on branch shows only this model's changes), `check.json` and the
-  test results. Changes not carried home yet are carried first.
-- `sync` writes what has no origin back to the model folder, and names each
-  change to an element or relation with an origin, which it keeps out and
-  undoes in the composed folder (exit 1). When the model folder changed too,
-  nothing is carried unless `--force`; `open --force` composes again from the
-  model folder and drops the composed folder's changes.
-- `watch` opens, then keeps both in step until stopped (Ctrl-C).
-
-Dependencies are not composed transitively. With a `deps.json`,
-`radical check` checks the model composed with its dependencies (see below).
+`fetch` fetches each dependency at its ref into the cache (`$RADICAL_CACHE`,
+else the user's cache directory; one bare partial clone per repository, so
+only the model files are downloaded), and the models it depends on in turn
+(a model pinned twice at the nearest pin: the folder's own `deps.json`
+first). It writes their elements, relations and views, each with
+`origin: "<name>@<commit>"`, into `.state/federation.json` in the model
+folder, out of git. Studio and the MCP server open the model folder itself
+and show them beside its own, read-only; they never write them into the
+folder. Without a `deps.json` there is nothing to fetch (exit 0). `--quiet`
+prints nothing, `--detach` fetches in the background and returns at once:
+`radical hooks install` runs `fetch --quiet --detach` after a checkout, a
+commit, a pull and a rebase. With a `deps.json`, `radical check` checks the
+model composed with its dependencies (see below).
 
 ## radical check
 

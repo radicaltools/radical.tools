@@ -55,8 +55,9 @@ its own ("model": { "repo": … }), it judges that repository's part of the mode
                       without --metrics too, and the metric conditions of
                       scenarios and fitness functions are evaluated against
                       the latest measurement each matches. The reviews
-                      radical sense review keeps in the model folder's
-                      reviews.json are read as measurements too
+                      radical sense review keeps in the repository's
+                      .radical/reviews.json (and a model folder's
+                      reviews.json from before) are read as measurements too
   --baseline <path>   earlier radical-metrics/1 files (a file, or a directory of
                       them; repeat for more) that a condition stated against a
                       baseline (<metric> <= baseline + 20%) compares with: the
@@ -119,7 +120,7 @@ export interface Io {
    *  command that started it (radical check --detach); absent when nothing
    *  can be started. */
   background?: (args: string[]) => void
-  /** Stops a command that runs until stopped (radical federation watch). */
+  /** Stops a command that runs until stopped. */
   signal?: AbortSignal
 }
 

@@ -404,4 +404,30 @@ describe('radical', () => {
     expect(unknown.code).toBe(2)
     expect(unknown.err).toContain('Unknown command: lint')
   })
+
+  it('answers --help for every command and subcommand its usage lists', async () => {
+    const cwd = await workspace()
+    const usage = (await run(cwd, '--help')).out
+    // "  explore prepare|verify|record" and "  federation fetch [folder]":
+    // the words up to the first argument, each choice of a|b|c on its own.
+    const commands = usage.split('\n').filter((line) => /^ {2}[a-z]/.test(line)).flatMap((line) => {
+      let lists: string[][] = [[]]
+      for (const word of line.trim().split(/\s{2,}/)[0].split(' ')) {
+        if (/^[[<"-]/.test(word) && !/^<[\w-]+(\|[\w-]+)+>$/.test(word)) break
+        lists = lists.flatMap((list) => word.replace(/^<|>$/g, '').split('|').map((choice) => [...list, choice]))
+      }
+      return lists
+    })
+    for (const command of commands) {
+      const help = await run(cwd, ...command, '--help')
+      expect({ command, code: help.code, err: help.err }).toEqual({ command, code: 0, err: '' })
+      // Its usage, the lines before the first blank one, has that command.
+      const forms = help.out.split('\n\n')[0].split('\n').map((line) => line.replace(/^(Usage:)?\s*radical\s+/, '').split(' '))
+      const named = forms.some((form) => command.every((word, i) => form[i]?.split('|').includes(word)))
+      expect({ command, named }).toEqual({ command, named: true })
+    }
+    expect(commands.map((c) => c.join(' '))).toEqual(expect.arrayContaining(['check', 'federation fetch', 'explore verify']))
+    // radical sense --help names the file a review is written to.
+    expect((await run(cwd, 'sense', '--help')).out).toContain('.radical/reviews.json')
+  })
 })
