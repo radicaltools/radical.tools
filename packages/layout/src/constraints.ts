@@ -257,13 +257,34 @@ function centre(
   return c
 }
 
+/** What a pass that keeps `pinned` where they are may not move: the pinned
+ *  elements, what they hold, and the frames holding them (moving one
+ *  carries the pin along), as Tidy's Layout counts them (fixed). */
+export function heldByPins(nodes: Record<string, C4Node>, pinned: readonly string[]): Set<string> {
+  const out = new Set<string>()
+  if (!pinned.length) return out
+  const within = (id: string): boolean => {
+    for (let cur: string | undefined = id; cur && nodes[cur]; cur = nodes[cur].parentId) if (pinned.includes(cur)) return true
+    return false
+  }
+  for (const id of Object.keys(nodes)) {
+    if (!within(id)) continue
+    out.add(id)
+    for (let p = nodes[id].parentId; p && nodes[p]; p = nodes[p].parentId) out.add(p)
+  }
+  return out
+}
+
 /**
  * Makes `positions` (parent-relative, as Smart Layout produces them) satisfy
  * `alignments`. `nodes` is the graph as drawn (projectToVisibleGraph);
  * nodes missing from `positions` start where they are. Returns a box for
  * every node. Without alignments the input is returned as is. Boxes in
- * `fixed` (pinned, or left out of a Tidy round a selection) are never
- * pushed aside to make room; a member of a line still moves onto it.
+ * `fixed` (pinned, or left out of a Tidy round a selection; heldByPins)
+ * never move: a line runs through its members among them, and one whose
+ * members there do not share it is left as it stands. Only what the pass
+ * moves pushes others aside, and only a frame round something that moved
+ * in it is fitted: the rest of the canvas stays as it is drawn.
  */
 export function enforceAlignments(
   nodes: Record<string, C4Node>,
@@ -315,20 +336,35 @@ export function enforceAlignments(
     return chain.map((id, k) => (parts.filter((p) => p === parts[k]).length === 1 ? parts[k] : id))
   }
 
+  // What the pass moved in its parent's frame (a frame: also refitted).
+  const touched = new Set<string>()
+  const shift = (id: string, axis: 'x' | 'y', d: number): void => {
+    if (Math.abs(d) < 0.01) return
+    boxes[id][axis] += d
+    touched.add(id)
+  }
+
   const snap = (): void => {
     // A grid's rows (columns) out of order: the rows take the places the
     // rows hold, in order, whole — moving single cells would break them.
     for (const lines of rankedLines(alignments)) {
+      if (lines.some((a) => a.ids.some((id) => fixed.has(id)))) continue
       const at = lines.map((a) => lineAt(nodes, boxes, parents, a))
       if (at.every((c, k) => k === 0 || c - at[k - 1] >= MIN_STEP)) continue
       const slots = [...at].sort((p, q) => p - q)
       for (let k = 1; k < slots.length; k++) slots[k] = Math.max(slots[k], slots[k - 1] + MIN_STEP)
-      lines.forEach((a, k) => { for (const id of a.ids) boxes[id][a.axis] += slots[k] - at[k] })
+      lines.forEach((a, k) => { for (const id of a.ids) shift(id, a.axis, slots[k] - at[k]) })
     }
     for (const a of alignments) {
+      // The line runs through its members that may not move; when they do
+      // not share one, it is left as it stands rather than move them (two
+      // of them put on one line would lie on each other, never parted).
       const centres = a.ids.map((id) => centre(nodes, boxes, parents, id, a.axis))
-      const target = centres.reduce((s, c) => s + c, 0) / centres.length
-      a.ids.forEach((id, i) => { boxes[id][a.axis] += target - centres[i] })
+      const held = centres.filter((_, i) => fixed.has(a.ids[i]))
+      if (held.length === a.ids.length || (held.length && Math.max(...held) - Math.min(...held) > TOLERANCE)) continue
+      const on = held.length ? held : centres
+      const target = on.reduce((s, c) => s + c, 0) / on.length
+      a.ids.forEach((id, i) => { if (!fixed.has(id)) shift(id, a.axis, target - centres[i]) })
       // Out of order: the members take the places they hold, in order. A
       // member alone in its part of the chain (a group of the parent the
       // chain shares) moves with that part: moved out of its group alone,
@@ -337,19 +373,22 @@ export function enforceAlignments(
       for (const chain of a.orders) {
         const cs = chain.map((id) => centre(nodes, boxes, parents, id, along))
         if (cs.every((c, k) => k === 0 || c - cs[k - 1] >= MIN_STEP)) continue
+        const movers = chainMovers(chain)
+        if (movers.some((m) => fixed.has(m))) continue
         const slots = [...cs].sort((x, y) => x - y)
         for (let k = 1; k < slots.length; k++) slots[k] = Math.max(slots[k], slots[k - 1] + MIN_STEP)
-        const movers = chainMovers(chain)
-        chain.forEach((id, k) => { boxes[movers[k]][along] += slots[k] - cs[k] })
+        chain.forEach((id, k) => { shift(movers[k], along, slots[k] - cs[k]) })
       }
     }
   }
 
   /** Refit a parent around its children without moving them on the canvas:
-   *  the parent's box moves, the children's relative positions follow. */
+   *  the parent's box moves, the children's relative positions follow. Only
+   *  round something the pass moved in it: a frame it did not touch keeps
+   *  its place and size (and the room it leaves round its children). */
   const fit = (pid: string): void => {
     const children = byParent.get(pid) ?? []
-    if (!children.length) return
+    if (!children.some((id) => touched.has(id))) return
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     for (const id of children) {
       const b = boxes[id]
@@ -363,12 +402,14 @@ export function enforceAlignments(
     const dx = minX - pad.side
     const dy = minY - pad.top
     const p = boxes[pid]
+    const was = { ...p }
     p.x += dx
     p.y += dy
     for (const id of children) { boxes[id].x -= dx; boxes[id].y -= dy }
     const min = NODE_SIZES[parent.type as keyof typeof NODE_SIZES] ?? { width: 0, height: 0 }
     p.width = Math.max(maxX - minX + 2 * pad.side, min.width)
     p.height = Math.max(maxY - minY + pad.top + pad.bottom, min.height)
+    if (Math.abs(p.x - was.x) > 0.01 || Math.abs(p.y - was.y) > 0.01 || Math.abs(p.width - was.width) > 0.01 || Math.abs(p.height - was.height) > 0.01) touched.add(pid)
   }
 
   /** Centre of `id` as drawn, in its parent's frame. */
@@ -424,13 +465,15 @@ export function enforceAlignments(
     const group = (id: string, axis: 'x' | 'y'): string[] => cluster[axis].get(id) ?? [id]
     const movable = (id: string, axis: 'x' | 'y'): boolean => !group(id, axis).some((m) => locked[axis].has(m) || fixed.has(m))
     const move = (id: string, axis: 'x' | 'y', d: number): void => {
-      for (const m of group(id, axis)) boxes[m][axis] += d
+      for (const m of group(id, axis)) shift(m, axis, d)
     }
 
     for (let pass = 0; pass < 200; pass++) {
       let moved = false
       for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
+          // Two the pass has not moved stand as the canvas has them.
+          if (!touched.has(ids[i]) && !touched.has(ids[j])) continue
           const a = boxes[ids[i]]
           const b = boxes[ids[j]]
           const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x) + gap

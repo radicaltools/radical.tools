@@ -1074,6 +1074,72 @@ describe('Pins in the store', () => {
     expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual(['acc'])
   }, 60_000)
 
+  it('Keep in a row, a column or a grid leaves a pinned frame, and frames it has nothing to do with, at their place and size (F-0174)', () => {
+    const s = useDiagramStore.getState
+    const geometry = (id: string) => {
+      const n = s().c4Nodes[id]
+      let x = n.x, y = n.y
+      for (let p = n.parentId; p; p = s().c4Nodes[p].parentId) { x += s().c4Nodes[p].x; y += s().c4Nodes[p].y }
+      return { x, y, width: n.width, height: n.height }
+    }
+    const keeps: Array<[string, () => unknown]> = [
+      ['row', () => s().addAlignment('horizontal', ['fx', 'val'])],
+      ['column', () => s().addAlignment('vertical', ['fx', 'val'])],
+      ['grid', () => s().addGrid(['fx', 'val'], 2)],
+    ]
+    for (const [name, keep] of keeps) {
+      for (const pinned of [false, true]) {
+        // As the sample's Core Banking: frames holding their children 58 px below their top.
+        useDiagramStore.setState({
+          c4Nodes: {
+            core: node('core', 'system', { x: 0, y: 0, width: 1700, height: 1400 }),
+            pay: node('pay', 'container', { parentId: 'core', x: 30, y: 58, width: 300, height: 396 }),
+            fx: node('fx', 'component', { parentId: 'pay', x: 20, y: 120 }),
+            val: node('val', 'component', { parentId: 'pay', x: name === 'column' ? 60 : 20, y: 256 }),
+            acc: node('acc', 'group', { parentId: 'core', x: 1100, y: 58, width: 520, height: 568 }),
+            auth: node('auth', 'container', { parentId: 'acc', x: 57, y: 58 }),
+            gw: node('gw', 'container', { parentId: 'acc', x: 57, y: 338 }),
+            risk: node('risk', 'group', { parentId: 'core', x: 30, y: 800, width: 658, height: 498 }),
+            db: node('db', 'container', { parentId: 'risk', x: 57, y: 58 }),
+            dw: node('dw', 'container', { parentId: 'risk', x: 357, y: 58 }),
+          },
+          c4Relations: {},
+          defaultLayoutConstraints: pinned ? [{ id: 'p', type: 'pin', nodeIds: ['acc'] }] : [],
+        } as any)
+        s()._sync()
+        const was = Object.fromEntries(['acc', 'auth', 'gw', 'risk', 'db', 'dw'].map((id) => [id, geometry(id)]))
+        expect(keep(), name).toBeTruthy()
+        for (const id of Object.keys(was)) expect(geometry(id), `${name}${pinned ? ', acc pinned' : ''}: ${id}`).toEqual(was[id])
+        const fx = geometry('fx'), val = geometry('val')
+        expect(fx.x >= val.x + val.width || val.x >= fx.x + fx.width || fx.y >= val.y + val.height || val.y >= fx.y + fx.height, `${name}: fx clear of val`).toBe(true)
+      }
+    }
+  })
+
+  it('Keep in a row lines up the pinned elements it is set on, and pushes no other pinned element aside', () => {
+    const s = useDiagramStore.getState
+    useDiagramStore.setState({
+      c4Nodes: {
+        a: node('a', 'system', { x: 0, y: 0 }),
+        b: node('b', 'system', { x: 600, y: 300 }),
+        c: node('c', 'system', { x: 600, y: 140 }),
+        d: node('d', 'system', { x: 1200, y: 600 }),
+      },
+      c4Relations: {},
+      defaultLayoutConstraints: [{ id: 'p', type: 'pin', nodeIds: ['a', 'b', 'c'] }],
+    } as any)
+    s()._sync()
+    // a and b were dropped on different lines: the row the author sets on them wins.
+    expect(s().addAlignment('horizontal', ['a', 'b'])).toBeTruthy()
+    const mid = (id: string) => s().c4Nodes[id].y + s().c4Nodes[id].height / 2
+    expect(Math.abs(mid('a') - mid('b'))).toBeLessThanOrEqual(0.5)
+    expect([s().c4Nodes.c.x, s().c4Nodes.c.y]).toEqual([600, 140])
+    // One pinned member: the other comes onto its line.
+    expect(s().addAlignment('horizontal', ['c', 'd'])).toBeTruthy()
+    expect([s().c4Nodes.c.x, s().c4Nodes.c.y]).toEqual([600, 140])
+    expect(mid('d')).toBeCloseTo(mid('c'), 1)
+  })
+
   it('pins in the active view only', () => {
     const s = useDiagramStore.getState
     const vid = s().addView('Context')
