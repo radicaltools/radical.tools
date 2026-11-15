@@ -165,6 +165,10 @@ const DURATION: Array<[RegExp, number]> = [
 const MONEY_AFTER = /^(?:€|eur|euros?|zł|zl|pln|usd|\$|£|gbp|chf|dollars?|pounds?)$/
 const CENTS = /^(?:cents?|ct|grosz[ey]?|pence|p)$/
 const MONEY_BEFORE = /(?:€|\$|£|eur|usd|pln|gbp|chf)\s?$/
+/** The minus signs typography gives ("−18", "–18 °C", a figure dash or a
+ *  hyphen of another kind) as the hyphen-minus, as plainWords gives them to
+ *  the limits: a value keeps its sign however it is written. */
+const minusSigns = (text: string): string => text.replace(/[‐‑‒–−]/g, '-')
 
 /** A number as a value: thousands separators out, a decimal comma a point,
  *  trailing zeros of the fraction dropped, a minus sign ("-18", "−18",
@@ -207,10 +211,10 @@ function valuesOf(text: string): ValueReading {
   // Dates and times are one value each, not three numbers.
   t = t.replace(/\b(\d{4}-\d{2}-\d{2})(?:[t ](\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?z?)?\b/gi, (_, date: string, time?: string) => { values.add(date); if (time) values.add(time); return ' ' })
   t = t.replace(/(?<![\d:])(\d{1,2}:\d{2})(?![\d:])/g, (_, time: string) => { values.add(time.padStart(5, '0')); return ' ' })
-  t = numerals(t)
+  t = minusSigns(numerals(t))
   // Not the number inside a code such as MUG-BLUE-01; a minus sign before a
   // number ("-18 °C", "minus 18"), not a dash between two or a list marker.
-  for (const m of t.matchAll(/((?:(?<![\w.,)\]])[-−]|\bminus\s+)?(?<![\w.,]|\w-)(?:\d{1,3}(?:,\d{3})+|\d+(?:[.,]\d+)?))(?:\s?(%|percent\b|per cent\b)|(st|nd|rd|th)\b|\s?([a-zżł€$£]+\b|€|\$|£))?(?![\w])/gi)) {
+  for (const m of t.matchAll(/((?:(?<![\w.,)\]])-|\bminus\s+)?(?<![\w.,]|[a-z]-)(?:\d{1,3}(?:,\d{3})+|\d+(?:[.,]\d+)?))(?:\s?(%|percent\b|per cent\b)|(st|nd|rd|th)\b|\s?([a-zżł€$£]+\b|€|\$|£))?(?![\w])/gi)) {
     const raw = m[1]; const n = numberValue(raw)
     if (m[2]) { values.add(`${n}%`); alias(`${n}%`, n); continue }
     values.add(n)

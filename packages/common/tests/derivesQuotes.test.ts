@@ -215,6 +215,25 @@ describe("reading the person's words", () => {
     ])
   })
 
+  it('reads a minus written as a dash: –18 is -18, as −18 and -18 are, in values and limits alike (Values read in their forms)', () => {
+    for (const sign of ['-', '−', '–', '‒', '‑']) {
+      expect([...hardValues(`rises above ${sign}18 °C`)], sign).toEqual(['-18'])
+      expect(readLimits(`rises above ${sign}18 °C`).map((l) => `${l.op}${l.value}`), sign).toEqual(['>-18'])
+    }
+    // A dash between two numbers is a range, not a sign.
+    expect([...hardValues('10–20 items')].sort()).toEqual(['10', '20'])
+    const answer = 'The freezer alarm sounds when the temperature rises above –18 °C.'
+    const need = node('n', 'need', 'Freezer', { description: `Q: When does the alarm sound?\nA: ${answer}` })
+    const data = governance(
+      [need, req('r', 'sound the freezer alarm when the temperature rises above 18 °C'), req('ok', 'sound the freezer alarm when the temperature rises above -18 °C')],
+      [derives('d', 'r', 'n', answer), derives('dok', 'ok', 'n', answer)],
+    )
+    expect(findings(data, ['quote-value-missing', 'requirement-value-unquoted', 'quote-value-differs']).map((f) => [f[0], f[1]])).toEqual([
+      ['quote-value-missing', 'd'],
+      ['requirement-value-unquoted', 'r'],
+    ])
+  })
+
   it("asks a scenario for the person's example (Example missing from scenarios)", () => {
     const need = node('n', 'need', 'Cost of goods', { description: 'Q: How is the average worked out?\nA: A moving average. For example, 4 on hand at 4.00 € and 12 received at 6.00 € gives 5.50 €.' })
     const sc = node('sc', 'scenario', 'Average over a delivery', { given: '4 on hand', when: '12 are received', then: 'the average changes' })
