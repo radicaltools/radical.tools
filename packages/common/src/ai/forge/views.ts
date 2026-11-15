@@ -237,9 +237,10 @@ const RADICAL_STAGE_VIEWPOINTS: Record<ForgeStageId, string[]> = {
   review: ['requirement-gaps', 'requirement-coverage', 'traceability'],
 }
 
-/** The views of a viewpoint the model has, in the list's order. */
+/** The views of a viewpoint the model has, in the list's order: its own,
+ *  none of another model's. */
 const viewsOfViewpoint = (views: Record<string, DiagramView> | undefined, viewpoint: string): DiagramView[] =>
-  Object.values(views ?? {}).filter((v) => v.viewpoint === viewpoint)
+  Object.values(views ?? {}).filter((v) => v.viewpoint === viewpoint && !v.origin)
 
 /** The view of a viewpoint the model has, if any: the first, and for a
  *  group of views of one element the first of its views by name. */
