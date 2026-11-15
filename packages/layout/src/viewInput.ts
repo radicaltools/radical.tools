@@ -243,13 +243,51 @@ export function applyAlignments(c4Nodes: Record<string, C4Node>, input: LayoutIn
 }
 
 /**
+ * The frames a Tidy that keeps something (round a selection, or with pins)
+ * hands back as it found them (`drawn`, the layout's input nodes), with
+ * everything they hold: a pinned frame, or one Tidy round a selection did
+ * not reach. The refit after the layout leaves them at their size; only a
+ * frame round something that moved is fitted. Not the frames a view draws
+ * only to hold what it shows (`tight`): they are refitted as always.
+ */
+export function keptFrames(drawn: Record<string, C4Node>, positions: PositionMap, tight: ReadonlySet<string>): Set<string> {
+  const near = (a: number | undefined, b: number | undefined): boolean => a === undefined || b === undefined || Math.abs(a - b) < 0.5
+  // Where it stands on the canvas: a frame round it refitted moves its place in it, not on the canvas.
+  const at = (id: string, after: boolean): { x: number; y: number } => {
+    let x = 0, y = 0
+    for (let c: string | undefined = id; c && drawn[c]; c = drawn[c].parentId) {
+      const p = (after && positions[c]) || drawn[c]
+      x += p.x; y += p.y
+    }
+    return { x, y }
+  }
+  const same = (id: string): boolean => {
+    const n = drawn[id], p = positions[id]
+    if (!p) return true
+    const was = at(id, false), now = at(id, true)
+    return near(was.x, now.x) && near(was.y, now.y) && near(n.width, p.width) && near(n.height, p.height)
+  }
+  const children = new Map<string, string[]>()
+  for (const n of Object.values(drawn)) if (n.parentId && drawn[n.parentId]) children.set(n.parentId, [...(children.get(n.parentId) ?? []), n.id])
+  const kept = new Map<string, boolean>()
+  const keeps = (id: string): boolean => {
+    let hit = kept.get(id)
+    if (hit === undefined) { hit = same(id) && (children.get(id) ?? []).every(keeps); kept.set(id, hit) }
+    return hit
+  }
+  return new Set([...children.keys()].filter((id) => !tight.has(id) && keeps(id)))
+}
+
+/**
  * Refits every compound node that has children in the view, deepest first,
  * to wrap those children at their effective (view-collapsed) size — what
- * Studio's store does after a layout run. Mutates `nodes`.
+ * Studio's store does after a layout run. Mutates `nodes`. Frames in `keep`
+ * (keptFrames) stay as they are.
  */
 export function resizeParentsBottomUp(
   nodes: Record<string, C4Node>,
   input: Pick<LayoutInput, 'viewFilter' | 'viewCollapsedSet' | 'expandedSet'>,
+  keep?: ReadonlySet<string>,
 ): void {
   const { viewFilter, viewCollapsedSet, expandedSet } = input
   const inView = (n: C4Node): boolean => !viewFilter || viewFilter.has(n.id)
@@ -267,7 +305,7 @@ export function resizeParentsBottomUp(
   parentIds.sort((a, b) => depth(b) - depth(a))
   for (const id of parentIds) {
     const parent = nodes[id]
-    if (!parent || !isContainerType(parent.type) || isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet)) continue
+    if (!parent || keep?.has(id) || !isContainerType(parent.type) || isEffectivelyCollapsed(parent, viewCollapsedSet, expandedSet)) continue
     const children = Object.values(nodes).filter((c) => c.parentId === id && inView(c))
     if (!children.length) continue
     const fitted = fittedParentSize(parent, children.map((c) => ({ x: c.x, y: c.y, ...size(c) })))

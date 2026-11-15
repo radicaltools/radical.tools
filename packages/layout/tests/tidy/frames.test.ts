@@ -72,3 +72,53 @@ describe('a frame the view shows part of', () => {
     expect(again.result.keptCurrent).toBe(true)
   })
 })
+
+/** The sample's Core Banking, cut down: frames holding their children 58 px
+ *  below their top (not the 120 Tidy fits them with), Access & Security
+ *  pinned, and the Payment Validator dropped on a neighbour in Payments. */
+function banking(): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation>; view: DiagramView } {
+  const nodes: Record<string, C4Node> = {
+    pay: node('pay', 'group', undefined, 0, 0, 900, 568),
+    val: node('val', 'container', 'pay', 57, 58, 240, 160),
+    ledger: node('ledger', 'container', 'pay', 67, 68, 240, 160),
+    notify: node('notify', 'container', 'pay', 57, 338, 240, 160),
+    acc: node('acc', 'group', undefined, 1100, 0, 520, 568),
+    auth: node('auth', 'container', 'acc', 57, 58, 240, 160),
+    gw: node('gw', 'container', 'acc', 57, 338, 240, 160),
+    risk: node('risk', 'group', undefined, 0, 800, 658, 498),
+    db: node('db', 'container', 'risk', 57, 58, 240, 160),
+    dw: node('dw', 'container', 'risk', 357, 58, 240, 160),
+  }
+  const rel = (id: string, sourceId: string, targetId: string): C4Relation => ({ id, sourceId, targetId, relationType: 'uses' } as unknown as C4Relation)
+  const relations = { r1: rel('r1', 'val', 'ledger'), r2: rel('r2', 'gw', 'auth'), r3: rel('r3', 'db', 'dw') }
+  const ids = Object.keys(nodes)
+  const view = { id: 'v', name: 'Core Banking', kind: 'static', nodeIds: ids, expandedNodeIds: ['pay', 'acc', 'risk'], positions: {}, layoutConstraints: [{ id: 'p', type: 'pin', nodeIds: ['acc'] }] } as unknown as DiagramView
+  return { nodes, relations, view }
+}
+
+/** Tidy round `around` as Studio and the MCP server run it, the view's pin kept. */
+function tidyAround(nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, view: DiagramView, around: string[]) {
+  const input = viewLayoutInput(view, nodes, relations)
+  return runTidyLayout(input.nodes, input.relations, { frames: [...input.frames], budget: TIDY_BUDGET, around, pinned: ['acc'] })
+}
+
+describe('Tidy around a selection (F-0138)', () => {
+  it('leaves a pinned frame and the frames it does not reach as they are drawn, their size too', () => {
+    const { nodes, relations, view } = banking()
+    const result = tidyAround(nodes, relations, view, ['val'])
+    expect(result.keptCurrent).toBe(false)
+    for (const id of ['acc', 'auth', 'gw', 'risk', 'db', 'dw']) {
+      const n = nodes[id]
+      expect(result.winner.positions[id], id).toEqual({ x: n.x, y: n.y, width: n.width, height: n.height })
+    }
+    for (const step of result.tidy.steps) for (const id of ['acc', 'auth', 'gw', 'risk', 'db', 'dw']) expect(step.moved[id], `${step.description}: ${id}`).toBeUndefined()
+  })
+
+  it('fits no frame round what the view shows when nothing in it moves', () => {
+    const { nodes, relations, view } = banking()
+    // Nothing on the canvas is out of place round Auth Service.
+    const result = tidyAround(nodes, relations, view, ['auth'])
+    expect(result.tidy.steps.filter((s) => s.kind === 'fit')).toEqual([])
+    expect(result.keptCurrent).toBe(true)
+  })
+})

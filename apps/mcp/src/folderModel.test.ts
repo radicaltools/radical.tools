@@ -747,6 +747,41 @@ describe('long Smart Layout runs', () => {
     expect((await model.call('smart_layout', { around: ['nope'] })).ok).toBe(false)
   }, 60_000)
 
+  it('round a selection, leaves a pinned frame and a frame it does not reach at their place and size (F-0138)', async () => {
+    // Frames holding their children 58 px below their top, as the sample's do; Access pinned.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const box = (id: string, type: string, parentId: string | undefined, x: number, y: number, width = 240, height = 160): C4Node =>
+      ({ id, type, label: id, ...(parentId ? { parentId } : {}), x, y, width, height, collapsed: false }) as C4Node
+    data.nodes = [
+      box('core', 'group', undefined, 0, 0, 1700, 1400),
+      box('pay', 'system', 'core', 30, 58, 900, 568), box('val', 'container', 'pay', 57, 58), box('ledger', 'container', 'pay', 67, 68), box('notify', 'container', 'pay', 57, 338),
+      box('acc', 'system', 'core', 1100, 58, 520, 568), box('auth', 'container', 'acc', 57, 58), box('gw', 'container', 'acc', 57, 338),
+      box('risk', 'system', 'core', 30, 800, 658, 498), box('db', 'container', 'risk', 57, 58), box('dw', 'container', 'risk', 357, 58),
+    ]
+    data.relations = [
+      { id: 'r1', sourceId: 'val', targetId: 'ledger', relationType: 'interacts' }, { id: 'r2', sourceId: 'gw', targetId: 'auth', relationType: 'interacts' },
+      { id: 'r3', sourceId: 'db', targetId: 'dw', relationType: 'interacts' },
+    ]
+    data.defaultLayoutConstraints = [{ id: 'p', type: 'pin', nodeIds: ['acc'] }]
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const outcome = await model.call('smart_layout', { around: ['val'] })
+    expect(outcome.ok, outcome.text).toBe(true)
+    const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    // On the canvas: the group round them is refitted round what moved, and their places in it change with it.
+    const geometry = (nodes: C4Node[], id: string) => {
+      const n = nodes.find((x) => x.id === id)!
+      let x = n.x, y = n.y
+      for (let p = n.parentId; p; p = nodes.find((q) => q.id === p)!.parentId) { const q = nodes.find((r) => r.id === p)!; x += q.x; y += q.y }
+      return [x, y, n.width, n.height]
+    }
+    for (const id of ['acc', 'auth', 'gw', 'risk', 'db', 'dw']) expect(geometry(after.nodes, id), id).toEqual(geometry(data.nodes, id))
+  }, 60_000)
+
   it('unpins the view it lays out whole; round a selection the pinned elements stay, pinned', async () => {
     // Two elements pinned in Studio, a third on top of them.
     const folder = await fixture()

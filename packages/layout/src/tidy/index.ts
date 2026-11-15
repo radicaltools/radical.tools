@@ -139,12 +139,12 @@ export function runTidyLayout(
   // The whole diagram from the top left, as every layout hands it over;
   // not when something is pinned: it stays where the author put it.
   const roots = Object.keys(positions).filter((id) => !nodes[id].parentId || !nodes[nodes[id].parentId!])
-  if (!first.pinned) {
+  if (!first.pinned.length) {
     const minX = Math.min(...roots.map((id) => positions[id].x)), minY = Math.min(...roots.map((id) => positions[id].y))
     for (const id of roots) positions[id] = { ...positions[id], x: positions[id].x - minX, y: positions[id].y - minY }
   }
   const projected = projectPositions(nodes, positions)
-  const afterLayout = new Layout(projected, options.metamodel, [], options.frames)
+  const afterLayout = new Layout(projected, options.metamodel, first.pinned, options.frames)
   afterLayout.edgeStyle = style
   const after = totalCost(afterLayout, lines)
   const score = computeCompositeScore(projected, relations, style)
@@ -171,8 +171,8 @@ interface Tidied {
   work: number
   budgetOut: boolean
   positions: PositionMap
-  /** Something stayed where the author put it: the layout is not moved to the top left. */
-  pinned: boolean
+  /** What stayed where the author put it (and, round a selection, everything out of its reach): the layout is not moved to the top left, and these frames are judged as drawn. */
+  pinned: readonly string[]
 }
 
 /** One run of Tidy, as a person makes it: the moves from the canvas as it
@@ -640,7 +640,23 @@ function tidyOnce(
   // where the canvas measures them off, so what is handed over stands
   // where the next run will find it.
   lineUp()
-  return { nodes, relations, baseline, lines, steps, before, work, budgetOut: outOfTime(), positions: l.positions(), pinned: pinned.length > 0 }
+  // A frame holding a pin, or round a selection, was fitted so that the
+  // moves in it were judged as drawn; where nothing in it moved, it stays
+  // as it was, and is not among the frames fitted.
+  if (options.around?.length || pinned.length) {
+    const back = new Set(l.keepUnmoved((id) => !!options.around?.length || l.fixed(id)))
+    const fit = steps[0]?.kind === 'fit' ? steps[0] : null
+    if (fit && back.size) {
+      const kept = l.refitted.filter((id) => !back.has(id))
+      if (!kept.length) steps.shift()
+      else {
+        const moved: PositionMap = {}
+        for (const id of kept) for (const x of [id, ...l.childrenOf(id)]) moved[x] = fit.moved[x]
+        steps[0] = { ...fit, moved, description: kept.length === 1 ? `${nodes[kept[0]].label ?? kept[0]} fitted round what the view shows` : `${kept.length} frames fitted round what the view shows` }
+      }
+    }
+  }
+  return { nodes, relations, baseline, lines, steps, before, work, budgetOut: outOfTime(), positions: l.positions(), pinned }
 }
 
 /** What a run did, as Studio's notice and the MCP server's smart_layout tell it: the

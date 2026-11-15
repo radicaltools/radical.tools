@@ -23,7 +23,7 @@ import { bindSuggestions, concernStatuses, holdsConcerns, suggestedCover, unboun
 import { fitShown, growFrameLeftUp, growWithRoom, makeRoomAround, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
 import { TIDY_BUDGET, runTidyLayout, tidySummary, type TidyReport } from '@radical/layout/tidy'
-import { computeViewNodeSet, viewFrames, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, resizeParentsBottomUp } from '@radical/layout/viewInput'
+import { computeViewNodeSet, viewFrames, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, keptFrames, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel, originOf, ownModel } from '@radical/common/model'
@@ -1010,7 +1010,8 @@ export class FolderModel {
       return { ok: true, text: ensemble ? `Smart Layout${where}: the current layout already scores best; nothing changed.` : `Smart Layout${where}: nothing left to tidy.` }
     }
     applyLayoutPositions(nodes, result.winner.positions, input)
-    resizeParentsBottomUp(nodes, input)
+    // Round a selection, a frame Tidy kept as it was (pinned, or out of its reach) keeps its size too.
+    resizeParentsBottomUp(nodes, input, !ensemble && options.around?.length ? keptFrames(input.nodes, result.winner.positions, input.frames) : undefined)
     // The whole view was arranged: pins (elements a Studio user dropped
     // after a drag) go with the old places. Round a selection the pinned
     // elements stayed where they are, so their pins stay.

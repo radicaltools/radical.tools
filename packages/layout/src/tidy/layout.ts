@@ -55,6 +55,8 @@ export class Layout {
    *  part of what a frame holds opens on All elements' places: the frame as
    *  wide as all it holds there, the part shown wherever it stood in it. */
   readonly refitted: string[] = []
+  /** The boxes as the canvas drew them, before the frames were fitted. */
+  private drawn: Map<string, Box>
 
   constructor(readonly nodes: Record<string, C4Node>, readonly metamodel?: Metamodel | null, pinned: Iterable<string> = [], frames: Iterable<string> = []) {
     for (const id of frames) this.tight.add(id)
@@ -92,12 +94,43 @@ export class Layout {
       for (const d of this.descendants(id)) this.fixedIds.add(d)
       for (const a of this.ancestorSets.get(id)!) this.holdsFixed.add(a)
     }
-    const drawn = new Map(this.boxes)
+    const drawn = this.drawn = new Map(this.boxes)
+    // A pinned frame, one inside it and one a Tidy round a selection leaves
+    // out stay as drawn, their size too. One holding a pin is fitted, so
+    // that the moves in it are judged as they will be drawn; where nothing
+    // in it moves, it is given back as drawn (keepUnmoved).
     this.fitAll()
     for (const [id, b] of this.boxes) {
       const was = drawn.get(id)!
       if (!this.tight.has(id) && (Math.abs(b.x - was.x) > 1 || Math.abs(b.y - was.y) > 1 || Math.abs(b.w - was.w) > 1 || Math.abs(b.h - was.h) > 1)) this.refitted.push(id)
     }
+  }
+
+  /** The frames `which` names given back as drawn where nothing they hold
+   *  moved (a frame holding a pin, a frame round a selection: fitted only
+   *  round a child that moved), and the frames round them fitted again. One
+   *  that would now lie on a sibling stays fitted. Returns the frames given back. */
+  keepUnmoved(which: (id: string) => boolean): string[] {
+    const back: string[] = []
+    const movedIn = new Set<string>()
+    for (const id of this.allIds) {
+      if (this.children.has(id)) continue
+      const b = this.boxes.get(id)!, was = this.drawn.get(id)!
+      if (Math.abs(b.x - was.x) > 0.01 || Math.abs(b.y - was.y) > 0.01) for (const a of this.ancestorSets.get(id)!) movedIn.add(a)
+    }
+    const depth = (id: string): number => this.ancestorSets.get(id)!.size
+    for (const id of [...this.children.keys()].sort((a, b) => depth(a) - depth(b))) {
+      if (movedIn.has(id) || this.fixedIds.has(id) || !which(id)) continue
+      const p = this.parentOf(id)
+      if (p && !movedIn.has(p) && !this.fixedIds.has(p) && which(p)) continue
+      const frames = [id, ...this.descendants(id)].filter((x) => this.children.has(x))
+      const fitted = this.snapshot(frames)
+      for (const f of frames) this.set(f, { ...this.drawn.get(f)! })
+      if (this.overlaps(id)) { this.restore(fitted); continue }
+      back.push(...frames)
+      for (let a = p; a; a = this.parentOf(a)) this.fit(a)
+    }
+    return back
   }
 
   /** Whether no move may take the element: it is pinned, held by one, or holds one. */
@@ -219,11 +252,11 @@ export class Layout {
     if (was.x === x0 && was.y === y0 && was.w === w && was.h === h) return
     this.set(id, { x: x0, y: y0, w, h, cx: x0 + w / 2, cy: y0 + h / 2 })
   }
-  /** Every frame fitted round its children again (after positions were set from outside). */
+  /** Every frame fitted round its children again (after positions were set from outside); a pinned one, or one inside it, stays as drawn. */
   refit(): void { this.fitAll() }
   private fitAll(): void {
     const depth = (id: string): number => { let d = 0; for (let p = this.parentOf(id); p; p = this.parentOf(p)) d++; return d }
-    for (const id of [...this.children.keys()].sort((a, b) => depth(b) - depth(a))) this.fit(id)
+    for (const id of [...this.children.keys()].sort((a, b) => depth(b) - depth(a))) if (!this.fixedIds.has(id)) this.fit(id)
   }
 
   /** Whether `id` lies clear of its siblings (by its container's gap) and inside its container. */
