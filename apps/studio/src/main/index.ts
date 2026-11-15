@@ -1,5 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { join, resolve } from 'path'
+import { basename, join, resolve } from 'path'
 import { watchFile, unwatchFile } from 'fs'
 import { readFile as readFileAsync, writeFile as writeFileAsync, mkdir } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -12,6 +12,7 @@ import { AGENT_ACTIVITY_FILE } from '@radical/common/formats/agentActivity'
 import { MODEL_BASE_FILE } from '@radical/common/formats/modelBase'
 import { DiskDiscussions } from '@radical/node-files/discussions'
 import { repositoryModel } from '@radical/node-files/repositoryLayout'
+import { noModelIn } from '@radical/common/modelFolders'
 import { DiscussionConflict, type DiscussionAction } from '@radical/common/discussions'
 
 const discussionFolders = new Map<string, DiskDiscussions>()
@@ -190,8 +191,10 @@ app.whenReady().then(() => {
       properties: ['openDirectory'],
     })
     if (result.canceled || result.filePaths.length === 0) return { success: false }
-    // A repository picked (its .radical/ hidden in the dialog) opens its model.
+    // A repository picked (its .radical/ hidden in the dialog) opens its
+    // model; a folder of other files with none is refused, not started.
     const folderPath = await repositoryModel(result.filePaths[0])
+    if (!folderPath) return { success: false, error: noModelIn(basename(result.filePaths[0])) }
     try {
       const files = await folderSession(folderPath).readAll()
       return { success: true, folderPath, files }

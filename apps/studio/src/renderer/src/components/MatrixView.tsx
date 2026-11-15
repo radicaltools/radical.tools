@@ -12,7 +12,7 @@ import { NODE_COLORS, TYPE_LABELS } from '@radical/common/c4'
 import { isRelationAllowed, relationTypeName, relationTypesFitting } from '@radical/common/metamodel'
 import { relationTypesAccepted } from '@radical/common/relationRules'
 import { viewShowsEveryNode } from '@radical/common/c4'
-import { chainDrawn, chainRelationFor } from '@radical/common/viewPipeline'
+import { chainDrawn, chainRelationFor, viewShownNodes } from '@radical/common/viewPipeline'
 import { viewExpandedSet } from '@radical/layout/viewInput'
 import { editingControl } from '@radical/ui/components/editingControl'
 
@@ -123,9 +123,11 @@ export function MatrixView(): React.ReactElement {
 
   const viewFilter = useMemo<Set<string> | undefined>(() => {
     if (chain) return chain.nodeIds
+    // Another model's matrix of every element: its models' elements only.
+    if (activeView?.originScope) return viewShownNodes(activeView, nodes, relations)
     if (!activeView || viewShowsEveryNode(activeView)) return undefined
     return new Set(activeView.nodeIds)
-  }, [activeView, chain])
+  }, [activeView, chain, nodes, relations])
 
   const viewCollapsedSet = useMemo<Set<string>>(() => {
     const vcs = computeViewCollapsedSet(viewFilter, nodes)

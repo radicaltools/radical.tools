@@ -388,6 +388,36 @@ test('Open → Folder… on the welcome screen opens a model folder', async ({ p
   await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toBeVisible()
 })
 
+test('Open → Folder… on a repository opens its model in architecture/, and refuses a folder that holds no model', async ({ page, studio }) => {
+  // F-0120: an empty model opened, and Studio wrote .state/, radical.md and
+  // nodes/ into the repository's root beside its code.
+  await folder.write('package.json', '{"name":"shop"}')
+  await folder.write('src/index.ts', 'export {}\n')
+  await page.goto('/')
+  const open = page.getByRole('button', { name: 'Open', exact: true })
+  const pick = page.getByRole('button', { name: 'Folder…' })
+  await open.click()
+  const said = page.waitForEvent('dialog').then(async (d) => { const text = d.message(); await d.accept(); return text })
+  await pick.click()
+  expect(await said).toContain('"model" holds no model')
+  await page.waitForTimeout(1000)
+  expect(await folder.paths()).toEqual(['package.json', 'src/index.ts'])
+
+  // Its model in architecture/, the old layout the CLI still reads: that one opens, and is written there.
+  const files = serializeToMdFolder(JSON.parse(fixture('bookstore')), 'Bookstore')
+  for (const [path, content] of Object.entries(files)) await folder.write(`architecture/${path}`, content)
+  if (!(await pick.isVisible())) await open.click()
+  await pick.click()
+  await expect(page.locator('.welcome-overlay')).toBeHidden()
+  await studio.ready()
+  await expect(studio.node('customer')).toBeVisible()
+  await studio.designer()
+  await studio.node('customer').dblclick()
+  await rename(page, 'Customer', 'Reader')
+  await expect.poll(async () => Object.entries(await folder.files()).some(([path, text]) => path.startsWith('architecture/nodes/') && text.includes('label: "Reader"')), { timeout: 10_000 }).toBe(true)
+  expect((await folder.paths()).filter((path) => !path.startsWith('architecture/'))).toEqual(['package.json', 'src/index.ts'])
+})
+
 test('New model on the welcome screen can keep the model in a folder', async ({ page, studio }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'New model' }).click()

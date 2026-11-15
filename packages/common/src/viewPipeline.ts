@@ -448,11 +448,17 @@ function nodeList(nodes: Record<string, C4Node>): C4Node[] {
 
 const nodeLists = new WeakMap<object, C4Node[]>()
 
+/** The elements a view's chain starts from: every element, or those it
+ *  lists; for another model's view (a federation), of its models only, as
+ *  viewShownNodes counts them. Its table, wiki, Warnier view and matrix
+ *  listed this model's elements too (F-0119). */
 export function pipelineSource(view: DiagramView | undefined, ctx: PipelineContext): C4Node[] {
   const all = nodeList(ctx.nodes)
-  if (!view || viewShowsEveryNode(view)) return all
+  const scope = view?.originScope
+  const ofScope = scope ? all.filter((n) => inOriginScope(scope, n)) : all
+  if (!view || viewShowsEveryNode(view)) return ofScope
   const ids = new Set(view.nodeIds)
-  return all.filter((n) => ids.has(n.id))
+  return ofScope.filter((n) => ids.has(n.id))
 }
 
 /** `pipeline` run from `source`. */
@@ -658,11 +664,16 @@ export function viewShownNodes(view: DiagramView | undefined, nodes: Record<stri
 
 /** The elements and relations of the models named (by their origin). */
 function scopedTo(scope: string[], nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): [Record<string, C4Node>, Record<string, C4Relation>] {
-  const inScope = (item: { origin?: string }) => !!item.origin && scope.includes(item.origin.slice(0, item.origin.lastIndexOf('@')))
+  const inScope = (item: { origin?: string }) => inOriginScope(scope, item)
   return [
     Object.fromEntries(Object.entries(nodes).filter(([, n]) => inScope(n))),
     Object.fromEntries(Object.entries(relations).filter(([, r]) => inScope(r))),
   ]
+}
+
+/** An element or relation of one of the models named (by its origin). */
+function inOriginScope(scope: string[], item: { origin?: string }): boolean {
+  return !!item.origin && scope.includes(item.origin.slice(0, item.origin.lastIndexOf('@')))
 }
 
 /** What viewShownNodes answered for a view's node list, and from what. */

@@ -891,6 +891,11 @@ let _typing: { key: string; step: HistoryItem | null } | null = null
  *  was typed before and after the question were two steps. */
 let _typingAtQuestion: { key: string; step: HistoryItem | null } | null = null
 
+/** A text field has the focus now (beginTyping, until endTyping). */
+export function typingInField(): boolean {
+  return _typing !== null
+}
+
 /** The undo step of an edit of `key` ("node:<id>:label"), unless it goes on
  *  what is being typed into a focused field (_typing). A step made before an
  *  outside change (StepChange) that the typing goes on gets the edit

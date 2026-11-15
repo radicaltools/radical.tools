@@ -148,10 +148,32 @@ describe('a repository laid out with .radical/', () => {
     radical.children.set('radical.json', new FakeFile('{ "implements": [] }'))
     expect(await openedFolder(radical)).toEqual({ model, radical })
     expect((await readCheckFilesFromHandle(model, radical)).repository).toBe('{ "implements": [] }')
-    // A folder of another name with a model/ in it is no .radical/.
+    // A folder of another name with a model/ in it is no .radical/, and holds no model.
     const other = new FakeDir('notes')
     other.children.set('model', model)
-    expect(await openedFolder(other)).toEqual({ model: other, radical: null })
+    await expect(openedFolder(other)).rejects.toThrow('"notes" holds no model')
+  })
+
+  it('opens the model of a repository in architecture/, the old layout, and refuses a folder that holds no model (F-0120)', async () => {
+    const repo = new FakeDir('payments')
+    repo.children.set('package.json', new FakeFile('{}'))
+    await repo.getDirectoryHandle('src', { create: true })
+    const model = await repo.getDirectoryHandle('architecture', { create: true }) as FakeDir
+    await session(model).write({ 'radical.md': 'x' })
+    expect(await openedFolder(repo)).toEqual({ model, radical: null })
+    // With its .radical/ (radical.json), that too.
+    const radical = await repo.getDirectoryHandle('.radical', { create: true }) as FakeDir
+    expect(await openedFolder(repo)).toEqual({ model, radical })
+
+    // Without a model, the repository is not taken for an empty one: refused, nothing written.
+    repo.children.delete('architecture')
+    repo.children.delete('.radical')
+    await expect(openedFolder(repo)).rejects.toThrow('"payments" holds no model')
+    expect([...repo.children.keys()].sort()).toEqual(['package.json', 'src'])
+    // A folder with nothing but hidden entries starts a new model, as the MCP server does.
+    const fresh = new FakeDir('fresh')
+    await fresh.getDirectoryHandle('.git', { create: true })
+    expect(await openedFolder(fresh)).toEqual({ model: fresh, radical: null })
   })
 
   it('reads the repository\'s mapping through the repository picked', async () => {
