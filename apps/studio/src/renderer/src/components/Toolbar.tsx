@@ -25,7 +25,7 @@ import { useOutsideClick } from '@radical/ui/hooks/useOutsideClick'
 import { useExport } from '../hooks/useExport'
 import { keysTakenByDialog } from './dialogKeys'
 import { FORGE_NEEDS_AI, aiReady, loadAISettings } from '../ai/settings'
-import { saveThemePref, useThemePref, type Theme, type ThemePref } from '../theme'
+import { saveThemePref, useDrawnTheme, useThemePref, type ThemePref } from '../theme'
 import { openSetup } from './SetupWizard'
 import { useMenuKeys } from '@radical/ui/hooks/menuKeys'
 import {
@@ -758,25 +758,9 @@ export function Toolbar(): React.ReactElement {
   const isVSCode = host().kind === 'vscode'
 
   // The theme chosen in this browser (Light, Dark or System), unless VS Code
-  // sets it.
-  const { pref: themePref, theme: chosenTheme } = useThemePref()
-  const [vscodeTheme, setVSCodeTheme] = useState<Theme>(() =>
-    document.body.classList.contains('vscode-light') ? 'light' : 'dark')
-  const theme = isVSCode ? vscodeTheme : chosenTheme
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-  }, [theme])
-
-  // In VS Code: follow the editor theme automatically
-  useEffect(() => {
-    if (!isVSCode) return
-    const obs = new MutationObserver(() => {
-      setVSCodeTheme(document.body.classList.contains('vscode-light') ? 'light' : 'dark')
-    })
-    obs.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-vscode-theme-kind'] })
-    return () => obs.disconnect()
-  }, [isVSCode])
+  // sets it. App draws it (useApplyTheme).
+  const { pref: themePref } = useThemePref()
+  const theme = useDrawnTheme()
 
   const toggleTheme = useCallback(() => {
     saveThemePref(theme === 'dark' ? 'light' : 'dark')

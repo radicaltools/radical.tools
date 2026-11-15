@@ -25,6 +25,7 @@ import { useRegisterCommands } from './commands'
 import { WelcomeScreen } from './components/WelcomeScreen'
 import { SetupWizard, OPEN_SETUP_EVENT } from './components/SetupWizard'
 import { firstStart } from './firstStart'
+import { useApplyTheme } from './theme'
 import { MilestoneEditOverlay } from './components/MilestoneEditOverlay'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useRouteSync, useShownMode, parseHash } from './route'
@@ -36,6 +37,7 @@ import { useNodeDiscussions } from './discussions/useNodeDiscussions'
 const LS_LEFT = 'radical-leftpanel-collapsed'
 
 function AppInner(): React.ReactElement {
+  useApplyTheme()
   const activeDocument = useDocumentsStore((s) => s.docs.find((d) => d.id === s.activeId))
   const h = host()
   const discussionDocumentId = activeDocument?.source === 'md' && (
