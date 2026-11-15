@@ -1,7 +1,7 @@
 import { test, expect } from '../../support/fixtures'
 
 // Navigation is the history of routes: the route names the place on screen
-// (perspective, view, Inspector tab, selected element…), every change of
+// (perspective, view, the Inspector's tab, selected element…), every change of
 // place adds an entry, and ‹ ›, Alt+← / Alt+→ and the History list walk it.
 
 test('back and forward walk through the places, the selection too', async ({ page, studio }) => {

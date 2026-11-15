@@ -1079,6 +1079,7 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
   overflow: clip;
   transition: opacity 0.18s ease;
 }
+.left-panel .panel-content[hidden] { display: none; }
 .left-panel.collapsed .panel-content {
   opacity: 0;
   pointer-events: none;

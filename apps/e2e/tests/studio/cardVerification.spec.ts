@@ -7,7 +7,8 @@ import type { C4Node, DiagramData } from '@radical/common/c4'
 
 // The properties card is one in every perspective, and says what the check
 // says of the element: its Verification (status, the conditions that are
-// no test with what was measured, what checks it, the findings, Path).
+// no test with what was measured, what checks it, the findings, Path). A
+// link in the Inspector opens that card on the element's view.
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
   ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
@@ -54,7 +55,8 @@ test('the card says in every perspective what the check says of the element, and
   await folder.write('.state/measurements.json', serializeMeasurementStore([
     { metric: 'checkout.latency.p95', value: 420, unit: 'ms', labels: {}, source: 'k6', at: new Date(Date.now() - 2 * 3600_000).toISOString() },
   ]))
-  await expect(page.getByRole('button', { name: /^Inspector/ })).toBeEnabled({ timeout: 10_000 })
+  const inspector = page.locator('.activity-rail').getByRole('button', { name: 'Inspector', exact: true })
+  await expect(inspector).toBeEnabled({ timeout: 10_000 })
 
   // In Viewer, where the model opens.
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
@@ -83,19 +85,21 @@ test('the card says in every perspective what the check says of the element, and
   await expect(checks).toContainText('failed')
   await expect(checks.locator('.pp-ver-measured')).toHaveText('420 ms · k6 · 2 h ago')
 
-  // The Inspector opens the same card, read-only, with its own actions.
-  await page.getByRole('button', { name: /^Inspector/ }).click()
-  await page.getByRole('tab', { name: /^Implementation/ }).click()
+  // A link in the Inspector opens the same card, on the element's view, in
+  // the perspective open: read-only in Viewer.
+  await inspector.click()
+  await page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab', { name: /^Implementation/ }).click()
   await page.locator('.insp-error').first().getByRole('button', { name: /Take card payments/ }).click()
-  const card = page.getByRole('complementary', { name: 'Properties' })
+  await expect(page.getByRole('region', { name: 'Inspector' })).toHaveCount(0)
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
+  await expect(studio.node('req')).toHaveClass(/selected/)
+  const card = studio.properties
   await expect(card.locator('.pp-title')).toHaveText('Take card payments')
   await expect(card.getByRole('textbox', { name: 'Name' })).toHaveCount(0)
-  await expect(card.getByRole('button', { name: /^Show on canvas/ })).toBeVisible()
-  await expect(card.getByRole('button', { name: /^Open wiki page/ })).toBeVisible()
   await expect(page.getByRole('complementary')).toHaveCount(1)
   await expect(card.getByRole('region', { name: 'Verification' }).locator('.pp-ver-status')).toHaveText('✗ broken')
-  // Its links move the card, not the selection of a canvas.
+  // Its links move the card, as in every perspective.
   await card.getByRole('group', { name: 'Checked by' }).getByRole('button', { name: /Paying by card/ }).click()
   await expect(card.locator('.pp-title')).toHaveText('Paying by card')
-  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Inspector/)
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
 })

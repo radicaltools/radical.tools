@@ -368,6 +368,20 @@ runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main. ~~Fixed on fix/round-211-220 (2026-11-15), where it failed in
 both full runs: the poll now asks again when a box is missing instead of failing.~~
 
+### Dogfooding (2026-11-15): the Inspector as a place of the rail
+
+Thirteen rounds of the product owner's corrections on a test server, each written into the model through the
+worktree's own MCP server, before the code.
+
+- **No ready client of the worktree's MCP server.** Model edits for a worktree branch need its own server, so an ad hoc
+  stdio client (a JSON list of tool calls run once) was written again; `radical mcp call <tool> --args <json>` or a
+  `--folder` switch on the session's server would spare it.
+- **A requirement rewritten twelve times by hand.** Each correction meant reading the action back, replacing a phrase
+  in a script and writing it again; an `update_node` that patches one phrase of a long field (find and replace,
+  refused when the phrase is not there) would keep such edits small and safe.
+- **The person's words grow in one need.** Every round appended to the need's description; a need holding a
+  conversation would read better as a list of dated entries the review tools quote by entry.
+
 ### Dogfooding (2026-11-15): exploratory round 211–220 and its fix round
 
 Ten runs on 46cb17bb (after #369) found 35 findings (F-0144…F-0178), about 27 of them the same pattern as a #369 fix

@@ -763,8 +763,8 @@ function slideMilestonesOf(presentations: Presentation[] | undefined): Record<st
 }
 
 /** Whether the model may be edited now: in Designer (and the metamodel
- *  editor, which edits Designer's model), not in Viewer, Presenter or the
- *  Inspector, nor while a presentation plays. Their canvases are put back on
+ *  editor, which edits Designer's model), not in Viewer or Presenter, nor
+ *  while a presentation plays. Their canvases are put back on
  *  the way out: a relation made or an element nested there was shown, with
  *  its notices, and then lost unsaid. */
 export function editsModel(state: Pick<DiagramStore, 'appMode' | 'presentationActive'>): boolean {
@@ -790,7 +790,7 @@ export function editsShownView(state: Pick<DiagramStore, 'appMode' | 'presentati
 function _pushUndo(state: DiagramStore): void {
   // Undo belongs to Designer. What is collapsed or laid out in Viewer or
   // Presenter is put back on the way out and is no step of Designer's.
-  if (state.appMode === 'viewer' || state.appMode === 'presenter' || state.appMode === 'inspector') return
+  if (state.appMode === 'viewer' || state.appMode === 'presenter') return
   // A step that lands while a drag is held (Smart Layout's result) starts
   // from where the drag began: the model halfway through a drag is none to
   // go back to (Undo gave a mid-drag state never seen). The drag's own step
@@ -1008,35 +1008,6 @@ function parkDesigner(state: DiagramStore): ParkedDesigner {
     hubTemplates: state.hubTemplates,
     milestoneHubBase: _milestoneHubBase,
   }
-}
-
-/** What the Inspector set aside to show the live model: the milestone shown
- *  where it was opened from, put back on the way to Viewer or Presenter
- *  (Designer gets its parked model back). */
-let _inspectorAside: ParkedDesigner | null = null
-
-/** The Inspector is about the live model: its lists read it, and so do the
- *  card it opens and the edits it offers. A milestone shown is set aside
- *  while it is open; its card showed the milestone's element, or nothing. */
-function _liveInInspector(): void {
-  const s = useDiagramStore.getState()
-  const backup = s.liveBackup
-  if (!s.activeSnapshotId || !backup) return
-  _inspectorAside = parkDesigner(s)
-  useDiagramStore.setState((state) => {
-    state.c4Nodes = backup.nodes as any
-    state.c4Relations = backup.relations as any
-    if (backup.sequences) state.sequences = backup.sequences as any
-    if (backup.hubTemplates) state.hubTemplates = backup.hubTemplates as any
-    unparkLiveViews(state as DiagramStore, backup)
-    state.activeSnapshotId = null
-    state.liveBackup = null
-    state.milestoneDirty = false
-    state.diffHighlight = {} as any
-    state.diffBaseSnapshotId = null
-    state.diffGhostNodes = {} as any
-    state.diffGhostRelations = {} as any
-  })
 }
 
 /** The live model of a parked Designer: its nodes, unless it was showing a
@@ -3555,10 +3526,10 @@ interface DiagramStore {
 
   // ── app mode ──
   /** The perspective: Designer edits; Viewer and Presenter explore and
-   *  present; the metamodel editor and the Inspector (what `radical check`
-   *  says about the model) show no canvas. */
-  appMode: 'designer' | 'viewer' | 'presenter' | 'metamodel' | 'inspector'
-  setAppMode: (mode: 'designer' | 'viewer' | 'presenter' | 'metamodel' | 'inspector') => void
+   *  present; the metamodel editor shows no canvas. The Inspector is a
+   *  panel under the view in Studio, no perspective. */
+  appMode: 'designer' | 'viewer' | 'presenter' | 'metamodel'
+  setAppMode: (mode: 'designer' | 'viewer' | 'presenter' | 'metamodel') => void
 
   // ── metamodel (per document) ──
   metamodel: Metamodel
@@ -8780,7 +8751,7 @@ export const useDiagramStore = create<DiagramStore>()(
         const W = window as any
         // An exploration stays open between Designer, Viewer and the
         // metamodel editor (Designer explores the live model, Viewer the one
-        // it shows); Presenter and the Inspector close it, back on the canvas
+        // it shows); Presenter closes it, back on the canvas
         // it was opened from. Its places go with it.
         const keepsExploration = (m: DiagramStore['appMode']): boolean => m === 'designer' || m === 'viewer' || m === 'metamodel'
         if (get().exploration && !keepsExploration(mode)) get().closeExploration()
@@ -8811,13 +8782,11 @@ export const useDiagramStore = create<DiagramStore>()(
           // Edits of a milestone not yet kept or dropped stay Designer's
           // question: Viewer and Presenter browse without being asked.
           set((state) => { state.milestoneDirty = false; state.milestonePromptOpen = false })
-        } else if (!editing(prevMode) && (editing(mode) || prevMode === 'presenter' || (prevMode === 'inspector' && _inspectorAside)) && W.__preModeLayout) {
+        } else if (!editing(prevMode) && (editing(mode) || prevMode === 'presenter') && W.__preModeLayout) {
           // Back to Designer: its parked model. From Presenter to Viewer as
           // well, kept parked: what the last slide showed (its places, its
-          // folds, its model) stayed in Viewer until a view switch. From the
-          // Inspector to Viewer or Presenter, the milestone it set aside.
-          const pre = (!editing(mode) && _inspectorAside) || W.__preModeLayout as ParkedDesigner
-          _inspectorAside = null
+          // folds, its model) stayed in Viewer until a view switch.
+          const pre = W.__preModeLayout as ParkedDesigner
           set((state) => {
             state.c4Nodes = pre.c4Nodes as any
             state.c4Relations = pre.c4Relations as any
@@ -8873,12 +8842,11 @@ export const useDiagramStore = create<DiagramStore>()(
         // snapshot above (restored on return) and by the auto-persist
         // subscriber gating writes on appMode === 'designer'. We stop it
         // only in metamodel mode where the canvas isn't shown.
-        if (mode === 'metamodel' || mode === 'inspector') {
+        if (mode === 'metamodel') {
           get().stopLiveLayout()
         } else {
           get().startLiveLayout()
         }
-        if (mode === 'inspector') _liveInInspector()
         set((state) => { state.appMode = mode as any; state.slideTreemapFocus = null; state.slideWikiPage = null })
         // Rebuild rfNodes so per-node draggable/selectable flags reflect
         // the new mode (designer = editable, viewer/presenter = locked).
@@ -9257,7 +9225,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // Resume live layout when returning to any non-metamodel mode
         // (designer or viewer). Reset the cola cache so it picks up the
         // restored c4Nodes positions instead of the slide-shown ones.
-        if (get().appMode !== 'metamodel' && get().appMode !== 'inspector') {
+        if (get().appMode !== 'metamodel') {
           _liveLayout?.reset()
           get().startLiveLayout()
         }
@@ -9566,7 +9534,7 @@ export const useDiagramStore = create<DiagramStore>()(
           get().pushNotification(`The milestone "${name}" was deleted outside Studio: the edits made in it and not saved are gone.`, 'warning')
         }
         // The metamodel editor edits Designer's model in the store; Viewer,
-        // Presenter and the Inspector park it (ParkedDesigner). The history
+        // Presenter park it (ParkedDesigner). The history
         // was forgotten when the agent wrote while one of them was open.
         const designerShown = st.appMode === 'designer' || st.appMode === 'metamodel'
         const parked = typeof window !== 'undefined' && !designerShown ? (window as any).__preModeLayout as ParkedDesigner | undefined : undefined

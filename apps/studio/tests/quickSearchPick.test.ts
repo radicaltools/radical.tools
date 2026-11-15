@@ -6,7 +6,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import type { C4Node, DiagramData } from '@radical/common/c4'
-import { canvasViewFor, canvasViewsFor, pickViewFor, showOnPage, viewNodeSets } from '../src/renderer/src/navigation'
+import { pickViewFor, showOnPage, viewNodeSets } from '../src/renderer/src/navigation'
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
   ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
@@ -101,7 +101,7 @@ describe('a pick on a wiki or hierarchy view', () => {
 
 // F-0021: a group of views per element is never a canvas of its own. Quick
 // Search opened one as a canvas (and saved positions into it), and the view
-// a pick or Show on canvas chose could be one.
+// a pick or the Inspector's Show on canvas chose could be one.
 describe('a group of views per element', () => {
   beforeEach(() => {
     s().loadDiagram({
@@ -129,13 +129,11 @@ describe('a group of views per element', () => {
     expect(s().views.g.positions).toEqual({})
   })
 
-  it('is never the view a pick, Show on canvas or the choice of views opens', () => {
+  it('is never the view a pick or the Inspector\'s link opens', () => {
     const sets = viewNodeSets(s().views, s().c4Nodes, s().c4Relations, s().metamodel)
     expect(sets.g).toBeUndefined()
     // Even with the group shown (a link of before), the element's own view.
     useDiagramStore.setState({ activeViewId: 'g' } as never)
     expect(pickViewFor('api', 'g', s().views, sets)).toBe(member('shop'))
-    expect(canvasViewFor('api')).toBe(member('shop'))
-    expect(canvasViewsFor('api').map((v) => v.id)).not.toContain('g')
   })
 })

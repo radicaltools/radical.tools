@@ -682,8 +682,8 @@ test('the activity rail keeps the app\'s menus in the metamodel editor, without 
   }
 })
 
-// With no sections above it (the metamodel editor, the Inspector), Settings
-// rose to the rail's top.
+// With no sections above it (the metamodel editor), Settings rose to the
+// rail's top.
 test('Settings stays at the activity rail\'s foot where the rail has no sections', async ({ page }) => {
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('menuitemcheckbox', { name: /Metamodel editor/ }).click()
@@ -712,20 +712,19 @@ test('the activity rail\'s menus open over the metamodel editor, which stays ope
   }
 })
 
-test('the toolbar groups the branch\'s changes with the model open, undo, and navigation around Quick Search', async ({ page }) => {
+test('the toolbar holds undo, and navigation around Quick Search; the model open and the branch\'s changes are elsewhere', async ({ page }) => {
   const box = async (l: import('@playwright/test').Locator) => (await l.boundingBox())!
   const edit = await box(page.getByRole('group', { name: 'Edit' }))
   const navigate = await box(page.getByRole('group', { name: 'Navigate' }))
   const history = await box(page.getByRole('button', { name: 'History' }))
   const search = await box(page.locator('.quick-search-bar'))
-  const model = await box(page.locator('.toolbar .app-brand-doc'))
-  const strip = await box(page.locator('.toolbar .app-brand-switch'))
-  const changes = await box(page.locator('.toolbar .branch-btn'))
-  // The branch's changes in the strip of the model open, after its name.
-  expect(changes.x).toBeGreaterThanOrEqual(model.x + model.width)
-  expect(changes.x + changes.width).toBeLessThanOrEqual(strip.x + strip.width)
-  // Undo and Redo after the model open, before the navigation.
-  expect(strip.x + strip.width).toBeLessThan(edit.x)
+  // The model open is named in the Models menu, the branch's changes are
+  // the Inspector's This branch, and the Inspector is on the rail.
+  await expect(page.locator('.toolbar .app-brand-doc')).toHaveCount(0)
+  await expect(page.locator('.toolbar').getByRole('button', { name: /Changes on branch|Inspector/ })).toHaveCount(0)
+  // Undo and Redo at the toolbar's left, before the navigation.
+  const toolbar = await box(page.locator('.toolbar'))
+  expect(edit.x - toolbar.x).toBeLessThan(24)
   expect(edit.x + edit.width).toBeLessThan(navigate.x)
   // ‹ › just before Quick Search, the clock just after it, as in VS Code.
   expect(navigate.x + navigate.width).toBeLessThanOrEqual(search.x)

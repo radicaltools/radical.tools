@@ -46,7 +46,7 @@ export function FindInView(): React.ReactElement | null {
     const onKey = (e: KeyboardEvent): void => {
       const s = useDiagramStore.getState()
       if (s.presentationActive || !(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== 'f') return
-      if (['metamodel', 'inspector'].includes(s.appMode)) return
+      if (s.appMode === 'metamodel') return
       if (keysTakenByDialog(e.target)) return
       e.preventDefault()
       openFindInView()

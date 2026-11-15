@@ -6,14 +6,14 @@
 // for) → metric or test.
 // The paths come from traceOf in @radical/common/check, the function
 // `radical check --trace` and the MCP tool get_trace print. A click on an
-// element makes the path that element's (Back returns); Details opens the
-// element's panel beside it. A test links to its file in VS Code when
+// element makes the path that element's (Back returns); Show shows it on
+// the view, with its properties card. A test links to its file in VS Code when
 // Studio knows the repository's folder.
 
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { parseTestIds, traceGap, traceOf, traceTypeLabel, formatAge, type Evidence, type TestCase, type TraceNode, type TraceResult } from '@radical/common/check'
 import type { C4Node, C4Relation } from '@radical/common/c4'
-import { MARK, PASSING, SHORT_TYPE, ShowOnCanvas, tone } from './shared'
+import { MARK, PASSING, SHORT_TYPE, tone } from './shared'
 
 type Item =
   | { kind: 'node'; key: string; col: number; row: number; parent?: string; node: TraceNode; folded: boolean; hidden: number }
@@ -256,11 +256,10 @@ export function TracePanel({ stack, nodes, relations, evidence, cases, ranAt, fo
                     )}
                   </div>
                   <button type="button" className="trace-label" onClick={() => n.target ? onDetails(n.id) : onTrace(n.id)}
-                    title={n.target ? 'Open its panel' : 'Make the path this element\'s'}>{n.label}</button>
+                    title={n.target ? 'Show it on the view, with its properties card' : 'Make the path this element\'s'}>{n.label}</button>
                   {n.repeated && <div className="trace-detail">Again: drawn higher on this path.</div>}
                   <div className="trace-acts">
-                    <button type="button" onClick={() => onDetails(n.id)}>Details</button>
-                    <ShowOnCanvas id={n.id} />
+                    <button type="button" onClick={() => onDetails(n.id)} title="Show it on the view, with its properties card">Show</button>
                   </div>
                 </div>
               )

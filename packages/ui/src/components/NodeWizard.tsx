@@ -135,7 +135,7 @@ function WizardDialog({ session, wizard, typeDef, type }: {
   }
   const done = (): void => {
     if (missing.length) return
-    // Opened in the Inspector (a fix of one step), it edits Designer's model.
+    // Opened from Viewer or Presenter (a fix of one step), it edits Designer's model.
     editAsDesigner(() => finish(values, links))
   }
   const next = (): void => (isLast ? done() : goTo(stepIndex + 1))

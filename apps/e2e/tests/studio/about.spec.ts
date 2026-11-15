@@ -30,7 +30,7 @@ test.describe('About Radical Studio', () => {
     await expect(about).toBeHidden()
   })
 
-  test('the folder at the top of the activity rail opens Models, the model open is named at the toolbar\'s left, and About is under Settings', async ({ page, studio }) => {
+  test('the folder at the top of the activity rail opens Models, which names the model open first, and About is under Settings', async ({ page, studio }) => {
     await studio.seed()
     await studio.open('v-context')
     // The rail runs from the window's top, as VS Code's activity bar, the
@@ -44,10 +44,13 @@ test.describe('About Radical Studio', () => {
     const folder = (await models.boundingBox())!
     expect(folder.y + folder.height).toBeLessThanOrEqual(toolbar.y + toolbar.height)
     expect(folder.y + folder.height).toBeLessThanOrEqual((await page.getByRole('tab', { name: 'Views' }).boundingBox())!.y)
-    // The model open, and where it is kept (the seeded model is in the browser).
-    await expect(page.locator('.toolbar .app-brand-doc')).toHaveText('E2ELOCAL')
-    await expect(page.locator('.toolbar .app-brand-doc')).toHaveAttribute('title', 'E2E: kept in this browser (local storage)')
+    // The model open, and where it is kept, at the top of the Models menu
+    // (the seeded model is in the browser); the toolbar names none.
+    await expect(page.locator('.toolbar .app-brand-doc')).toHaveCount(0)
     await models.click()
+    const open = page.getByRole('menu', { name: 'Models' }).locator('.app-menu-model')
+    await expect(open).toHaveText('E2ELOCAL')
+    await expect(open).toHaveAttribute('title', 'E2E: kept in this browser (local storage)')
     await expect(page.getByRole('menu', { name: 'Models' }).getByText('Manage models…')).toBeVisible()
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Settings', exact: true }).click()

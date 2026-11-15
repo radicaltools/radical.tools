@@ -289,8 +289,8 @@ describe('Undo after an outside change', () => {
   })
 
   // The history was forgotten when the agent wrote while Designer was left
-  // for the Inspector, the metamodel editor, Viewer or Presenter.
-  for (const mode of ['inspector', 'metamodel', 'viewer', 'presenter'] as const) {
+  // for the metamodel editor, Viewer or Presenter.
+  for (const mode of ['metamodel', 'viewer', 'presenter'] as const) {
     it(`outlives an outside change while the ${mode} is open`, () => {
       s().updateNode('a', { label: 'Shop' })
       s().setAppMode(mode)

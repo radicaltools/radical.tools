@@ -8,22 +8,23 @@
 //
 // URL grammar (segments are key/value pairs, each value URI-encoded):
 //
-//   #/m/<mode>/v/<viewId>[/t/<tab>][/tr/<traceId>][/f/<focusId>][/e/<elementId>][/s/<snapshotId>]
+//   #/m/<mode>/v/<viewId>[/i/<tab>][/tr/<traceId>][/f/<focusId>][/e/<elementId>][/s/<snapshotId>]
 //   #/d/<docId>/m/<mode>/v/<viewId>...[/p/<presId>/play/1/sl/<n>]
 //
-//   <mode>    designer | viewer | presenter | metamodel   (default: designer)
+//   <mode>    designer | viewer | presenter | metamodel   (default: designer;
+//             `inspector`, the perspective the Inspector was, opens Viewer
+//             with the Inspector on the tab `t` names)
 //
 // Without a route Studio starts in Viewer: most openings are to look at a
 // model, and Viewer cannot change it. A model the user has just created is
 // there to be edited, so it starts in Designer (openInDesigner).
 //   <viewId>  a view id, or `canvas` for the default Canvas (activeViewId null)
-//   <tab>     the Inspector's tab (inspector mode only): changes | model |
-//             implementation | settings
+//   <tab>     the Inspector's tab, while it is open in place of the view:
+//             overview | model | implementation | branch. A route without
+//             it shows the view: the Inspector is a place, as a view is.
 //   <traceId> the element whose verification path the Inspector shows
-//             (inspector mode only)
 //   <focusId> a Wiki element node id (only applied for wiki views)
-//   <elementId> the selected element; in the Inspector, the element whose
-//             card is open in Changes
+//   <elementId> the selected element
 //   <docId>   `ls:<id>` (a model in this app's list: browser storage or a
 //             browser folder), `fs:<absolutePath>` (a .radical file) or
 //             `md:<absolutePath>` (a Markdown folder); paths only where the
@@ -45,8 +46,9 @@ import { documents, useDocumentsStore } from './store/documentStore'
 import { loadingDocumentId, onDocumentLoaded } from './persistence/autosave'
 import { host } from './platform/host'
 import { inspectorTabOf, useInspectorNav, usePlaceHold, type InspectorTab } from './navigation'
+import { openCheckSettings } from './components/inspector/checkSettingsOpen'
 import { useBranchStore } from './persistence/branchChanges'
-import { useInspectorStore } from './persistence/inspector'
+import { inspectorMayShow, useInspectorStore } from './persistence/inspector'
 import { pushEntry, replaceEntry, moveTo, restoreNav, saveNav, stepIndex, useNavHistory, type NavEntry } from './navHistory'
 
 /** The view token of All elements, the table of the whole model. Links
@@ -54,8 +56,8 @@ import { pushEntry, replaceEntry, moveTo, restoreNav, saveNav, stepIndex, useNav
 export const ALL_ELEMENTS = 'all'
 const isAllElements = (view: string): boolean => view === ALL_ELEMENTS || view === 'canvas'
 
-type Mode = 'designer' | 'viewer' | 'presenter' | 'metamodel' | 'inspector'
-const MODES: readonly Mode[] = ['designer', 'viewer', 'presenter', 'metamodel', 'inspector'] as const
+type Mode = 'designer' | 'viewer' | 'presenter' | 'metamodel'
+const MODES: readonly Mode[] = ['designer', 'viewer', 'presenter', 'metamodel'] as const
 
 export interface Route {
   /** `ls:<id>`, `fs:<absolutePath>` or `md:<absolutePath>`; undefined = keep active document. */
@@ -63,13 +65,15 @@ export interface Route {
   mode: Mode
   /** view id, or `canvas` for the default Canvas. */
   view: string
-  /** The Inspector's tab (inspector mode only). */
-  tab?: InspectorTab
-  /** The element whose verification path the Inspector shows (inspector mode only). */
+  /** The Inspector's tab: it is open on it, in place of the view. Undefined: the view. */
+  panel?: InspectorTab
+  /** The element whose verification path the Inspector shows (with `panel` only). */
   trace?: string
+  /** A link to the Inspector's Settings tab of before: Inspector settings… opens. */
+  checkSettings?: boolean
   /** wiki element node id (only meaningful for wiki views). */
   focus?: string
-  /** The selected element; in the Inspector, the element whose card is open. */
+  /** The selected element. */
   el?: string
   /** active milestone (snapshot) id. */
   snap?: string
@@ -94,8 +98,8 @@ let pending: { route: Route; docId: string } | null = null
 /** The perspective Studio starts in without a route. */
 let startMode: Mode = 'viewer'
 
-/** The document whose Inspector a route opened (a link, Back, a reload),
- *  until it is known whether the Inspector has anything for it. */
+/** The document whose Inspector panel a route opened (a link, Back, a
+ *  reload), until it is known whether the Inspector has anything for it. */
 let inspectorByRoute: string | null = null
 
 /** For a model the user has just created: Designer, now and when the route
@@ -142,16 +146,21 @@ export function parseHash(hash: string): Route | null {
     }
   }
   if (map.m === undefined && map.v === undefined && map.d === undefined) return null
-  const mode = (MODES as readonly string[]).includes(map.m) ? (map.m as Mode) : 'designer'
+  // The Inspector was a perspective: its links open Viewer with the panel.
+  const legacy = map.m === 'inspector'
+  const mode = legacy ? 'viewer' : (MODES as readonly string[]).includes(map.m) ? (map.m as Mode) : 'designer'
+  const panel = legacy ? inspectorTabOf(map.t) ?? 'overview' : inspectorTabOf(map.i)
   const slide = map.sl !== undefined && /^\d+$/.test(map.sl) ? Number(map.sl) : undefined
   return {
     doc: map.d || undefined,
     mode,
     view: map.v && !isAllElements(map.v) ? map.v : ALL_ELEMENTS,
-    tab: mode === 'inspector' ? inspectorTabOf(map.t) : undefined,
-    trace: mode === 'inspector' ? map.tr || undefined : undefined,
+    ...(panel ? { panel } : {}),
+    ...(panel && map.tr ? { trace: map.tr } : {}),
+    ...(legacy && map.t === 'settings' ? { checkSettings: true } : {}),
     focus: map.f || undefined,
-    el: map.e || undefined,
+    // The Inspector's This branch named the element whose card was open.
+    el: legacy && map.t !== 'changes' && map.t !== 'branch' ? undefined : map.e || undefined,
     snap: map.s || undefined,
     pres: map.p || undefined,
     play: map.play === '1' || undefined,
@@ -164,8 +173,8 @@ export function formatRoute(r: Route): string {
   if (r.doc) segs.push('d', encodeURIComponent(r.doc))
   segs.push('m', encodeURIComponent(r.mode))
   segs.push('v', encodeURIComponent(r.view))
-  if (r.tab && r.mode === 'inspector') segs.push('t', encodeURIComponent(r.tab))
-  if (r.trace && r.mode === 'inspector') segs.push('tr', encodeURIComponent(r.trace))
+  if (r.panel) segs.push('i', encodeURIComponent(r.panel))
+  if (r.panel && r.trace) segs.push('tr', encodeURIComponent(r.trace))
   if (r.focus && !isAllElements(r.view)) segs.push('f', encodeURIComponent(r.focus))
   if (r.el) segs.push('e', encodeURIComponent(r.el))
   if (r.snap) segs.push('s', encodeURIComponent(r.snap))
@@ -198,18 +207,17 @@ export function currentRoute(): Route {
     if (v && v.kind === 'wiki' && page) focus = page
   }
   const playing = s.presentationActive
-  const inspector = s.appMode === 'inspector'
   const nav = useInspectorNav.getState()
-  const tab = inspector ? inspectorTabShown() : undefined
-  const el = inspector ? (tab === 'branch' ? nav.cardId ?? undefined : undefined) : s.selectedNodeId ?? undefined
+  // The panel is part of the place while it is on screen.
+  const panel = inspectorPanelShown() ? inspectorTabShown() : undefined
   return {
     doc: currentDocToken(),
     mode: s.appMode,
     view: s.activeViewId ?? ALL_ELEMENTS,
-    tab,
-    ...(inspector && nav.trace ? { trace: nav.trace } : {}),
+    ...(panel ? { panel } : {}),
+    ...(panel && nav.trace ? { trace: nav.trace } : {}),
     focus,
-    el,
+    el: s.selectedNodeId ?? undefined,
     snap: s.activeSnapshotId ?? undefined,
     pres: playing ? (s.activePresentationId ?? undefined) : undefined,
     play: playing || undefined,
@@ -220,6 +228,14 @@ export function currentRoute(): Route {
 /** The Inspector's tab on screen: the one picked, else its first, Overview. */
 export function inspectorTabShown(): InspectorTab {
   return useInspectorNav.getState().tab ?? 'overview'
+}
+
+/** Whether the Inspector panel is on screen: open, in a perspective that
+ *  shows it (not the metamodel editor, nor a presentation played), with
+ *  something to show (inspectorAvailable). */
+export function inspectorPanelShown(): boolean {
+  const s = useDiagramStore.getState()
+  return useInspectorNav.getState().open && s.appMode !== 'metamodel' && !s.presentationActive && inspectorMayShow()
 }
 
 // ─── Route → state ───────────────────────────────────────────────────────────
@@ -271,7 +287,7 @@ function applyViewModeFocus(route: Route): void {
     if ((MODES as readonly string[]).includes(route.mode) && store.appMode !== route.mode) {
       store.setAppMode(route.mode)
     }
-    inspectorByRoute = route.mode === 'inspector' ? documents.getActiveId() : null
+    inspectorByRoute = route.panel ? documents.getActiveId() : null
     // Resolve the target view. A view id that doesn't exist in the current
     // document (e.g. a link opened on a machine whose localStorage doesn't
     // hold that doc, so we fell back to the freshly-seeded sample) degrades
@@ -310,18 +326,21 @@ function applyViewModeFocus(route: Route): void {
         else s.discardMilestoneChanges()
       }
     }
-    // The Inspector's tab and card, or the selection: the route is the whole place.
-    if (route.mode === 'inspector') {
-      useInspectorNav.setState({ tab: route.tab ?? null, cardId: route.tab === 'branch' ? route.el ?? null : null, trace: route.trace ?? null })
-    } else {
-      const s = useDiagramStore.getState()
-      const el = route.el && s.c4Nodes[route.el] ? route.el : null
-      if (s.selectedNodeId !== el || (el === null && s.selectedNodeIds.length)) {
-        s.setSelectedNodeIds(el ? [el] : [])
-        s.selectNode(el)
-      }
+    // The Inspector panel's tab and path, when the route names it (one that
+    // does not leaves it open or closed as it is), and the selection.
+    // The Inspector is a place, as a view is: open on the tab the route
+    // names, or closed for the view (Back from it, or from a path a card
+    // opened, gives the view back).
+    if (route.panel) useInspectorNav.setState({ open: true, tab: route.panel, trace: route.trace ?? null })
+    else if (useInspectorNav.getState().open || useInspectorNav.getState().trace) useInspectorNav.setState({ open: false, trace: null })
+    const s = useDiagramStore.getState()
+    const el = route.el && s.c4Nodes[route.el] ? route.el : null
+    if (s.selectedNodeId !== el || (el === null && s.selectedNodeIds.length)) {
+      s.setSelectedNodeIds(el ? [el] : [])
+      s.selectNode(el)
     }
   })
+  if (route.checkSettings) openCheckSettings()
   applyPresentation(route)
 }
 
@@ -361,16 +380,14 @@ export function applyRoute(route: Route): void {
 
 // ─── State → URL ─────────────────────────────────────────────────────────────
 
-const MODE_NAMES: Record<Mode, string> = { designer: 'Designer', viewer: 'Viewer', presenter: 'Presenter', metamodel: 'Metamodel', inspector: 'Inspector' }
-const TAB_NAMES: Record<InspectorTab, string> = { overview: 'Overview', model: 'Model', implementation: 'Implementation', branch: 'This branch', settings: 'Settings' }
+const MODE_NAMES: Record<Mode, string> = { designer: 'Designer', viewer: 'Viewer', presenter: 'Presenter', metamodel: 'Metamodel' }
 
 /** What the History list says of a route: where, in which perspective, on what. */
 export function describeRoute(route: Route, hash = formatRoute(route), at = Date.now()): NavEntry {
   const s = useDiagramStore.getState()
   // The exploration too, by its name ("Explore: API"), not its id.
   const view = isAllElements(route.view) ? 'All elements' : viewById(s, route.view)?.name ?? route.view
-  const where = route.mode === 'inspector' ? (route.trace ? 'Inspector › Verification path' : `Inspector › ${TAB_NAMES[route.tab ?? 'overview']}`)
-    : route.mode === 'metamodel' ? 'Metamodel' : view
+  const where = route.mode === 'metamodel' ? 'Metamodel' : route.trace ? `${view} › Verification path` : view
   const id = route.trace ?? route.el ?? route.focus
   const node = id ? s.c4Nodes[id] : undefined
   const def = node ? s.metamodel?.nodeTypes[node.type] : undefined
@@ -520,8 +537,6 @@ export function startRouteSync(): () => void {
   window.addEventListener('popstate', onPop)
 
   const unsubDiagram = useDiagramStore.subscribe((s, p) => {
-    // A route back to the Inspector of a model already looked at.
-    if (s.appMode !== p.appMode && s.appMode === 'inspector') queueMicrotask(() => leaveEmptyInspector())
     if (
       s.appMode !== p.appMode ||
       s.activeViewId !== p.activeViewId ||
@@ -537,7 +552,21 @@ export function startRouteSync(): () => void {
     }
   })
   const unsubDocs = useDocumentsStore.subscribe(() => schedule())
-  const unsubInspector = useInspectorNav.subscribe(() => schedule())
+  // The panel's tab, and its opening and closing, are written in place: no
+  // Back step of their own. A verification path is a place to go back from.
+  // The Inspector opened or closed, its tab and its path are places, as a
+  // view is: each is a step of Back.
+  const unsubInspector = useInspectorNav.subscribe((s, p) => {
+    // Opened or closed while a link still waits for its document: the user's
+    // move wins, as a perspective picked does (dropPendingMode).
+    if (pending && !applying && (s.open !== p.open || s.tab !== p.tab || s.trace !== p.trace)) {
+      const { panel: _panel, trace: _trace, ...rest } = pending.route
+      pending = { ...pending, route: s.open ? { ...rest, panel: s.tab ?? 'overview', ...(s.trace ? { trace: s.trace } : {}) } : rest }
+    }
+    if (s.trace !== p.trace || s.open !== p.open || s.tab !== p.tab) schedule()
+    // A route back to the panel of a model already looked at.
+    if (s.open && !p.open) queueMicrotask(() => leaveEmptyInspector())
+  })
   const unsubHold = usePlaceHold.subscribe((h, p) => {
     // The place left is written first, if it waits: it is where Back goes.
     if (h.held > 0 && p.held === 0 && timer) {
@@ -551,22 +580,28 @@ export function startRouteSync(): () => void {
   })
 
   // The Inspector's button is greyed out while the model has no test report
-  // and no base beside it. A route to it then opens the start perspective
-  // in its place, written over the address, once both have been looked for.
+  // and no base beside it. A route to its panel then closes it, written over
+  // the address, once both have been looked for.
   function leaveEmptyInspector(): void {
     const id = documents.getActiveId()
     if (!inspectorByRoute) return
-    if (inspectorByRoute !== id || useDiagramStore.getState().appMode !== 'inspector') { inspectorByRoute = null; return }
-    const { check, results } = useInspectorStore.getState()
+    if (inspectorByRoute !== id || !useInspectorNav.getState().open) { inspectorByRoute = null; return }
+    const { check, results, measurements } = useInspectorStore.getState()
     const { readFor, base } = useBranchStore.getState()
     if (!check || readFor !== id) return
     inspectorByRoute = null
-    if (results || base) return
-    useDiagramStore.getState().setAppMode(startMode)
+    if (results || measurements || base) return
+    useInspectorNav.setState({ open: false, trace: null })
     schedule(true)
   }
-  const unsubCheck = useInspectorStore.subscribe(leaveEmptyInspector)
-  const unsubBase = useBranchStore.subscribe(leaveEmptyInspector)
+  // The panel comes and goes with what it has to show: the address follows.
+  let panelShown = inspectorPanelShown()
+  const onEvidence = (): void => {
+    leaveEmptyInspector()
+    if (inspectorPanelShown() !== panelShown) { panelShown = !panelShown; schedule(true) }
+  }
+  const unsubCheck = useInspectorStore.subscribe(onEvidence)
+  const unsubBase = useBranchStore.subscribe(onEvidence)
 
   return () => {
     window.removeEventListener('hashchange', onHash)

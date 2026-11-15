@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { ReactFlowProvider } from 'reactflow'
 import { host } from './platform/host'
 import { Toolbar } from './components/Toolbar'
@@ -13,11 +13,15 @@ import { WikiView } from '@radical/ui/components/WikiView'
 import { PresentationBar, PresenterDock } from './components/PresentationBar'
 import { RightPanel, LeftPanel, ActivityRail } from '@radical/ui/components/RightPanel'
 import { MetamodelEditor } from './components/MetamodelEditor'
-import { Inspector } from './components/Inspector'
+import { InspectorMain, InspectorSection } from './components/Inspector'
+import { CheckSettingsDialog } from './components/CheckSettingsDialog'
+import { toggleInspector, useInspectorNav } from './navigation'
+import { setLeftCollapsed, toggleLeftPanel, useLeftPanelFold } from './leftPanelFold'
 import { NotificationHost } from '@radical/ui/components/NotificationHost'
 import { MilestoneChip } from '@radical/ui/components/MilestoneChip'
 import { OtherModelViewBar } from '@radical/ui/components/OtherModelViewBar'
 import { NodeWizard } from '@radical/ui/components/NodeWizard'
+import { setCanvasCovered } from '@radical/ui/components/keysHere'
 import { SelectionActionBar } from '@radical/ui/components/SelectionActions'
 import { QuickSearch } from './components/QuickSearch'
 import { FindInView } from './components/FindInView'
@@ -33,9 +37,8 @@ import { useDocumentsStore } from './store/documentStore'
 import { DiscussionPanel, type DiscussionTarget } from './components/DiscussionPanel'
 import { webFolderSupported } from './persist/webFolder'
 import { useNodeDiscussions } from './discussions/useNodeDiscussions'
-import { OPEN_HUB_EVENT } from './persistence/inspector'
+import { OPEN_HUB_EVENT, useInspectorMayShow } from './persistence/inspector'
 
-const LS_LEFT = 'radical-leftpanel-collapsed'
 
 /** The Hub's packs a link asks to import (`?hub=id1,id2`, its Open in
  *  Studio). The link stays in the address until its import opens, so a
@@ -105,13 +108,21 @@ function AppInner(): React.ReactElement {
   const isViewer = appMode === 'viewer'
   const isPresenter = appMode === 'presenter'
   const isMetamodel = appMode === 'metamodel'
-  const isInspector = appMode === 'inspector'
-  const isReadOnlyMode = !isDesigner && !isMetamodel && !isInspector
+  const isReadOnlyMode = !isDesigner && !isMetamodel
+  // The Inspector, a place of the rail as the Views section is: its tabs
+  // in the left panel and the tab picked in place of the view, in Designer,
+  // Viewer and Presenter, while it is open and has something to show.
+  const inspectorOpen = useInspectorNav((s) => s.open)
+  const inspectorHas = useInspectorMayShow()
+  const showInspector = inspectorOpen && inspectorHas && !isPresenting && !isMetamodel
+  // A click on a section of the rail goes back to the view and shows the section.
+  useEffect(() => { setCanvasCovered(showInspector) }, [showInspector])
+  const inspectorOver = useMemo(() => ({ open: showInspector, close: () => toggleInspector(false) }), [showInspector])
   // Another model's view (a federation), of any view type: its bar says
   // whose it is, in a row of its own above the view.
-  const otherModelBar = useDiagramStore((s) => !!otherModelViewShown(s)) && !isPresenting && !isInspector && (isDesigner || isViewer)
+  const otherModelBar = useDiagramStore((s) => !!otherModelViewShown(s)) && !isPresenting && !showInspector && (isDesigner || isViewer)
 
-  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(() => localStorage.getItem(LS_LEFT) === '1')
+  const leftCollapsed = useLeftPanelFold((s) => s.collapsed)
   // The welcome screen is a web-only landing splash. Skip it when the user
   // arrived via a deep link (the hash already encodes a destination) so the
   // pasted URL lands straight on its target instead of behind the splash.
@@ -143,18 +154,16 @@ function AppInner(): React.ReactElement {
     window.addEventListener(OPEN_SETUP_EVENT, open)
     return () => window.removeEventListener(OPEN_SETUP_EVENT, open)
   }, [])
-  const toggleLeft = useCallback(() => {
-    setLeftCollapsed((c) => { localStorage.setItem(LS_LEFT, c ? '0' : '1'); return !c })
-  }, [])
+  const toggleLeft = toggleLeftPanel
   // Something shown in the left panel (Quick Search's pick of a folder or
   // a sequence) opens it when it is folded away.
   useEffect(() => {
-    const show = (): void => setLeftCollapsed((c) => { if (c) localStorage.setItem(LS_LEFT, '0'); return false })
+    const show = (): void => setLeftCollapsed(false)
     window.addEventListener('radical:show-left-panel', show)
     return () => window.removeEventListener('radical:show-left-panel', show)
   }, [])
   useRegisterCommands('app', () => [
-    { id: 'panel.left', title: leftCollapsed ? 'Show the left panel' : 'Hide the left panel', group: 'Panels', run: toggleLeft, when: () => !['metamodel', 'inspector'].includes(useDiagramStore.getState().appMode) },
+    { id: 'panel.left', title: leftCollapsed ? 'Show the left panel' : 'Hide the left panel', group: 'Panels', run: toggleLeft, when: () => useDiagramStore.getState().appMode !== 'metamodel' },
   ], [leftCollapsed, toggleLeft])
   // Run Radical layout automatically on first load — but only when nodes have
   // no saved positions yet (all at origin). Skip if positions were loaded from file.
@@ -171,7 +180,7 @@ function AppInner(): React.ReactElement {
   const layoutClass = [
     'app-layout',
     isPresenting ? 'mode-presenting' : '',
-    !isPresenting && isInspector ? 'mode-inspector' : '',
+    showInspector ? 'with-inspector' : '',
     !isPresenting && isMetamodel ? 'mode-metamodel' : '',
     !isPresenting && isReadOnlyMode ? 'mode-presentation' : '',
     !isPresenting && leftCollapsed ? 'lp-collapsed' : '',
@@ -183,29 +192,34 @@ function AppInner(): React.ReactElement {
       {!isPresenting && <Toolbar />}
       {/* As in VS Code: the left panel's sections and the app's actions
           (the Toolbar puts them there) along the left edge. */}
-      {!isPresenting && <ActivityRail sections={isDesigner || isViewer || isPresenter} collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
-      {!isPresenting && isDesigner && <LeftPanel mode="designer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
-      {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
-      {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} />}
-      {isInspector && !isPresenting ? <Inspector /> : isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView onDiscuss={discussionDocumentId ? openDiscussion : undefined} /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView onDiscuss={discussionDocumentId ? openDiscussion : undefined} /> : isWarnierView ? <WarnierView /> : oversized ? <LargeCanvasNotice view={oversized.view} count={oversized.count} readOnly={!isDesigner} /> : <Canvas onDiscuss={discussionDocumentId ? openDiscussion : undefined} nodeDiscussions={nodeDiscussions} />}
+      {!isPresenting && <ActivityRail sections={isDesigner || isViewer || isPresenter} collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} over={inspectorOver} />}
+      {!isPresenting && isDesigner && <LeftPanel mode="designer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} place={showInspector ? <InspectorSection /> : undefined} />}
+      {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} place={showInspector ? <InspectorSection /> : undefined} />}
+      {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} place={showInspector ? <InspectorSection /> : undefined} />}
+      {/* The Inspector covers the view, which stays mounted under it: its
+          camera and its places stay as they were, and going back is at once. */}
+      {showInspector && <InspectorMain />}
+      {isTreemapView ? <TreemapView /> : isSequenceView ? <SequenceView /> : isTableView ? <TableView onDiscuss={discussionDocumentId ? openDiscussion : undefined} /> : isMatrixView ? <MatrixView /> : isWikiView ? <WikiView onDiscuss={discussionDocumentId ? openDiscussion : undefined} /> : isWarnierView ? <WarnierView /> : oversized ? <LargeCanvasNotice view={oversized.view} count={oversized.count} readOnly={!isDesigner} /> : <Canvas onDiscuss={discussionDocumentId ? openDiscussion : undefined} nodeDiscussions={nodeDiscussions} />}
       {/* The canvas and the flow view name the milestone in their own
           corner; the other views have it at the bottom left of theirs. */}
-      {!isPresenting && !isInspector && !isCanvasView && !isSequenceView && (
+      {!isPresenting && !showInspector && !isCanvasView && !isSequenceView && (
         <MilestoneChip style={{ gridArea: 'canvas', justifySelf: 'start', alignSelf: 'end', margin: 10, position: 'relative', zIndex: 7 }} />
       )}
       {/* Another model's view (a federation), of any view type: whose it
           is, read-only, and Copy to this model, above the view and over
           none of its controls. */}
       {otherModelBar && <OtherModelViewBar style={{ gridArea: 'otherbar' }} />}
-      {!isPresenting && isDesigner && <RightPanel />}
-      {!isPresenting && isViewer && <RightPanel readOnly />}
+      {!isPresenting && !showInspector && isDesigner && <RightPanel />}
+      {!isPresenting && !showInspector && isViewer && <RightPanel readOnly />}
       {!isPresenting && isPresenter && <PresenterDock />}
       <PresentationBar />
-      {!isPresenting && !isInspector && isCanvasView && <SelectionActionBar />}
-      {!isInspector && <QuickSearch />}
-      {!isPresenting && !isInspector && !isMetamodel && <FindInView />}
-      {/* The Inspector's Add scenario and Add fitness function start one too. */}
-      {(isDesigner || isInspector) && <NodeWizard />}
+      <CheckSettingsDialog />
+      {!isPresenting && !showInspector && isCanvasView && <SelectionActionBar />}
+      <QuickSearch />
+      {!isPresenting && !isMetamodel && !showInspector && <FindInView />}
+      {/* The Inspector's Add scenario and Add fitness function start one too
+          (from Viewer and Presenter, in Designer). */}
+      {isDesigner && <NodeWizard />}
       <NotificationHost />
       <MilestoneEditOverlay />
       {!isPresenting && discussionTarget && discussionTarget.documentId === discussionDocumentId && <DiscussionPanel key={`${discussionTarget.documentId}:${discussionTarget.nodeId}`} target={discussionTarget} onClose={closeDiscussion} />}

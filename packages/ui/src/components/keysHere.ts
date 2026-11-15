@@ -55,10 +55,20 @@ export function keysTakenElsewhere(target: EventTarget | null, menus = false): b
   return !!el && typeof el.closest === 'function' && !!el.closest(menus ? KEEPS_CANVAS_KEYS : KEEPS_KEYS)
 }
 
-/** Whether the canvas leaves a key alone: something else has it
- *  (keysTakenElsewhere), or it is typed into a field (or something marked
- *  `nokey`), as React Flow tells. */
+let canvasCovered = false
+
+/** The app shows a place of its own over the view (Studio's Inspector):
+ *  the view stays mounted under it, and its keys are off, so Delete or an
+ *  arrow never acts on a selection out of sight. */
+export function setCanvasCovered(covered: boolean): void {
+  canvasCovered = covered
+}
+
+/** Whether the canvas leaves a key alone: the view is covered
+ *  (setCanvasCovered), something else has it (keysTakenElsewhere), or it is
+ *  typed into a field (or something marked `nokey`), as React Flow tells. */
 export function canvasKeysOff(e: { target: EventTarget | null }): boolean {
+  if (canvasCovered) return true
   if (keysTakenElsewhere(e.target, true)) return true
   const el = e.target as HTMLElement | null
   if (!el || typeof el.closest !== 'function') return false

@@ -3606,16 +3606,44 @@ div.milestone-option { cursor: default; }
   to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
 
-/* ─── Inspector perspective (what radical check says) ─────────────────── */
-.app-layout.mode-inspector {
-  grid-template-columns: var(--rail-w) 1fr;
-  grid-template-rows: 48px 1fr;
-  grid-template-areas:
-    "rail toolbar"
-    "rail canvas";
-}
-.insp { grid-area: canvas; position: relative; min-height: 0; overflow: hidden; display: flex; background: var(--bg-app); color: var(--text-primary); }
-.insp-main { flex: 1; min-width: 0; overflow-y: auto; padding: 22px 32px 60px; display: grid; gap: 24px; align-content: start; max-width: 1640px; margin: 0 auto; font-size: 13px; }
+/* ─── Inspector panel (what radical check says), under the view ─────────── */
+.insp { position: relative; min-height: 0; color: var(--text-primary); font-size: 13px; }
+/* The Inspector in place of the view, its tabs in the left panel (as a
+   section of the rail is). */
+.insp-area { grid-area: canvas; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; background: var(--bg-app); position: relative; z-index: 95; }
+/* The left panel's chevron stands out over the view: above the Inspector too. */
+.app-layout.with-inspector .left-panel { z-index: 96; }
+/* The Inspector's button on the rail, above Settings, drawn as the left
+   panel's sections are, coloured as the panel's verdict: red with errors
+   (its count), green with none. */
+.rail-inspector { --sec-color: var(--accent); }
+.rail-inspector.e { --sec-color: var(--danger); }
+.rail-inspector.ok { --sec-color: var(--success); }
+.rail-inspector .lp-section-icon svg { width: 16px; height: 16px; }
+.rail-inspector .lp-rail-count { color: var(--sec-color); }
+.rail-inspector:disabled { opacity: 0.4; cursor: default; }
+.rail-inspector:disabled:hover { background: none; }
+/* Its tabs in the left panel, as the Views section lists its views. */
+.insp-side-list { display: flex; flex-direction: column; gap: 4px; }
+.insp-side-card { width: 100%; border: 1px solid transparent; text-align: left; font: inherit; color: inherit; --kind-color: var(--accent); }
+.insp-side-card:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.insp-side-card .lp-card-meta { white-space: normal; }
+.insp-side-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+/* This branch: the changes marked on the canvas, or not (Changes on branch). */
+.insp-changes > .insp-notice { display: grid; gap: 8px; }
+.insp-changes > .insp-notice p { margin: 0; }
+.insp-switch { display: inline-flex; align-items: center; gap: 8px; justify-self: start; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-panel); font-size: 12.5px; cursor: pointer; }
+.insp-switch.off { opacity: 0.6; cursor: default; }
+.insp-switch input { margin: 0; accent-color: var(--accent); }
+.insp-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+.insp-main { flex: 1; min-width: 0; overflow-y: auto; padding: 12px 20px 40px; display: grid; gap: 20px; align-content: start; font-size: 13px; }
+.insp-area .insp-main { padding: 18px 28px 48px; }
+.insp-area .insp-main > * { max-width: 1640px; }
+/* Inspector settings: the Inspector's Settings tab of before, in a dialog. */
+.milestone-modal.check-settings { width: min(1040px, calc(100vw - 48px)); max-width: none; max-height: calc(100vh - 64px); display: flex; flex-direction: column; padding-bottom: 0; }
+.check-settings-body { overflow-y: auto; display: grid; gap: 20px; align-content: start; padding: 4px 2px 24px; min-height: 0; }
+.app-menu-pill { margin-left: 8px; font-size: 10.5px; }
+
 .insp h1 { margin: 0; font-size: 20px; letter-spacing: -0.015em; }
 .insp h2 { margin: 0 0 3px; font-size: 14px; }
 .insp code { font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace); font-size: 11.5px; }
@@ -3690,7 +3718,6 @@ div.milestone-option { cursor: default; }
    need or ADR to the tests and measurements, lines drawn between the cards. */
 .insp-main[hidden] { display: none; }
 /* The element's card (340 px, 10 px from the edge) keeps its room. */
-.insp.with-card .insp-main, .insp.with-card .trace { padding-right: 372px; }
 .trace { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 18px 28px 24px; overflow: hidden; font-size: 13px; }
 .trace-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
 .trace-title { display: flex; gap: 14px; align-items: flex-start; }
@@ -3781,6 +3808,10 @@ div.milestone-option { cursor: default; }
 .insp-rule-head { display: grid; grid-template-columns: 1.2em minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 6px 14px 4px 36px; }
 /* The header: how old the evidence is, each chip opening to where it came from. */
 .insp-meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 2px; }
+/* The bar over the report: how old the evidence is, the verdict;
+   apart from the report, as the left panel's head is from its list. */
+.insp-topbar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 40px; padding: 6px 28px; box-sizing: border-box; border-bottom: 1px solid var(--border-color); background: var(--bg-toolbar); }
+.insp-topbar .insp-verdict { padding: 3px 11px; font-size: 12.5px; margin-left: auto; }
 .insp-meta-row .insp-meta { margin: 0; }
 .insp-ages { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 .insp-age-wrap { position: relative; display: inline-block; }
@@ -3883,14 +3914,6 @@ div.milestone-option { cursor: default; }
 .insp-diff > summary { padding: 10px 14px; cursor: pointer; font-weight: 600; }
 .insp-diff pre { margin: 0; padding: 10px 16px; border-top: 1px solid var(--border-color); overflow-x: auto; font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace); font-size: 12px; line-height: 1.6; }
 .insp-diff .add { color: var(--success); } .insp-diff .del { color: var(--danger); } .insp-diff .ctx { color: var(--text-muted); }
-.toolbar-mode-btn .insp-count { display: inline-flex; gap: 4px; margin-left: 6px; font-variant-numeric: tabular-nums; font-size: 11.5px; font-weight: 600; }
-.toolbar-mode-btn .insp-count span { padding: 0 5px; border-radius: 4px; line-height: 1.5; }
-.toolbar-mode-btn .insp-count .e { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
-.toolbar-mode-btn .insp-count .w { color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, transparent); }
-.toolbar-mode-btn.active .insp-count .e,
-.toolbar-mode-btn.active .insp-count .w { color: #fff; background: rgba(0, 0, 0, 0.28); }
-.toolbar-mode-btn:disabled { opacity: 0.4; cursor: default; }
-.toolbar-mode-btn:disabled:hover { background: transparent; }
 
 /* ─── Changes on branch (the model since its base, persistence/branchChanges) ─── */
 .branch-btn-wrap { position: relative; }
@@ -3987,10 +4010,6 @@ div.milestone-option { cursor: default; }
 .insp-branch-rels ul { margin-top: 6px; }
 @media (max-width: 640px) { .insp-field { grid-template-columns: 1fr; gap: 2px; } }
 /* Show on canvas: the views to choose from. */
-.insp-show { position: relative; display: inline-block; }
-.insp-show-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 220px; max-height: 320px; overflow-y: auto; display: grid; padding: 4px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-md, 0 6px 20px rgba(0,0,0,0.25)); }
-.insp-show .insp-show-menu button { display: flex; justify-content: space-between; gap: 14px; padding: 6px 9px; border: 0; border-radius: 5px; background: none; color: var(--text-primary); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; white-space: nowrap; }
-.insp-show .insp-show-menu button:hover, .insp-show .insp-show-menu button:focus-visible { background: var(--bg-app); }
 
 /* ─── Back, forward and History (NavHistory.tsx) ─── */
 /* Toolbar groups: buttons that belong together in one pill. */
@@ -4016,8 +4035,6 @@ div.milestone-option { cursor: default; }
 .toolbar-center > .toolbar-group { position: absolute; top: 0; transform: translateY(-50%); }
 .toolbar-center > .toolbar-group:first-child { right: calc(var(--qs-w) / 2 + 8px); }
 .toolbar-center > .toolbar-group:last-child { left: calc(var(--qs-w) / 2 + 8px); }
-.toolbar-center.no-search > .toolbar-group:first-child { right: 3px; }
-.toolbar-center.no-search > .toolbar-group:last-child { left: 3px; }
 .nav-history-list .nav-menu { left: auto; right: 0; }
 .nav-history { position: relative; display: inline-flex; align-items: center; gap: 2px; }
 .nav-btn-wrap { position: relative; }
@@ -4451,3 +4468,14 @@ div.milestone-option { cursor: default; }
   font-weight: 600;
   color: var(--success, #059669);
 }
+
+/* The model open, at the top of the Models menu (the toolbar named it before). */
+.app-menu-model { display: flex; align-items: center; gap: 8px; padding: 2px 10px 0; min-width: 0; }
+.app-menu-model-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.app-menu-model-where { padding: 2px 10px 4px; font-size: 11.5px; color: var(--text-muted); }
+
+/* Undo and Redo: larger, bolder arrows, clear against the toolbar; greyed
+   out when there is nothing to undo or redo. */
+.toolbar-edit .toolbar-icon-btn { min-width: 34px; height: 30px; color: var(--text-primary); }
+.toolbar-edit .toolbar-icon-btn svg { width: 18px; height: 18px; }
+.toolbar-edit .toolbar-icon-btn:disabled { color: var(--text-muted); opacity: 0.45; }

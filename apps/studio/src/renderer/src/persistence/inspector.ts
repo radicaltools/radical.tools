@@ -13,7 +13,8 @@
 
 import { findingsByElement, useCardVerification } from '@radical/ui/store/verification'
 import { create } from 'zustand'
-import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults, withRepositorySettings, withoutRepositorySettings } from '@radical/common/check'
+import { useMemo } from 'react'
+import { checkModel, compareCheckConfig, defaultSeverity, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults, withRepositorySettings, withoutRepositorySettings } from '@radical/common/check'
 import { REPOSITORY_FILE, parseRepositoryFile, serializeRepositoryFile, type RepositoryFile } from '@radical/common/repositoryMapping'
 import { historyMark, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
@@ -50,9 +51,12 @@ interface InspectorState {
   /** When the model was last edited in Studio since it was opened (epoch
    *  ms): evidence read before then may not hold for it. */
   editedAt: number | null
+  /** The document whose files beside the model (results, measurements,
+   *  check.json) were read: until then the Inspector cannot tell what it has. */
+  readFor: string | null
 }
 
-export const useInspectorStore = create<InspectorState>(() => ({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', settingsDrafts: {}, settingsBases: {}, editedAt: null }))
+export const useInspectorStore = create<InspectorState>(() => ({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', settingsDrafts: {}, settingsBases: {}, editedAt: null, readFor: null }))
 
 /** The Settings as the Inspector shows them: check.json, with the test files
  *  and CI artifacts the repository's .radical/radical.json names over its
@@ -65,6 +69,51 @@ export function settingsOf(config: CheckConfig, repository: RepositoryFile | nul
 export function useSettingsDraft(): CheckConfig | null {
   const id = useDocumentsStore((s) => s.activeId)
   return useInspectorStore((s) => (id && s.settingsDrafts[id]) || null)
+}
+
+/** Whether the Inspector has anything to show: a check report or
+ *  measurements beside the model, or a base (This branch lists the
+ *  branch's changes). Without, its button is greyed out and its panel stays
+ *  away. */
+export function inspectorAvailable(): boolean {
+  const { results, measurements } = useInspectorStore.getState()
+  return results !== null || measurements !== null || useBranchStore.getState().base !== null
+}
+
+/** Whether the files beside the open model have been read and checked with. */
+export function useEvidenceRead(): boolean {
+  const id = useDocumentsStore((s) => s.activeId)
+  return useInspectorStore((s) => !!id && s.readFor === id)
+}
+
+/** Whether the Inspector, open, is drawn: it has something to show, or a
+ *  folder's files are not read yet and it may (a link, a reload). Drawn
+ *  only once they were read, the view painted first and the Inspector
+ *  replaced it a moment later. */
+export function inspectorMayShow(): boolean {
+  if (inspectorAvailable()) return true
+  const { activeId, docs } = useDocumentsStore.getState()
+  return !!activeId && docs.find((d) => d.id === activeId)?.source === 'md' && useInspectorStore.getState().readFor !== activeId
+}
+
+export function useInspectorMayShow(): boolean {
+  const available = useInspectorAvailable()
+  const folder = useDocumentsStore((s) => !!s.activeId && s.docs.find((d) => d.id === s.activeId)?.source === 'md')
+  const unread = useInspectorStore((s) => s.readFor) !== useDocumentsStore((s) => s.activeId)
+  return available || (folder && unread)
+}
+
+export function useInspectorAvailable(): boolean {
+  const report = useInspectorStore((s) => s.results !== null || s.measurements !== null)
+  const base = useBranchStore((s) => s.base !== null)
+  return report || base
+}
+
+/** Whether the active document's Inspector settings hold changes not saved yet. */
+export function useSettingsUnsaved(): boolean {
+  const draft = useSettingsDraft()
+  const config = useInspectorStore((s) => s.config)
+  return useMemo(() => !!draft && compareCheckConfig(config, draft, defaultSeverity).length > 0, [config, draft])
 }
 
 /** Sets (or with null, drops) the unsaved Settings of the active document;
@@ -226,7 +275,7 @@ if (typeof window !== 'undefined') {
       lastRepository = null
       useDiagramStore.setState({ repository: null, testOutcomes: null })
       useCardVerification.setState({ evidence: null, findings: {} })
-      useInspectorStore.setState({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', editedAt: null })
+      useInspectorStore.setState({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', editedAt: null, readFor: null })
     }
     if (!id) return
     const files = await documents.readCheckFiles(id).catch(() => null)
@@ -265,6 +314,8 @@ if (typeof window !== 'undefined') {
     }
     useInspectorStore.setState({ results: resultsText ? parseTestResults(resultsText) : null, measurements: inspectorMeasurements(measurementsText, reviewsText), config, configError, configText })
     recheck()
+    // Read, and checked with what was read: the Inspector may now tell.
+    if (useInspectorStore.getState().readFor !== id) useInspectorStore.setState({ readFor: id })
   }
 
   let timer: ReturnType<typeof setTimeout> | undefined

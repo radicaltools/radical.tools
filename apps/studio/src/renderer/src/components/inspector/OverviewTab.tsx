@@ -11,7 +11,7 @@ import type { CheckFinding, CheckMetricResult, CheckResult } from '@radical/comm
 import type { C4Relation } from '@radical/common/c4'
 import { openConcern } from '../../persistence/inspector'
 import { attentionGroups, measuredWhen, notRunItems, unverifiedBreakdown, type AttentionGroup, type NotRunItem } from './attention'
-import { ONE_STEP_FIXES, startFix } from './fixes'
+import { ONE_STEP_FIXES, startFix, useFixOffer } from './fixes'
 import { Bar, Chip, GoalPill, Message, MetricBar, RULE_INFO, metricOf, modelScores, type Ctx } from './shared'
 
 const FINDINGS_SHOWN = 8
@@ -34,6 +34,7 @@ function ScoreCard({ label, m, pill, sub, onOpen, data }: {
 function Finding({ f, ctx, onCreated }: { f: CheckFinding; ctx: Ctx; onCreated: (id: string) => void }): React.ReactElement {
   const node = f.nodeId && ctx.nodes[f.nodeId] ? f.nodeId : null
   const fix = node ? ONE_STEP_FIXES[f.rule] : undefined
+  const offer = useFixOffer()
   return (
     <div className="insp-finding" data-rule={f.rule}>
       <div className="insp-finding-what">
@@ -45,7 +46,10 @@ function Finding({ f, ctx, onCreated }: { f: CheckFinding; ctx: Ctx; onCreated: 
         )}
       </div>
       <div className="insp-finding-acts">
-        {fix && <button type="button" className="insp-btn primary" onClick={() => startFix(f.rule, node!, onCreated)}>{fix.label}</button>}
+        {fix && (
+          <button type="button" className="insp-btn primary" disabled={!!offer.refused} title={offer.refused ?? offer.title}
+            onClick={() => startFix(f.rule, node!, onCreated)}>{fix.label}{offer.suffix}</button>
+        )}
         {f.rule === 'concern-unaddressed' && f.code && (
           <button type="button" className="insp-btn primary" title={f.details?.join('\n')} onClick={() => openConcern(f.code!, f.nodeId)}>Answer the questions…</button>
         )}
