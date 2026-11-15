@@ -52,10 +52,9 @@ const details = (message: unknown, durationMs: unknown, line: unknown): Pick<Tes
   }
 }
 
-/** Between a test id's file and titles, as Playwright and Vitest's
- *  terminal print them. */
+/** Between a test id's file and titles, as Playwright prints them. */
 const SEPARATOR = /\s+›\s+/
-/** The same as Vitest 4 prints it, in an id without a ›. */
+/** The same as Vitest prints it, read in an id without a ›. */
 const ASCII_SEPARATOR = /\s+>\s+/
 /** Between the describe blocks in a JUnit test name: Vitest writes >. */
 const JUNIT_SEPARATOR = /\s+[›>]\s+/
