@@ -52,7 +52,10 @@ node apps/cli/dist/index.js explore verify <run> "f1-name.mjs args" "f2-name.mjs
 ```
 
 It serves the run's build on the run's ports (Studio and the Hub), runs the
-scripts from the run's folder and stops the servers. A finding whose script does not show the bug
+scripts from the run's folder and stops the servers. For each script it says
+whether the bug shows (`→ …`): by its `REPRODUCED: yes|no` line, else by its
+exit (1 shows the bug, 0 does not), and when the two disagree; it ends with the
+scripts that show the bug and those that do not. A finding whose script does not show the bug
 goes to "Seen once", not to the user. Agents' guesses about causes are
 sometimes narrower than the bug: look at the code before repeating one.
 

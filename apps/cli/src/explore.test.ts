@@ -129,6 +129,23 @@ describe('radical explore prepare', () => {
     expect(brief).toContain('Scripts name no absolute path:')
   })
 
+  // Rounds moved from crucible/rounds to .radical/crucible/rounds (#314); an
+  // earlier round's round.json keeps the folders where it was prepared.
+  it('lists the earlier runs\' folders where they are now, and verifies a run there', async () => {
+    // No server: the runs of the gate go side by side.
+    const { cwd, first } = await project({ serve: [] })
+    const old = (run: number) => ({ run, folder: join(cwd, '.crucible', 'rounds', 'round-3-4', `run-${run}`), ports: { app: PORTS + run, hub: PORTS + 100 + run, other: PORTS + 200 + run }, verified: [] })
+    await writeFile(join(cwd, 'rounds', 'round-3-4', 'round.json'), JSON.stringify({ round: 'round-3-4', from: 3, to: 4, commit: first, created: '2026-10-21', runs: [old(3), old(4)] }))
+    await mkdir(join(cwd, 'rounds', 'round-3-4', 'run-3'))
+    await writeFile(join(cwd, 'rounds', 'round-3-4', 'run-3', 'f1.mjs'), "console.log('REPRODUCED: yes')\nprocess.exit(1)\n")
+    expect((await run(cwd, 'prepare', '--runs', '1')).code).toBe(0)
+    const brief = await readFile(join(cwd, 'rounds', 'round-5-5', 'BRIEF.md'), 'utf8')
+    expect(brief).toContain("- Earlier runs' folders, with their scripts (copy a helper into your folder and change its port; do not write there): rounds/round-3-4/run-3, rounds/round-3-4/run-4.")
+    expect(brief).not.toContain('.crucible')
+    const verified = await run(cwd, 'verify', '3', 'f1.mjs')
+    expect(verified.out).toContain('=== f1.mjs\n  REPRODUCED: yes\n  (exit 1)')
+  })
+
   it('exits 2 without explore settings', async () => {
     const { cwd } = await project(null)
     const { code, err } = await run(cwd, 'prepare', '--runs', '2')
@@ -154,6 +171,28 @@ describe('radical explore verify', () => {
     const journal = JSON.parse(await readFile(join(cwd, 'rounds', 'round-5-5', 'round.json'), 'utf8'))
     expect(journal.runs[0].verified.map((v: { script: string; exit: number }) => [v.script, v.exit])).toEqual([[`look.mjs ${PORTS + 5}`, 0], ['broken.mjs', 3]])
     expect((await run(cwd, 'verify', '9', 'look.mjs')).code).toBe(2)
+  })
+})
+
+describe('radical explore verify, what a script says', () => {
+  // Exploring agents' scripts printed REPRODUCED and exited 0 either way.
+  it('judges a script by its exit and by a line that says whether the bug shows, and says when they disagree', async () => {
+    const { cwd } = await project({ serve: [] })
+    await run(cwd, 'prepare', '--runs', '1')
+    const folder = join(cwd, 'rounds', 'round-5-5', 'run-5')
+    await writeFile(join(folder, 'says.mjs'), "console.log('REPRODUCED: yes')\n")
+    await writeFile(join(folder, 'holds.mjs'), "console.log('REPRODUCED: no')\n")
+    await writeFile(join(folder, 'exits.mjs'), "console.log('DB is 12 px lower')\nprocess.exit(1)\n")
+    const { code, out } = await run(cwd, 'verify', '5', 'says.mjs', 'holds.mjs', 'exits.mjs')
+    expect(code).toBe(0)
+    expect(out).toContain('=== says.mjs\n  REPRODUCED: yes\n  (exit 0)\n  says: REPRODUCED: yes\n  → the bug shows, as its output says; its exit 0 says otherwise (a script exits 1 while the bug shows, 0 when it does not)')
+    expect(out).toContain('=== holds.mjs\n  REPRODUCED: no\n  (exit 0)\n  says: REPRODUCED: no\n  → the bug does not show\n')
+    expect(out).toContain('=== exits.mjs\n  DB is 12 px lower\n  (exit 1)\n  → the bug shows (exit 1)')
+    expect(out).toContain('Shows the bug: says.mjs, exits.mjs. Does not: holds.mjs.')
+    const journal = JSON.parse(await readFile(join(cwd, 'rounds', 'round-5-5', 'round.json'), 'utf8'))
+    expect(journal.runs[0].verified.map((v: { script: string; shown: boolean }) => [v.script, v.shown])).toEqual([['says.mjs', true], ['holds.mjs', false], ['exits.mjs', true]])
+    // The brief says the convention.
+    expect(await readFile(join(cwd, 'rounds', 'round-5-5', 'BRIEF.md'), 'utf8')).toContain('A script exits 1 while the bug shows and 0 when it does not, and says which in a line of its own, `REPRODUCED: yes` or `REPRODUCED: no`')
   })
 })
 

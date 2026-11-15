@@ -235,7 +235,9 @@ gives, from which the maintainer's session records your findings in
 - **Steps**: the shortest sequence that shows it, from a named model, and
   the script that runs it (`node <script> [args]` from your run's folder
   while your server runs; helpers it imports from your folder are copied
-  with it). The copy runs from `.radical/crucible/findings/F-NNNN/`, so the script
+  with it). The script exits 1 while the bug shows and 0 when it does not,
+  and says which in a line of its own, `REPRODUCED: yes` or
+  `REPRODUCED: no`: `radical explore verify` judges it by both. The copy runs from `.radical/crucible/findings/F-NNNN/`, so the script
   names no absolute path: it finds the repository by walking up from its
   own folder to `.radical/crucible/crucible.json`, and takes ports and the round's folder as
   arguments.

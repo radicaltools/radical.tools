@@ -222,7 +222,11 @@ agent's session starts the agents and talks to you (in this repository, the
 - `radical explore verify 70 "f1-row.mjs 2" "f2-undo.mjs"` serves run 70's
   build on its ports, runs each reproduction script from the run's folder,
   shows what it printed and its exit status, and stops the servers, so every
-  finding is re-run before anyone reads it.
+  finding is re-run before anyone reads it. A script exits 1 while the bug
+  shows and 0 when it does not, and says which in a line (`REPRODUCED: yes`
+  or `REPRODUCED: no`); verify judges each by both, the line first (a script
+  that throws exits 1 too), says when they disagree, and lists the scripts
+  that show the bug and those that do not.
 - `radical explore record run-70/REPORT.md` writes the findings of a run's
   report (its JSON block) to the findings folder, as `open` or, for a
   question to decide, `question`, each with a copy of its script, the helpers

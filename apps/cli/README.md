@@ -769,7 +769,13 @@ that scripts name no absolute path (they find the repository by walking up to
 `.radical/crucible/crucible.json`), since a finding's script is copied out of the round.
 `verify` serves a run's build on its ports (each server `serve` lists, on the
 run's port it names: `app`, `hub` or `other`), runs its scripts from its
-folder and stops the servers. `record` writes a report's findings (`open`, or
+folder and stops the servers. A script shows the bug when it exits 1, and
+says so in a line of its own (`REPRODUCED: yes` or `REPRODUCED: no`; `BUG: …`
+and `FINDING: …` count as yes): `verify` prints those lines and whether the
+bug shows for each script (the line wins, as a script that throws exits 1
+too, and it says when exit and line disagree), keeps both in `round.json`, and
+ends with the scripts that show the bug and those that do not. A run's folder
+is `run-NN` in its round's folder, wherever the rounds folder is now. `record` writes a report's findings (`open`, or
 `question`) with copies of their scripts and of the screenshot each names,
 and warns about a copied script that names the repository's or the round's
 absolute paths.
