@@ -418,6 +418,56 @@ test('Open → Folder… on a repository opens its model in architecture/, and r
   expect((await folder.paths()).filter((path) => !path.startsWith('architecture/'))).toEqual(['package.json', 'src/index.ts'])
 })
 
+test('New model and Move to a folder… write no model in front of a repository\'s, and ask before a folder of other files', async ({ page, studio }) => {
+  // F-0164: New model in a folder on a repository's root, its model in
+  // .radical/model, wrote a second model into the root without a question,
+  // and Open → Folder… then opened that one in place of the repository's.
+  const said = (answer: 'accept' | 'dismiss') => page.waitForEvent('dialog').then(async (d) => { const text = d.message(); await d[answer](); return text })
+  const moveToFolder = async (answer: 'accept' | 'dismiss'): Promise<string> => {
+    await studio.open('v-context')
+    // A load of its own: a hash alone leaves the welcome screen up.
+    await page.reload()
+    await studio.ready()
+    await openModels(page)
+    const asked = said(answer)
+    await page.getByRole('button', { name: 'Actions for E2E' }).click()
+    await page.getByRole('menuitem', { name: 'Move to a folder…' }).click()
+    const text = await asked
+    await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toHaveCount(0)
+    return text
+  }
+  const newModel = async (answer: 'accept' | 'dismiss'): Promise<string> => {
+    await page.goto('/')
+    await page.getByRole('button', { name: 'New model' }).click()
+    await page.getByRole('radio', { name: /In a folder/ }).check()
+    const asked = said(answer)
+    await page.getByRole('button', { name: 'Choose folder and create' }).click()
+    const text = await asked
+    await expect(page.locator('.welcome-overlay')).toBeVisible()
+    return text
+  }
+  // A folder of other files: both ask, and a no writes nothing.
+  await folder.write('package.json', '{"name":"shop"}')
+  await folder.write('src/index.ts', 'export {}\n')
+  const before = await folder.paths()
+  for (const write of [moveToFolder, newModel]) {
+    expect(await write('dismiss')).toContain('"model" already contains files and is not a Radical model folder')
+    await page.waitForTimeout(500)
+    expect(await folder.paths()).toEqual(before)
+  }
+  // A repository with its model where Open finds it: both refuse, naming it, and write nothing.
+  const bookstore = JSON.parse(fixture('bookstore'))
+  for (const [where, name] of [['architecture', 'Bookstore'], ['.radical/model', 'Payments']]) {
+    for (const [path, content] of Object.entries(serializeToMdFolder(bookstore, name))) await folder.write(`${where}/${path}`, content)
+    const files = await folder.files()
+    for (const write of [moveToFolder, newModel]) {
+      expect(await write('accept')).toContain(`"model" holds the model "${name}" in ${where}: a new model written into "model" would be opened in its place.`)
+      await page.waitForTimeout(500)
+      expect(await folder.files()).toEqual(files)
+    }
+  }
+})
+
 test('New model on the welcome screen can keep the model in a folder', async ({ page, studio }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'New model' }).click()

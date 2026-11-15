@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { basename, join, resolve } from 'path'
 import { watchFile, unwatchFile } from 'fs'
-import { readFile as readFileAsync, writeFile as writeFileAsync, mkdir } from 'fs/promises'
+import { access, readdir, readFile as readFileAsync, writeFile as writeFileAsync, mkdir } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { MdFolderSession, mergeMdFolderFiles } from '@radical/common/formats/mdFolderSync'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
@@ -12,7 +12,8 @@ import { AGENT_ACTIVITY_FILE } from '@radical/common/formats/agentActivity'
 import { MODEL_BASE_FILE } from '@radical/common/formats/modelBase'
 import { DiskDiscussions } from '@radical/node-files/discussions'
 import { repositoryModel } from '@radical/node-files/repositoryLayout'
-import { noModelIn } from '@radical/common/modelFolders'
+import { modelBelow, noModelIn } from '@radical/common/modelFolders'
+import { MD_MANIFEST_FILE } from '@radical/common/formats/mdFolder'
 import { DiscussionConflict, type DiscussionAction } from '@radical/common/discussions'
 
 const discussionFolders = new Map<string, DiskDiscussions>()
@@ -210,7 +211,11 @@ app.whenReady().then(() => {
       properties: ['openDirectory', 'createDirectory'],
     })
     if (result.canceled || result.filePaths.length === 0) return { success: false }
-    return { success: true, folderPath: result.filePaths[0] }
+    // What it holds, so that no model is written in front of a repository's.
+    const folderPath = result.filePaths[0]
+    const entries = await readdir(folderPath).catch(() => [])
+    const modelAt = await modelBelow(basename(folderPath), (path) => access(join(folderPath, path, MD_MANIFEST_FILE)).then(() => true, () => false))
+    return { success: true, folderPath, entries, ...(modelAt ? { modelAt } : {}) }
   })
 
   ipcMain.handle('folder:read', async (_event, folderPath: string) => {

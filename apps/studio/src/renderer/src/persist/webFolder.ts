@@ -15,12 +15,12 @@
 // `showOpenFilePicker()` / `showSaveFilePicker()` is stored the same way and
 // needs the same re-grant after a reload.
 
-import { isMdFolderModelPath } from '@radical/common/formats/mdFolder'
+import { MD_MANIFEST_FILE, deserializeFromMdFolder, isMdFolderModelPath } from '@radical/common/formats/mdFolder'
 import { OLD_STATE_DIR, STATE_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
 import { MODEL_CACHE_DIR, MODEL_CACHE_NAMES } from '@radical/common/formats/modelCache'
 import { readEach, type MdFolderStorage } from '@radical/common/formats/mdFolderSync'
 import { DEPS_FILE, FEDERATION_FILE } from '@radical/common/federation'
-import { RADICAL_DIR, modelFolderCandidates, noModelIn, startsEmpty } from '@radical/common/modelFolders'
+import { RADICAL_DIR, modelBelow, modelFolderCandidates, noModelIn, startsEmpty } from '@radical/common/modelFolders'
 
 // Minimal structural typings for the File System Access API (avoids depending
 // on lib.dom variants that may not ship these definitions).
@@ -102,6 +102,30 @@ export async function openedFolder(picked: FsDirHandle): Promise<{ model: FsDirH
 /** The model a picked folder holds (see openedFolder). */
 export async function modelHandleOf(picked: FsDirHandle): Promise<FsDirHandle> {
   return (await openedFolder(picked)).model
+}
+
+/** What a folder picked to write a model into holds besides its model
+ *  files: the names of its entries, and the model below it that Open would
+ *  find in its place (modelBelow), with that model's name. */
+export async function pickedFolderHolds(picked: FsDirHandle): Promise<{ names: string[]; below?: { path: string; model?: string } }> {
+  const names: string[] = []
+  for await (const [name] of picked.entries()) names.push(name)
+  const manifestAt = async (path: string): Promise<FsFileHandle | null> => {
+    let dir: FsDirHandle | null = picked
+    for (const part of path.split('/')) dir = dir && await dir.getDirectoryHandle(part).catch(() => null)
+    return dir && dir.getFileHandle(MD_MANIFEST_FILE).catch(() => null)
+  }
+  const path = await modelBelow(picked.name, async (p) => !!(await manifestAt(p)))
+  if (!path) return { names }
+  const manifest = await manifestAt(path)
+  const text = manifest ? await (await manifest.getFile()).text().catch(() => '') : ''
+  let model: string | undefined
+  try {
+    model = deserializeFromMdFolder({ [MD_MANIFEST_FILE]: text }).name
+  } catch {
+    // A manifest that does not read: the refusal names the folder only.
+  }
+  return { names, below: { path, ...(model ? { model } : {}) } }
 }
 
 /** True when this environment can keep a model in a single file it reads and

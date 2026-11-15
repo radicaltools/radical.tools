@@ -31,3 +31,21 @@ export function startsEmpty(names: string[]): boolean {
 export function noModelIn(name: string): string {
   return `"${name}" holds no model: it has no radical.md, and neither has ${MODEL_FOLDER} or ${OLD_MODEL_FOLDER}/ in it. Open the model folder, or an empty folder to start a new model.`
 }
+
+/** Where, in a folder picked to write a new model into (named `name`), a
+ *  model already is that Open finds there in its place (modelFolderCandidates
+ *  but the folder itself): a repository's .radical/model or architecture/.
+ *  `holds` says whether a folder there (a path from the picked one) has a
+ *  radical.md. Undefined when there is none. */
+export async function modelBelow(name: string, holds: (path: string) => Promise<boolean>): Promise<string | undefined> {
+  for (const candidate of modelFolderCandidates(name)) if (candidate && await holds(candidate)) return candidate
+  return undefined
+}
+
+/** Why a new model is not written into folder `name`, whose model (named
+ *  `model`) is in `path` below it (modelBelow). Written there, it was opened
+ *  in place of the repository's model, for Studio and agents alike, and
+ *  that model was out of reach (F-0164). */
+export function modelBelowRefusal(name: string, path: string, model?: string): string {
+  return `"${name}" holds the model ${model ? `"${model}" ` : ''}in ${path}: a new model written into "${name}" would be opened in its place. Open "${name}" to work on that model, or pick another folder for a new one.`
+}
