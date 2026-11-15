@@ -71,7 +71,10 @@ its own ("model": { "repo": … }), it judges that repository's part of the mode
   --ratchet           lower each baseline (max) in the config to the count found
                       now, so a rule that got better cannot get worse again
                       (the test rules only with --report: without it they
-                      do not run and keep their baselines)
+                      do not run and keep their baselines). Where only this
+                      repository's part of a model is judged, it lowers no
+                      baseline of the model's check.json (exit 2): only one
+                      --config names
   --alone             check without the models deps.json names; with a
                       deps.json the model is checked composed with them, at
                       their pinned refs (radical federation --help)
@@ -215,6 +218,12 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     }
   } catch (error) {
     io.err(`Cannot read the repository's mapping: ${(error as Error).message}`)
+    return 2
+  }
+  // The model's check.json holds the whole model's baselines: the part this
+  // repository judges must not lower them (a config of its own may).
+  if (values.ratchet && repository?.model && !relative(root, await realpath(dirname(configPath)).catch(() => dirname(configPath))).startsWith('..')) {
+    io.err(`radical check --ratchet: ${configPath} holds the baselines of the whole model of ${repository.model.repo}, and this repository judges only its part of it. Ratchet in the model's repository, or name a config of this repository's own with --config.`)
     return 2
   }
   let tests: TestCase[] | undefined

@@ -106,6 +106,32 @@ describe('radical check', () => {
     expect(JSON.parse(await readFile(join(cwd, 'gate.json'), 'utf8'))).toEqual({ rules: { 'requirement-without-scenario': { severity: 'error', max: 1 } } })
   })
 
+  it('leaves the model\'s baselines alone in a repository that judges its part of a model kept elsewhere', async () => {
+    // Two requirements no scenario verifies; the repository builds what satisfies one.
+    const cwd = await workspace({
+      nodes: [
+        node('sys', 'system', 'Shop'), node('web', 'container', 'Web', { parentId: 'sys' }), node('api', 'container', 'API', { parentId: 'sys' }),
+        node('need', 'need', 'Brief', { description: 'Shoppers see a basket and pay by card.' }),
+        node('basket', 'requirement', 'Basket', { action: 'show the basket' }), node('pay', 'requirement', 'Pay', { action: 'take the payment' }),
+      ],
+      relations: [
+        { id: 'r1', relationType: 'derives', sourceId: 'basket', targetId: 'need' }, { id: 'r2', relationType: 'derives', sourceId: 'pay', targetId: 'need' },
+        { id: 'r3', relationType: 'satisfies', sourceId: 'web', targetId: 'basket' }, { id: 'r4', relationType: 'satisfies', sourceId: 'api', targetId: 'pay' },
+      ],
+    })
+    const config = JSON.stringify({ rules: { 'requirement-without-scenario': { severity: 'error', max: 2 }, 'concern-unaddressed': 'off' } })
+    await writeFile(join(cwd, 'model', 'check.json'), config)
+    await mkdir(join(cwd, '.radical'))
+    await writeFile(join(cwd, '.radical', 'radical.json'), JSON.stringify({ model: { repo: '../central' }, implements: [{ element: 'web', paths: ['.'] }] }))
+    const ratchet = await run(cwd, 'check', 'model', '--ratchet')
+    expect(ratchet.code).toBe(2)
+    expect(ratchet.err).toContain('baselines of the whole model of ../central')
+    expect(await readFile(join(cwd, 'model', 'check.json'), 'utf8')).toBe(config)
+    // A config of the repository's own may follow its part.
+    await writeFile(join(cwd, 'web.json'), config)
+    expect((await run(cwd, 'check', 'model', '--config', 'web.json', '--ratchet')).err).toContain('requirement-without-scenario 2 → 1')
+  })
+
   it('exits 1 on a folder that is no model', async () => {
     const cwd = await workspace()
     await rm(join(cwd, 'model/radical.md'))

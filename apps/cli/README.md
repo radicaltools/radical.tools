@@ -374,7 +374,12 @@ check, so an existing model can adopt a rule before every gap is closed.
 `--ratchet` lowers each `max` to the count found now and writes the config
 back; it never raises one. A rule that did not run keeps its `max`: the
 `test-*` rules without `--report` (the output marks them `–` and "not run"),
-every rule but the folder's when the folder is no model.
+every rule but the folder's when the folder is no model. In a repository
+that judges only its part of a model kept in a repository of its own
+(`"model": { "repo": … }` in `.radical/radical.json`), the model's
+`check.json` holds the whole model's baselines: `--ratchet` refuses to lower
+them (exit 2), and lowers only a config of the repository's own named with
+`--config`.
 
 ### Goals
 

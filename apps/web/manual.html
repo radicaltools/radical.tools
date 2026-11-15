@@ -938,7 +938,7 @@ sh radical.sh &lt;command&gt;                  <span class="cm"># radical.cmd &l
           <li><code>--trace &lt;id&gt;</code> prints every verification path through one element, from its need or ADR to the tests and metric conditions, as the Inspector's <a href="#inspector-path">Verification path</a> draws it.</li>
           <li>With <code>--from-ci</code> it reads those of CI instead: the reports GitHub Actions kept for the commit checked out, or the nearest one before it that CI tested, downloaded with the GitHub CLI (<code>gh</code>). Test results never go into git: a commit cannot hold the results of its own tests.</li>
           <li>It compares the values sensors measured with the conditions in the model: what <code>radical sense</code> keeps beside it, and the files <code>--metrics</code> names (from another CI job).</li>
-          <li><code>check.json</code> in the model folder sets each rule's severity and a baseline, and goals in percent. <code>--ratchet</code> lowers baselines to what the check finds now, never raises them.</li>
+          <li><code>check.json</code> in the model folder sets each rule's severity and a baseline, and goals in percent. <code>--ratchet</code> lowers baselines to what the check finds now, never raises them; in a repository that judges only its part of a model kept elsewhere it leaves the model's baselines alone.</li>
           <li>Exit status 0 means no errors, 1 errors, 2 the check could not run. <code>--format github</code> writes annotations for GitHub Actions.</li>
         </ul>
         <h3 id="cli-sense">Sensors</h3>
