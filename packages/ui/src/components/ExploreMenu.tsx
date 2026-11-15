@@ -1,6 +1,8 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { shownExploration, useDiagramStore } from '../store/diagramStore'
-import { type ExploreChoice, type ExploreLink, explorationLinks, menuRows } from '../store/exploration'
+import { CANVAS_MAX_ELEMENTS } from '@radical/common/c4'
+import { canvasOverflow } from '@radical/common/viewPipeline'
+import { type ExploreChoice, type ExploreLink, explorationLinks, grown, menuRows } from '../store/exploration'
 import { nodeControlAt } from './CollapseToggleMirror'
 import { editingControl } from './editingControl'
 
@@ -80,10 +82,11 @@ export function ExploreMenu({ containerRef }: { containerRef: React.RefObject<HT
     place()
     return () => cancelAnimationFrame(raf)
   }, [nodeId, containerRef])
-  // Opens focused, on Show all (once it has a place).
+  // Opens focused, on Show all (once it has a place); on the first row
+  // when Show all would add more than a canvas draws.
   const placed = !!at
   useEffect(() => {
-    if (nodeId && placed) menuRef.current?.querySelector<HTMLElement>('[data-col="top"]')?.focus()
+    if (nodeId && placed) menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')?.focus()
   }, [nodeId, placed])
   // A click elsewhere closes it.
   useEffect(() => {
@@ -113,13 +116,21 @@ export function ExploreMenu({ containerRef }: { containerRef: React.RefObject<HT
     return next
   })
   const ticked = allRows.filter((r) => checked.has(r.id))
+  const tickedChoice: ExploreChoice = {
+    rows: ticked.flatMap((r) => r.choice.rows ?? []),
+    parent: ticked.some((r) => r.choice.parent),
+    children: ticked.some((r) => r.choice.children),
+  }
+  // What would take the exploration past what a canvas draws is not added
+  // (exploreNeighbours): its row is off.
+  const tooMany = (choice?: ExploreChoice): boolean => {
+    const next = grown(exploration, nodeId, links, choice, '')
+    return !!next && canvasOverflow(next, nodes, relations) !== null
+  }
+  const pastCanvas = `More than a canvas draws (${CANVAS_MAX_ELEMENTS.toLocaleString('en')} elements)`
   const showChecked = (): void => {
-    if (!ticked.length) return
-    exploreNeighbours(nodeId, {
-      rows: ticked.flatMap((r) => r.choice.rows ?? []),
-      parent: ticked.some((r) => r.choice.parent),
-      children: ticked.some((r) => r.choice.children),
-    })
+    if (!ticked.length || tooMany(tickedChoice)) return
+    exploreNeighbours(nodeId, tickedChoice)
   }
   const focusAt = (col: string, idx: number): void => {
     menuRef.current?.querySelector<HTMLElement>(`[data-col="${col}"][data-idx="${idx}"]`)?.focus()
@@ -157,7 +168,8 @@ export function ExploreMenu({ containerRef }: { containerRef: React.RefObject<HT
         <div key={r.id} className="explore-menu-row">
           <input type="checkbox" tabIndex={-1} aria-label={`Check ${r.text}`} checked={checked.has(r.id)} onChange={() => toggle(r.id)} />
           <button type="button" role="menuitem" data-col={col} data-idx={i} className="explore-menu-add"
-            title={`Add the ${r.n === 1 ? 'element' : `${r.n} elements`} joined to ${label} this way`}
+            disabled={tooMany(r.choice)}
+            title={tooMany(r.choice) ? pastCanvas : `Add the ${r.n === 1 ? 'element' : `${r.n} elements`} joined to ${label} this way`}
             onClick={() => exploreNeighbours(nodeId, r.choice)}>
             <span>{r.text}{r.note && <span className="explore-menu-note"> {r.note}</span>}</span>
             <span className="explore-menu-count">{r.n}</span>
@@ -177,14 +189,14 @@ export function ExploreMenu({ containerRef }: { containerRef: React.RefObject<HT
       onKeyDown={onKeyDown}
     >
       <div className="explore-menu-title">Add to {label}</div>
-      <button type="button" role="menuitem" data-col="top" data-idx={0} className="explore-menu-all" onClick={() => exploreNeighbours(nodeId)}>
+      <button type="button" role="menuitem" data-col="top" data-idx={0} className="explore-menu-all" disabled={tooMany()} title={tooMany() ? pastCanvas : undefined} onClick={() => exploreNeighbours(nodeId)}>
         Show all {count(links)}
       </button>
       <div className="explore-menu-cols">
         {column(columns.out, 'L', `${label} → others`)}
         {column(columns.in, 'R', `others → ${label}`)}
       </div>
-      <button type="button" role="menuitem" data-col="bottom" data-idx={0} className="explore-menu-show" disabled={!ticked.length} onClick={showChecked}>
+      <button type="button" role="menuitem" data-col="bottom" data-idx={0} className="explore-menu-show" disabled={!ticked.length || tooMany(tickedChoice)} title={ticked.length && tooMany(tickedChoice) ? pastCanvas : undefined} onClick={showChecked}>
         Show checked
       </button>
     </div>

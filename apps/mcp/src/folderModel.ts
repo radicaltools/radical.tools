@@ -1014,7 +1014,7 @@ export class FolderModel {
     const changed = JSON.parse(JSON.stringify(data)) as DiagramData
     const view = viewId === undefined ? undefined : changed.views?.find((v) => v.id === viewId)
     if (viewId !== undefined && !view) return { ok: false, text: `smart_layout: unknown view id "${viewId}"` }
-    const refused = view ? noCanvasLayout('smart_layout', view) : null
+    const refused = view ? noCanvasLayout('smart_layout', view, byId(changed.nodes), byId(changed.relations)) : null
     if (refused) return { ok: false, text: `${refused}.` }
     // The canvas the view shows: its saved positions over the model's.
     const nodes = byId(view ? (JSON.parse(JSON.stringify(changed.nodes)) as C4Node[]) : changed.nodes)

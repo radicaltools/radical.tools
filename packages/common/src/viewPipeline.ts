@@ -11,7 +11,7 @@
 // the steps that fit, with how many elements each concerns.
 
 import type { C4Node, C4Relation, ChainLevel, ChainVia, ChainWay, DiagramView, ViewFilter, ViewPipeline, ViewSort } from './c4'
-import { holderOf, notedPlacesOnly, viewShowsEveryNode } from './c4'
+import { CANVAS_MAX_ELEMENTS, holderOf, notedPlacesOnly, viewShowsEveryNode } from './c4'
 import type { Metamodel, PropertyDef } from './metamodel/types'
 import type { WizardLink } from './metamodel/wizard'
 import { inferRelationType, isParentAllowed, isPlacementAllowed, isRelationAllowed, relationTypesFitting } from './metamodel/lookup'
@@ -874,6 +874,27 @@ function computeShownNodes(view: DiagramView, nodes: Record<string, C4Node>, rel
 export function viewDrawnIds(view: DiagramView | undefined, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): Set<string> | undefined {
   if (!view || !pipelineOf(view)?.levels?.length || view.kind === 'dynamic') return undefined
   return viewShownNodes(view, nodes, relations)
+}
+
+/** How many elements `view` draws on a canvas: those it lists when it is
+ *  of type Explore (an exploration draws them flat, each on its own), else
+ *  those it shows (viewShownNodes), every element of the model when it
+ *  shows every one. Also what a view turned into an exploration lists. */
+export function canvasCount(view: DiagramView, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): number {
+  if (view.kind === 'explore') return view.nodeIds.filter((id) => id in nodes).length
+  return viewShownNodes(view, nodes, relations)?.size ?? Object.keys(nodes).length
+}
+
+/** How many elements the canvas of `view` would draw, when that is more
+ *  than a canvas draws (CANVAS_MAX_ELEMENTS): such a view is neither drawn
+ *  nor laid out, by Studio or by an agent's layout tools. Null for a view
+ *  within the limit, and for one of a kind that draws no canvas (a table,
+ *  a wiki, a flow, …). A view's filter grows with the model, so a view
+ *  drawn once may be too large now. */
+export function canvasOverflow(view: DiagramView | undefined, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): number | null {
+  if (!view || ((view.kind ?? 'static') !== 'static' && view.kind !== 'explore')) return null
+  const count = canvasCount(view, nodes, relations)
+  return count > CANVAS_MAX_ELEMENTS ? count : null
 }
 
 /** `ids` and every container they sit in. */

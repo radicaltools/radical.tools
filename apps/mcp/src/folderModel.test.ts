@@ -17,7 +17,7 @@ import { parseModelBase } from '@radical/common/formats/modelBase'
 import { AGENT_ACTIVE_MS, AGENT_ACTIVITY_FILE, parseAgentActivity } from '@radical/common/formats/agentActivity'
 import { FolderModel } from './folderModel'
 import { drawnSize } from '@radical/layout/geometry'
-import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, type C4Node } from '@radical/common/c4'
+import { CANVAS_MAX_ELEMENTS, COLLAPSED_HEIGHT, COLLAPSED_WIDTH, type C4Node } from '@radical/common/c4'
 import { documentMetamodel } from '@radical/common/model'
 import { serializeTestResults } from '@radical/common/check'
 import { TIDY_BUDGET, costRows, formatPart, runTidyLayout } from '@radical/layout/tidy'
@@ -931,6 +931,37 @@ describe('long Smart Layout runs', () => {
     expect((await model.call('align_nodes', { nodeIds: ['a', 'b'], axis: 'vertical', viewId: 'v' })).ok).toBe(false)
     const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
     expect(after.views!.find((v) => v.id === 'v')!.layoutConstraints ?? []).toEqual([])
+  }, 60_000)
+
+  it('lays out no view with more elements than a canvas draws, as Studio neither draws nor lays it out', async () => {
+    // smart_layout took 11 s on 1,001 elements and wrote a place for each,
+    // answering "the view keeps its places"; grid_nodes was accepted.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const requirements = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `r${i}`, type: 'requirement', label: `Requirement ${i}`, x: (i % 40) * 260, y: Math.floor(i / 40) * 160, width: 240, height: 140, collapsed: false }))
+    data.nodes = requirements(CANVAS_MAX_ELEMENTS + 1) as never
+    data.views = [
+      { id: 'v', name: 'Every requirement', nodeIds: [], positions: {}, pipeline: { levels: [{ ways: [{ types: ['requirement'] }] }] } } as never,
+      { id: 'w', name: 'Some', nodeIds: requirements(CANVAS_MAX_ELEMENTS).map((n) => n.id), positions: {} } as never,
+    ]
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const views = await readFile(join(folder, 'views.json'), 'utf8')
+    for (const [tool, args] of [
+      ['smart_layout', { viewId: 'v' }],
+      ['align_nodes', { viewId: 'v', nodeIds: ['r0', 'r1'], axis: 'horizontal' }],
+      ['grid_nodes', { viewId: 'v', nodeIds: ['r0', 'r1', 'r2', 'r3'], columns: 2 }],
+    ] as const) {
+      const outcome = await model.call(tool, args)
+      expect(outcome.ok, outcome.text).toBe(false)
+      expect(outcome.text).toContain(`${tool}: "Every requirement" shows 1,001 elements; a canvas draws up to 1,000`)
+    }
+    expect(await readFile(join(folder, 'views.json'), 'utf8')).toBe(views)
+    // A view of 1,000 is a canvas.
+    expect((await model.call('grid_nodes', { viewId: 'w', nodeIds: ['r0', 'r1', 'r2', 'r3'], columns: 2 })).ok).toBe(true)
   }, 60_000)
 
   it('takes a type that another writer added to the metamodel since its last call', async () => {
