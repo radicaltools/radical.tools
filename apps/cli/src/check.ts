@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/pro
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, formatTrace, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, splitTestId, testsRanAt, traceOf, type CheckConfig, type CiSource, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, formatTrace, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, splitTestId, testsRanAt, traceOf, withBoundTests, type CheckConfig, type CiSource, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { DEPS_FILE } from '@radical/common/federation'
 import { STATE_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
@@ -75,7 +75,8 @@ its own ("model": { "repo": … }), it judges that repository's part of the mode
                       do not run and keep their baselines). Where only this
                       repository's part of a model is judged, it lowers no
                       baseline of the model's check.json (exit 2): only one
-                      --config names
+                      --config names. With --alone or --trigger, which leave
+                      part of the model out, it lowers none (exit 2)
   --alone             check without the models deps.json names; with a
                       deps.json the model is checked composed with them, at
                       their pinned refs (radical federation --help)
@@ -169,6 +170,14 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     || (values.evidence && !values.report?.length && !fromCi && !values.metrics?.length)
     || (values.trace !== undefined && (!values.trace.trim() || values.format === 'github' || values.ratchet))) {
     io.err(CHECK_USAGE)
+    return 2
+  }
+
+  // A baseline is the whole model's: a check that leaves part of it out
+  // (the models deps.json names, the conditions of other events) finds less.
+  const partial = values.alone ? '--alone' : values.trigger !== undefined ? '--trigger' : null
+  if (values.ratchet && partial) {
+    io.err(`radical check --ratchet: with ${partial} the check leaves part of the model out (${partial === '--alone' ? 'the models deps.json names' : 'the metric conditions of other events'}), and a baseline counts the whole model. Ratchet with a check of all of it.`)
     return 2
   }
 
@@ -380,7 +389,8 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     const own = deserializeFromMdFolder(files).data
     const nodes = [...own.nodes, ...others?.nodes ?? []]
     const relations = [...own.relations, ...others?.relations ?? []]
-    const byId = Object.fromEntries(nodes.map((n) => [n.id, n]))
+    // With the tests the repository binds, listed before any results too.
+    const byId = Object.fromEntries(withBoundTests(nodes, repository?.verifies).map((n) => [n.id, n]))
     if (!byId[values.trace]) { io.err(`radical check --trace: no element ${values.trace} in ${folder}${others?.nodes.length ? ' or the models it depends on' : ''}.`); return 2 }
     const trace = traceOf({ nodes: byId, relations: Object.fromEntries(relations.map((r) => [r.id, r])), evidence: result.evidence, cases: tests }, values.trace)
     if (!values.quiet) io.out(values.format === 'json' ? JSON.stringify(trace, null, 2) : formatTrace(trace, byId))

@@ -124,7 +124,7 @@ function ResultCard({ r, root }: { r: TraceResult; root: string | null }): React
   const m = r.measurement
   return (
     <div className={`trace-card trace-result ${tone(r.outcome)}`} data-testid="trace-result">
-      <div className="trace-card-head"><Mark status={r.outcome} /><span className="trace-kind">{r.test ? 'Test' : 'Metric'}</span><span className="trace-status">{r.outcome}</span></div>
+      <div className="trace-card-head"><Mark status={r.outcome} /><span className="trace-kind">{r.test ? 'Test' : 'Metric'}</span><span className="trace-status">{r.outcome ?? 'no results'}</span></div>
       {id ? (
         <div className="trace-test-id"><span className="trace-file">{id.file}</span>{id.title.length > 0 && <b>{id.title.join(' › ')}</b>}</div>
       ) : <code className="trace-condition">{r.condition}</code>}
