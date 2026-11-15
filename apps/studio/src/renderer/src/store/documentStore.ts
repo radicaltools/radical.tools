@@ -208,15 +208,18 @@ function withFederation(id: string, data: DiagramData | null, texts: FederationT
   return data ? withOtherModels(data, fetched) : null
 }
 
-/** Reads a watched folder model's federation files every FEDERATION_POLL_MS
- *  while it has a deps.json: when they differ from what its last read found
- *  (a fetch), the document reloads as for an outside edit, its unsaved edits
- *  merged in. Returns the function that stops. */
+/** Reads a watched folder model's federation files every FEDERATION_POLL_MS,
+ *  also one without a deps.json (radical setup --depends-on writes one, then
+ *  fetches): when they differ from what its last read found (a fetch), the
+ *  document reloads as for an outside edit, its unsaved edits merged in.
+ *  Polled only with a deps.json, a model opened without one, or whose
+ *  deps.json went, showed a later fetch only at a reload (F-0118). Returns
+ *  the function that stops. */
 function followFederation(id: string): () => void {
   let busy = false
   const timer = setInterval(() => {
     const last = federations.get(id)
-    if (busy || last?.texts.deps == null) return
+    if (busy || !last) return
     busy = true
     void readFederationTexts(id).then((now) => {
       const seen = federations.get(id)

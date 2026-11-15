@@ -48,11 +48,11 @@ const fetched = (label = 'Orders'): string => serializeFederationFile({
 /** Opens the payments folder (`own`) in Studio, in Designer, on the view
  *  named, with its `deps` and the other models `federation` fetched (null:
  *  none fetched). */
-async function openComposed(page: Page, studio: Studio, view: string, { own = PAYMENTS, deps = DEPS, federation = fetched() }: { own?: DiagramData; deps?: string; federation?: string | null } = {}): Promise<ModelFolder> {
+async function openComposed(page: Page, studio: Studio, view: string, { own = PAYMENTS, deps = DEPS, federation = fetched() }: { own?: DiagramData; deps?: string | null; federation?: string | null } = {}): Promise<ModelFolder> {
   const folder = new ModelFolder(page)
   await folder.install()
   await page.goto('/')
-  const files = { ...serializeToMdFolder(own, 'payments'), 'deps.json': deps, ...(federation ? { '.state/federation.json': federation } : {}) }
+  const files = { ...serializeToMdFolder(own, 'payments'), ...(deps ? { 'deps.json': deps } : {}), ...(federation ? { '.state/federation.json': federation } : {}) }
   for (const [path, content] of Object.entries(files)) await folder.write(path, content)
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
@@ -160,6 +160,30 @@ test('edits stay the model\'s own, and a new fetch reaches the open model', asyn
   const after = await folder.files()
   expect(nodeFileOf(after, 'Orders v2')).toBe(false)
   expect(nodeFileOf(after, 'Payments v2')).toBe(true)
+})
+
+test('a model opened without deps.json shows the other models once they are added and fetched', async ({ page, studio }) => {
+  // F-0118: only a model read with a deps.json was polled, and the poll
+  // stopped once deps.json went: radical setup --depends-on and a fetch
+  // reached the open model only at a reload.
+  const folder = await openComposed(page, studio, 'Landscape', { deps: null, federation: null })
+  await expect(studio.node('pay')).toBeVisible()
+  await expect(studio.node('ord')).toHaveCount(0)
+  const button = page.locator('.app-brand-switch').getByRole('button', { name: /other model/ })
+  await expect(button).toHaveCount(0)
+
+  await folder.write('deps.json', DEPS)
+  await folder.write('.state/federation.json', fetched())
+  await expect(studio.node('ord')).toBeVisible({ timeout: 10_000 })
+  await expect(button).toHaveCount(1)
+
+  // deps.json and the fetch removed, then made again: followed both ways.
+  await folder.remove('deps.json')
+  await folder.remove('.state/federation.json')
+  await expect(studio.node('ord')).toHaveCount(0, { timeout: 10_000 })
+  await folder.write('deps.json', DEPS)
+  await folder.write('.state/federation.json', fetched('Orders v2'))
+  await expect(studio.node('ord')).toContainText('Orders v2', { timeout: 10_000 })
 })
 
 test('a model whose other models are not fetched says how to fetch them', async ({ page, studio }) => {
