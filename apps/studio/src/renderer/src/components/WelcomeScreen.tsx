@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useHubStore } from '@radical/ui/store/hubStore'
 import { documents } from '../store/documentStore'
 import { aiReady, loadAISettings } from '../ai/settings'
 import { BrowserIcon, ModelRow, NewModelStep, OpenSources, StepRow, openSample } from './ModelSteps'
@@ -8,6 +9,25 @@ import radicalMark from '../radical-mark.svg?url'
 
 interface Props {
   onDismiss: () => void
+  /** The Hub's packs a link asks to import: they wait for the model the
+   *  user picks or creates here. */
+  hubWaits?: string[] | null
+}
+
+/** Names the Hub's packs a link asked for (its Open in Studio), which wait
+ *  for a model: their import opens once one is picked or created. */
+function HubWaiting({ ids }: { ids: string[] }): React.ReactElement {
+  const concepts = useHubStore((s) => s.concepts)
+  const fetchConcepts = useHubStore((s) => s.fetchConcepts)
+  useEffect(() => { void fetchConcepts() }, [fetchConcepts])
+  const names = ids.map((id) => concepts.find((c) => c.id === id)?.name ?? id)
+  const listed = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+  return (
+    <p className="welcome-hub-waits" role="status">
+      From Radical Hub: <strong>{listed}</strong> {names.length === 1 ? 'waits' : 'wait'} to be imported.
+      Open or create the model {names.length === 1 ? 'it goes' : 'they go'} into.
+    </p>
+  )
 }
 
 /** Stylised slice of the fintech sample: the C4 core with the ADR,
@@ -76,7 +96,7 @@ function SamplePreview(): React.ReactElement {
   )
 }
 
-export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
+export function WelcomeScreen({ onDismiss, hubWaits }: Props): React.ReactElement {
   // The doc auto-seeded on a first visit is not the user's work: leave it out
   // so newcomers are not greeted by a model they never made.
   const existingDocs = documents.listDocuments().filter(d => !documents.isBootSeeded(d.id))
@@ -131,6 +151,7 @@ export function WelcomeScreen({ onDismiss }: Props): React.ReactElement {
 
         {/* ── Right column: New model or Open, then the details ── */}
         <div className="welcome-right">
+          {hubWaits && <HubWaiting ids={hubWaits} />}
           {step === 'start' && (
             <div className="welcome-start">
               <button

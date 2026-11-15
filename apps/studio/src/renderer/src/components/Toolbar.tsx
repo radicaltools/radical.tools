@@ -869,7 +869,8 @@ export function Toolbar(): React.ReactElement {
     setHubBindTo(undefined)
   }, [])
   // The Inspector's concern finding opens the modal on its pack, bound to
-  // the element the concern applies to (persistence/inspector.ts, openConcern).
+  // the element the concern applies to (persistence/inspector.ts, openConcern),
+  // and a Hub link (?hub=id1,id2) on its packs once a model is open (App).
   useEffect(() => {
     const onOpen = (e: Event): void => {
       const { ids, bindTo } = (e as CustomEvent<{ ids: string[]; bindTo?: string }>).detail
@@ -879,22 +880,6 @@ export function Toolbar(): React.ReactElement {
     }
     window.addEventListener(OPEN_HUB_EVENT, onOpen)
     return () => window.removeEventListener(OPEN_HUB_EVENT, onOpen)
-  }, [])
-
-  // Detect ?hub=id1,id2 query param and open modal pre-filtered.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const hubParam = params.get('hub')
-    if (hubParam) {
-      const ids = hubParam.split(',').map((s) => s.trim()).filter(Boolean)
-      if (ids.length > 0) {
-        setHubPreselectedIds(ids)
-        setHubOpen(true)
-        // Clean the URL without triggering a reload.
-        const clean = window.location.pathname + window.location.hash
-        window.history.replaceState(null, '', clean)
-      }
-    }
   }, [])
 
   const { exportBusy, exportAs, copyToClipboard } = useExport()
