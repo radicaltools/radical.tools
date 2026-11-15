@@ -119,7 +119,9 @@ test('a pick on a wiki opens the element\'s page, and the highlighted result sta
   const active = page.locator('.quick-search-item.active')
   // Measured once the list has scrolled (it scrolls after the highlight moves).
   await expect.poll(async () => {
-    const [l, a] = [(await list.boundingBox())!, (await active.boundingBox())!]
+    // No box while the list draws again: ask again rather than fail.
+    const [l, a] = [await list.boundingBox(), await active.boundingBox()]
+    if (!l || !a) return false
     return a.y >= l.y - 1 && a.y + a.height <= l.y + l.height + 1
   }).toBe(true)
 })

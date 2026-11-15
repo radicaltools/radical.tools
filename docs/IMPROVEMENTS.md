@@ -365,7 +365,8 @@ line 199), and the next full run passed.
 page, and the highlighted result stays in sight` failed in a full local run on
 feat/assay-syntax (2026-11-09, which does not touch Studio) and once in 4
 runs alone (`boundingBox()` null while the list re-renders, line 123); then
-8 of 8 passed, as 8 of 8 did on main.
+8 of 8 passed, as 8 of 8 did on main. ~~Fixed on fix/round-211-220 (2026-11-15), where it failed in
+both full runs: the poll now asks again when a box is missing instead of failing.~~
 
 ### Dogfooding (2026-11-15): exploratory round 211–220 and its fix round
 
