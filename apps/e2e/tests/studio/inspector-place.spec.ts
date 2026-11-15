@@ -106,3 +106,43 @@ test('the Inspector is a place of the rail: its tabs in the left panel, its repo
   await expect(report).toHaveCount(0)
   await expect(canvas).toBeVisible()
 })
+
+test('after a reload, the rail button of an open Inspector works before the files beside the model are read', async ({ page, studio }) => {
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  for (const [path, content] of Object.entries(serializeToMdFolder(MODEL, 'Shop'))) await folder.write(path, content)
+  await folder.write('.state/test-results.json', serializeTestResults([{ file: '/repo/tests/pay.test.ts', title: ['pays by card'], status: 'failed' }], ['reports/unit.json']))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await expect(page.locator('.welcome-overlay')).toBeHidden()
+  await studio.ready()
+
+  const button = page.locator('.activity-rail').getByRole('button', { name: 'Inspector', exact: true })
+  const report = page.getByRole('region', { name: 'Inspector' })
+  await expect(button).toBeEnabled({ timeout: 10_000 })
+  await button.click()
+  await expect(report).toBeVisible()
+  await expect(page).toHaveURL(/\/i\//)
+
+  // The test results are read slowly after the reload: the Inspector is
+  // drawn at once, and its button is lit and works meanwhile.
+  await page.addInitScript(() => {
+    const getFile = FileSystemFileHandle.prototype.getFile
+    FileSystemFileHandle.prototype.getFile = async function (this: FileSystemFileHandle) {
+      if (this.name === 'test-results.json') await new Promise((r) => setTimeout(r, 8_000))
+      return getFile.call(this)
+    }
+  })
+  await page.reload()
+  await expect(report).toBeVisible({ timeout: 15_000 })
+  await expect(button.locator('.lp-rail-count')).toHaveText('–')
+  await expect(button).toBeEnabled()
+  await expect(button).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('.app-layout')).not.toHaveClass(/lp-collapsed/)
+  await button.click()
+  await expect(page.locator('.app-layout')).toHaveClass(/lp-collapsed/)
+  await expect(report).toBeVisible()
+  // Once read, the count is there.
+  await expect(button.locator('.lp-rail-count')).toHaveText('1', { timeout: 15_000 })
+})

@@ -3814,7 +3814,8 @@
     ] },
     { "element": "895cb22f-31a9-48c0-9853-d0b48190f1d6", "name": "Inspector in place of the view", "tests": [
       "apps/e2e/tests/studio/inspector-place.spec.ts › the Inspector is a place of the rail: its tabs in the left panel, its report in place of the view, folded as a section",
-      "apps/studio/tests/inspector.test.ts › the Inspector › is kept open or folded for the next start, and folding leaves its path"
+      "apps/studio/tests/inspector.test.ts › the Inspector › is kept open or folded for the next start, and folding leaves its path",
+      "apps/e2e/tests/studio/inspector-place.spec.ts › after a reload, the rail button of an open Inspector works before the files beside the model are read"
     ] },
     { "element": "c5ee2274-53df-4e77-b7ff-8bb12e343a85", "name": "Link to the Inspector perspective", "tests": [
       "apps/studio/tests/route.test.ts › route parse/format › opens a link to the Inspector perspective of before in Viewer, with the Inspector on its tab",
