@@ -83,7 +83,7 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'review_requirements',
-    description: 'Check requirements against the words of the needs they derive from (ADR Agents check requirements against the person\'s words). Lists each requirement added or changed since the model\'s version in git, and each one a need changed since then leads to, with its sentence next to the whole text of every need it derives from, directly or through other requirements; names those that derive from no need, and the needs that hold no question asked of a person. Call it after you change requirements and before you write their code; confirm each, or correct it with update_node where it adds, drops or changes a value, a number, a range, a state or who may do what, and where the need does not settle a point, ask the person and add the question and answer to the need word for word. It writes nothing.',
+    description: 'Check requirements against the words of the needs they derive from (ADR Agents check requirements against the person\'s words). Lists each requirement added or changed since the model\'s version in git (a derives relation of it added, removed or quoting other words too), and each one a need changed since then leads to, with its sentence next to the whole text of every need it derives from, directly or through other requirements; names those that derive from no need, and the needs that hold no question asked of a person. Call it after you change requirements and before you write their code; confirm each, or correct it with update_node where it adds, drops or changes a value, a number, a range, a state or who may do what, and where the need does not settle a point, ask the person and add the question and answer to the need word for word. It writes nothing.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -780,8 +780,11 @@ export class FolderModel {
         return { ok: false, text: `review_requirements: ${(err as Error).message}; name the requirements with ids instead` }
       }
       const changed = new Set([...changes.report.elements.added, ...changes.report.elements.changed].map((c) => c.id))
+      // A requirement whose derives relation was added, changed (its quote) or removed rests on other words.
+      const { relations: rels } = changes.report
+      for (const r of [...rels.added, ...rels.changed, ...rels.removed]) if (r.relationType === 'derives' && r.source.type === 'requirement') changed.add(r.source.id)
       chosen = own.nodes.filter((n) => n.type === 'requirement' && (changed.has(n.id) || needsOf(n.id).some((need) => changed.has(need.id))))
-      scope = `the requirements added or changed since ${changes.base.described}, and those a need changed since then leads to`
+      scope = `the requirements added or changed since ${changes.base.described}, with their derives relations, and those a need changed since then leads to`
     }
     if (!chosen.length) return { ok: true, text: `Nothing to review: no requirement among ${scope}.` }
     const props = (n: C4Node) => n as unknown as Record<string, unknown>
@@ -1126,8 +1129,12 @@ export class FolderModel {
       off = new Set(Object.entries(config.rules ?? {}).filter(([id, setting]) => WORD_RULES.has(id) && (setting === 'off' || (typeof setting === 'object' && setting !== null && (setting as { severity?: unknown }).severity === 'off'))).map(([id]) => id))
     } catch { /* no check.json: every rule on */ }
     const findings = (d: DiagramData) => wordFindings({ nodes: byId(d.nodes), relations: byId(d.relations), metamodel }, off)
-    const before = new Set(findings(data).map((f) => `${f.rule}\0${f.message}`))
-    return findings(changed).filter((f) => !before.has(`${f.rule}\0${f.message}`))
+    // A finding is the same one by its rule, what it is about and what it
+    // says; the model before is read with the names the change gives, so a
+    // rename brings in nothing.
+    const key = (f: { rule: string; message: string; nodeId?: string; relationId?: string }) => `${f.rule}\0${f.nodeId ?? ''}\0${f.relationId ?? ''}\0${f.message}`
+    const before = new Set(findings(withLabelsOf(data, changed)).map(key))
+    return findings(changed).filter((f) => !before.has(key(f)))
   }
 
   /** Tell Studio, open on the folder, that an agent is writing it: it holds
@@ -1150,4 +1157,10 @@ export class FolderModel {
 function positionsOf(nodes: Record<string, C4Node>): Record<string, NodePosition> {
   return Object.fromEntries(Object.values(nodes).map((node): [string, NodePosition] =>
     [node.id, { x: node.x, y: node.y, width: node.width, height: node.height }]))
+}
+
+/** A model with the labels another version gives its elements. */
+function withLabelsOf(data: DiagramData, named: DiagramData): DiagramData {
+  const labels = new Map(named.nodes.map((n) => [n.id, n.label]))
+  return { ...data, nodes: data.nodes.map((n) => labels.has(n.id) && labels.get(n.id) !== n.label ? { ...n, label: labels.get(n.id)! } : n) }
 }

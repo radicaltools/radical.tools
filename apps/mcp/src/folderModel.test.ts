@@ -1470,6 +1470,31 @@ describe('requirements reviewed against their needs', () => {
     expect((await model.call('review_requirements', { ids: ['orphan'] })).text).toContain('holds no question asked of a person')
   })
 
+  it('reviews a requirement whose derives relation changed: a new quote, or a need it newly derives from (Requirement read against the client\'s words)', async () => {
+    const folder = await fixture()
+    const model = await FolderModel.open(folder)
+    await model.call('add_node', { tempId: 'brief', type: 'need', label: 'Brief', description: 'Q: How big is a basket?\nA: A basket holds at most 20 items.\n\nQ: How long is it kept?\nA: An idle basket is kept for 30 days.' })
+    await model.call('add_node', { tempId: 'limit', type: 'requirement', label: 'Basket limit', properties: { ears_type: 'ubiquitous', action: 'keep at most 20 items in a basket' } })
+    const quoted = await model.call('add_relation', { sourceId: 'limit', targetId: 'brief', relationType: 'derives', properties: { quote: 'A basket holds at most 20 items.' } })
+    const quoteId = /Relation ID: (\S+)\./.exec(quoted.text)![1]
+    await model.call('add_node', { tempId: 'idle', type: 'requirement', label: 'Idle baskets', properties: { ears_type: 'ubiquitous', action: 'delete a basket idle for 7 days' } })
+    await model.call('add_node', { tempId: 'other', type: 'requirement', label: 'Untouched', properties: { ears_type: 'ubiquitous', action: 'show the basket' } })
+    await model.call('add_relation', { sourceId: 'other', targetId: 'brief', relationType: 'derives', properties: { quote: 'A basket holds at most 20 items.' } })
+    await git(folder, 'init', '-q', '-b', 'main')
+    await git(folder, 'add', '.')
+    await git(folder, 'commit', '-q', '-m', 'model')
+    expect((await model.call('review_requirements', {})).text).toMatch(/^Nothing to review/)
+
+    const requoted = await model.call('update_relation', { id: quoteId, properties: { quote: 'An idle basket is kept for 30 days.' } })
+    expect(requoted.ok, requoted.text).toBe(true)
+    await model.call('add_relation', { sourceId: 'idle', targetId: 'brief', relationType: 'derives', properties: { quote: 'An idle basket is kept for 30 days.' } })
+    const review = await model.call('review_requirements', {})
+    expect(review.text).toContain('Review 2 requirements')
+    expect(review.text).toContain('## Requirement "Basket limit"')
+    expect(review.text).toContain('## Requirement "Idle baskets"')
+    expect(review.text).not.toContain('## Requirement "Untouched"')
+  })
+
   it("tells an agent writing the model what it brings in of the person's words (Write tells of a lost value)", async () => {
     const write = async (folder: string) => {
       const model = await FolderModel.open(folder)
@@ -1488,6 +1513,22 @@ describe('requirements reviewed against their needs', () => {
     const silent = await write(quiet)
     expect(silent.ok, silent.text).toBe(true)
     expect(silent.text).not.toContain('does not say "0"')
+  })
+
+  it("tells nothing of the person's words after a rename: it brings in no finding (Write tells of a lost value)", async () => {
+    const model = await FolderModel.open(await fixture())
+    await model.call('add_node', { tempId: 'brief', type: 'need', label: 'Brief', description: 'Q: How big is a basket?\nA: A basket holds at most 20 items.\n\nQ: How long is it kept?\nA: An idle basket is kept for 30 days.' })
+    await model.call('add_node', { tempId: 'limit', type: 'requirement', label: 'Basket limit', properties: { ears_type: 'ubiquitous', action: 'keep at most 25 items in a basket' } })
+    const told = await model.call('add_relation', { sourceId: 'limit', targetId: 'brief', relationType: 'derives', properties: { quote: 'A basket holds at most 20 items.' } })
+    expect(told.text).toContain("The person's words, as radical check reads them, after this change")
+    for (const [id, label] of [['limit', 'Basket size'], ['brief', 'Shop brief']]) {
+      const renamed = await model.call('update_node', { id, label })
+      expect(renamed.ok, renamed.text).toBe(true)
+      expect(renamed.text).not.toContain("The person's words")
+    }
+    // A change that does bring one in is still told, with the new names.
+    const lost = await model.call('update_node', { id: 'limit', properties: { action: 'keep at most 25 items in a basket for 7 days' } })
+    expect(lost.text).toContain('Requirement "Basket size" says "25", "7"')
   })
 
   it('asks agents for the person\'s words in the need and a review before the code (Agent told to keep answers and review)', async () => {

@@ -1068,9 +1068,10 @@ export function testBinding(model: CheckModel): Map<string, { total: number; unb
  *  requirements against the person's words). */
 export const WORD_RULES: ReadonlySet<string> = new Set(['derives-quote-not-in-need', 'quote-value-missing', 'quote-value-differs', 'requirement-value-unquoted', 'scenario-value-missing', 'example-not-in-scenario', 'need-answer-unquoted'])
 
-/** What the word rules find in a model, each with its rule and severity;
- *  `off`, the rules check.json turns off. */
-export function wordFindings(model: CheckModel, off: ReadonlySet<string> = new Set()): Array<{ rule: string; severity: CheckSeverity; message: string }> {
+/** What the word rules find in a model, each with its rule, severity and
+ *  the element or relation it is about; `off`, the rules check.json turns
+ *  off. */
+export function wordFindings(model: CheckModel, off: ReadonlySet<string> = new Set()): Array<{ rule: string; severity: CheckSeverity; message: string; nodeId?: string; relationId?: string }> {
   return CHECK_RULES.filter((r) => WORD_RULES.has(r.id) && !off.has(r.id))
-    .flatMap((rule) => rule.run(model).map((f) => ({ rule: rule.id, severity: f.severity ?? rule.severity, message: f.message })))
+    .flatMap((rule) => rule.run(model).map((f) => ({ rule: rule.id, severity: f.severity ?? rule.severity, message: f.message, ...(f.nodeId ? { nodeId: f.nodeId } : {}), ...(f.relationId ? { relationId: f.relationId } : {}) })))
 }
