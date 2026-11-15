@@ -1027,6 +1027,10 @@ export class FolderModel {
     // it out from the same canvas.
     if (view && (view.kind ?? 'static') === 'static' && !Object.keys(view.positions ?? {}).length) placeOnViewCanvas(nodes, positionsOf(nodes), view, byId(changed.relations))
     const constraints = view ? view.layoutConstraints : changed.defaultLayoutConstraints
+    // A row or column set by a tool (align_nodes, grid_nodes) holds from
+    // the moment Studio shows the canvas: lined up here too, so that both
+    // lay the view out from the same canvas.
+    applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
     const input = viewLayoutInput(view, nodes, byId(changed.relations), constraints)
     if (!Object.keys(input.nodes).length) return { ok: true, text: 'Smart Layout: there are no nodes to lay out.' }
     // Large models take a while: report each step, and stop at the next one
@@ -1075,8 +1079,8 @@ export class FolderModel {
       if (view) view.layoutConstraints = view.layoutConstraints?.filter((c) => c.type !== 'pin')
       else changed.defaultLayoutConstraints = changed.defaultLayoutConstraints?.filter((c) => c.type !== 'pin')
     }
-    // The refit knows nothing of the alignments; put them back.
-    applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
+    // The refit knows nothing of the alignments; put them back (round what is still pinned).
+    applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), view ? view.layoutConstraints : changed.defaultLayoutConstraints))
     // All elements writes the nodes themselves (settleGeometry then syncs
     // defaultPositions); a view keeps its own positions.
     if (view) view.positions = viewCanvasPositions(view, nodes, positionsOf(nodes), viewDrawnIds(view, nodes, byId(changed.relations)))
@@ -1103,7 +1107,7 @@ export class FolderModel {
     fitAndSeparateBottomUp(nodes, input)
     const unpinned = pinnedNodeIds(constraints).length
     view.layoutConstraints = view.layoutConstraints?.filter((c) => c.type !== 'pin')
-    applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
+    applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), view.layoutConstraints))
     view.positions = viewCanvasPositions(view, nodes, positionsOf(nodes), viewDrawnIds(view, nodes, byId(changed.relations)))
     return {
       ok: true,

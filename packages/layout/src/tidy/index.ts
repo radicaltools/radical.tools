@@ -323,7 +323,10 @@ function tidyOnce(
           if (level(ds)) continue
           off = true
           const moved = ds.filter((m) => Math.abs(m.d) >= 0.01)
-          if (follow && level(moved)) { for (const m of ds) if (Math.abs(m.d) < 0.01) shift(a, m.id, moved[0].d) }
+          // The members left behind follow, unless one of them may not move
+          // (pinned, or out of reach round a selection): then the move is undone.
+          const follows = ds.every((m) => Math.abs(m.d) >= 0.01 || !l.fixed(m.id))
+          if (follow && follows && level(moved)) { for (const m of ds) if (Math.abs(m.d) < 0.01) shift(a, m.id, moved[0].d) }
           else for (const m of moved) shift(a, m.id, -m.d)
         }
         if (!off) break

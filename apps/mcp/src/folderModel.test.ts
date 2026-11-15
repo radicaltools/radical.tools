@@ -782,6 +782,38 @@ describe('long Smart Layout runs', () => {
     for (const id of ['acc', 'auth', 'gw', 'risk', 'db', 'dw']) expect(geometry(after.nodes, id), id).toEqual(geometry(data.nodes, id))
   }, 60_000)
 
+  it('a row, column or grid an agent set and a Tidy round something else leave no siblings on each other (F-0175)', async () => {
+    const box = (id: string, type: string, parentId: string | undefined, x: number, y: number, width = 240, height = 160): C4Node =>
+      ({ id, type, label: id, ...(parentId ? { parentId } : {}), x, y, width, height, collapsed: false }) as C4Node
+    const keeps: Array<[string, Record<string, unknown>]> = [
+      ['align_nodes', { axis: 'horizontal', nodeIds: ['fx', 'val'] }],
+      ['align_nodes', { axis: 'vertical', nodeIds: ['fx', 'val'] }],
+      ['grid_nodes', { nodeIds: ['fx', 'val'], columns: 2 }],
+    ]
+    for (const [tool, args] of keeps) {
+      const folder = await fixture()
+      const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+      // fx and val one above the other in pay (side by side for a column); fraud and ledger far off, related to each other only.
+      const column = args.axis === 'vertical'
+      data.nodes = [
+        box('pay', 'container', undefined, 0, 0, 300, 396), box('fx', 'component', 'pay', 20, 120, 200, 120), box('val', 'component', 'pay', column ? 240 : 20, column ? 120 : 256, 200, 120),
+        box('fraud', 'container', undefined, 1200, 0), box('ledger', 'container', undefined, 1200, 600),
+      ]
+      data.relations = [{ id: 'r1', sourceId: 'fraud', targetId: 'ledger', relationType: 'interacts' }]
+      for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+        await mkdir(dirname(join(folder, path)), { recursive: true })
+        await writeFile(join(folder, path), content)
+      }
+      const model = await FolderModel.open(folder)
+      expect((await model.call(tool, args)).ok, tool).toBe(true)
+      const outcome = await model.call('smart_layout', { around: ['fraud'] })
+      expect(outcome.ok, outcome.text).toBe(true)
+      const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+      const fx = after.nodes.find((n) => n.id === 'fx')!, val = after.nodes.find((n) => n.id === 'val')!
+      expect(fx.x >= val.x + val.width || val.x >= fx.x + fx.width || fx.y >= val.y + val.height || val.y >= fx.y + fx.height, `${tool} ${JSON.stringify(args)}: fx clear of val`).toBe(true)
+    }
+  }, 60_000)
+
   it('unpins the view it lays out whole; round a selection the pinned elements stay, pinned', async () => {
     // Two elements pinned in Studio, a third on top of them.
     const folder = await fixture()

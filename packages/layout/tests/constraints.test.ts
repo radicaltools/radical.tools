@@ -344,3 +344,61 @@ describe('Smart Layout with alignments', () => {
     }
   }, 60_000)
 })
+
+describe('enforceAlignments moves only what a line needs (F-0174, F-0175)', () => {
+  // As the sample's Core Banking: Payments Service holds the two members;
+  // Access & Security and Risk & Data hold their children 58 px below their
+  // top (not Smart Layout's padding), with nothing to do with the line.
+  const canvas = (fx: { x: number; y: number }, val: { x: number; y: number }): Record<string, C4Node> => byId(
+    node('core', 'system', { x: 0, y: 0, width: 1700, height: 1400 }),
+    node('pay', 'container', { parentId: 'core', x: 30, y: 58, width: 460, height: 396 }),
+    node('fx', 'component', { parentId: 'pay', ...fx }),
+    node('val', 'component', { parentId: 'pay', ...val }),
+    node('acc', 'group', { parentId: 'core', x: 1100, y: 58, width: 520, height: 568 }),
+    node('auth', 'container', { parentId: 'acc', x: 57, y: 58 }),
+    node('gw', 'container', { parentId: 'acc', x: 57, y: 338 }),
+    node('risk', 'group', { parentId: 'core', x: 30, y: 800, width: 658, height: 498 }),
+    node('db', 'container', { parentId: 'risk', x: 57, y: 58 }),
+    node('dw', 'container', { parentId: 'risk', x: 357, y: 58 }),
+  )
+  const stacked = canvas({ x: 20, y: 120 }, { x: 20, y: 256 })
+  const sideBySide = canvas({ x: 20, y: 120 }, { x: 240, y: 150 })
+  const lines: Array<[string, Record<string, C4Node>, LayoutConstraint]> = [
+    ['a row', stacked, align('horizontal', 'fx', 'val')],
+    ['an ordered row', stacked, ordered('horizontal', 'fx', 'val')],
+    ['a column', sideBySide, align('vertical', 'fx', 'val')],
+    ['a grid', stacked, grid(2, 'fx', 'val')],
+  ]
+  const unrelated = ['acc', 'auth', 'gw', 'risk', 'db', 'dw']
+  const given = (nodes: Record<string, C4Node>): PositionMap =>
+    Object.fromEntries(Object.values(nodes).map((n) => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }]))
+
+  for (const [name, nodes, rule] of lines) {
+    for (const pinned of [[], ['acc', 'auth', 'gw']]) {
+      it(`${name} leaves the frames it has nothing to do with at their place and size${pinned.length ? ', one of them pinned' : ''}`, () => {
+        const alignments = resolveAlignments([rule], nodes)
+        const out = enforceAlignments(nodes, {}, alignments, new Set(pinned))
+        expect(alignmentError(nodes, out, alignments)).toBeLessThanOrEqual(0.5)
+        const was = absolute(nodes, given(nodes)), now = absolute(nodes, out)
+        for (const id of unrelated) expect(now[id], id).toEqual(was[id])
+        expect(overlapping([now.fx, now.val])).toBe(false)
+      })
+    }
+
+    it(`${name} whose members may not move is left as it is, its members not put on each other`, () => {
+      const alignments = resolveAlignments([rule], nodes)
+      const out = enforceAlignments(nodes, {}, alignments, new Set(['fx', 'val']))
+      const was = absolute(nodes, given(nodes)), now = absolute(nodes, out)
+      for (const id of Object.keys(nodes)) expect(now[id], id).toEqual(was[id])
+    })
+  }
+
+  it('lines up the members that may move on the ones that may not', () => {
+    const alignments = resolveAlignments([align('horizontal', 'fx', 'val')], stacked)
+    const out = enforceAlignments(stacked, {}, alignments, new Set(['fx']))
+    expect(alignmentError(stacked, out, alignments)).toBeLessThanOrEqual(0.5)
+    const was = absolute(stacked, given(stacked)), now = absolute(stacked, out)
+    expect(now.fx).toEqual(was.fx)
+    expect(overlapping([now.fx, now.val])).toBe(false)
+  })
+})

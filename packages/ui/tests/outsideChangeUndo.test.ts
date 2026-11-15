@@ -271,6 +271,8 @@ describe('Undo after an outside change', () => {
   it('takes back Keep in a row whole when the reload nudged the row (item 165)', () => {
     s().setActiveView('one')
     drag('b', { x: 900, y: 400 })
+    // Unpinned, so that the row moves both (a pinned member stays where it is).
+    s().unpinNodes(['b'])
     s().addAlignment('horizontal', ['a', 'b'])
     const row = { a: at('a'), b: at('b') }
     expect(row.a.y).toBe(row.b.y)
