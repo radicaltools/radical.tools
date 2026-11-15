@@ -227,6 +227,22 @@ function tidyOnce(
     l.setPositions(enforceAlignments(nodes, l.positions(), alignments, new Set(l.ids().filter((id) => l.fixed(id)))))
     l.refit()
   }
+  // Frames drawn otherwise than round what the view shows are fitted first,
+  // as every move fits them: a step of its own, so that a canvas with no
+  // move left to make still hands them over fitted (and is not kept as it was).
+  if (l.refitted.length) {
+    const now = l.positions()
+    const moved: PositionMap = {}
+    for (const id of l.refitted) {
+      moved[id] = now[id]
+      for (const c of l.childrenOf(id)) moved[c] = now[c]
+    }
+    const description = l.refitted.length === 1
+      ? `${nodes[l.refitted[0]].label ?? l.refitted[0]} fitted round what the view shows`
+      : `${l.refitted.length} frames fitted round what the view shows`
+    steps.push({ kind: 'fit', description, gain: 0, moved })
+    options.onProgress?.(steps.length, description)
+  }
   {
     const wasPositions = l.positions()
     lineUp()

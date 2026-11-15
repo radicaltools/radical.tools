@@ -367,6 +367,20 @@ feat/assay-syntax (2026-11-09, which does not touch Studio) and once in 4
 runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main.
 
+### Dogfooding (2026-11-15): Smart Layout over every view of our own model
+
+Laying out each canvas of `.radical/model` through the worktree's own MCP server, after the view Crucible of
+Entities of a domain opened with its two entities at the far end of a 2840 px frame. Open:
+
+- **No "lay out every view" call.** It took a stdio script with one `smart_layout` per view from `LIST VIEWS`,
+  the table, wiki, matrix and Warnier views picked out by hand; `smart_layout` with no `viewId` arranges All
+  elements, which Studio shows as a table now, and on 1600 elements it ran for minutes.
+- **`smart_layout` on a group of views per element says it moved things and writes nothing**: "Components of a
+  container: 90 moves … No files changed". A group keeps no canvas; it should refuse, or lay out each of its views.
+- **Older views of a group keep their subject folded, newer ones open**: Agent access (no `expandedNodeIds`) draws
+  its domain folded, Assay and Benchmark (made later, subject expanded) draw an empty 520×360 frame. A view per
+  element of an element with nothing to show might say so instead of drawing an empty frame.
+
 ### Dogfooding (2026-11-12): the Radical benchmark and the person's words
 
 Building the benchmark's product changes (PR #360) through the worktree's own MCP server, and measuring the
