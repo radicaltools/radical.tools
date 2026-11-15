@@ -1,0 +1,13 @@
+discount
+  need answer: Members get -10% on every basket.
+  requirement: give members a discount of 10% on every basket
+  radical check: 
+    quote-value-missing: Requirement "Requirement" does not say "-10%", which the words it quotes from "Brief" say.
+    requirement-value-unquoted: Requirement "Requirement" says "10%", which none of the words it quotes say: correct it to what the person said, or say in its rationale that it is the model's decision.
+
+subtraction
+  need answer: A member pays the basket total minus 5 € delivery.
+  requirement: subtract 5 € delivery from the basket total of a member
+  radical check: 
+    quote-value-missing: Requirement "Requirement" does not say "-5", which the words it quotes from "Brief" say.
+    requirement-value-unquoted: Requirement "Requirement" says "5", which none of the words it quotes say: correct it to what the person said, or say in its rationale that it is the model's decision.

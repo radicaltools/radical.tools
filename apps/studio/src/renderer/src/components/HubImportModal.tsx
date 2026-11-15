@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useHubStore, type HubConcept, type HubConceptSummary } from '@radical/ui/store/hubStore'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { editAsDesigner } from '@radical/ui/store/designerEdit'
+import { designerEditModel, editAsDesigner } from '@radical/ui/store/designerEdit'
+import { editsModel, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useDialogFocus } from './dialogKeys'
 import { bindProblem, bindSuggestions, CONCERN_GROUPS, isConcernPack, metamodelProblem, type BindSuggestion } from '@radical/common/concerns'
 import { categoryTheme, hubGroupOf } from '@radical/ui/types/hubTheme'
 import { NODE_COLORS, NODE_FG, TYPE_ICON_PATHS } from '@radical/common/c4'
 import { ConcernWizard } from './ConcernWizard'
 import { importConcernPackIntoDiagram } from '../hub/importConcept'
+import { keysOnTop } from '@radical/ui/components/keysHere'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ export function HubImportModal({ open, onClose, preselectedIds, bindTo }: Props)
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && keysOnTop(dialogRef.current, e)) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -110,7 +111,17 @@ export function HubImportModal({ open, onClose, preselectedIds, bindTo }: Props)
   const activeMetamodelId = useDiagramStore((s) => s.metamodel?.id)
   const metamodel       = useDiagramStore((s) => s.metamodel)
   const selectedNodeId  = useDiagramStore((s) => s.selectedNodeId)
-  const c4Nodes         = useDiagramStore((s) => s.c4Nodes)
+  // The elements of the model the import goes into (Designer's), not of a
+  // milestone Viewer or Presenter shows.
+  const c4Nodes         = useDiagramStore((s) => designerEditModel(s).nodes)
+
+  // Opened in Viewer, Presenter or the Inspector, the imports are Designer's
+  // edits (editAsDesigner) and list nothing in the view Designer has open,
+  // which the user did not choose for them: each pack is in its own view.
+  const offeredInDesigner = useRef(true)
+  useEffect(() => {
+    if (open) offeredInDesigner.current = editsModel(useDiagramStore.getState())
+  }, [open])
 
   const dialogRef = useRef<HTMLDivElement>(null)
   useDialogFocus(dialogRef, open)
@@ -155,7 +166,7 @@ export function HubImportModal({ open, onClose, preselectedIds, bindTo }: Props)
 
   // Where a concern pack can be bound, best first (bindSuggestions), with
   // the selected element after them when it is none of them.
-  const c4Relations = useDiagramStore((s) => s.c4Relations)
+  const c4Relations = useDiagramStore((s) => designerEditModel(s).relations)
   const concernChoices = useMemo((): { suggestions: BindSuggestion[]; others: string[] } => {
     if (!concernConcept || !isConcernPack(concernConcept)) return { suggestions: [], others: [] }
     const suggestions = bindSuggestions(concernConcept, c4Nodes, c4Relations, metamodel)
@@ -337,8 +348,15 @@ export function HubImportModal({ open, onClose, preselectedIds, bindTo }: Props)
               // never saved: the import is Designer's edit. From the
               // Inspector, which opened it, the user stays to see the
               // concern settled.
+              const intoOpenView = offeredInDesigner.current
               try {
-                if (!editAsDesigner(() => importConcernPackIntoDiagram(concernConcept, answers, elementIds))) return
+                const imported = editAsDesigner(() => importConcernPackIntoDiagram(concernConcept, answers, elementIds, intoOpenView))
+                if (!imported) return
+                // From Viewer or Presenter Studio stays in Designer: on the
+                // pack's view, the one that lists it.
+                const s = useDiagramStore.getState()
+                const view = imported.insert.views[0]
+                if (!intoOpenView && s.appMode === 'designer' && view && s.views[view.id]) s.setActiveView(view.id)
               } catch (error) {
                 useDiagramStore.getState().pushNotification((error as Error).message, 'error')
                 return

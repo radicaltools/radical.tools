@@ -68,8 +68,10 @@ export interface HostCapabilities {
   writeFile?(filePath: string, content: string): Promise<HostResult>
   /** Folder dialog, then read the model files in the chosen folder. */
   openFolder?(): Promise<ReadFolderResult & { folderPath?: string }>
-  /** Folder dialog only. */
-  pickFolder?(): Promise<HostResult & { folderPath?: string }>
+  /** Folder dialog only, with what the folder holds: the names of its
+   *  entries, and where below it a model is that Open finds in its place
+   *  (modelBelow: a repository's .radical/model or architecture/). */
+  pickFolder?(): Promise<HostResult & { folderPath?: string; entries?: string[]; modelAt?: string }>
   /** Read the md-folder model files in a folder. */
   readFolder?(folderPath: string): Promise<ReadFolderResult>
   /** Write an md-folder model. When the folder changed on disk since it was

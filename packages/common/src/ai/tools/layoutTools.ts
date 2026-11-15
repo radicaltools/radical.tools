@@ -17,7 +17,13 @@ const AXIS_ENUM = ['horizontal', 'vertical'] as const
 export function noCanvasLayout(tool: string, view: DiagramView, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): string | null {
   if (!view.kind || view.kind === 'static') {
     const count = canvasOverflow(view, nodes, relations)
-    return count === null ? null : `${tool}: "${view.name}" shows ${count.toLocaleString('en')} elements; a canvas draws up to ${CANVAS_MAX_ELEMENTS.toLocaleString('en')}, and Studio neither draws nor lays out a larger view. Show it as a table (update_view with kind "table"), which shows any number, or narrow its filter`
+    if (count === null) return null
+    const tooLarge = `${tool}: "${view.name}" shows ${count.toLocaleString('en')} elements; a canvas draws up to ${CANVAS_MAX_ELEMENTS.toLocaleString('en')}, and Studio neither draws nor lays out a larger view`
+    // A view per element takes its kind and filter from its group's
+    // viewpoint, and update_view refuses to change them (F-0160).
+    return view.partOf && view.viewpoint
+      ? `${tooLarge}. It is one of the views of a group per element, whose viewpoint "${view.viewpoint}" sets its view type and filter: show the group's views as tables (upsert_viewpoint with id "${view.viewpoint}" and kind "table"), which show any number, or narrow the viewpoint's filter`
+      : `${tooLarge}. Show it as a table (update_view with kind "table"), which shows any number, or narrow its filter`
   }
   if (view.kind === 'explore') return `${tool}: "${view.name}" is an explore view, laid out by Studio level by level from its start element; only static views have a canvas layout`
   return `${tool}: "${view.name}" is a ${view.kind} view; only static views have a canvas layout${view.kind === 'dynamic' ? ' (a dynamic view plays its sequence, drawn in order, with no positions of its own)' : ''}`

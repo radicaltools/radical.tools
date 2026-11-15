@@ -15,7 +15,7 @@
 
 import type { C4Node, C4Relation } from '../../c4'
 import { runTool, type ToolDef, type ToolRunContext } from '../tools'
-import { PRIMARY_TYPE_IDS_FOR_STAGE, type ForgeStageId } from './prompts'
+import { FORGE_STAGES, PRIMARY_TYPE_IDS_FOR_STAGE, type ForgeStageId } from './prompts'
 import { rejectRefinements, snapshotOf, stageRefinements, type ForgeRefinement, type ModelSnapshot } from './refinements'
 
 /** The tools a proposal may call: additions and corrections, no deletions. */
@@ -216,6 +216,17 @@ export interface RefinementGuardState {
   proposed: Set<string>
 }
 
+/** The stage that makes nodes of `type`, as seen from `stage`: the last
+ *  earlier one that does, else the first later one; undefined when none does. */
+function stageOfType(type: string, stage: ForgeStageId): { title: string; earlier: boolean } | undefined {
+  const at = FORGE_STAGES.findIndex((s) => s.id === stage)
+  const makes = (s: { id: ForgeStageId }): boolean => PRIMARY_TYPE_IDS_FOR_STAGE[s.id].includes(type)
+  const earlier = FORGE_STAGES.slice(0, at).filter(makes).pop()
+  if (earlier) return { title: earlier.title, earlier: true }
+  const later = FORGE_STAGES.slice(at + 1).find(makes)
+  return later ? { title: later.title, earlier: false } : undefined
+}
+
 /** Why the stage may not make this tool call itself, or null when it may.
  *  `proposeTool` is the tool the message points to. */
 export function refinementGuard(
@@ -240,7 +251,13 @@ export function refinementGuard(
     case 'add_node': {
       const own = PRIMARY_TYPE_IDS_FOR_STAGE[state.stage]
       if (typeof input.type === 'string' && !own.includes(input.type)) {
-        return `add_node: a ${input.type} belongs to an earlier stage, not to this one (${own.join(', ') || 'none of its own'}). ${ask}`
+        const article = /^[aeiou]/i.test(input.type) ? 'an' : 'a'
+        const owner = stageOfType(input.type, state.stage)
+        const here = `not to this one (${own.join(', ') || 'none of its own'})`
+        if (!owner) return `add_node: ${article} ${input.type} is made by no Forge stage, ${here}. ${ask}`
+        return owner.earlier
+          ? `add_node: ${article} ${input.type} belongs to an earlier stage (${owner.title}), ${here}. ${ask}`
+          : `add_node: ${article} ${input.type} belongs to a later stage (${owner.title}), ${here}: add it in that stage.`
       }
       return null
     }

@@ -1,0 +1,61 @@
+$ (A) radical federation fetch  → exit 0
+    Fetched orders@9f43134 (v1.0.0): 3 elements into .radical/model/.state/federation.json.
+$ (A) radical check  → exit 0
+    Checked with orders@9f43134 (v1.0.0) (deps.json).
+    radical check: .radical/model (2 elements, 1 relation)
+    
+    ⚠ inherited-adr-unapplied  1 (max 1)
+        warning  .radical/model  ADR "Every service logs as JSON" of orders@9f43134 binds this model and applies to none of its elements: link it with constrains to the elements it governs, or record an accepted ADR of this model that waives it and says why.
+    
+    ✓ 0 errors, 1 warning
+$ (A) radical check --alone --ratchet  → exit 1
+    radical check: .radical/model (2 elements, 1 relation)
+    
+    ✖ metamodel  1
+        error    .radical/model/relations.json  Relation "places orders" points at "oapi", which is no element of the model.
+    ✓ inherited-adr-unapplied  0 (max 1)
+    
+    ✖ 1 error, 0 warnings
+    [stderr] Ratchet: inherited-adr-unapplied 1 → 0 (written to /private/var/folders/pn/fh62qrjd1xx840kyv7dyk4tw0000gn/T/radical-218-alone-4i1NLI/shop/.radical/model/check.json).
+$ (A) radical check  → exit 1
+    Checked with orders@9f43134 (v1.0.0) (deps.json).
+    radical check: .radical/model (2 elements, 1 relation)
+    
+    ✖ inherited-adr-unapplied  1 (max 0)
+        error    .radical/model  ADR "Every service logs as JSON" of orders@9f43134 binds this model and applies to none of its elements: link it with constrains to the elements it governs, or record an accepted ADR of this model that waives it and says why.
+    
+    ✖ 1 error, 0 warnings
+$ (B) radical check --metrics bundle.json  → exit 0
+    radical check: .radical/model (3 elements, 2 relations)
+    
+    ⚠ metric-not-measured  1 (max 1)
+        warning  .radical/model/nodes/ff1.md  Fitness function "Shop stays up": nothing measured uptime >= 99.9 %.
+    
+    Test reports: 0 test cases; measurements: 1
+      Fitness functions: 1 passed, 1 not-run
+    
+    ✓ 0 errors, 1 warning
+$ (B) radical check --trigger pull-request --ratchet  → exit 0
+    radical check: .radical/model (3 elements, 2 relations)
+    
+    ✓ metric-not-measured  0 (max 1)
+    
+    Test reports: 0 test cases; measurements: 1
+      Fitness functions: 1 passed, 1 not-run
+    
+    ✓ 0 errors, 0 warnings
+    [stderr] Ratchet: metric-not-measured 1 → 0 (written to /private/var/folders/pn/fh62qrjd1xx840kyv7dyk4tw0000gn/T/radical-218-trigger-YZt7WB/.radical/model/check.json).
+$ (B) radical check  → exit 1
+    radical check: .radical/model (3 elements, 2 relations)
+    
+    ✖ metric-not-measured  1 (max 0)
+        error    .radical/model/nodes/ff1.md  Fitness function "Shop stays up": nothing measured uptime >= 99.9 %.
+    
+    Test reports: 0 test cases; measurements: 1
+      Fitness functions: 1 passed, 1 not-run
+    
+    ✖ 1 error, 0 warnings
+
+Expected: a baseline stays where a rule ran on part of its input (--alone, --trigger), or --ratchet refuses with them; the full check still passes.
+Actual: A (--alone): check exit 0, inherited-adr-unapplied max 1 → 0, full check then exit 1. B (--trigger pull-request): check exit 0, metric-not-measured max 1 → 0, check then exit 1.
+REPRODUCED: yes

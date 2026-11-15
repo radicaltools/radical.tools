@@ -28,7 +28,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel, originOf, ownModel } from '@radical/common/model'
 import { REPOSITORY_FILE, builtIn, parseRepositoryFile, serializeRepositoryFile, testsBoundTo, type RepositoryFile } from '@radical/common/repositoryMapping'
-import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, WORD_RULES, canonicalTestId, computeEvidence, conditionsOf, formatAge, formatTrace, parseCheckConfig, parseMeasurementStore, parseTestResults, quoteValueGaps, testsRanAt, traceOf, verifiedHere, withBoundTests, wordFindings, type CheckModel } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, WORD_RULES, computeEvidence, conditionsOf, formatAge, formatTrace, parseCheckConfig, parseMeasurementStore, parseTestResults, quoteValueGaps, rebindTests, testsRanAt, traceOf, verifiedHere, withBoundTests, wordFindings, type CheckModel } from '@radical/common/check'
 import { mappingRoot, repositoryFileOf } from '@radical/node-files/repositoryLayout'
 import { FEDERATION_FILE, parseFederationFile, withOtherModels } from '@radical/common/federation'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
@@ -301,6 +301,17 @@ function settleGeometry(before: DiagramData, after: DiagramData): void {
     if (prev && prev.x === node.x && prev.y === node.y && prev.width === node.width && prev.height === node.height) continue
     after.defaultPositions[node.id] = { x: node.x, y: node.y, width: node.width, height: node.height }
   }
+}
+
+/** What a write's layout of the views per element it made did: the views
+ *  Smart Layout arranged, and why it left the others (`notLaidOut`, its
+ *  refusals: a view larger than a canvas draws). It said every new view
+ *  was arranged (F-0160). */
+function freshLayoutNote(arranged: DiagramView[], notLaidOut: string[]): string {
+  const done = arranged.length
+    ? ` Smart Layout arranged ${arranged.length === 1 ? `the new view ${arranged[0].name}` : `the ${arranged.length} new views per element`}.`
+    : ''
+  return done + notLaidOut.map((why) => ` Not laid out: ${why}`).join('')
 }
 
 /** Whether `view` draws `node` folded: folded there, or on the model and
@@ -636,10 +647,8 @@ export class FolderModel {
         return { ok: false, text: 'set_verification: tests and drop must be lists of test ids ("<file> › <title>"), one of them given, or remove: true alone' }
       }
       // Added beside those bound, as radical verify --test does, and kept with ›,
-      // also when written as Vitest prints them (with >).
-      const dropped = drops.map(canonicalTestId)
-      const bound = testsBoundTo(repository.verifies, node.id).filter((t) => !dropped.includes(canonicalTestId(t)))
-      const entry = { element: node.id, name: node.label, tests: [...new Set([...bound, ...adds.map(canonicalTestId)])] }
+      // also when written as Vitest or Playwright prints them; each test once.
+      const entry = { element: node.id, name: node.label, tests: rebindTests(testsBoundTo(repository.verifies, node.id), adds, drops) }
       if (!entry.tests.length) { if (at >= 0) repository.verifies.splice(at, 1) }
       else if (at < 0) repository.verifies.push(entry)
       else repository.verifies[at] = { ...repository.verifies[at], ...entry }
@@ -976,11 +985,15 @@ export class FolderModel {
       // is laid out at once, as Studio does when it is first opened.
       const known = new Set((data.views ?? []).map((v) => v.id))
       const fresh = (changed.views ?? []).filter((v) => v.partOf && !known.has(v.id) && (v.kind ?? 'static') === 'static' && !Object.keys(v.positions ?? {}).length)
+      const arranged: DiagramView[] = []
+      const notLaidOut: string[] = []
       for (const view of fresh) {
         const laidOut = await this.smartLayout(changed, metamodel, view.id)
         if (laidOut.changed) changed = laidOut.changed
+        if (laidOut.ok) arranged.push(view)
+        else notLaidOut.push(laidOut.text.replace(/^smart_layout: /, ''))
       }
-      const note = fresh.length ? ` Smart Layout arranged ${fresh.length === 1 ? `the new view ${fresh[0].name}` : `the ${fresh.length} new views per element`}.` : ''
+      const note = freshLayoutNote(arranged, notLaidOut)
       const outcome = await this.commit(session, before, data, changed, metamodel, result.resultText + note, metamodelBefore)
       if (!outcome.ok) {
         this.restoreTempIds(priorTempIds)
@@ -1027,6 +1040,10 @@ export class FolderModel {
     // it out from the same canvas.
     if (view && (view.kind ?? 'static') === 'static' && !Object.keys(view.positions ?? {}).length) placeOnViewCanvas(nodes, positionsOf(nodes), view, byId(changed.relations))
     const constraints = view ? view.layoutConstraints : changed.defaultLayoutConstraints
+    // A row or column set by a tool (align_nodes, grid_nodes) holds from
+    // the moment Studio shows the canvas: lined up here too, so that both
+    // lay the view out from the same canvas.
+    applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
     const input = viewLayoutInput(view, nodes, byId(changed.relations), constraints)
     if (!Object.keys(input.nodes).length) return { ok: true, text: 'Smart Layout: there are no nodes to lay out.' }
     // Large models take a while: report each step, and stop at the next one
@@ -1075,8 +1092,8 @@ export class FolderModel {
       if (view) view.layoutConstraints = view.layoutConstraints?.filter((c) => c.type !== 'pin')
       else changed.defaultLayoutConstraints = changed.defaultLayoutConstraints?.filter((c) => c.type !== 'pin')
     }
-    // The refit knows nothing of the alignments; put them back.
-    applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
+    // The refit knows nothing of the alignments; put them back (round what is still pinned).
+    applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), view ? view.layoutConstraints : changed.defaultLayoutConstraints))
     // All elements writes the nodes themselves (settleGeometry then syncs
     // defaultPositions); a view keeps its own positions.
     if (view) view.positions = viewCanvasPositions(view, nodes, positionsOf(nodes), viewDrawnIds(view, nodes, byId(changed.relations)))
@@ -1103,7 +1120,7 @@ export class FolderModel {
     fitAndSeparateBottomUp(nodes, input)
     const unpinned = pinnedNodeIds(constraints).length
     view.layoutConstraints = view.layoutConstraints?.filter((c) => c.type !== 'pin')
-    applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), constraints))
+    applyAlignments(nodes, viewLayoutInput(view, nodes, byId(changed.relations), view.layoutConstraints))
     view.positions = viewCanvasPositions(view, nodes, positionsOf(nodes), viewDrawnIds(view, nodes, byId(changed.relations)))
     return {
       ok: true,
@@ -1182,11 +1199,14 @@ export class FolderModel {
     } catch { /* no check.json: every rule on */ }
     const findings = (d: DiagramData) => wordFindings({ nodes: byId(d.nodes), relations: byId(d.relations), metamodel }, off)
     // A finding is the same one by its rule, what it is about and what it
-    // says; the model before is read with the names the change gives, so a
-    // rename brings in nothing.
-    const key = (f: { rule: string; message: string; nodeId?: string; relationId?: string }) => `${f.rule}\0${f.nodeId ?? ''}\0${f.relationId ?? ''}\0${f.message}`
-    const before = new Set(findings(withLabelsOf(data, changed)).map(key))
-    return findings(changed).filter((f) => !before.has(key(f)))
+    // says, or, when it names values or parts, by each of them: one that
+    // only names fewer (a value corrected, a part quoted) is not new. The
+    // model before is read with the names the change gives, so a rename
+    // brings in nothing.
+    const place = (f: { rule: string; nodeId?: string; relationId?: string }) => `${f.rule}\0${f.nodeId ?? ''}\0${f.relationId ?? ''}`
+    const keys = (f: { rule: string; message: string; nodeId?: string; relationId?: string; about?: string[] }) => f.about?.length ? f.about.map((a) => `${place(f)}\0${a}`) : [`${place(f)}\0${f.message}`]
+    const before = new Set(findings(withLabelsOf(data, changed)).flatMap(keys))
+    return findings(changed).filter((f) => keys(f).some((k) => !before.has(k)))
   }
 
   /** Tell Studio, open on the folder, that an agent is writing it: it holds

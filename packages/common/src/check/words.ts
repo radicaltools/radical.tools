@@ -161,10 +161,26 @@ export function numerals(text: string): string {
 const DURATION: Array<[RegExp, number]> = [
   [/^(?:ms|msecs?|milliseconds?)$/, 0.001], [/^(?:s|secs?|seconds?)$/, 1], [/^(?:mins?|minutes?)$/, 60],
   [/^(?:h|hrs?|hours?)$/, 3600], [/^(?:d|days?)$/, 86400], [/^(?:weeks?|wks?)$/, 604800],
+  [/^(?:months?|mos?)$/, 2628000], [/^(?:years?|yrs?)$/, 31536000],
 ]
 const MONEY_AFTER = /^(?:€|eur|euros?|zł|zl|pln|usd|\$|£|gbp|chf|dollars?|pounds?)$/
 const CENTS = /^(?:cents?|ct|grosz[ey]?|pence|p)$/
 const MONEY_BEFORE = /(?:€|\$|£|eur|usd|pln|gbp|chf)\s?$/
+/** The currency a sign or a name gives an amount: 5 € is not 5 USD. */
+const CURRENCIES: Array<[RegExp, string]> = [
+  [/€|\beur\b|\beuros?\b/, 'EUR'], [/zł|\bzl\b|\bpln\b/, 'PLN'], [/\$|\busd\b|\bdollars?\b/, 'USD'],
+  [/£|\bgbp\b|\bpounds?\b/, 'GBP'], [/\bchf\b/, 'CHF'],
+]
+const currencyOf = (text: string): string | undefined => CURRENCIES.find(([re]) => re.test(text))?.[1]
+// "minus" after a verb, a preposition or a limit is the sign of a value ("is
+// minus 18", "at minus 4 degrees", "a balance of minus 50 €", "above minus
+// 5"); after a value or a noun ("the total minus 5 €", "8 hours minus 30
+// minutes") it subtracts, and the value has no sign.
+const SIGN_AFTER = /(?:^|[^\w\s%€$£)\]]|\b(?:is|are|was|were|be|been|becomes?|became|reach(?:es|ed)?|show(?:s|n|ed)?|reads?|equals?|stays?|remains?|falls?|fell|drops?|dropped|sinks?|goes|went|gets?|of|at|to|from|in|on|by|as|than|above|below|under|over|between|and|or|until|till|down|least|most|minimum|maximum|around|about|approximately|only|still|with))\s*$/i
+/** The minus signs typography gives ("−18", "–18 °C", a figure dash or a
+ *  hyphen of another kind) as the hyphen-minus, as plainWords gives them to
+ *  the limits: a value keeps its sign however it is written. */
+const minusSigns = (text: string): string => text.replace(/[‐‑‒–−]/g, '-')
 
 /** A number as a value: thousands separators out, a decimal comma a point,
  *  trailing zeros of the fraction dropped, a minus sign ("-18", "−18",
@@ -178,7 +194,9 @@ const numberValue = (raw: string): string => {
 }
 const fmt = (n: number): string => String(Math.round(n * 1000) / 1000)
 
-export type Quantity = { value: string; dimension: 'time' | 'money'; base: string; text: string }
+/** A value with a unit of time or money: `base` the value in seconds or
+ *  cents, `currency` the money's when the text names it. */
+export type Quantity = { value: string; dimension: 'time' | 'money'; base: string; text: string; currency?: string }
 
 export interface ValueReading {
   /** The values the text states. */
@@ -207,12 +225,15 @@ function valuesOf(text: string): ValueReading {
   // Dates and times are one value each, not three numbers.
   t = t.replace(/\b(\d{4}-\d{2}-\d{2})(?:[t ](\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?z?)?\b/gi, (_, date: string, time?: string) => { values.add(date); if (time) values.add(time); return ' ' })
   t = t.replace(/(?<![\d:])(\d{1,2}:\d{2})(?![\d:])/g, (_, time: string) => { values.add(time.padStart(5, '0')); return ' ' })
-  t = numerals(t)
+  t = minusSigns(numerals(t))
   // Not the number inside a code such as MUG-BLUE-01; a minus sign before a
   // number ("-18 °C", "minus 18"), not a dash between two or a list marker.
-  for (const m of t.matchAll(/((?:(?<![\w.,)\]])[-−]|\bminus\s+)?(?<![\w.,]|\w-)(?:\d{1,3}(?:,\d{3})+|\d+(?:[.,]\d+)?))(?:\s?(%|percent\b|per cent\b)|(st|nd|rd|th)\b|\s?([a-zżł€$£]+\b|€|\$|£))?(?![\w])/gi)) {
-    const raw = m[1]; const n = numberValue(raw)
-    if (m[2]) { values.add(`${n}%`); alias(`${n}%`, n); continue }
+  for (const m of t.matchAll(/((?:(?<![\w.,)\]])-|\bminus\s+)?(?<![\w.,]|[a-z]-)(?:\d{1,3}(?:,\d{3})+|\d+(?:[.,]\d+)?))(?:\s?(%|percent\b|per cent\b)|(st|nd|rd|th)\b|\s?([a-zżł€$£]+\b|€|\$|£))?(?![\w])/gi)) {
+    // "the total minus 5 €" subtracts: no sign of the value.
+    const raw = /^minus/i.test(m[1]) && !SIGN_AFTER.test(t.slice(Math.max(0, (m.index ?? 0) - 40), m.index ?? 0)) ? m[1].replace(/^minus\s+/i, '') : m[1]
+    const n = numberValue(raw)
+    // A minus before a percentage is a discount ("-10% on every basket"): 10% says it too.
+    if (m[2]) { values.add(`${n}%`); alias(`${n}%`, n, ...(n.startsWith('-') ? [`${n.slice(1)}%`] : [])); continue }
     values.add(n)
     if (/[.,]\d\d$/.test(raw) && !/^\D*\d{1,3}(,\d{3})+$/.test(raw)) alias(n, fmt(Number(n) * 100))
     if (!/%$/.test(n)) alias(n, `${n}%`)
@@ -220,7 +241,11 @@ function valuesOf(text: string): ValueReading {
     const before = t.slice(Math.max(0, (m.index ?? 0) - 4), m.index ?? 0).toLowerCase()
     const duration = DURATION.find(([re]) => re.test(unit))
     if (duration) { const base = `${fmt(Number(n) * duration[1])}s`; alias(n, base); quantities.push({ value: n, dimension: 'time', base, text: `${raw} ${unit}` }) }
-    else if (MONEY_AFTER.test(unit) || MONEY_BEFORE.test(before)) { const cents = fmt(Number(n) * 100); alias(n, `${cents}¢`, cents); quantities.push({ value: n, dimension: 'money', base: `${cents}¢`, text: `${raw} ${unit}`.trim() }) }
+    else if (MONEY_AFTER.test(unit) || MONEY_BEFORE.test(before)) {
+      const cents = fmt(Number(n) * 100); alias(n, `${cents}¢`, cents)
+      const sign = MONEY_AFTER.test(unit) ? unit : MONEY_BEFORE.exec(before)![0].trim()
+      quantities.push({ value: n, dimension: 'money', base: `${cents}¢`, text: sign === unit ? `${raw} ${unit}` : `${sign}${/\w$/.test(sign) ? ' ' : ''}${raw}`, currency: currencyOf(sign) })
+    }
     else if (CENTS.test(unit)) { alias(n, `${n}¢`); quantities.push({ value: n, dimension: 'money', base: `${n}¢`, text: `${raw} ${unit}` }) }
   }
   const lower = t.toLowerCase()
@@ -262,13 +287,48 @@ const LIMIT_AFTER: Array<[RegExp, Op]> = [
   [new RegExp(String.raw`${N}(?:\s*[a-z%€$£]+)?\s+or\s+(?:less|fewer|below|under|lower|smaller|shorter)\b`, 'g'), '<='],
   [new RegExp(String.raw`${N}(?:\s*[a-z%€$£]+)?\s+or\s+(?:more|above|over|higher|greater|larger|longer)\b`, 'g'), '>='],
 ]
+// Where a sentence is cut into clauses: not at the "and" of a range ("between
+// 8 and 64") nor at a comma inside a number ("1,000"), so that a range is read
+// whole.
+const CLAUSE = /(?<!\d),|,(?!\d)|;|(?<!\bbetween (?:-|minus )?\d+(?:[.,]\d+)?)\s(?:and|but|so|then|otherwise)\s/
 const RANGE = new RegExp(String.raw`\b(?:from|between)\s+${N}\s+(?:to|and)\s+${N}|(?<![\d.,-])${N}\s?(?:-|to)\s?${N}(?![\d.,-])`, 'g')
 // Words that turn what follows round: "not", "never", "cannot" and the n't
 // forms ("can't", "doesn't", "won't"); "no" only right before the limit ("no
 // greater than 20"). The "not" of a refusal ("not allowed") is the refusal's.
-const NEGATION = /\b(?:not|never|neither|nor|cannot|\w+n't)\b/
-const negates = (before: string): boolean => NEGATION.test(before.replace(/\bnot (?:allowed|accepted|permitted)\b/g, ' ')) || /\bno\s*$/.test(before)
+const NEGATION = /\b(?:not|never|neither|nor|cannot|\w+n't)\b/g
+const negates = (before: string): boolean => {
+  const text = before.replace(/\bnot (?:allowed|accepted|permitted)\b/g, ' ')
+  if (/\bno\s*$/.test(text)) return true
+  const last = [...text.matchAll(NEGATION)].pop()
+  return !!last && !ownClause(text.slice(0, last.index), text.slice((last.index ?? 0) + last[0].length))
+}
+// A negation in a clause of its own before the limit ("a guest who can't pay
+// yet keeps at most 20", "when the guest does not log in the basket keeps
+// …") is of that clause's verb: the limit's verb comes after it, a word in -s
+// or one after a modal, with another word between ("cannot hold more than
+// 20" is one verb; "is not a whole number above 0" has no second).
+const OPENER = /\b(?:who|which|that|whose|whom|where|when|whenever|if|while|until|unless|because|since|once)\b/
+const MODAL = new Set(['can', 'could', 'may', 'might', 'must', 'shall', 'should', 'will', 'would', 'to'])
+const CARRIER = new Set([...MODAL, 'a', 'an', 'the', 'its', 'their', 'his', 'her', 'my', 'our', 'your', 'this', 'that', 'these', 'those', 'each', 'every', 'any', 'some',
+  'be', 'been', 'being', 'is', 'are', 'was', 'were', 'am', 'do', 'does', 'did', 'have', 'has', 'had',
+  'yet', 'ever', 'always', 'still', 'also', 'even', 'just', 'only', 'already', 'again', 'now', 'later', 'really',
+  'in', 'on', 'at', 'of', 'with', 'for', 'by', 'from', 'into', 'out', 'up', 'off'])
+function ownClause(before: string, after: string): boolean {
+  if (!OPENER.test(before)) return false
+  const words = after.split(/[^\p{L}\p{N}']+/u).filter(Boolean)
+  const verb = words[words.length - 1]
+  if (!verb || CARRIER.has(verb) || words.filter((w) => !CARRIER.has(w)).length < 2) return false
+  return MODAL.has(words[words.length - 2]) || /[^s']s$/.test(verb)
+}
 export const REFUSAL = /\b(?:refus\w*|reject\w*|declin\w*|den(?:y|ies|ied)|invalid|not (?:allowed|accepted|permitted)|forbidden|disallow\w*|error|too (?:long|short|many|few|high|low|big|small))\b/
+/** Whether every refusal of a clause comes before the limit at `at`, the last
+ *  in a clause of its own (as a negation can be, ownClause). */
+function refusalBefore(clause: string, at: number): boolean {
+  const last = [...clause.matchAll(new RegExp(REFUSAL.source, 'g'))].pop()
+  if (!last) return false
+  const end = (last.index ?? 0) + last[0].length
+  return end <= at && ownClause(clause.slice(0, last.index), clause.slice(end, at))
+}
 
 /** The limits a text puts on numbers, each as the side that is allowed: "at
  *  most 20" and "refuses more than 20" both allow `<= 20`. A clause that
@@ -281,7 +341,7 @@ function limitsOf(text: string, refusing: boolean): Limit[] {
   const limits: Limit[] = []
   const plain = numerals(plainWords(text)).replace(/\b\d{4}-\d{2}-\d{2}\S*|\b\d{1,2}:\d{2}\b/g, ' ')
   for (const sentence of plain.split(/(?<=[.;!?])\s+(?=\D)/)) {
-    const clauses = sentence.split(/,|;|\s(?:and|but|so|then|otherwise)\s/).filter((c) => c.trim())
+    const clauses = sentence.split(CLAUSE).filter((c) => c.trim())
     clauses.forEach((clause, i) => {
       const refused = refusing || REFUSAL.test(clause) || /^\s*(?:if|when|whenever|where|once|should)\b/.test(clause) && REFUSAL.test(clauses[i + 1] ?? '')
       // A limit inside one read already ("more than 20" in "no more than 20") is that one.
@@ -293,7 +353,9 @@ function limitsOf(text: string, refusing: boolean): Limit[] {
           read.push([start, end])
           // "a cost that is not above zero": the negation turns the limit round once more.
           const negated = negates(clause.slice(0, start))
-          limits.push({ value: numberValue(m[1]), op: refused !== negated ? COMPLEMENT[op] : op, text: m[0].trim() })
+          // "a guest who is not allowed to pay keeps at most 20": that refusal is of its own clause.
+          const turned = refused && !(!refusing && refusalBefore(clause, start))
+          limits.push({ value: numberValue(m[1]), op: turned !== negated ? COMPLEMENT[op] : op, text: m[0].trim() })
         }
       }
       // A range is what is allowed; one in a refusal is too often "not 2 to 10" to read.

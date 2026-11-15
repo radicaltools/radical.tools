@@ -1,0 +1,68 @@
+
+=== bound as "tests/pay.spec.ts:2:3 › pay › takes a card"
+$ (printed) radical verify "Pays by card" --test "tests/pay.spec.ts:2:3 › pay › takes a card"  → exit 0
+    scenario "Pays by card" (pay) is checked by 1 test (.radical/radical.json):
+      tests/pay.spec.ts:2:3 › pay › takes a card
+$ (printed) radical check --report playwright.json  → exit 0
+    radical check: .radical/model (5 elements, 3 relations)
+    
+    ⚠ test-not-run  1
+        warning  .radical/model/nodes/pays-by-card.md  Scenario "Pays by card": no report has the file of test tests/pay.spec.ts:2:3 › pay › takes a card.
+    
+    Test reports: 1 test case
+      Requirements: 1 unverified
+      Scenarios: 1 not-run
+    
+    ✓ 0 errors, 1 warning
+$ (printed) radical check --trace pay  → exit 0
+    Verification path of Pays by card [pay]
+    - Need: Pay [need] — unverified
+      - Requirement: Take card payments [req] — unverified
+        ▶ Scenario: Pays by card [pay] — not-run
+            · tests/pay.spec.ts:2:3 › pay › takes a card — not-run
+
+=== bound as "[chromium] › tests/pay.spec.ts:2:3 › pay › takes a card"
+$ (withProject) radical verify "Pays by card" --test "[chromium] › tests/pay.spec.ts:2:3 › pay › takes a card"  → exit 0
+    scenario "Pays by card" (pay) is checked by 1 test (.radical/radical.json):
+      [chromium] › tests/pay.spec.ts:2:3 › pay › takes a card
+$ (withProject) radical check --report playwright.json  → exit 0
+    radical check: .radical/model (5 elements, 3 relations)
+    
+    ⚠ test-not-run  1
+        warning  .radical/model/nodes/pays-by-card.md  Scenario "Pays by card": no report has the file of test [chromium] › tests/pay.spec.ts:2:3 › pay › takes a card.
+    
+    Test reports: 1 test case
+      Requirements: 1 unverified
+      Scenarios: 1 not-run
+    
+    ✓ 0 errors, 1 warning
+$ (withProject) radical check --trace pay  → exit 0
+    Verification path of Pays by card [pay]
+    - Need: Pay [need] — unverified
+      - Requirement: Take card payments [req] — unverified
+        ▶ Scenario: Pays by card [pay] — not-run
+            · [chromium] › tests/pay.spec.ts:2:3 › pay › takes a card — not-run
+
+=== bound as "tests/pay.spec.ts › pay › takes a card"
+$ (bare) radical verify "Pays by card" --test "tests/pay.spec.ts › pay › takes a card"  → exit 0
+    scenario "Pays by card" (pay) is checked by 1 test (.radical/radical.json):
+      tests/pay.spec.ts › pay › takes a card
+$ (bare) radical check --report playwright.json  → exit 0
+    radical check: .radical/model (5 elements, 3 relations)
+    
+    
+    Test reports: 1 test case
+      Requirements: 1 verified
+      Scenarios: 1 passed
+    
+    ✓ 0 errors, 0 warnings
+$ (bare) radical check --trace pay  → exit 0
+    Verification path of Pays by card [pay]
+    - Need: Pay [need] — verified
+      - Requirement: Take card payments [req] — verified
+        ▶ Scenario: Pays by card [pay] — passed
+            · tests/pay.spec.ts › pay › takes a card — passed
+
+Expected: a test given as Playwright prints it is the test the report has passed (Scenarios: 1 passed), or radical verify says how to write it.
+Actual: printed form accepted=true passed=false; with project accepted=true passed=false; bare form passed=true.
+REPRODUCED: yes

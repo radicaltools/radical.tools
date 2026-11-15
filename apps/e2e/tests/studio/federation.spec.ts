@@ -262,6 +262,35 @@ test('another model\'s table and matrix of every element list that model\'s elem
   await expect(page.locator('.mx-rowhead-text')).toHaveText(['Orders'])
 })
 
+test('the read-only bar of another model\'s view covers none of the view\'s controls', async ({ page, studio }) => {
+  // F-0165: the bar lay over the wiki's Single page / Multi page, the
+  // hierarchy's Size by and the matrix's title; a click on Multi page did nothing.
+  const file = JSON.parse(fetched()) as FederationFile
+  const kinds = ['wiki', 'treemap', 'matrix', 'table', 'warnier'] as const
+  file.views = [...(file.views ?? []), ...kinds.map((kind) => ({ id: `v-ord-${kind}`, name: `Orders ${kind}`, kind, nodeIds: [], positions: {}, origin: 'orders@abc1234' }))]
+  await openComposed(page, studio, 'Landscape', { federation: serializeFederationFile(file) })
+  // Orders' view of the name, not payments' own Containers.
+  const card = (name: string) => page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: name }) }).filter({ has: page.locator('.lp-view-origin') })
+  const bar = page.locator('.other-model-bar')
+  for (const name of ['Containers', ...kinds.map((kind) => `Orders ${kind}`)]) {
+    await card(name).click()
+    await expect(bar).toBeVisible()
+    // Every control and heading of the view, none under the bar.
+    const covered = await page.evaluate(() => {
+      const box = document.querySelector('.other-model-bar')!.getBoundingClientRect()
+      const view = document.querySelector('.wiki-view, .treemap-wrap-outer, .mx-wrap, .tv-wrap, .warnier-view, .canvas-column')!
+      return [...view.querySelectorAll<HTMLElement>('button, select, input, [role="button"], h1, h2, h3, .mx-title')].filter((el) => {
+        const r = el.getBoundingClientRect()
+        return r.width > 0 && r.height > 0 && r.left < box.right && r.right > box.left && r.top < box.bottom && r.bottom > box.top
+      }).map((el) => el.textContent?.trim() || el.className)
+    })
+    expect(covered, name).toEqual([])
+  }
+  await card('Orders wiki').click()
+  await page.getByRole('button', { name: 'Multi page' }).click()
+  await expect(page.locator('.wiki-page-mode-toggle button.active')).toHaveText('Multi page')
+})
+
 test('a milestone shows the other models as they were when it was made', async ({ page, studio }) => {
   // orders at a commit A has Orders and Orders API; payments reads Orders API.
   const ordersAt = (commit: string, api: string, extra: Partial<FederationFile> = {}): string => serializeFederationFile({

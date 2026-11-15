@@ -58,6 +58,7 @@ import { downloadGherkinFiles } from '../export/downloadGherkinFiles'
 import { AIReportLine } from './AIReportLine'
 import { useHubStore } from '@radical/ui/store/hubStore'
 import { concernPacks, type ConcernPack } from '@radical/common/concerns'
+import { keysOnTop } from '@radical/ui/components/keysHere'
 import { importConcernPackIntoDiagram } from '../hub/importConcept'
 import { askClarifyingQuestions } from '../ai/forgeClarify'
 import { addTokenUsage, type AISettings, type TokenUsage } from '../ai/types'
@@ -146,6 +147,9 @@ const PROGRESS_VISIBLE_COUNT = 7
 
 interface Props {
   open: boolean
+  /** Opened again after another run panel took its place: the run goes on
+   *  where it was, not afresh. */
+  resume?: boolean
   onClose: () => void
   /** Told when a stage starts or stops generating: the panel then stays. */
   onBusy?: (busy: boolean) => void
@@ -208,7 +212,7 @@ const isCanvas = (view: DiagramView | undefined): boolean => !!view && (!view.ki
 const NO_NODES: Record<string, C4Node> = {}
 const NO_RELATIONS: Record<string, C4Relation> = {}
 
-export function RadicalForgeModal({ open, onClose, onBusy }: Props): React.ReactElement | null {
+export function RadicalForgeModal({ open, resume = false, onClose, onBusy }: Props): React.ReactElement | null {
   const [step, setStep] = useState<WizardStep>('input')
   const [description, setDescription] = useState('')
   /** The `need` node the description lives in — picked on the Description
@@ -262,6 +266,7 @@ export function RadicalForgeModal({ open, onClose, onBusy }: Props): React.React
   const [customising, setCustomising] = useState(false)
   const progressIdRef = useRef(0)
   const progressListRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   // Stages the clarify effect below has already started for this wizard run
   // — a ref, not state, so starting a fetch doesn't itself change an effect
@@ -286,9 +291,12 @@ export function RadicalForgeModal({ open, onClose, onBusy }: Props): React.React
     [structureKind, chosenViewpoints],
   )
 
-  // Reset to a clean run every time the wizard is (re)opened.
+  // Reset to a clean run every time the wizard is (re)opened, unless it
+  // was only put aside for another run panel.
+  const resumeRef = useRef(resume)
+  resumeRef.current = resume
   useEffect(() => {
-    if (!open) return
+    if (!open || resumeRef.current) return
     setStep('input')
     setDescription('')
     setNeedId(null)
@@ -339,7 +347,8 @@ export function RadicalForgeModal({ open, onClose, onBusy }: Props): React.React
 
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape' && !busy) onClose() }
+    // Not under a dialog opened over the panel: Esc is that dialog's.
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape' && !busy && keysOnTop(panelRef.current, e)) onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, busy, onClose])
@@ -911,6 +920,7 @@ export function RadicalForgeModal({ open, onClose, onBusy }: Props): React.React
   return createPortal(
     <div
       className="forge-panel"
+      ref={panelRef}
       role="dialog"
       aria-label="Radical Forge"
     >

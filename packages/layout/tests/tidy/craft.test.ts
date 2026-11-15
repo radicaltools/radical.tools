@@ -240,6 +240,33 @@ describe('Tidy, the finer points', () => {
     expect(around.tidy.steps.every((s) => !('d' in s.moved) && !('e' in s.moved))).toBe(true)
   })
 
+  it('tidy around leaves a row out of its reach as it stands, its members not put on each other (F-0175)', () => {
+    // fx and val, one above the other in pay, kept in a row an agent set and never lined up; x relates to y only.
+    const nodes = [
+      node('pay', 'container', 0, 0, undefined, { width: 300, height: 396 }), node('fx', 'component', 20, 120, 'pay'), node('val', 'component', 20, 256, 'pay'),
+      node('x', 'container', 900, 0), node('y', 'container', 900, 600),
+    ]
+    const relations = [rel('x', 'y')]
+    for (const axis of ['horizontal', 'vertical'] as const) {
+      const alignments = resolveAlignments([{ id: 'row', type: 'align', axis, nodeIds: axis === 'horizontal' ? ['fx', 'val'] : ['fx', 'x'] }], byId(nodes))
+      const around = runTidyLayout(byId(nodes), byId(relations), { around: ['y'], alignments })
+      const at = (id: string) => ({ ...byId(nodes)[id], ...around.winner.positions[id] })
+      const fx = at('fx'), val = at('val')
+      expect(fx.y >= val.y + val.height || val.y >= fx.y + fx.height || fx.x >= val.x + val.width || val.x >= fx.x + fx.width, `${axis}: fx clear of val`).toBe(true)
+      expect(at('pay'), axis).toMatchObject({ x: 0, y: 0, width: 300, height: 396 })
+    }
+  })
+
+  it('a move that shifts a line by less than a hair, its members unevenly, is taken back rather than fail', () => {
+    // Found by the fuzzer (nested world, seed 1611204325): Customer kept in a column with System 0, whose containers are folded.
+    const c = (id: string, x: number, width: number) => node(id, 'container', x, 120, 's0', { collapsed: true, width, height: 280 })
+    const nodes = [c('s0c0', 40, 760), c('s0c1', 840, 520), c('s0c2', 1400, 1000), node('s0', 'system', -472.5, 400, undefined, { width: 2440, height: 440 }), node('p0', 'person', 672.5, 0, undefined, { width: 150, height: 170 })]
+    const relations = [rel('p0', 's0c0', 'uses'), rel('s0c0', 's0c1', 'calls')]
+    const alignments = resolveAlignments([{ id: 'col', type: 'align', axis: 'vertical', nodeIds: ['p0', 's0'] }], byId(nodes))
+    const result = runTidyLayout(byId(nodes), byId(relations), { alignments, budget: 424500, metamodel: builtInGovernanceMetamodel() })
+    expect(alignmentError(byId(nodes), result.winner.positions, alignments)).toBeLessThanOrEqual(0.5)
+  })
+
   it('a frame holding a pinned element is not moved', () => {
     // s holds the pinned x and y; y relates to z far off. Moving s would carry x along.
     const nodes = [node('s', 'system', 0, 0), node('x', 'container', 40, 120, 's'), node('y', 'container', 340, 120, 's'), node('z', 'container', 2400, 1600)]

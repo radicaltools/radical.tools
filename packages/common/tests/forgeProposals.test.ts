@@ -142,4 +142,24 @@ describe('Forge proposals', () => {
     // Over MCP the message names the MCP tool.
     expect(refinementGuard(state, 'update_node', { id: 's1' }, resolve, 'forge_propose_refinement')).toContain('forge_propose_refinement')
   })
+
+  it('refinementGuard names the stage a refused type belongs to, earlier or later (F-0156)', () => {
+    type Stage = 'domain' | 'processes' | 'review'
+    const guard = (stage: Stage, type: string): string | null =>
+      refinementGuard({ stage, before: snapshotOf(before()), proposed: new Set() }, 'add_node', { tempId: 'x', type, label: 'X' }, (id) => id)
+    const cases: Array<[Stage, string, string]> = [
+      ['domain', 'requirement', 'a requirement belongs to an earlier stage (Requirements)'],
+      ['domain', 'system', 'a system belongs to a later stage (C4 model)'],
+      ['domain', 'mockup', 'a mockup belongs to a later stage (Mockups)'],
+      ['processes', 'scenario', 'a scenario belongs to an earlier stage (Gherkin scenarios)'],
+      ['processes', 'container', 'a container belongs to a later stage (C4 model)'],
+      // Made by the Domain model and the State machines stages: the nearer one is named.
+      ['processes', 'entity', 'an entity belongs to an earlier stage (State machines)'],
+      ['review', 'person', 'a person belongs to an earlier stage (C4 model)'],
+      ['domain', 'adr', 'an adr is made by no Forge stage'],
+    ]
+    for (const [stage, type, said] of cases) expect(guard(stage, type), `${stage}: ${type}`).toContain(said)
+    // A later stage's type is added in that stage, not proposed as a refinement.
+    expect(guard('domain', 'system')).not.toContain('propose_refinement')
+  })
 })

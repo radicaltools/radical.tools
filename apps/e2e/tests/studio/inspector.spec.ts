@@ -602,3 +602,62 @@ test('the Inspector asks the questions of an unaddressed concern and the import 
   await expect(undo).toBeDisabled()
   await expect.poll(decision, { timeout: 10_000 }).toBe(false)
 })
+
+test('a concern answered in the Inspector goes into its own view, not into the view Designer has open', async ({ page, studio }) => {
+  // F-0166: the pack's elements went into the view Designer showed last,
+  // one that does not show the element the concern is about.
+  await page.route(/^https:\/\/hub\.radical\.tools\/hub\//, async (route) => {
+    const response = await route.fetch({ url: `http://localhost:${HUB_PORT}` + new URL(route.request().url()).pathname })
+    await route.fulfill({ response, headers: { ...response.headers(), 'content-type': 'application/json' } })
+  })
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  const shop: DiagramData = {
+    metamodel: builtInGovernanceMetamodel(),
+    nodes: [
+      node('user', 'person', 'Customer', { x: 40, y: 40 }),
+      node('shop', 'system', 'Shop', { x: 40, y: 260, width: 360, height: 220 }),
+      node('web', 'webapp', 'Storefront', { parentId: 'shop', x: 40, y: 60 }),
+      node('pay', 'system', 'Payment Provider', { x: 500, y: 260, external: true }),
+    ],
+    relations: [
+      { id: 'u', relationType: 'interacts', sourceId: 'user', targetId: 'web' },
+      { id: 'p', relationType: 'interacts', sourceId: 'web', targetId: 'pay' },
+    ],
+    views: [
+      { id: 'v-shop', name: 'Shop', nodeIds: ['user', 'shop', 'web'], positions: {} },
+      { id: 'v-pay', name: 'Payments', nodeIds: ['pay'], positions: {} },
+    ],
+  }
+  for (const [path, content] of Object.entries(serializeToMdFolder(shop, 'Shop'))) await folder.write(path, content)
+  await folder.write('.state/test-results.json', results('passed'))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await studio.ready()
+  // Designer on Payments, which does not show Storefront.
+  await studio.designer()
+  await page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: 'Payments' }) }).click()
+  await expect(page).toHaveURL(/\/v\/v-pay/)
+  await expect(page.locator('.react-flow__node')).toHaveCount(1)
+  await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
+  await page.getByRole('tab', { name: /^Model/ }).click()
+  const decisions = page.locator('details.insp-dim[data-dimension="decisions"]')
+  await expect(decisions).toBeVisible({ timeout: 10_000 })
+  if ((await decisions.getAttribute('open')) === null) await decisions.locator('summary').click()
+  const finding = page.locator('.insp-item', { has: page.getByTestId('concern-finding') }).filter({ hasText: 'Authentication:' }).getByTestId('concern-finding')
+  await finding.getByRole('button', { name: 'Answer the questions…' }).click()
+  await page.getByTestId('concern-wizard').getByRole('button', { name: 'Add to model' }).click()
+  await expect(page.getByTestId('concern-wizard')).toHaveCount(0)
+
+  // Saved: Payments and Shop list what they listed; the pack is in its own view.
+  const views = async (): Promise<Array<{ name: string; nodeIds: string[]; folder?: string }>> => JSON.parse((await folder.files())['views.json'] ?? '[]')
+  await expect.poll(async () => (await views()).some((v) => v.folder === 'Concerns' && v.nodeIds.length > 0), { timeout: 10_000 }).toBe(true)
+  await studio.settle()
+  const saved = await views()
+  expect(saved.find((v) => v.name === 'Payments')!.nodeIds).toEqual(['pay'])
+  expect(saved.find((v) => v.name === 'Shop')!.nodeIds).toEqual(['user', 'shop', 'web'])
+  // And Designer draws Payments as it was.
+  await page.locator('.toolbar-mode-btn', { hasText: 'Designer' }).click()
+  await expect(page.locator('.react-flow__node')).toHaveCount(1)
+})

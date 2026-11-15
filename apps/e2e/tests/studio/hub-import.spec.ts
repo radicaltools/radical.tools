@@ -73,7 +73,6 @@ test('a Hub link with no model open waits on the Welcome screen, and its import 
   await expect(welcome.getByRole('status')).toContainText('From Radical Hub: Authentication waits to be imported.')
   await page.waitForTimeout(500)
   await expect(page.getByRole('dialog')).toHaveCount(0)
-  expect(new URL(page.url()).search).toBe('')
 
   await welcome.locator('.welcome-start-recent .msteps-row').first().click()
   await expect(welcome).toHaveCount(0)
@@ -82,6 +81,68 @@ test('a Hub link with no model open waits on the Welcome screen, and its import 
   // On top: a click in it reaches it.
   const box = (await wizard.boundingBox())!
   expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('[data-testid="concern-wizard"]'), [box.x + box.width / 2, box.y + 20])).toBe(true)
+})
+
+test('a Hub link waits across a reload of the Welcome screen until its import opens, and after that a reload asks nothing', async ({ page, studio }) => {
+  // F-0170: the link was taken out of the address at once, so a reload of
+  // the Welcome screen that said the pack waits forgot it.
+  await studio.seed()
+  await page.goto('/?hub=concern-authentication')
+  const welcome = page.locator('.welcome-overlay')
+  await expect(welcome.getByRole('status')).toContainText('Authentication waits to be imported.')
+  await page.reload()
+  await expect(welcome.getByRole('status')).toContainText('From Radical Hub: Authentication waits to be imported.')
+
+  await welcome.locator('.welcome-start-recent .msteps-row').first().click()
+  const wizard = page.getByTestId('concern-wizard')
+  await expect(wizard).toBeVisible()
+  // Opened: the link is done with, and a reload does not ask again.
+  await expect.poll(() => new URL(page.url()).searchParams.has('hub')).toBe(false)
+  await page.reload()
+  await studio.ready()
+  await page.waitForTimeout(500)
+  await expect(wizard).toHaveCount(0)
+  await expect(welcome).toHaveCount(0)
+})
+
+test('Import from Hub in Viewer showing a milestone offers the elements of the model the pack goes into', async ({ page, studio }) => {
+  // F-0167: the wizard offered (and ticked) an element only the milestone
+  // has; the import, Designer's edit of the live model, then bound the
+  // pack's decisions to nothing, without a word.
+  const box = { x: 0, y: 0, width: 200, height: 100, collapsed: false }
+  const user = { ...box, id: 'user', type: 'person', label: 'Customer' }
+  const web = { ...box, id: 'web', type: 'webapp', label: 'Storefront', x: 300 }
+  const shop = { ...box, id: 'shopweb', type: 'webapp', label: 'Shop Web', x: 600 }
+  const reach = (id: string, targetId: string) => ({ id, relationType: 'interacts', sourceId: 'user', targetId })
+  await studio.seedDocument(JSON.stringify({
+    metamodel: { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} },
+    nodes: [user, shop],
+    relations: [reach('r2', 'shopweb')],
+    views: [{ id: 'v-main', name: 'Main', nodeIds: ['user', 'shopweb'], positions: {} }],
+    sequences: [], presentations: [],
+    // Storefront was deleted since v1.
+    snapshots: [{ id: 'm1', name: 'v1', timestamp: Date.now() - 86400e3, nodes: { user, web, shopweb: shop }, relations: { r1: reach('r1', 'web'), r2: reach('r2', 'shopweb') } }],
+  }))
+  await studio.open('v-main', 'designer')
+  await page.locator('.toolbar-mode-btn', { hasText: 'Viewer' }).click()
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
+  const v1 = page.locator('.lp-snap-card', { hasText: 'v1' }).first()
+  if (!(await v1.isVisible())) await page.getByRole('tab', { name: 'Milestones' }).click()
+  await v1.click()
+  await expect(page).toHaveURL(/\/s\/m1/)
+  await studio.settle()
+
+  const wizard = await packWizard(page, 'Authentication')
+  await expect(wizard.getByRole('checkbox', { name: /^Shop Web/ })).toHaveAttribute('aria-checked', 'true')
+  await expect(wizard.getByRole('checkbox', { name: /^Storefront/ })).toHaveCount(0)
+  await wizard.getByRole('button', { name: 'Add to model' }).click()
+  await expect(wizard).toHaveCount(0)
+  await studio.settle()
+  const doc = await studio.storedDoc() as unknown as { nodes: Array<{ id: string }>; relations: Array<{ relationType: string; targetId: string }> }
+  expect(doc.nodes.some((n) => n.id === 'web')).toBe(false)
+  const constrained = doc.relations.filter((r) => r.relationType === 'constrains').map((r) => r.targetId)
+  expect(constrained).toContain('shopweb')
+  expect(constrained).not.toContain('web')
 })
 
 test('a concern pack is imported with its answers and bound to the element in one undo step', async ({ page, studio }) => {

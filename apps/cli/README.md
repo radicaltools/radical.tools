@@ -380,7 +380,9 @@ that judges only its part of a model kept in a repository of its own
 (`"model": { "repo": … }` in `.radical/radical.json`), the model's
 `check.json` holds the whole model's baselines: `--ratchet` refuses to lower
 them (exit 2), and lowers only a config of the repository's own named with
-`--config`.
+`--config`. With `--alone` or `--trigger`, which leave part of the model out
+(the models `deps.json` names, the metric conditions of other events),
+`--ratchet` lowers no baseline (exit 2).
 
 ### Goals
 
@@ -428,7 +430,9 @@ scenarios and fitness functions in `.radical/radical.json` ("verifies"), and
 a scenario or fitness function passes when every test bound to it passed and
 its `metrics` (metric conditions only) hold. A test is named as Vitest and
 Playwright print it, from the repository's root, its parts joined by `›`
-(Vitest's `>` is read too, and `radical verify` keeps it with `›`):
+(Vitest's `>` is read too, and `radical verify` keeps it with `›`; the
+project Playwright or Vitest prints before the file, `[chromium] › ` or
+`|unit| `, and the line and column after it, `:2:3`, are left out):
 
 ```sh
 radical verify "Prints JSON" --test "apps/cli/src/cli.test.ts › radical check › prints the result as JSON"
@@ -442,7 +446,10 @@ radical verify "Prints JSON" --drop "<test>"     # take one off
 A test may be bound to a scenario or fitness function of another model of
 the federation (a consumer contract test): it is this repository's, so
 `radical check` judges it with the model's own (a failed or missing test is
-an error here), and `--trace` shows that scenario's path.
+an error here), and `--trace` shows that scenario's path, with the other
+model's requirement above a failed one broken, as the check says. Before any
+results, `--trace` lists the tests bound to each scenario and fitness function
+with no outcome yet.
 
 `radical check` warns about a scenario the repository must verify (an
 element it builds satisfies its requirement) that has no test bound and no
@@ -770,14 +777,16 @@ ports (`<ports>+NN`, `+100+NN`, `+200+NN`) and a `PROMPT.md` with its area;
 `BRIEF.md` names the commit, the commits and the model elements changed since
 the last round (by area), the open findings, the setup, the rules and the
 report's JSON form. `--since`, `--from` and `--no-build` change what it
-counts from, the first run's number and whether it builds. The brief asks
+counts from, the first run's number and whether it builds; a run number an
+earlier round has is refused (exit 2). The brief asks
 that scripts name no absolute path (they find the repository by walking up to
 `.radical/crucible/crucible.json`), since a finding's script is copied out of the round.
 `verify` serves a run's build on its ports (each server `serve` lists, on the
 run's port it names: `app`, `hub` or `other`), runs its scripts from its
-folder and stops the servers. A script shows the bug when it exits 1, and
+folder and stops the servers; a script not in the folder stops it before
+anything runs (exit 2). A script shows the bug when it exits 1, and
 says so in a line of its own (`REPRODUCED: yes` or `REPRODUCED: no`; `BUG: …`
-and `FINDING: …` count as yes): `verify` prints those lines and whether the
+and `FINDING: …` count as yes, whatever they say): `verify` prints those lines and whether the
 bug shows for each script (the line wins, as a script that throws exits 1
 too, and it says when exit and line disagree), keeps both in `round.json`, and
 ends with the scripts that show the bug and those that do not. A run's folder

@@ -165,16 +165,45 @@ export interface TestId {
   title: string[]
 }
 
+/** What runners print before a test's file: Playwright's `[project]` (and
+ *  its line reporter's `[1/4]`), Vitest's `|project|`. */
+const RUNNER_PREFIX = /^(?:(?:\[[^\]]*\]|\|[^|]*\|)(?:\s+|$))+/
+/** The line and column Playwright prints after a test's file. */
+const FILE_LOCATION = /:\d+(?::\d+)?$/
+
 /** A test id's file and titles. An id is written as Playwright prints it
- *  (`a.test.ts › suite › title`) or as Vitest does (`a.test.ts > suite >
- *  title`); an id with a › splits only on ›, so a title may hold " > ". */
+ *  (`a.test.ts › suite › title`, also `[chromium] › a.spec.ts:2:3 › suite
+ *  › title`) or as Vitest does (`a.test.ts > suite > title`, also with
+ *  `|project| ` before it); an id with a › splits only on ›, so a title
+ *  may hold " > ". The project and the line are left out. */
 export function testIdParts(raw: string): string[] {
-  return raw.split(SEPARATOR.test(raw) ? SEPARATOR : ASCII_SEPARATOR).map((part) => part.trim())
+  const parts = raw.split(SEPARATOR.test(raw) ? SEPARATOR : ASCII_SEPARATOR).map((part) => part.trim())
+  const file = parts[0].replace(RUNNER_PREFIX, '')
+  if (!file && parts.length > 1) parts.shift()
+  else parts[0] = file
+  parts[0] = parts[0].replace(FILE_LOCATION, '')
+  return parts
 }
 
 /** A test id as it is kept (in .radical/radical.json): its parts joined by
  *  ›, however it was written. */
 export const canonicalTestId = (raw: string): string => testIdParts(raw.trim()).filter(Boolean).join(' › ')
+
+/** The tests bound to an element once `adds` are bound and `drops` taken
+ *  off, each test once: ids are compared canonical, so a test written
+ *  another way is the same test. Those bound stay as written, the added
+ *  ones are kept canonical. */
+export function rebindTests(bound: string[], adds: string[], drops: string[]): string[] {
+  const dropped = new Set(drops.map(canonicalTestId))
+  const seen = new Set<string>()
+  const tests: string[] = []
+  for (const [test, id] of [...bound.map((t) => [t, canonicalTestId(t)]), ...adds.map((t) => [canonicalTestId(t), canonicalTestId(t)])]) {
+    if (!id || dropped.has(id) || seen.has(id)) continue
+    seen.add(id)
+    tests.push(test)
+  }
+  return tests
+}
 
 /** The test ids in a list, one per line (a title may hold
  *  "; "). Blank lines and lines starting with # are left out. */

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useHubStore } from '@radical/ui/store/hubStore'
-import { documents } from '../store/documentStore'
+import { documents, usersModels } from '../store/documentStore'
 import { aiReady, loadAISettings } from '../ai/settings'
 import { BrowserIcon, ModelRow, NewModelStep, OpenSources, StepRow, openSample } from './ModelSteps'
 // The mark of radical.tools: a copy of tools/brand/radical-mark.svg that
@@ -99,7 +99,7 @@ function SamplePreview(): React.ReactElement {
 export function WelcomeScreen({ onDismiss, hubWaits }: Props): React.ReactElement {
   // The doc auto-seeded on a first visit is not the user's work: leave it out
   // so newcomers are not greeted by a model they never made.
-  const existingDocs = documents.listDocuments().filter(d => !documents.isBootSeeded(d.id))
+  const existingDocs = usersModels(documents.listDocuments())
   const hasExisting  = existingDocs.length > 0
   const browserDocs  = existingDocs.filter(d => d.source === 'ls')
   // AI settings live behind the logo menu, which this overlay covers, so

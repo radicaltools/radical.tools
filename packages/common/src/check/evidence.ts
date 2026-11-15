@@ -10,7 +10,7 @@
 import type { C4Node, C4Relation } from '../c4'
 import { originOf } from '../model'
 import type { CheckModel } from './rules'
-import { findTests, outcomeOf, type TestId, type TestStatus } from './reports'
+import { findTests, outcomeOf, rebindTests, type TestId, type TestStatus } from './reports'
 import { evaluateMetric, parseCombine, parseCondition, parseConditions, parseMaxAge, type Combine, type Condition, type Measurement } from './metrics'
 
 /** A test id's outcome; `not-found` when its file ran but no test has its
@@ -79,12 +79,13 @@ export const BOUND_TESTS = 'boundTests'
 export function withBoundTests<T extends C4Node>(nodes: T[], verifies: Array<{ element: string; tests: string[] }> | undefined): T[] {
   if (!verifies?.length) return nodes
   const bound = new Map<string, string[]>()
-  for (const v of verifies) bound.set(v.element, [...bound.get(v.element) ?? [], ...v.tests])
+  // Each test once, however the file writes it.
+  for (const v of verifies) bound.set(v.element, rebindTests([...bound.get(v.element) ?? [], ...v.tests], [], []))
   return nodes.map((n) => (bound.has(n.id) ? { ...n, [BOUND_TESTS]: bound.get(n.id) } : n))
 }
 
 /** A `test(<id>) passed` for each test the repository binds to a node. */
-const boundConditions = (node: C4Node): Condition[] => {
+export const boundConditions = (node: C4Node): Condition[] => {
   const bound = (node as unknown as Props)[BOUND_TESTS]
   return Array.isArray(bound) ? bound.map((id) => parseCondition(`test(${id}) passed`)) : []
 }

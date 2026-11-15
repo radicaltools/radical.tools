@@ -215,6 +215,97 @@ describe("reading the person's words", () => {
     ])
   })
 
+  it('reads a minus written as a dash: –18 is -18, as −18 and -18 are, in values and limits alike (Values read in their forms)', () => {
+    for (const sign of ['-', '−', '–', '‒', '‑']) {
+      expect([...hardValues(`rises above ${sign}18 °C`)], sign).toEqual(['-18'])
+      expect(readLimits(`rises above ${sign}18 °C`).map((l) => `${l.op}${l.value}`), sign).toEqual(['>-18'])
+    }
+    // A dash between two numbers is a range, not a sign.
+    expect([...hardValues('10–20 items')].sort()).toEqual(['10', '20'])
+    const answer = 'The freezer alarm sounds when the temperature rises above –18 °C.'
+    const need = node('n', 'need', 'Freezer', { description: `Q: When does the alarm sound?\nA: ${answer}` })
+    const data = governance(
+      [need, req('r', 'sound the freezer alarm when the temperature rises above 18 °C'), req('ok', 'sound the freezer alarm when the temperature rises above -18 °C')],
+      [derives('d', 'r', 'n', answer), derives('dok', 'ok', 'n', answer)],
+    )
+    expect(findings(data, ['quote-value-missing', 'requirement-value-unquoted', 'quote-value-differs']).map((f) => [f[0], f[1]])).toEqual([
+      ['quote-value-missing', 'd'],
+      ['requirement-value-unquoted', 'r'],
+    ])
+  })
+
+  it('reads a range as one limit before a sentence is cut into clauses: between 8 and 64, 1,000 to 5,000 (Limits, units and order kept)', () => {
+    const limits = (text: string) => readLimits(text).map((l) => `${l.op}${l.value}`)
+    const cases: Array<[string, string[]]> = [
+      ['A password has between 8 and 64 characters.', ['>=8', '<=64']],
+      ['A password has from 8 to 64 characters.', ['>=8', '<=64']],
+      ['A password has 8 to 64 characters.', ['>=8', '<=64']],
+      ['An order holds between 1,000 and 5,000 items.', ['>=1000', '<=5000']],
+      ['An order holds at most 1,000 items.', ['<=1000']],
+      ['A password has between 8 and 64 characters and at most 3 digits.', ['>=8', '<=64', '<=3']],
+    ]
+    for (const [text, want] of cases) expect(limits(text).sort(), text).toEqual([...want].sort())
+    const need = node('n', 'need', 'Brief', { description: 'Q: How long is a password?\nA: A password has between 8 and 64 characters.' })
+    const data = governance([need, req('r', 'accept a password of at most 8 characters')], [derives('d', 'r', 'n', 'A password has between 8 and 64 characters.')])
+    expect(findings(data, ['quote-value-differs']).map((f) => f[1])).toEqual(['d'])
+  })
+
+  it('turns a limit round only by a negation of its own verb, not of a verb in a clause before it (Limits, units and order kept)', () => {
+    const limits = (text: string) => readLimits(text).map((l) => `${l.op}${l.value}`)
+    const cases: Array<[string, string]> = [
+      ["A guest who can't pay yet keeps at most 20 items in the basket.", '<=20'],
+      ["A guest who doesn't log in keeps at most 20 items in the basket.", '<=20'],
+      ['A guest who cannot pay yet keeps at most 20 items in the basket.', '<=20'],
+      ["A guest that isn't logged in can keep at most 20 items.", '<=20'],
+      ['When the guest does not log in the basket keeps at most 20 items.', '<=20'],
+      // The negation of the limit's own verb still turns it round.
+      ['A basket cannot exceed 20 items.', '<=20'],
+      ['A basket that cannot hold more than 20 items.', '<=20'],
+      ['A shop which does not accept baskets with more than 20 items.', '<=20'],
+      ['A guest who is not allowed to pay keeps at most 20 items.', '<=20'],
+      ['A cost that is not above 0.', '<=0'],
+      ['A basket must never hold more than 20 items.', '<=20'],
+    ]
+    for (const [text, want] of cases) expect(limits(text), text).toEqual([want])
+    const need = node('n', 'need', 'Brief', { description: "Q: And a guest?\nA: A guest who can't pay yet keeps at most 20 items in the basket." })
+    const data = governance([need, req('r', 'keep at most 20 items in the basket of a guest')], [derives('d', 'r', 'n', "A guest who can't pay yet keeps at most 20 items in the basket.")])
+    expect(findings(data, ['quote-value-differs'])).toEqual([])
+  })
+
+  it('compares the unit of a value in years, months and currencies: 10 years is not 10 days, 5 € not 5 USD (Limits, units and order kept)', () => {
+    const cases: Array<[string, string, boolean]> = [
+      ['Invoices are kept for 10 years.', 'keep invoices for 10 days', true],
+      ['A login is kept for 6 months.', 'keep a login for 6 weeks', true],
+      ['A guest pays 5 € for delivery.', 'charge a guest 5 USD for delivery', true],
+      ['A guest pays $5 for delivery.', 'charge a guest 5 PLN for delivery', true],
+      ['Invoices are kept for 10 years.', 'keep invoices for 120 months', false],
+      ['Invoices are kept for 1 year.', 'keep invoices for 365 days', false],
+      ['A guest pays 5 € for delivery.', 'charge a guest 5 euros for delivery', false],
+      ['A guest pays 5 € for delivery.', 'charge a guest 500 cents for delivery', false],
+    ]
+    for (const [answer, action, differs] of cases) {
+      const need = node('n', 'need', 'Brief', { description: `Q: What?\nA: ${answer}` })
+      const data = governance([need, req('r', action)], [derives('d', 'r', 'n', answer)])
+      expect(findings(data, ['quote-value-differs', 'quote-value-missing', 'requirement-value-unquoted']).map((f) => f[0]), `${answer} → ${action}`).toEqual(differs ? ['quote-value-differs'] : [])
+    }
+  })
+
+  it('reads a discount and a subtraction without a sign: -10% off and total minus 5 € are 10% and 5 €; a balance of minus 50 € keeps it (Values read in their forms)', () => {
+    const cases: Array<[string, string, string[]]> = [
+      ['Members get -10% on every basket.', 'give members a discount of 10% on every basket', []],
+      ['Members get -10% on every basket.', 'give members -10% on every basket', []],
+      ['A member pays the basket total minus 5 € delivery.', 'subtract 5 € delivery from the basket total of a member', []],
+      ['A shift lasts 8 hours minus 30 minutes for lunch.', 'count a shift as 8 hours less 30 minutes for lunch', []],
+      ['An account may reach a balance of minus 50 €.', 'let an account reach a balance of 50 €', ['quote-value-missing', 'requirement-value-unquoted']],
+      ['The freezer is kept at minus 18 degrees.', 'keep the freezer at 18 degrees', ['quote-value-missing', 'requirement-value-unquoted']],
+    ]
+    for (const [answer, action, want] of cases) {
+      const need = node('n', 'need', 'Brief', { description: `Q: What?\nA: ${answer}` })
+      const data = governance([need, req('r', action)], [derives('d', 'r', 'n', answer)])
+      expect(findings(data, ['quote-value-missing', 'requirement-value-unquoted', 'quote-value-differs']).map((f) => f[0]), `${answer} → ${action}`).toEqual(want)
+    }
+  })
+
   it("asks a scenario for the person's example (Example missing from scenarios)", () => {
     const need = node('n', 'need', 'Cost of goods', { description: 'Q: How is the average worked out?\nA: A moving average. For example, 4 on hand at 4.00 € and 12 received at 6.00 € gives 5.50 €.' })
     const sc = node('sc', 'scenario', 'Average over a delivery', { given: '4 on hand', when: '12 are received', then: 'the average changes' })

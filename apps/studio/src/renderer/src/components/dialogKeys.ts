@@ -7,25 +7,17 @@
 
 import { useEffect, type RefObject } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { modalDialogOpen } from '@radical/ui/components/keysHere'
+import { keysTakenElsewhere } from '@radical/ui/components/keysHere'
 
-/** A modal dialog is open (a node wizard, the Models dialog, About…):
- *  Studio's own shortcuts stay out of it, as the canvas's keys do (the one
- *  gate, modalDialogOpen). Ctrl/Cmd+Z in a wizard took back the element the
- *  wizard was creating its child in, and Create then saved a child of
- *  nothing (the model could not be opened again). */
-export function inModalDialog(): boolean {
-  return modalDialogOpen()
-}
-
-/** Whether a key pressed on `target` is a dialog's: a modal one is open, or
- *  the focus is in a dialog that leaves the canvas usable (Radical Forge),
- *  or the metamodel editor fills the window. */
+/** Whether a key pressed on `target` is a dialog's: something else has it
+ *  as the canvas's keys go (keysTakenElsewhere: a modal dialog, the Delete
+ *  prompt among them, or the focus in a dialog that leaves the canvas
+ *  usable, as Radical Forge, or in a menu), or the metamodel editor fills
+ *  the window. Ctrl/Cmd+Z in a wizard took back the element the wizard was
+ *  creating its child in, and Create then saved a child of nothing. */
 export function keysTakenByDialog(target: EventTarget | null): boolean {
-  if (inModalDialog()) return true
-  if (useDiagramStore.getState().appMode === 'metamodel') return true
-  const el = target as Element | null
-  return !!el && typeof el.closest === 'function' && !!el.closest('[role="dialog"]')
+  if (keysTakenElsewhere(target)) return true
+  return useDiagramStore.getState().appMode === 'metamodel'
 }
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'

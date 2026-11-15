@@ -26,6 +26,7 @@ import { openCard, showNodeInView, useCardOpen } from '../store/showInView'
 import { CardNavigation, ElementVerification, useCardNavigate } from './ElementVerification'
 import { NodeActions, RelationActions } from './SelectionActions'
 import { OPEN_VIEW_PROPERTIES_EVENT } from './LargeCanvasNotice'
+import { keysOnTop } from './keysHere'
 import { CANVAS_MAX_ELEMENTS, viewShowsEveryNode, viewFolderTree, viewFolderPaths, normalizeViewFolder, isInViewFolder, wikiDepthOf, WIKI_DEPTH_MIN, WIKI_DEPTH_MAX, type ViewFolder, type DiagramView } from '@radical/common/c4'
 
 /** A text field got or lost focus: what is typed into it in between (each
@@ -1467,7 +1468,7 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
   }, [newMenuOpen, placeNewMenu])
   useEffect(() => {
     if (!newMenuOpen) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNewMenuOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && keysOnTop(newMenuPopRef.current, e)) setNewMenuOpen(false) }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [newMenuOpen])
@@ -2167,63 +2168,73 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
 // EARS inline sentence editor for right panel (compact)
 const EARS_SENTENCE_FIELDS = ['trigger', 'precondition', 'unwanted_condition', 'feature', 'action'] as const
 
+/** A part of the sentence, edited in place. Declared here, not in the
+ *  sentence's render: a reload of the folder (an agent's write) re-rendered
+ *  the card and made each part a new component, which closed the one being
+ *  typed in and lost what was typed (F-0176). An outside change of the part
+ *  itself leaves the draft alone while it is typed in. */
+function EarsSlotSm({ value, fieldKey, placeholder, nodeId, readOnly, updateNode }: { value: string; fieldKey: string; placeholder: string; nodeId: string; readOnly: boolean; updateNode: (id: string, patch: Record<string, unknown>) => void }) {
+  const [editing, setEditing] = React.useState(false)
+  const [draft, setDraft] = React.useState(value)
+  const inputRef = React.useRef<HTMLInputElement>(null)
+  React.useEffect(() => { if (!editing) setDraft(value) }, [value, editing])
+  React.useEffect(() => { if (editing && inputRef.current) inputRef.current.focus() }, [editing])
+
+  if (!editing) {
+    return (
+      <span
+        className={`ears-slot-sm ${value ? 'ears-slot-filled' : 'ears-slot-empty'}`}
+        onClick={() => !readOnly && setEditing(true)}
+      >
+        {value || placeholder}
+      </span>
+    )
+  }
+  return (
+    <input
+      ref={inputRef}
+      className="ears-slot-input-sm"
+      value={draft}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => { setEditing(false); if (draft !== value) updateNode(nodeId, { [fieldKey]: draft || undefined }) }}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setDraft(value); setEditing(false) } }}
+    />
+  )
+}
+
 function EarsSentencePreview({ node, nodeId, subject: subjectProp, statePhrase, readOnly, updateNode }: { node: Record<string, unknown>; nodeId: string; subject?: string; statePhrase?: string; readOnly: boolean; updateNode: (id: string, patch: Record<string, unknown>) => void }) {
   const earsType = String(node.ears_type ?? 'ubiquitous')
   const subject = subjectProp || 'the system'
 
-  const Slot = ({ fieldKey, placeholder }: { fieldKey: string; placeholder: string }) => {
-    const val = String(node[fieldKey] ?? '')
-    const [editing, setEditing] = React.useState(false)
-    const [draft, setDraft] = React.useState(val)
-    const inputRef = React.useRef<HTMLInputElement>(null)
-    React.useEffect(() => { setDraft(val) }, [val])
-    React.useEffect(() => { if (editing && inputRef.current) inputRef.current.focus() }, [editing])
-
-    if (!editing) {
-      return (
-        <span
-          className={`ears-slot-sm ${val ? 'ears-slot-filled' : 'ears-slot-empty'}`}
-          onClick={() => !readOnly && setEditing(true)}
-        >
-          {val || placeholder}
-        </span>
-      )
-    }
-    return (
-      <input
-        ref={inputRef}
-        className="ears-slot-input-sm"
-        value={draft}
-        placeholder={placeholder}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => { setEditing(false); if (draft !== val) updateNode(nodeId, { [fieldKey]: draft || undefined }) }}
-        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setDraft(val); setEditing(false) } }}
-      />
-    )
-  }
+  // An element, not a component declared here: one declared in the render
+  // is a new component at each render, and its part was put back closed.
+  const slot = (fieldKey: string, placeholder: string) => (
+    <EarsSlotSm value={String(node[fieldKey] ?? '')} fieldKey={fieldKey} placeholder={placeholder} nodeId={nodeId} readOnly={readOnly} updateNode={updateNode} />
+  )
 
   // A requirement pointing at a state (While in state) reads "While the
   // Order is Confirmed", as on the canvas and in the wiki; it read the
   // precondition's text, or ‹precondition›.
   const precondition = statePhrase
     ? <span className="ears-fixed-sm" title="The state it points at (While in state)">{statePhrase}</span>
-    : <Slot fieldKey="precondition" placeholder="‹precondition›" />
-  const shall = (<><span className="ears-subject-sm">{subject}</span><span className="ears-fixed-sm"> shall </span><Slot fieldKey="action" placeholder="‹action›" /><span className="ears-fixed-sm">.</span></>)
+    : slot('precondition', '‹precondition›')
+  const shall = (<><span className="ears-subject-sm">{subject}</span><span className="ears-fixed-sm"> shall </span>{slot('action', '‹action›')}<span className="ears-fixed-sm">.</span></>)
 
   let content: React.ReactNode
   switch (earsType) {
     case 'event-driven':
-      content = (<><span className="ears-fixed-sm">When </span><Slot fieldKey="trigger" placeholder="‹trigger›" /><span className="ears-fixed-sm">, </span>{shall}</>); break
+      content = (<><span className="ears-fixed-sm">When </span>{slot('trigger', '‹trigger›')}<span className="ears-fixed-sm">, </span>{shall}</>); break
     case 'state-driven':
       content = (<><span className="ears-fixed-sm">While </span>{precondition}<span className="ears-fixed-sm">, </span>{shall}</>); break
     case 'unwanted-behaviour':
-      content = (<><span className="ears-fixed-sm">If </span><Slot fieldKey="unwanted_condition" placeholder="‹condition›" /><span className="ears-fixed-sm">, then </span>{shall}</>); break
+      content = (<><span className="ears-fixed-sm">If </span>{slot('unwanted_condition', '‹condition›')}<span className="ears-fixed-sm">, then </span>{shall}</>); break
     case 'optional':
-      content = (<><span className="ears-fixed-sm">Where </span><Slot fieldKey="feature" placeholder="‹feature›" /><span className="ears-fixed-sm">, </span>{shall}</>); break
+      content = (<><span className="ears-fixed-sm">Where </span>{slot('feature', '‹feature›')}<span className="ears-fixed-sm">, </span>{shall}</>); break
     case 'complex':
-      content = (<><span className="ears-fixed-sm">While </span>{precondition}<span className="ears-fixed-sm">, when </span><Slot fieldKey="trigger" placeholder="‹trigger›" /><span className="ears-fixed-sm">, </span>{shall}</>); break
+      content = (<><span className="ears-fixed-sm">While </span>{precondition}<span className="ears-fixed-sm">, when </span>{slot('trigger', '‹trigger›')}<span className="ears-fixed-sm">, </span>{shall}</>); break
     default:
-      content = (<><span className="ears-subject-sm">{subject.charAt(0).toUpperCase() + subject.slice(1)}</span><span className="ears-fixed-sm"> shall </span><Slot fieldKey="action" placeholder="‹action›" /><span className="ears-fixed-sm">.</span></>)
+      content = (<><span className="ears-subject-sm">{subject.charAt(0).toUpperCase() + subject.slice(1)}</span><span className="ears-fixed-sm"> shall </span>{slot('action', '‹action›')}<span className="ears-fixed-sm">.</span></>)
   }
 
   return (

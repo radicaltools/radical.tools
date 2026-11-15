@@ -1,0 +1,22 @@
+cant-pay
+  need answer: A guest who can't pay yet keeps at most 20 items in the basket.
+  requirement: keep at most 20 items in the basket of a guest
+  radical check: 
+    quote-value-differs: Requirement "Requirement" allows up to and with 20 ("at most 20") where the words it quotes from "Brief" allow above 20 ("at most 20"): check on which side of 20 the limit is.
+
+doesnt-log-in
+  need answer: A guest who doesn't log in keeps at most 20 items in the basket.
+  requirement: keep at most 20 items in the basket of a guest
+  radical check: 
+    quote-value-differs: Requirement "Requirement" allows up to and with 20 ("at most 20") where the words it quotes from "Brief" allow above 20 ("at most 20"): check on which side of 20 the limit is.
+
+cannot-pay
+  need answer: A guest who cannot pay yet keeps at most 20 items in the basket.
+  requirement: keep at most 20 items in the basket of a guest
+  radical check: 
+    quote-value-differs: Requirement "Requirement" allows up to and with 20 ("at most 20") where the words it quotes from "Brief" allow above 20 ("at most 20"): check on which side of 20 the limit is.
+
+control
+  need answer: A guest who logs in later keeps at most 20 items in the basket.
+  requirement: keep at most 20 items in the basket of a guest
+  radical check: (no finding)

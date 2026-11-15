@@ -1,0 +1,12 @@
+between-and
+  need answer: A password has between 8 and 64 characters.
+  requirement: accept a password of at most 8 characters
+  radical check: 
+    quote-value-missing: Requirement "Requirement" does not say "64", which the words it quotes from "Brief" say.
+
+control-from-to
+  need answer: A password has from 8 to 64 characters.
+  requirement: accept a password of at most 8 characters
+  radical check: 
+    quote-value-missing: Requirement "Requirement" does not say "64", which the words it quotes from "Brief" say.
+    quote-value-differs: Requirement "Requirement" allows up to and with 8 ("at most 8") where the words it quotes from "Brief" allow from and with 8 ("from 8 to 64"): check on which side of 8 the limit is.

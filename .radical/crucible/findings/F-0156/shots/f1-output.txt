@@ -1,0 +1,16 @@
+
+== Domain stage open, then forge_finish: accepted
+forge_finish: - Domain model: begun but not completed
+forge-run.json: state finished, domain {"id":"domain","status":"generating"}
+after the finish, add_node: REFUSED - add_node: a system belongs to an earlier stage, not to this one (domain, entity). Propose it with forge_propose_refinement instead: the user decides.
+after the finish, update_node: REFUSED - update_node: "Pay by card" belongs to an earlier stage. Propose it with forge_propose_refinement instead: the user decides.
+after the finish, delete_node: REFUSED - delete_node: "Pay by card" belongs to an earlier stage, and a Forge stage never deletes one.
+
+== Domain stage with a proposal waiting, then forge_finish: accepted
+forge_finish: - Domain model: begun but not completed
+forge-run.json: state finished, domain {"id":"domain","status":"generating","asking":true}
+after the finish, add_node: REFUSED - add_node: proposal p1 waits for the user's answer; ask them and call forge_answer_refinement first.
+after the finish, update_node: REFUSED - update_node: proposal p1 waits for the user's answer; ask them and call forge_answer_refinement first.
+after the finish, delete_node: REFUSED - delete_node: proposal p1 waits for the user's answer; ask them and call forge_answer_refinement first.
+
+REPRODUCED: yes

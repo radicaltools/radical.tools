@@ -107,6 +107,31 @@ describe('mergeModels', () => {
     ])
   })
 
+  it('drops a relation to an element one side deleted without a word when the side that kept the element did not draw or change it (F-0177)', () => {
+    // Another program deleted Bank's file and left its relations in
+    // relations.json while Studio renamed Customer: the notice said the
+    // relations to Bank were made in Studio.
+    const b = { ...clone(base), relations: [rel('r1', 'user', 'shop', 'buys'), rel('r2', 'shop', 'bank', 'charges'), rel('r3', 'bank', 'user', 'pays out')] }
+    const fileGone = { ...clone(b), nodes: b.nodes.filter((n) => n.id !== 'bank') }
+    const renamed = clone(b)
+    renamed.nodes.find((n) => n.id === 'user')!.label = 'Client'
+    for (const [o, t] of [[renamed, fileGone], [fileGone, renamed]]) {
+      const { merged, conflicts, dropped } = mergeModels(b, o, t)
+      expect(merged.nodes.map((n) => n.id)).toEqual(['shop', 'user'])
+      expect(merged.relations.map((r) => r.id)).toEqual(['r1'])
+      expect(conflicts).toEqual([])
+      expect(dropped).toEqual([])
+    }
+    // The side that kept Bank changed a relation to it: that is reported.
+    const relabelled = clone(renamed)
+    relabelled.relations.find((r) => r.id === 'r2')!.label = 'bills'
+    for (const [o, t, by] of [[relabelled, fileGone, 'ours'], [fileGone, relabelled, 'theirs']] as const) {
+      const { merged, dropped } = mergeModels(b, o, t)
+      expect(merged.relations.map((r) => r.id)).toEqual(['r1'])
+      expect(dropped).toEqual([{ name: 'Bank', by, change: 'the relation Shop → Bank made to it' }])
+    }
+  })
+
   it('drops a step one side added for a relation the other deleted, and says so (item 234)', () => {
     const b = { ...clone(base), relations: [rel('r1', 'user', 'shop', 'buys'), rel('r2', 'shop', 'bank', 'charges')], sequences: [{ id: 's', name: 'Order', relationIds: ['r1', 'r2'] }] }
     const deleted = { ...clone(b), relations: [rel('r1', 'user', 'shop', 'buys')], sequences: [{ id: 's', name: 'Order', relationIds: ['r1'] }] }

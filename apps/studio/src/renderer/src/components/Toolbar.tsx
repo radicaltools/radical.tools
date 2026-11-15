@@ -28,6 +28,7 @@ import { FORGE_NEEDS_AI, aiReady, loadAISettings } from '../ai/settings'
 import { saveThemePref, useDrawnTheme, useThemePref, type ThemePref } from '../theme'
 import { openSetup } from './SetupWizard'
 import { useMenuKeys } from '@radical/ui/hooks/menuKeys'
+import { isTypedField } from '@radical/ui/components/keysHere'
 import {
   loadStudioSettings,
   updateStudioSettings,
@@ -605,16 +606,9 @@ function AppMenu({
 /** The panels that show a run, in one place over the canvas (Toolbar). */
 type RunPanel = 'forge' | 'agent-forge' | 'agent-assay'
 
-/** Input kinds that hold no text: Ctrl/Cmd+Z there is not about typing. */
-const NOT_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file', 'image'])
-
-/** Whether the key event comes from a field the user types text into. */
-function typingInTextField(target: EventTarget | null): boolean {
-  const el = target as HTMLElement | null
-  if (!el || typeof el.tagName !== 'string') return false
-  if (el.isContentEditable || el.tagName === 'TEXTAREA') return true
-  return el.tagName === 'INPUT' && !NOT_TEXT_INPUTS.has((el as HTMLInputElement).type)
-}
+/** Whether the key event comes from a field the user types text into: not
+ *  a checkbox or a drop-down, where Ctrl/Cmd+Z is not about typing. */
+const typingInTextField = isTypedField
 
 /** Before a presentation starts from F5, the focus leaves what has it, as a
  *  click elsewhere would take it: a name being typed (the table's F2, a
@@ -830,19 +824,26 @@ export function Toolbar(): React.ReactElement {
   // none open. Each had a flag of its own, and the one open hid the others:
   // the Assay button did nothing under the agent's Forge panel, and the Assay
   // panel opened by itself once that closed. Radical Forge generating stays:
-  // closed, its run would be lost.
+  // closed, its run would be lost. Between two stages it is put aside, and
+  // comes back where it was (forgeAside): replaced, it was opened afresh on
+  // an empty Description, and the run could not be continued.
   const [runPanel, setRunPanel] = useState<RunPanel | null>(null)
   const runPanelShown = useRef(runPanel)
   runPanelShown.current = runPanel
   const forgeBusy = useRef(false)
+  const [forgeAside, setForgeAside] = useState(false)
   const showRunPanel = useCallback((panel: RunPanel) => {
-    if (runPanelShown.current === 'forge' && panel !== 'forge' && forgeBusy.current) {
-      useDiagramStore.getState().pushNotification('Radical Forge is generating: its panel stays open until it is done.', 'info')
-      return
+    if (runPanelShown.current === 'forge' && panel !== 'forge') {
+      if (forgeBusy.current) {
+        useDiagramStore.getState().pushNotification('Radical Forge is generating: its panel stays open until it is done.', 'info')
+        return
+      }
+      setForgeAside(true)
     }
     setRunPanel(panel)
   }, [])
   const closeRunPanel = useCallback((panel: RunPanel) => {
+    if (panel === 'forge') setForgeAside(false)
     setRunPanel((open) => (open === panel ? null : open))
   }, [])
   const onForgeBusy = useCallback((busy: boolean) => { forgeBusy.current = busy }, [])
@@ -959,7 +960,7 @@ export function Toolbar(): React.ReactElement {
       <AISettingsModal open={aiSettingsOpen} onClose={handleCloseAISettings} />
       <AboutDialog open={aboutOpen} onClose={handleCloseAbout} />
       <HubImportModal open={hubOpen} onClose={handleCloseHub} preselectedIds={hubPreselectedIds} bindTo={hubBindTo} />
-      <RadicalForgeModal open={runPanel === 'forge'} onClose={handleCloseForge} onBusy={onForgeBusy} />
+      <RadicalForgeModal open={runPanel === 'forge'} resume={forgeAside} onClose={handleCloseForge} onBusy={onForgeBusy} />
       <AgentForgeModal open={runPanel === 'agent-forge'} onClose={closeAgentForge} />
       <AgentAssayModal open={runPanel === 'agent-assay'} onClose={closeAgentAssay} />
       <AppMenu

@@ -782,6 +782,38 @@ describe('long Smart Layout runs', () => {
     for (const id of ['acc', 'auth', 'gw', 'risk', 'db', 'dw']) expect(geometry(after.nodes, id), id).toEqual(geometry(data.nodes, id))
   }, 60_000)
 
+  it('a row, column or grid an agent set and a Tidy round something else leave no siblings on each other (F-0175)', async () => {
+    const box = (id: string, type: string, parentId: string | undefined, x: number, y: number, width = 240, height = 160): C4Node =>
+      ({ id, type, label: id, ...(parentId ? { parentId } : {}), x, y, width, height, collapsed: false }) as C4Node
+    const keeps: Array<[string, Record<string, unknown>]> = [
+      ['align_nodes', { axis: 'horizontal', nodeIds: ['fx', 'val'] }],
+      ['align_nodes', { axis: 'vertical', nodeIds: ['fx', 'val'] }],
+      ['grid_nodes', { nodeIds: ['fx', 'val'], columns: 2 }],
+    ]
+    for (const [tool, args] of keeps) {
+      const folder = await fixture()
+      const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+      // fx and val one above the other in pay (side by side for a column); fraud and ledger far off, related to each other only.
+      const column = args.axis === 'vertical'
+      data.nodes = [
+        box('pay', 'container', undefined, 0, 0, 300, 396), box('fx', 'component', 'pay', 20, 120, 200, 120), box('val', 'component', 'pay', column ? 240 : 20, column ? 120 : 256, 200, 120),
+        box('fraud', 'container', undefined, 1200, 0), box('ledger', 'container', undefined, 1200, 600),
+      ]
+      data.relations = [{ id: 'r1', sourceId: 'fraud', targetId: 'ledger', relationType: 'interacts' }]
+      for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+        await mkdir(dirname(join(folder, path)), { recursive: true })
+        await writeFile(join(folder, path), content)
+      }
+      const model = await FolderModel.open(folder)
+      expect((await model.call(tool, args)).ok, tool).toBe(true)
+      const outcome = await model.call('smart_layout', { around: ['fraud'] })
+      expect(outcome.ok, outcome.text).toBe(true)
+      const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+      const fx = after.nodes.find((n) => n.id === 'fx')!, val = after.nodes.find((n) => n.id === 'val')!
+      expect(fx.x >= val.x + val.width || val.x >= fx.x + fx.width || fx.y >= val.y + val.height || val.y >= fx.y + fx.height, `${tool} ${JSON.stringify(args)}: fx clear of val`).toBe(true)
+    }
+  }, 60_000)
+
   it('unpins the view it lays out whole; round a selection the pinned elements stay, pinned', async () => {
     // Two elements pinned in Studio, a third on top of them.
     const folder = await fixture()
@@ -1041,6 +1073,43 @@ describe('long Smart Layout runs', () => {
     // A view of 1,000 is a canvas.
     expect((await model.call('grid_nodes', { viewId: 'w', nodeIds: ['r0', 'r1', 'r2', 'r3'], columns: 2 })).ok).toBe(true)
   }, 60_000)
+
+  it('says which new views per element it laid out, and advises for one too large what the server accepts', async () => {
+    // create_view said "Smart Layout arranged the 2 new views per element"
+    // when it had refused API, and the refusal advised update_view kind
+    // table, which update_view refuses for a view per element.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const node = (id: string, type: string, parentId?: string, i = 0) => ({ id, type, label: id === 'api' ? 'API' : id === 'small' ? 'Small' : id, ...(parentId ? { parentId } : {}), x: 20 + (i % 40) * 260, y: 60 + Math.floor(i / 40) * 160, width: 240, height: 140, collapsed: false })
+    data.nodes = [
+      node('shop', 'system'), node('api', 'container', 'shop'), node('small', 'container', 'shop'),
+      ...Array.from({ length: CANVAS_MAX_ELEMENTS }, (_, i) => node(`c${i}`, 'component', 'api', i)),
+      node('s0', 'component', 'small'), node('s1', 'component', 'small', 1),
+    ] as never
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const made = await model.call('create_view', { tempId: 'g', name: 'Components', viewpoint: 'container-components' })
+    expect(made.ok, made.text).toBe(true)
+    const stored = async () => deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data.views!
+    const api = (await stored()).find((v) => v.name === 'API')!
+    expect(made.text).toContain('Smart Layout arranged the new view Small.')
+    expect(made.text).toContain('Not laid out: "API" shows 1,001 elements')
+    expect(made.text).not.toContain('2 new views')
+    expect(Object.keys(api.positions ?? {})).toEqual([])
+    // Each advice the refusals give is a call the server takes.
+    for (const refused of [made.text, (await model.call('smart_layout', { viewId: api.id })).text]) {
+      expect(refused).not.toContain('update_view')
+      expect(refused).toContain('upsert_viewpoint with id "container-components" and kind "table"')
+    }
+    // update_view, which a view per element refuses, points there too.
+    expect((await model.call('update_view', { id: api.id, kind: 'table' })).text).toContain('change the viewpoint "container-components" with upsert_viewpoint')
+    const advised = await model.call('upsert_viewpoint', { id: 'container-components', kind: 'table' })
+    expect(advised.ok, advised.text).toBe(true)
+    expect((await stored()).find((v) => v.id === api.id)!.kind).toBe('table')
+  }, 120_000)
 
   it('takes a type that another writer added to the metamodel since its last call', async () => {
     // The client checks a call against the tool schema, whose list of types
@@ -1436,6 +1505,30 @@ describe('test bindings', () => {
     expect(await model.call('set_verification', { id: 's-pay', tests: [] })).toMatchObject({ ok: false })
     expect(await model.call('set_verification', { id: 's-pay', tests: ['x'], remove: true })).toMatchObject({ ok: false })
   })
+
+  it('binds a test once when the file has it written another way, as radical verify does (F-0157)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'radical-mcp-verify-'))
+    folders.push(root)
+    await promisify(execFile)('git', ['init', '-q'], { cwd: root })
+    const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
+      ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
+    const folder = join(root, '.radical', 'model')
+    const files = serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), relations: [], nodes: [node('s-pay', 'scenario', 'Pays', { given: 'a cart', when: 'paying', then: 'paid' })] }, 'shop')
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const file = join(root, '.radical', 'radical.json')
+    const model = await FolderModel.open(folder)
+    for (const [boundAs, given] of [
+      ['tests/pay.test.ts > checkout > pays by card', 'tests/pay.test.ts › checkout › pays by card'],
+      ['tests/pay.spec.ts › checkout › pays by card', '[chromium] › tests/pay.spec.ts:2:3 › checkout › pays by card'],
+    ]) {
+      await writeFile(file, JSON.stringify({ implements: [], verifies: [{ element: 's-pay', name: 'Pays', tests: [boundAs] }] }))
+      expect((await model.call('set_verification', { id: 's-pay', tests: [given] })).text, given).toBe('scenario "Pays" (s-pay) is checked by 1 test(s) (.radical/radical.json).')
+      expect(JSON.parse(await readFile(file, 'utf8')).verifies[0].tests, given).toEqual([boundAs])
+    }
+  })
 })
 
 describe('entries of deleted elements', () => {
@@ -1709,6 +1802,32 @@ describe('requirements reviewed against their needs', () => {
     // A change that does bring one in is still told, with the new names.
     const lost = await model.call('update_node', { id: 'limit', properties: { action: 'keep at most 25 items in a basket for 7 days' } })
     expect(lost.text).toContain('Requirement "Basket size" says "25", "7"')
+  })
+
+  it("tells nothing of the person's words after a write that only takes findings away: a value corrected, a part quoted, a scenario added (Write tells of a lost value)", async () => {
+    const model = await FolderModel.open(await fixture())
+    const words = "The person's words"
+    await model.call('add_node', { tempId: 'need', type: 'need', label: 'Basket brief', description: 'Q: What are the limits?\nA: A basket holds at most 20 items and is kept for 30 days.\n\nQ: What else?\nA: Members pay no delivery fee.\n\nA guest pays 5 € for delivery.' })
+    await model.call('add_node', { tempId: 'req', type: 'requirement', label: 'Basket limit', properties: { ears_type: 'ubiquitous', action: 'keep at most 25 items in a basket for 7 days' } })
+    const told = await model.call('add_relation', { sourceId: 'req', targetId: 'need', relationType: 'derives', properties: { quote: 'A basket holds at most 20 items and is kept for 30 days.' } })
+    expect(told.text).toContain('does not say "20", "30"')
+    const quiet = async (what: string, name: string, args: Record<string, unknown>) => {
+      const result = await model.call(name, args)
+      expect(result.ok, result.text).toBe(true)
+      expect(result.text, what).not.toContain(words)
+    }
+    await quiet('one of two wrong values corrected', 'update_node', { id: 'req', properties: { action: 'keep at most 20 items in a basket for 7 days' } })
+    // A wrong value in place of another is brought in, and told with the one left.
+    const other = await model.call('update_node', { id: 'req', properties: { action: 'keep at most 20 items in a basket for 8 days' } })
+    expect(other.text).toContain('Requirement "Basket limit" says "8"')
+    await quiet('the other corrected', 'update_node', { id: 'req', properties: { action: 'keep at most 20 items in a basket for 30 days' } })
+    await model.call('add_node', { tempId: 'req2', type: 'requirement', label: 'Member delivery', properties: { ears_type: 'ubiquitous', action: 'charge members no delivery fee' } })
+    await quiet('one of two parts of an answer quoted', 'add_relation', { sourceId: 'req2', targetId: 'need', relationType: 'derives', properties: { quote: 'Members pay no delivery fee.' } })
+    await model.call('add_node', { tempId: 'sc', type: 'scenario', label: 'Full basket', properties: { given: 'a basket', when: 'adding an item', then: 'it is refused' } })
+    expect((await model.call('add_relation', { sourceId: 'sc', targetId: 'req', relationType: 'verifies' })).text).toContain('takes "20", "30"')
+    await quiet('the scenario names one of two values', 'update_node', { id: 'sc', properties: { given: 'a basket with 20 items' } })
+    await model.call('add_node', { tempId: 'sc2', type: 'scenario', label: 'Old basket', properties: { given: 'a basket', when: 'time passes', then: 'it is gone' } })
+    await quiet('a second scenario that names neither', 'add_relation', { sourceId: 'sc2', targetId: 'req', relationType: 'verifies' })
   })
 
   it('asks agents for the person\'s words in the need and a review before the code (Agent told to keep answers and review)', async () => {

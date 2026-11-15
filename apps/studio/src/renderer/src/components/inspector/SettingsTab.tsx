@@ -9,10 +9,10 @@
 
 import React, { useMemo, useState } from 'react'
 import {
-  CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, compareCheckConfig, defaultSeverity, ratchetConfig, withRepositorySettings,
+  CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, compareCheckConfig, defaultSeverity, ratchetConfig,
   type CheckConfig, type CheckConfigChange, type CheckMetric, type CheckResult, type CheckSeverity,
 } from '@radical/common/check'
-import { saveCheckConfig, serializeCheckConfig, setSettingsDraft, useInspectorStore, useSettingsDraft } from '../../persistence/inspector'
+import { saveCheckConfig, serializeCheckConfig, setSettingsDraft, settingsOf, useInspectorStore, useSettingsDraft } from '../../persistence/inspector'
 import { DIMENSIONS, RULE_INFO, dimensionOfKey, metricOf } from './shared'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { lineDiff, patchRule, setGoal, type RulePatch } from './settingsDraft'
@@ -58,7 +58,7 @@ export function SettingsTab({ check, editable, readOnlyReason }: { check: CheckR
   // names over its own: Settings edit both.
   const modelConfig = useInspectorStore((s) => s.config)
   const repository = useDiagramStore((s) => s.repository)
-  const config = useMemo(() => ({ ...modelConfig, rules: withRepositorySettings(modelConfig.rules ?? {}, repository?.tests), ...(repository?.ci ? { ci: repository.ci } : {}) }), [modelConfig, repository])
+  const config = useMemo(() => settingsOf(modelConfig, repository), [modelConfig, repository])
   const configError = useInspectorStore((s) => s.configError)
   // In the store, not here: going to another tab or Back kept no edit.
   const draft = useSettingsDraft()

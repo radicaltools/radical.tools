@@ -17,7 +17,7 @@ import { SENSOR_NAMES, isSensorName, parseMeasure } from './sensors'
 import { findTests, globMatch, type TestCase } from './reports'
 import type { CheckDimension } from './goals'
 import { concernStatuses, holdsConcerns, questionLine, unboundDecisions, type ConcernPack } from '../concerns'
-import { REFUSAL, SUPERSEDED, answerBlocks, answerKey, currentNeedText, exampleSentences, fragmentWords, needAnswers, needParts, oppositeOrder, plainWords, quoteFound, quoteFragments, readLimits, readOrders, readRoundings, readValues, saysValueOf, wordsAt, type Limit, type Op, type ValueReading } from './words'
+import { REFUSAL, SUPERSEDED, answerBlocks, answerKey, currentNeedText, exampleSentences, fragmentWords, needAnswers, needParts, oppositeOrder, plainWords, quoteFound, quoteFragments, readLimits, readOrders, readRoundings, readValues, saysValueOf, wordsAt, type Limit, type Op, type Quantity, type ValueReading } from './words'
 
 export { hardValues, needAnswers, needParts, quoteFragments, readValues } from './words'
 export { relationsOf } from './evidence'
@@ -44,6 +44,10 @@ export interface RuleFinding {
   /** Lines that belong to the finding, such as the titles of the tests it
    *  counts. */
   details?: string[]
+  /** What the finding names, each its own (the values a requirement does not
+   *  say, the parts of an answer no requirement quotes): a change that only
+   *  takes some of them away brings in no finding. */
+  about?: string[]
   /** When the test results it reads were read (ISO time), when they were
    *  kept from an earlier run: the finding is a warning, whatever the rule's
    *  setting, as the tests may have changed since. */
@@ -439,8 +443,8 @@ function requirementLimits(req: C4Node): Limit[] {
 /** Where a requirement gives a value it quotes another sense: a limit on the
  *  other side of the number, another unit, the opposite order, another
  *  rounding. */
-export function quoteSenseGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, req: C4Node): Array<{ relationId: string; message: string }> {
-  const out: Array<{ relationId: string; message: string }> = []
+export function quoteSenseGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, req: C4Node): Array<{ relationId: string; message: string; about: string[] }> {
+  const out: Array<{ relationId: string; message: string; about: string[] }> = []
   const text = requirementText(req)
   const limits = requirementLimits(req)
   const own = reading(text)
@@ -453,26 +457,29 @@ export function quoteSenseGaps(model: Pick<CheckModel, 'nodes' | 'relations'>, r
     for (const l of readLimits(q)) {
       const same = limits.filter((m) => m.value === l.value)
       if (same.length && !same.some((m) => m.op === l.op)) {
-        out.push({ relationId: r.id, message: `Requirement ${quoteLabel(req)} allows ${same.map(allows).join(' and ')} ("${same[0].text}") where the words it quotes from ${need} allow ${allows(l)} ("${l.text}"): check on which side of ${l.value} the limit is.` })
+        out.push({ relationId: r.id, about: [`limit ${l.op}${l.value}`], message: `Requirement ${quoteLabel(req)} allows ${same.map(allows).join(' and ')} ("${same[0].text}") where the words it quotes from ${need} allow ${allows(l)} ("${l.text}"): check on which side of ${l.value} the limit is.` })
       }
     }
     for (const qty of reading(q).quantities) {
-      if (own.quantities.some((m) => m.dimension === qty.dimension && m.base === qty.base)) continue
+      if (own.quantities.some((m) => m.dimension === qty.dimension && m.base === qty.base && sameCurrency(m, qty))) continue
       const other = own.quantities.find((m) => m.dimension === qty.dimension && m.value === qty.value)
-      if (other) out.push({ relationId: r.id, message: `Requirement ${quoteLabel(req)} says "${other.text}" where the words it quotes from ${need} say "${qty.text}".` })
+      if (other) out.push({ relationId: r.id, about: [`unit ${qty.text}`], message: `Requirement ${quoteLabel(req)} says "${other.text}" where the words it quotes from ${need} say "${qty.text}".` })
     }
     for (const o of readOrders(q)) {
-      if (!orders.has(o) && orders.has(oppositeOrder(o))) out.push({ relationId: r.id, message: `Requirement ${quoteLabel(req)} lists ${oppositeOrder(o).replace('-', ' ')} where the words it quotes from ${need} say ${o.replace('-', ' ')}.` })
+      if (!orders.has(o) && orders.has(oppositeOrder(o))) out.push({ relationId: r.id, about: [`order ${o}`], message: `Requirement ${quoteLabel(req)} lists ${oppositeOrder(o).replace('-', ' ')} where the words it quotes from ${need} say ${o.replace('-', ' ')}.` })
     }
     const said = readRoundings(q)
     if (said.size && roundings.size && ![...said].some((x) => roundings.has(x))) {
-      out.push({ relationId: r.id, message: `Requirement ${quoteLabel(req)} rounds ${[...roundings].join(', ')} where the words it quotes from ${need} say ${[...said].join(', ')}.` })
+      out.push({ relationId: r.id, about: [...said].map((x) => `rounding ${x}`), message: `Requirement ${quoteLabel(req)} rounds ${[...roundings].join(', ')} where the words it quotes from ${need} say ${[...said].join(', ')}.` })
     }
   }
   return out
 }
 
 const quoteLabel = (n: C4Node): string => `"${n.label}"`
+/** Whether two amounts are in one currency, as far as their texts say (an
+ *  amount in cents names none). */
+const sameCurrency = (a: Quantity, b: Quantity): boolean => !a.currency || !b.currency || a.currency === b.currency
 
 /** The paragraphs and list items of an answer no quoted piece falls in (a
  *  piece across two of them counts for both); the whole answer when it has
@@ -622,7 +629,7 @@ export const CHECK_RULES: CheckRule[] = [
     run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => {
       const byRelation = new Map<string, string[]>()
       for (const g of quoteValueGaps(model, req).missing) byRelation.set(g.relationId, [...byRelation.get(g.relationId) ?? [], g.value])
-      return [...byRelation].map(([relationId, values]) => ({ relationId, message: `Requirement ${quote(req)} does not say ${values.map((v) => `"${v}"`).join(', ')}, which the words it quotes from ${quote(model.nodes[model.relations[relationId].targetId])} say.` }))
+      return [...byRelation].map(([relationId, values]) => ({ relationId, about: values, message: `Requirement ${quote(req)} does not say ${values.map((v) => `"${v}"`).join(', ')}, which the words it quotes from ${quote(model.nodes[model.relations[relationId].targetId])} say.` }))
     }),
   },
   {
@@ -639,7 +646,7 @@ export const CHECK_RULES: CheckRule[] = [
     dimension: 'traceability',
     run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => {
       const { unsupported } = quoteValueGaps(model, req)
-      return unsupported.length ? [{ nodeId: req.id, message: `Requirement ${quote(req)} says ${unsupported.map((v) => `"${v}"`).join(', ')}, which none of the words it quotes say: correct it to what the person said, or say in its rationale that ${unsupported.length === 1 ? 'it is' : 'they are'} the model's decision.` }] : []
+      return unsupported.length ? [{ nodeId: req.id, about: unsupported, message: `Requirement ${quote(req)} says ${unsupported.map((v) => `"${v}"`).join(', ')}, which none of the words it quotes say: correct it to what the person said, or say in its rationale that ${unsupported.length === 1 ? 'it is' : 'they are'} the model's decision.` }] : []
     }),
   },
   {
@@ -656,7 +663,7 @@ export const CHECK_RULES: CheckRule[] = [
       const from = quoted.map((r) => reading(quoteOf(model, r)))
       const readings = scenarios.map((sc) => reading(scenarioText(sc)))
       const missing = gaps.carried.filter((v) => !readings.some((sc) => from.some((q) => q.values.has(v) && saysValueOf(q, v, sc))))
-      return missing.length ? [{ nodeId: req.id, relatedIds: scenarios.map((sc) => sc.id), message: `Requirement ${quote(req)} takes ${missing.map((v) => `"${v}"`).join(', ')} from the words it quotes, which ${scenarios.length === 1 ? `its scenario ${quote(scenarios[0])} does not say` : `none of its ${scenarios.length} scenarios says`}: a scenario that checks the requirement names the values the person gave.` }] : []
+      return missing.length ? [{ nodeId: req.id, relatedIds: scenarios.map((sc) => sc.id), about: missing, message: `Requirement ${quote(req)} takes ${missing.map((v) => `"${v}"`).join(', ')} from the words it quotes, which ${scenarios.length === 1 ? `its scenario ${quote(scenarios[0])} does not say` : `none of its ${scenarios.length} scenarios says`}: a scenario that checks the requirement names the values the person gave.` }] : []
     }),
   },
   {
@@ -675,7 +682,7 @@ export const CHECK_RULES: CheckRule[] = [
             .sort((x, y) => x.missing.length - y.missing.length)[0]
           if (!closest.missing.length) return []
           const shown = example.length > 140 ? `${example.slice(0, 139)}…` : example
-          return [{ nodeId: need.id, relatedIds: [closest.sc.id], message: `Need ${quote(need)} gives the example "${shown}", which no scenario of its requirements holds whole: the closest, ${quote(closest.sc)}, does not say ${closest.missing.map((v) => `"${v}"`).join(', ')}. A scenario with the person's own example checks what they meant.` }]
+          return [{ nodeId: need.id, relatedIds: [closest.sc.id], about: [example], message: `Need ${quote(need)} gives the example "${shown}", which no scenario of its requirements holds whole: the closest, ${quote(closest.sc)}, does not say ${closest.missing.map((v) => `"${v}"`).join(', ')}. A scenario with the person's own example checks what they meant.` }]
         })
     }),
   },
@@ -715,8 +722,8 @@ export const CHECK_RULES: CheckRule[] = [
           if (!open.length) return []
           const blocks = answerBlocks(answer)
           const start = (t: string) => `"${t.replace(/\s+/g, ' ').slice(0, 90)}${t.length > 90 ? '…' : ''}"`
-          if (open.length === Math.max(1, blocks.length)) return [{ nodeId: need.id, message: `No requirement quotes this answer in need ${quote(need)}: ${start(answer)} Quote it on a requirement's derives relation, or mark it (no requirement).` }]
-          return [{ nodeId: need.id, details: open.map(start), message: `No requirement quotes ${open.length} of the ${blocks.length} parts of this answer in need ${quote(need)}: ${open.map(start).join(', ')}. Quote each on a requirement's derives relation, or mark the answer (no requirement).` }]
+          if (open.length === Math.max(1, blocks.length)) return [{ nodeId: need.id, about: open, message: `No requirement quotes this answer in need ${quote(need)}: ${start(answer)} Quote it on a requirement's derives relation, or mark it (no requirement).` }]
+          return [{ nodeId: need.id, details: open.map(start), about: open, message: `No requirement quotes ${open.length} of the ${blocks.length} parts of this answer in need ${quote(need)}: ${open.map(start).join(', ')}. Quote each on a requirement's derives relation, or mark the answer (no requirement).` }]
         }))
     },
   },
@@ -1075,7 +1082,7 @@ export const WORD_RULES: ReadonlySet<string> = new Set(['derives-quote-not-in-ne
 /** What the word rules find in a model, each with its rule, severity and
  *  the element or relation it is about; `off`, the rules check.json turns
  *  off. */
-export function wordFindings(model: CheckModel, off: ReadonlySet<string> = new Set()): Array<{ rule: string; severity: CheckSeverity; message: string; nodeId?: string; relationId?: string }> {
+export function wordFindings(model: CheckModel, off: ReadonlySet<string> = new Set()): Array<{ rule: string; severity: CheckSeverity; message: string; nodeId?: string; relationId?: string; about?: string[] }> {
   return CHECK_RULES.filter((r) => WORD_RULES.has(r.id) && !off.has(r.id))
-    .flatMap((rule) => rule.run(model).map((f) => ({ rule: rule.id, severity: f.severity ?? rule.severity, message: f.message, ...(f.nodeId ? { nodeId: f.nodeId } : {}), ...(f.relationId ? { relationId: f.relationId } : {}) })))
+    .flatMap((rule) => rule.run(model).map((f) => ({ rule: rule.id, severity: f.severity ?? rule.severity, message: f.message, ...(f.nodeId ? { nodeId: f.nodeId } : {}), ...(f.relationId ? { relationId: f.relationId } : {}), ...(f.about ? { about: f.about } : {}) })))
 }

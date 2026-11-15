@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ASSAY_STAGES, assayRunCurrentStage, assayRunPhase, type AssayRunStageInfo, type AssayRunStatus } from '@radical/common/formats/assayRunStatus'
 import { forgeRunClientName } from '@radical/common/formats/forgeRunStatus'
 import { useAgentAssayStore } from '../persistence/agentAssay'
 import { setFollowAgent, useFollowAgentStore } from '../persistence/followAgent'
+import { keysOnTop } from '@radical/ui/components/keysHere'
 
 // ─── An agent's Assay run, read only ─────────────────────────────────────────
 // What an agent running Radical Assay over MCP with this folder as its
@@ -54,9 +55,11 @@ export function AgentAssayModal({ open, onClose }: Props): React.ReactElement | 
     const timer = setInterval(() => setNow(Date.now()), 10_000)
     return () => clearInterval(timer)
   }, [open])
+  // Esc closes it, unless a dialog was opened over it.
+  const panelRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape' && keysOnTop(panelRef.current, e)) onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
@@ -79,7 +82,7 @@ export function AgentAssayModal({ open, onClose }: Props): React.ReactElement | 
   const { accepted, rejected } = status.proposals
 
   return createPortal(
-    <div className="forge-panel" role="dialog" aria-label="Radical Assay — agent run">
+    <div className="forge-panel" ref={panelRef} role="dialog" aria-label="Radical Assay — agent run">
       <button type="button" className="ai-settings-close" onClick={onClose} aria-label="Close" title="Close (Esc)">✕</button>
       <div className="forge-title-row">
         <span className="forge-title-icon" aria-hidden><AssayIcon /></span>

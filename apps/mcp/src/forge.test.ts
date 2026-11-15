@@ -953,4 +953,47 @@ describe('concern packs in a Forge run', () => {
       await client.close()
     }
   }, 60_000)
+
+  it('does not finish while a stage is open or a proposal waits, so a finished run guards no write (F-0156)', async () => {
+    const { client, folder, read } = await connect()
+    const runFile = async () => parseForgeRun(await readFile(join(folder, '.state/forge-run.json'), 'utf8'))!
+    try {
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
+      await call(client, 'forge_clarify', { stage: 'requirements' })
+      await call(client, 'forge_generate', { stage: 'requirements' })
+      await call(client, 'add_node', { tempId: 'req', type: 'requirement', label: 'Pay by card', properties: { ears_type: 'ubiquitous', action: 'take card payments' } })
+      await call(client, 'forge_complete_stage', { stage: 'requirements', summary: 'One requirement.' })
+      await call(client, 'forge_clarify', { stage: 'domain' })
+      await call(client, 'forge_generate', { stage: 'domain' })
+      const reqId = (await read()).nodes.find((n) => n.label === 'Pay by card')!.id
+
+      // A proposal waits: finish refuses, as forge_complete_stage does.
+      await call(client, 'forge_propose_refinement', {
+        stage: 'domain', reason: 'Refunds.',
+        changes: [{ tool: 'add_node', input: { tempId: 'refund', type: 'requirement', label: 'Refund', properties: { ears_type: 'ubiquitous', action: 'refund payments' } } }],
+      })
+      expect(await refused(client, 'forge_finish', {})).toContain("proposal p1 waits for the user's answer")
+      await call(client, 'forge_answer_refinement', { stage: 'domain', proposal: 'p1', accept: false })
+      // The stage open: finish says to complete it first.
+      expect(await refused(client, 'forge_finish', {})).toContain('the Domain model stage is open; complete it with forge_complete_stage first')
+      expect((await runFile()).state).toBe('active')
+
+      await call(client, 'forge_complete_stage', { stage: 'domain', summary: 'Nothing.' })
+      await call(client, 'forge_finish', {})
+      const status = await runFile()
+      expect(status.state).toBe('finished')
+      expect(status.stages.filter((s) => s.status === 'generating' || s.asking)).toEqual([])
+      // A finished run guards nothing.
+      await call(client, 'add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+      await call(client, 'update_node', { id: reqId, label: 'Pay by card or wallet' })
+      await call(client, 'delete_node', { id: reqId })
+
+      // A stage begun after the finish goes on with the run.
+      await call(client, 'forge_clarify', { stage: 'fitness' })
+      await call(client, 'forge_generate', { stage: 'fitness' })
+      expect((await runFile()).state).toBe('active')
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
 })

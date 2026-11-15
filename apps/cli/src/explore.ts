@@ -28,10 +28,12 @@ checks what comes back; the agent session starts the agents
     --areas "<a>;…"   an area per run, in order (the rest choose their own)
     --since <ref>     what changed is counted from here (default: the last
                       round's commit)
-    --from <n>        the first run's number (default: after the last round's)
+    --from <n>        the first run's number (default: after the last round's);
+                      a run an earlier round has is refused
     --no-build        copy what is built already
   verify <run> …      serves the run's build on its ports, runs each script
-                      ("<script> [args]", from the run's folder) and stops the
+                      ("<script> [args]", from the run's folder; one not
+                      there stops it before anything runs) and stops the
                       servers; the results go into round.json. A script
                       shows the bug when it exits 1, or when a line of its
                       output says so (REPRODUCED: yes, BUG: …, FINDING: …;
@@ -219,6 +221,9 @@ async function prepare(settings: Settings, count: number, areas: string[], since
   const commit = head.stdout.trim()
   const dirty = git(root, ['status', '--porcelain', '--untracked-files=no']).stdout.trim() !== ''
   const since = sinceArg ?? last?.commit
+  // A run's number names it (findRun, the ports): one round per run.
+  const taken = earlier.find((r) => r.from <= to && from <= r.to)
+  if (taken) { io.err(`Run ${Math.max(from, taken.from)} is in ${taken.round} already: give --from ${Math.max(...earlier.map((r) => r.to)) + 1} or more.`); return 2 }
   const name = `round-${from}-${to}`
   const dir = join(roundsDir, name)
   if (existsSync(dir)) { io.err(`${relative(io.cwd, dir)} exists already: give --from.`); return 2 }
@@ -366,6 +371,9 @@ async function verify(settings: Settings, run: number, scripts: string[], io: Io
   const found = findRun(settings, run)
   if (!found) { io.err(`No round has run ${run}.`); return 2 }
   const { dir, round, entry } = found
+  // Node would fail to find it, and exit 1 as a script does while the bug shows.
+  const absent = scripts.map((line) => line.trim().split(/\s+/)[0]).find((script) => !existsSync(resolve(entry.folder, script)))
+  if (absent !== undefined) { io.err(`No script ${absent} in ${relative(io.cwd, entry.folder)}: nothing was run.`); return 2 }
   const servers = serveCommands(settings, dir, entry)
   const started: { pid?: number; port: number }[] = []
   try {
@@ -408,9 +416,10 @@ async function verify(settings: Settings, run: number, scripts: string[], io: Io
 }
 
 /** A line in which a script says whether the bug shows (REPRODUCED: yes,
- *  BUG: …, FINDING: …); one saying no (REPRODUCED: no) says it does not. */
+ *  BUG: …, FINDING: …); only REPRODUCED: no says it does not (a BUG or
+ *  FINDING line describes the bug: 'BUG: no undo step is made'). */
 const SAYS = /^\s*(REPRODUCED|BUG|FINDING)\b/
-const SAYS_NO = /^\s*\w+\s*[:=]?\s*(no|false|none|0)\b/i
+const SAYS_NO = /^\s*REPRODUCED\s*[:=]?\s*(no|false|none|0)\b/i
 
 /** Whether a script showed the bug. The brief's convention: it exits 1
  *  while the bug shows and 0 when it does not, and says so in a line

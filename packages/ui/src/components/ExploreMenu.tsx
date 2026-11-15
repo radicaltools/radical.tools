@@ -83,10 +83,14 @@ export function ExploreMenu({ containerRef }: { containerRef: React.RefObject<HT
     return () => cancelAnimationFrame(raf)
   }, [nodeId, containerRef])
   // Opens focused, on Show all (once it has a place); on the first row
-  // when Show all would add more than a canvas draws.
+  // when Show all would add more than a canvas draws; on the menu itself
+  // when every row would (the focus stayed on the page, and Esc, which the
+  // menu answers, did not close it).
   const placed = !!at
   useEffect(() => {
-    if (nodeId && placed) menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')?.focus()
+    if (!nodeId || !placed) return
+    const menu = menuRef.current
+    ;(menu?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)') ?? menu)?.focus()
   }, [nodeId, placed])
   // A click elsewhere closes it.
   useEffect(() => {
@@ -184,6 +188,7 @@ export function ExploreMenu({ containerRef }: { containerRef: React.RefObject<HT
       {...editingControl}
       className="explore-menu nodrag nopan"
       role="menu"
+      tabIndex={-1}
       aria-label={`Add to ${label}`}
       style={{ left: at?.left ?? 0, top: at?.top ?? 0, visibility: at ? 'visible' : 'hidden' }}
       onKeyDown={onKeyDown}

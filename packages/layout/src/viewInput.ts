@@ -3,8 +3,8 @@
 // rules and hidden relations the canvas applies when it renders — and how
 // its result is written back. Shared by Studio's store and the MCP server.
 
-import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, viewShowsEveryNode, type C4Node, type C4Relation, type DiagramView, type LayoutConstraint, type PositionMap } from '@radical/common/c4'
-import { alignmentError, enforceAlignments, resolveAlignments, type Alignment } from './constraints'
+import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewShowsEveryNode, type C4Node, type C4Relation, type DiagramView, type LayoutConstraint, type PositionMap } from '@radical/common/c4'
+import { alignmentError, enforceAlignments, heldByPins, resolveAlignments, type Alignment } from './constraints'
 import { chainCanvas, viewShownNodes, withAncestors } from '@radical/common/viewPipeline'
 import type { Metamodel } from '@radical/common/metamodel'
 
@@ -168,6 +168,8 @@ export interface LayoutInput {
   alignments: Alignment[]
   /** The containers the view draws only to hold what it shows (viewFrames): drawn tight round it, no frame of their own. */
   frames: Set<string>
+  /** What the view pins (dropped after a drag): lining up a row leaves it where it is. */
+  pinned: string[]
 }
 
 /**
@@ -205,7 +207,7 @@ export function viewLayoutInput(
   for (const [id, r] of Object.entries(lines)) {
     if (!hidden.has(id)) relations[id] = r
   }
-  return { nodes, relations, viewFilter, viewCollapsedSet, expandedSet, alignments: resolveAlignments(constraints, nodes), frames: new Set([...frames].filter((id) => nodes[id])) }
+  return { nodes, relations, viewFilter, viewCollapsedSet, expandedSet, alignments: resolveAlignments(constraints, nodes), frames: new Set([...frames].filter((id) => nodes[id])), pinned: pinnedNodeIds(constraints).filter((id) => nodes[id]) }
 }
 
 /**
@@ -260,15 +262,28 @@ export function applyLayoutPositions(
 
 /**
  * Moves `c4Nodes` (the model, mutated) so the view's alignments hold, when
- * they do not yet. `input` must describe the current positions. True when
- * anything moved.
+ * they do not yet. `input` must describe the current positions. What the
+ * view pins stays where it is (heldByPins), unless it is on a line that
+ * cannot hold round it (its pinned members on different lines): the rule
+ * wins over the places they were dropped at. True when anything moved.
  */
 export function applyAlignments(c4Nodes: Record<string, C4Node>, input: LayoutInput): boolean {
   if (!input.alignments.length) return false
   const { nodes } = projectToVisibleGraph(input.nodes, input.relations)
   if (alignmentError(nodes, {}, input.alignments) <= 0.5) return false
-  applyLayoutPositions(c4Nodes, enforceAlignments(nodes, {}, input.alignments), input)
-  return true
+  const held = heldByPins(nodes, input.pinned)
+  let positions = enforceAlignments(nodes, {}, input.alignments, held)
+  let off = input.alignments.filter((a) => alignmentError(nodes, positions, [a]) > 0.5).flatMap((a) => a.ids)
+  // A grid's rows out of order, each on its line.
+  if (!off.length && alignmentError(nodes, positions, input.alignments) > 0.5) off = input.alignments.filter((a) => a.rank).flatMap((a) => a.ids)
+  if (off.length) positions = enforceAlignments(nodes, {}, input.alignments, new Set([...held].filter((id) => !off.includes(id))))
+  const changed: PositionMap = {}
+  for (const [id, p] of Object.entries(positions)) {
+    const n = nodes[id]
+    if (Math.abs(p.x - n.x) > 0.01 || Math.abs(p.y - n.y) > 0.01 || Math.abs((p.width ?? n.width) - n.width) > 0.01 || Math.abs((p.height ?? n.height) - n.height) > 0.01) changed[id] = p
+  }
+  applyLayoutPositions(c4Nodes, changed, input)
+  return Object.keys(changed).length > 0
 }
 
 /**

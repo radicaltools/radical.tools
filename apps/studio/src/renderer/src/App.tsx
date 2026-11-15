@@ -27,7 +27,7 @@ import { SetupWizard, OPEN_SETUP_EVENT } from './components/SetupWizard'
 import { firstStart } from './firstStart'
 import { useApplyTheme } from './theme'
 import { MilestoneEditOverlay } from './components/MilestoneEditOverlay'
-import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { otherModelViewShown, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useRouteSync, useShownMode, parseHash } from './route'
 import { useDocumentsStore } from './store/documentStore'
 import { DiscussionPanel, type DiscussionTarget } from './components/DiscussionPanel'
@@ -38,14 +38,23 @@ import { OPEN_HUB_EVENT } from './persistence/inspector'
 const LS_LEFT = 'radical-leftpanel-collapsed'
 
 /** The Hub's packs a link asks to import (`?hub=id1,id2`, its Open in
- *  Studio), taken out of the address so a reload does not ask again. */
+ *  Studio). The link stays in the address until its import opens, so a
+ *  reload of the Welcome screen still has the packs wait (doneWithHubLink). */
 let hubLinkIds: string[] | null | undefined
 function takeHubLink(): string[] | null {
   if (hubLinkIds !== undefined) return hubLinkIds
   const ids = (new URLSearchParams(window.location.search).get('hub') ?? '').split(',').map((s) => s.trim()).filter(Boolean)
   hubLinkIds = ids.length ? ids : null
-  if (hubLinkIds) window.history.replaceState(null, '', window.location.pathname + window.location.hash)
   return hubLinkIds
+}
+
+/** The link's import has opened: out of the address, so a reload does not
+ *  ask again. */
+function doneWithHubLink(): void {
+  const params = new URLSearchParams(window.location.search)
+  params.delete('hub')
+  const search = params.toString()
+  window.history.replaceState(window.history.state, '', window.location.pathname + (search ? `?${search}` : '') + window.location.hash)
 }
 
 function AppInner(): React.ReactElement {
@@ -98,6 +107,9 @@ function AppInner(): React.ReactElement {
   const isMetamodel = appMode === 'metamodel'
   const isInspector = appMode === 'inspector'
   const isReadOnlyMode = !isDesigner && !isMetamodel && !isInspector
+  // Another model's view (a federation), of any view type: its bar says
+  // whose it is, in a row of its own above the view.
+  const otherModelBar = useDiagramStore((s) => !!otherModelViewShown(s)) && !isPresenting && !isInspector && (isDesigner || isViewer)
 
   const [leftCollapsed, setLeftCollapsed] = useState<boolean>(() => localStorage.getItem(LS_LEFT) === '1')
   // The welcome screen is a web-only landing splash. Skip it when the user
@@ -119,6 +131,7 @@ function AppInner(): React.ReactElement {
   useEffect(() => {
     if (showWelcome || !hubLink) return
     window.dispatchEvent(new CustomEvent(OPEN_HUB_EVENT, { detail: { ids: hubLink } }))
+    doneWithHubLink()
     setHubLink(null)
   }, [showWelcome, hubLink])
   // The Setup wizard: over the Welcome screen on the first start, and from
@@ -162,6 +175,7 @@ function AppInner(): React.ReactElement {
     !isPresenting && isMetamodel ? 'mode-metamodel' : '',
     !isPresenting && isReadOnlyMode ? 'mode-presentation' : '',
     !isPresenting && leftCollapsed ? 'lp-collapsed' : '',
+    otherModelBar ? 'other-model-shown' : '',
   ].filter(Boolean).join(' ')
 
   return (
@@ -180,10 +194,9 @@ function AppInner(): React.ReactElement {
         <MilestoneChip style={{ gridArea: 'canvas', justifySelf: 'start', alignSelf: 'end', margin: 10, position: 'relative', zIndex: 7 }} />
       )}
       {/* Another model's view (a federation), of any view type: whose it
-          is, read-only, and Copy to this model. */}
-      {!isPresenting && !isInspector && (isDesigner || isViewer) && (
-        <OtherModelViewBar style={{ gridArea: 'canvas', justifySelf: 'center', alignSelf: 'start', margin: 8, position: 'relative', zIndex: 7 }} />
-      )}
+          is, read-only, and Copy to this model, above the view and over
+          none of its controls. */}
+      {otherModelBar && <OtherModelViewBar style={{ gridArea: 'otherbar' }} />}
       {!isPresenting && isDesigner && <RightPanel />}
       {!isPresenting && isViewer && <RightPanel readOnly />}
       {!isPresenting && isPresenter && <PresenterDock />}

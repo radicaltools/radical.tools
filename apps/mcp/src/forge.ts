@@ -314,7 +314,7 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'forge_finish',
-    description: 'End the Forge run: what each stage added, which were skipped (with forge_skip_stage) and which not run, and the Gherkin .feature files built from the scenarios in the model.',
+    description: 'End the Forge run: what each stage added, which were skipped (with forge_skip_stage) and which not run, and the Gherkin .feature files built from the scenarios in the model. Refused while a stage is open (complete it with forge_complete_stage first) or a proposed refinement waits for the user\'s answer.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -798,7 +798,8 @@ export class Forge {
       status: 'generating', before, opened, snapshot: snapshotOf(facade), clarifications, concernPicks,
       proposed: new Set(), accepted: [], proposals: 0, declined: 0,
     }
-    return ok(brief, { readOnly, ...(data ? { data } : {}), commit: () => { run.stages[id] = state; run.concerns = decided } })
+    // A stage begun after forge_finish goes on with the run.
+    return ok(brief, { readOnly, ...(data ? { data } : {}), commit: () => { run.stages[id] = state; run.concerns = decided; run.finished = false } })
   }
 
   private complete(args: Record<string, unknown>, facade: ModelFacade): ForgeResult {
@@ -1054,12 +1055,17 @@ export class Forge {
   private async finish(args: Record<string, unknown>, facade: ModelFacade): Promise<ForgeResult> {
     const run = this.run
     if (!run) return fail('forge_finish: no Forge run; call forge_start first')
+    // As forge_complete_stage: a finished run has no stage open, so it guards
+    // no write and its status shows nothing generating or asking.
+    const open = STAGE_IDS.find((stage) => run.stages[stage]?.status === 'generating')
+    const pending = open && run.stages[open]!.pending
+    if (pending) return fail(`forge_finish: proposal ${pending.id} waits for the user's answer; ask them and call forge_answer_refinement first`)
+    if (open) return fail(`forge_finish: the ${stageTitle(open)} stage is open; complete it with forge_complete_stage first`)
     const lines = FORGE_STAGES.map((stage) => {
       const state = run.stages[stage.id]
       const why = run.skipped.get(stage.id)
       // Skipped only when left out with forge_skip_stage, as the run status says.
       if (!state) return `- ${stage.title}: ${why !== undefined ? `skipped (${why})` : 'not run'}`
-      if (state.status === 'generating') return `- ${stage.title}: begun but not completed`
       const refined = state.refinements?.length ? ` · ${state.refinements.length} refinements of earlier stages accepted` : ''
       return `- ${stage.title}: +${state.added!.nodes.length} nodes · +${state.added!.relations.length} relations${refined}`
     })

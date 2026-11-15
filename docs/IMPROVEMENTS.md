@@ -365,7 +365,37 @@ line 199), and the next full run passed.
 page, and the highlighted result stays in sight` failed in a full local run on
 feat/assay-syntax (2026-11-09, which does not touch Studio) and once in 4
 runs alone (`boundingBox()` null while the list re-renders, line 123); then
-8 of 8 passed, as 8 of 8 did on main.
+8 of 8 passed, as 8 of 8 did on main. ~~Fixed on fix/round-211-220 (2026-11-15), where it failed in
+both full runs: the poll now asks again when a box is missing instead of failing.~~
+
+### Dogfooding (2026-11-15): exploratory round 211–220 and its fix round
+
+Ten runs on 46cb17bb (after #369) found 35 findings (F-0144…F-0178), about 27 of them the same pattern as a #369 fix
+in another place, or a side effect of a fix that was too narrow. All fixed on fix/round-211-220 in eight groups,
+each told to sweep the mechanism. Open after the fixes:
+
+- **Words:** a negation in a relative clause is told apart by a heuristic without parts of speech ("a shop which
+  does not accept the baskets above 20" is not turned round); ranges in a clause with a refusal are not read; the em
+  dash is no minus for values but is for limits; limits read "minus" as a sign everywhere.
+- **Inspector Settings:** the "changed" marks are computed against the polled config, so an agent's change to
+  check.json while a draft is open shows as the draft's reversal; where Settings and an agent changed one value,
+  Settings win without a notice. The Settings "Ratchet" button may lower baselines from a check that left out
+  federation models not fetched (the F-0145 pattern, not checked).
+- **CLI:** `radical check --ratchet` with a deps.json whose models cannot be fetched (not checked); test ids with a
+  trailing timing (" (5ms)") are not normalised; `findRun` resolves run numbers duplicated before F-0147 to the
+  older round; get_trace's description does not say it lists bound tests before results.
+- **Canvas limit:** a view drawn only because a large container is folded in it cannot be switched to Explore
+  (right), but the disabled button says "The view shows more elements than a canvas draws".
+- **Federation:** our own groups of views per element make a view for each of another model's elements, which
+  changes with each fetch (undecided); views the earlier bug wrote into a folder are removed at the next sync
+  without a question; the Electron branch of the folder refusal is only typechecked.
+- **Layout:** Studio's Keep in a grid does not refit the container round the cells (the physics does); refitted
+  frames take Smart Layout's 120 px padding, not the canvas's 58; overlaps already in saved positions are no longer
+  parted as a side effect of a line-up (.radical/model view 38ccf554). Two fuzzer failures reproduce on base with
+  the same seeds: nested 1611431197 (collapse, add, reparent, redo → reloadKeeps) and sample 1611566707 (open
+  milestone, delete, delete → overlap of Banking Services and Risk & Data on snap-v1).
+- **Forge and Hub:** a Presenter slide linked to a milestone is not driven by a test of the concern import; a concern
+  import in Designer while a presentation plays is not checked.
 
 ### Dogfooding (2026-11-15): exploratory round 201–210 and its fix round
 
@@ -388,9 +418,10 @@ groups. Open after the fixes:
 - **Designer edits offered elsewhere** (`editAsDesigner`): an Inspector fix while Designer shows a milestone leaves
   Designer on the live model even when the wizard is cancelled; Viewer → Inspector → an edit → Viewer gives Viewer
   the edited live model back, not the milestone it showed.
-- **Keys:** Esc listeners on `window` other than the canvas's and the hierarchy's (the Delete prompt, popovers) are
-  not behind the dialog gate (`keysHere.ts`). The agent's run panels close when F5 starts a presentation (the
-  Toolbar unmounts while presenting).
+- **Keys:** the Esc listeners of the Inspector's popovers (`Freshness`, `inspector/shared`), Other models and the
+  wiki menu do not ask `keysOnTop` (`keysHere.ts`): under a dialog opened over them, Esc closes them too. The agent's
+  run panels, and Radical Forge put aside for one, close when F5 starts a presentation (the Toolbar unmounts while
+  presenting): Forge's run is lost then.
 - **Electron's `folder:open` refusal** of a folder with no model has no test of its own (only `repositoryModel`).
 
 ### Dogfooding (2026-11-15): Smart Layout over every view of our own model

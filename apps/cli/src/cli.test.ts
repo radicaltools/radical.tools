@@ -132,6 +132,18 @@ describe('radical check', () => {
     expect((await run(cwd, 'check', 'model', '--config', 'web.json', '--ratchet')).err).toContain('requirement-without-scenario 2 → 1')
   })
 
+  it('lowers no baseline from a check that leaves part out, with --alone or --trigger (F-0145)', async () => {
+    const cwd = await workspace()
+    const config = JSON.stringify({ rules: { 'requirement-without-scenario': { severity: 'error', max: 4 } } })
+    await writeFile(join(cwd, 'model', 'check.json'), config)
+    for (const partial of [['--alone'], ['--trigger', 'pull-request']]) {
+      const ratchet = await run(cwd, 'check', 'model', '--ratchet', ...partial)
+      expect(ratchet.code, partial[0]).toBe(2)
+      expect(ratchet.err, partial[0]).toContain(`radical check --ratchet: with ${partial[0]} the check leaves part of the model out`)
+      expect(await readFile(join(cwd, 'model', 'check.json'), 'utf8'), partial[0]).toBe(config)
+    }
+  })
+
   it('exits 1 on a folder that is no model', async () => {
     const cwd = await workspace()
     await rm(join(cwd, 'model/radical.md'))

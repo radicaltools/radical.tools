@@ -64,7 +64,7 @@ import * as model from '@radical/common/model'
 import { originFor, otherModelsAt, type FederationFile } from '@radical/common/federation'
 import type { RepositoryFile } from '@radical/common/repositoryMapping'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
-import { canvasCount, canvasOverflow, chainRelationFor, pipelineOf, viewDrawnIds, viewShownNodes } from '@radical/common/viewPipeline'
+import { canvasOverflow, chainRelationFor, explorationCount, pipelineOf, viewDrawnIds, viewShownNodes } from '@radical/common/viewPipeline'
 import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { mergeModels, mergeNotices, mergeSteps } from '@radical/common/modelMerge'
 import { markdownToPlain } from '@radical/common/markdown'
@@ -3862,7 +3862,7 @@ export function oversizedCanvas(s: Pick<DiagramStore, 'activeViewId' | 'views' |
  *  notice stays. */
 export function tooLargeToExplore(s: Pick<DiagramStore, 'views' | 'c4Nodes' | 'c4Relations'>, viewId: string): boolean {
   const view = s.views[viewId]
-  return !!view && view.kind !== 'explore' && canvasCount(view, s.c4Nodes, s.c4Relations) > CANVAS_MAX_ELEMENTS
+  return !!view && view.kind !== 'explore' && explorationCount(view, s.c4Nodes, s.c4Relations) > CANVAS_MAX_ELEMENTS
 }
 
 function continuousShape(s: DiagramStore): string | null {
@@ -9219,9 +9219,11 @@ export const useDiagramStore = create<DiagramStore>()(
           state.presentationActive = true
           showSelection(state as DiagramStore, [], null)
           // Nor what was open over the canvas: a relation's type asked for,
-          // an element's Explore menu.
+          // an element's Explore menu, the Delete prompt (over the slide,
+          // its Remove from model deleted nothing).
           state.relationTypeChoice = null
           state.exploreMenuFor = null
+          state.pendingDelete = null
         })
         // Re-derive rfNodes immediately so the per-node `draggable` flag
         // flips off before the user can grab anything (rfNodes carry

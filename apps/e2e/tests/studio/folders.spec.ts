@@ -418,6 +418,56 @@ test('Open → Folder… on a repository opens its model in architecture/, and r
   expect((await folder.paths()).filter((path) => !path.startsWith('architecture/'))).toEqual(['package.json', 'src/index.ts'])
 })
 
+test('New model and Move to a folder… write no model in front of a repository\'s, and ask before a folder of other files', async ({ page, studio }) => {
+  // F-0164: New model in a folder on a repository's root, its model in
+  // .radical/model, wrote a second model into the root without a question,
+  // and Open → Folder… then opened that one in place of the repository's.
+  const said = (answer: 'accept' | 'dismiss') => page.waitForEvent('dialog').then(async (d) => { const text = d.message(); await d[answer](); return text })
+  const moveToFolder = async (answer: 'accept' | 'dismiss'): Promise<string> => {
+    await studio.open('v-context')
+    // A load of its own: a hash alone leaves the welcome screen up.
+    await page.reload()
+    await studio.ready()
+    await openModels(page)
+    const asked = said(answer)
+    await page.getByRole('button', { name: 'Actions for E2E' }).click()
+    await page.getByRole('menuitem', { name: 'Move to a folder…' }).click()
+    const text = await asked
+    await expect(page.getByRole('dialog', { name: 'Models' }).locator('.docmgr-badge.md')).toHaveCount(0)
+    return text
+  }
+  const newModel = async (answer: 'accept' | 'dismiss'): Promise<string> => {
+    await page.goto('/')
+    await page.getByRole('button', { name: 'New model' }).click()
+    await page.getByRole('radio', { name: /In a folder/ }).check()
+    const asked = said(answer)
+    await page.getByRole('button', { name: 'Choose folder and create' }).click()
+    const text = await asked
+    await expect(page.locator('.welcome-overlay')).toBeVisible()
+    return text
+  }
+  // A folder of other files: both ask, and a no writes nothing.
+  await folder.write('package.json', '{"name":"shop"}')
+  await folder.write('src/index.ts', 'export {}\n')
+  const before = await folder.paths()
+  for (const write of [moveToFolder, newModel]) {
+    expect(await write('dismiss')).toContain('"model" already contains files and is not a Radical model folder')
+    await page.waitForTimeout(500)
+    expect(await folder.paths()).toEqual(before)
+  }
+  // A repository with its model where Open finds it: both refuse, naming it, and write nothing.
+  const bookstore = JSON.parse(fixture('bookstore'))
+  for (const [where, name] of [['architecture', 'Bookstore'], ['.radical/model', 'Payments']]) {
+    for (const [path, content] of Object.entries(serializeToMdFolder(bookstore, name))) await folder.write(`${where}/${path}`, content)
+    const files = await folder.files()
+    for (const write of [moveToFolder, newModel]) {
+      expect(await write('accept')).toContain(`"model" holds the model "${name}" in ${where}: a new model written into "model" would be opened in its place.`)
+      await page.waitForTimeout(500)
+      expect(await folder.files()).toEqual(files)
+    }
+  }
+})
+
 test('New model on the welcome screen can keep the model in a folder', async ({ page, studio }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'New model' }).click()
@@ -687,6 +737,47 @@ test('an outside write keeps the selected relation\'s card open, and what is typ
   await expect(technology).toBeFocused()
   await page.keyboard.type('.1')
   await expect(technology).toHaveValue('SQL v2.1')
+})
+
+// F-0176: a part of a requirement's sentence being typed in its card closed
+// when another program changed any element of the folder: the reload
+// re-rendered the card, its slots were declared inside the render and came
+// back new, and what was typed was lost.
+test('an outside write keeps a requirement\'s sentence part open in its card, and what is typed in it', async ({ page, studio }) => {
+  await studio.openSample('view-register')
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
+  await page.getByRole('menuitem', { name: /Manage models/ }).click()
+  const models = page.getByRole('dialog', { name: 'Models' })
+  await models.getByRole('button', { name: /^Actions for / }).first().click()
+  await page.getByRole('menuitem', { name: 'Move to a folder…' }).click()
+  await expect(models.locator('.docmgr-badge.md').first()).toBeVisible()
+  await models.getByRole('button', { name: 'Close' }).click()
+  await expect.poll(async () => Object.keys(await folder.files()).some((p) => p.startsWith('nodes/'))).toBe(true)
+
+  await page.locator('tr[data-node-id="req-dual-approval"]').first().dblclick()
+  const card = page.locator('.right-panel.open')
+  const action = card.locator('.ears-slot-sm', { hasText: 'second authorised signatory' })
+  const before = await action.innerText()
+  await action.click()
+  const input = card.locator('.ears-slot-input-sm')
+  await expect(input).toBeFocused()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' abc')
+
+  // Another program renames another element.
+  const files = await folder.files()
+  const [path, text] = Object.entries(files).find(([p, t]) => p.startsWith('nodes/') && /^id: "need-corporate-feedback"/m.test(t))!
+  await folder.write(path, text.replace(/^label: "(.*)"$/m, 'label: "$1 (renamed)"'))
+  await expect(page.locator('tr[data-node-id="need-corporate-feedback"]').first()).toContainText('(renamed)', { timeout: 15_000 })
+
+  await expect(input).toBeFocused()
+  await page.keyboard.type(' def')
+  await expect(input).toHaveValue(`${before} abc def`)
+  await page.keyboard.press('Enter')
+  await expect.poll(async () => {
+    const saved = Object.entries(await folder.files()).find(([p, t]) => p.startsWith('nodes/') && /^id: "req-dual-approval"/m.test(t))?.[1] ?? ''
+    return /^action:\s*(.*)$/m.exec(saved)?.[1]
+  }, { timeout: 10_000 }).toContain(`${before} abc def`)
 })
 
 // F-0026: an agent's write that arrived while an element was held in a drag

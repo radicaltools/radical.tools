@@ -13,7 +13,7 @@
 
 import { findingsByElement, useCardVerification } from '@radical/ui/store/verification'
 import { create } from 'zustand'
-import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults, withoutRepositorySettings } from '@radical/common/check'
+import { checkModel, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults, withRepositorySettings, withoutRepositorySettings } from '@radical/common/check'
 import { REPOSITORY_FILE, parseRepositoryFile, serializeRepositoryFile, type RepositoryFile } from '@radical/common/repositoryMapping'
 import { historyMark, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
@@ -44,12 +44,22 @@ interface InspectorState {
   /** Settings edited and not saved yet, by document: kept when the user goes
    *  to another tab, perspective or model, and back. */
   settingsDrafts: Record<string, CheckConfig>
+  /** The Settings each draft was made from (settingsOf): Save writes what
+   *  the draft changed from them over the files as they are then. */
+  settingsBases: Record<string, CheckConfig>
   /** When the model was last edited in Studio since it was opened (epoch
    *  ms): evidence read before then may not hold for it. */
   editedAt: number | null
 }
 
-export const useInspectorStore = create<InspectorState>(() => ({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', settingsDrafts: {}, editedAt: null }))
+export const useInspectorStore = create<InspectorState>(() => ({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', settingsDrafts: {}, settingsBases: {}, editedAt: null }))
+
+/** The Settings as the Inspector shows them: check.json, with the test files
+ *  and CI artifacts the repository's .radical/radical.json names over its
+ *  own. Settings edit both. */
+export function settingsOf(config: CheckConfig, repository: RepositoryFile | null): CheckConfig {
+  return { ...config, rules: withRepositorySettings(config.rules ?? {}, repository?.tests), ...(repository?.ci ? { ci: repository.ci } : {}) }
+}
 
 /** The unsaved Settings of the active document, or null. */
 export function useSettingsDraft(): CheckConfig | null {
@@ -65,9 +75,12 @@ export function setSettingsDraft(next: CheckConfig | null | ((draft: CheckConfig
   useInspectorStore.setState((s) => {
     const draft = typeof next === 'function' ? next(s.settingsDrafts[id] ?? null) : next
     const settingsDrafts = { ...s.settingsDrafts }
+    const settingsBases = { ...s.settingsBases }
     if (draft) settingsDrafts[id] = draft
     else delete settingsDrafts[id]
-    return { settingsDrafts }
+    if (!draft) delete settingsBases[id]
+    else if (!settingsBases[id]) settingsBases[id] = settingsOf(s.config, useDiagramStore.getState().repository)
+    return { settingsDrafts, settingsBases }
   })
 }
 
@@ -89,15 +102,27 @@ export function inspectorMeasurements(storeText: string, reviewsText: string): M
 export const serializeCheckConfig = (config: CheckConfig): string => JSON.stringify(config, null, 2) + '\n'
 
 /** Saves `config` as the active document's check.json and checks the model
- *  with it at once, without waiting for the next poll to read it back. */
+ *  with it at once, without waiting for the next poll to read it back. What
+ *  the Settings changed from those the draft was made from is written over
+ *  check.json and radical.json as they are now, not as the last poll read
+ *  them: Save took an agent's binding written since out of radical.json
+ *  again (F-0158). A file nothing changed in is not written. */
 export async function saveCheckConfig(edited: CheckConfig): Promise<void> {
   const id = documents.getActiveId()
   if (!id) throw new Error('No model is open.')
+  const files = await documents.readCheckFiles(id).catch(() => null)
+  let repository = useDiagramStore.getState().repository
+  let fileConfig = useInspectorStore.getState().config
+  if (files) {
+    try { repository = files.repository === null ? null : parseRepositoryFile(files.repository) } catch { /* the last one read */ }
+    try { fileConfig = files.config ? parseCheckConfig(files.config) : {} } catch { /* the last one read */ }
+  }
+  const base = useInspectorStore.getState().settingsBases[id] ?? settingsOf(useInspectorStore.getState().config, useDiagramStore.getState().repository)
+  edited = mergeSettings(base, edited, settingsOf(fileConfig, repository)) as CheckConfig
   // The repository's settings (test files, CI's artifacts) go to its
   // .radical/radical.json where Studio can write it; else they stay in
   // check.json, which is still read.
   let config = edited
-  const repository = useDiagramStore.getState().repository
   if (repository && await documents.canWriteRepositoryFile(id)) {
     const unbound = edited.rules?.['test-unbound']
     const lists = typeof unbound === 'object' ? { ...(unbound.include?.length ? { include: unbound.include } : {}), ...(unbound.exclude?.length ? { exclude: unbound.exclude } : {}) } : {}
@@ -108,16 +133,32 @@ export async function saveCheckConfig(edited: CheckConfig): Promise<void> {
     const tests = { ...testsRest, ...lists }
     const ci = { ...ciRest, ...(edited.ci?.artifacts?.length ? { artifacts: edited.ci.artifacts } : {}) }
     const next: RepositoryFile = { ...rest, ...(Object.keys(tests).length ? { tests } : {}), ...(Object.keys(ci).length ? { ci } : {}) }
-    await documents.writeRepositoryFile(id, serializeRepositoryFile(next))
+    if (serializeRepositoryFile(next) !== serializeRepositoryFile(repository)) await documents.writeRepositoryFile(id, serializeRepositoryFile(next))
     useDiagramStore.setState({ repository: next })
     config = withoutRepositorySettings(edited)
   }
   const text = serializeCheckConfig(config)
-  await documents.writeCheckConfig(id, text)
+  if (text !== files?.config) await documents.writeCheckConfig(id, text)
   if (documents.getActiveId() !== id) return
   lastConfig = text
   useInspectorStore.setState({ config, configError: null, configText: text })
   recheck()
+}
+
+/** What `ours` changed from `base`, over `theirs`, key by key: where both
+ *  changed one value, ours (the Settings saved). */
+function mergeSettings(base: unknown, ours: unknown, theirs: unknown): unknown {
+  const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
+  const plain = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+  if (same(ours, base)) return theirs
+  if (same(theirs, base) || !plain(ours) || !plain(theirs)) return ours
+  const b = plain(base) ? base : {}
+  const out: Record<string, unknown> = {}
+  for (const key of new Set([...Object.keys(theirs), ...Object.keys(ours)])) {
+    const value = mergeSettings(b[key], ours[key], theirs[key])
+    if (value !== undefined) out[key] = value
+  }
+  return out
 }
 
 let lastConfig = ''

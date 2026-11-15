@@ -1,0 +1,21 @@
+$ () radical explore verify 1 bug-no.mjs finding-0.mjs bug-other.mjs  → exit 0
+    === bug-no.mjs
+      BUG: no undo step is made for the drag
+      (exit 1)
+      says: BUG: no undo step is made for the drag
+      → the bug does not show, as its output says; its exit 1 says otherwise (a script exits 1 while the bug shows, 0 when it does not)
+    === finding-0.mjs
+      FINDING: 0 of 3 elements keep their place after a reload
+      (exit 1)
+      says: FINDING: 0 of 3 elements keep their place after a reload
+      → the bug does not show, as its output says; its exit 1 says otherwise (a script exits 1 while the bug shows, 0 when it does not)
+    === bug-other.mjs
+      BUG: the drag made two undo steps
+      (exit 1)
+      says: BUG: the drag made two undo steps
+      → the bug shows
+    Shows the bug: bug-other.mjs. Does not: bug-no.mjs, finding-0.mjs.
+
+Expected: all three scripts show the bug (each exits 1 and says BUG: … or FINDING: …).
+Actual (round.json "shown"): bug-no.mjs false, finding-0.mjs false, bug-other.mjs true.
+REPRODUCED: yes

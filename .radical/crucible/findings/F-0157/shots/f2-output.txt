@@ -1,0 +1,6 @@
+set_verification: scenario "Pays" (d96ba7a3-6c06-4fb6-a741-4d30bcbc5272) is checked by 2 test(s) (.radical/radical.json).
+radical verify: scenario "Refunds" (7eddd8fe-e470-4c0f-8005-cc0b55bc6d35) is checked by 1 test (.radical/radical.json):
+  tests/pay.test.ts > checkout > pays by card
+Pays (set_verification) binds 2: ["tests/pay.test.ts > checkout > pays by card","tests/pay.test.ts › checkout › pays by card"]
+Refunds (radical verify) binds 1: ["tests/pay.test.ts > checkout > pays by card"]
+REPRODUCED: yes

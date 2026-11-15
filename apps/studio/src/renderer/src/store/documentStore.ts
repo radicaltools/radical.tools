@@ -11,6 +11,7 @@
 import { create } from 'zustand'
 import type { DiagramData } from '@radical/common/c4'
 import { ownModel } from '@radical/common/model'
+import { modelBelowRefusal, startsEmpty } from '@radical/common/modelFolders'
 import { parseDeps, parseFederationFile, withOtherModels, type Deps, type FederationFile } from '@radical/common/federation'
 import { host } from '../platform/host'
 import { forgetViewCameras } from '@radical/ui/store/viewCameras'
@@ -21,6 +22,7 @@ import {
   serializeToMdFolder,
   deserializeFromMdFolder,
   MalformedFolderFileError,
+  MD_MANIFEST_FILE,
   isMdFolder,
   stripBom,
   type FolderFiles,
@@ -34,6 +36,7 @@ import {
   webFolderSupported,
   webFileSupported,
   pickWebDirectory,
+  pickedFolderHolds,
   openedFolder,
   pickWebFileToOpen,
   pickWebFileToSave,
@@ -245,6 +248,14 @@ export interface DocumentMeta {
    *  forgot it: the Welcome screen then listed an "Untitled" model the user
    *  never made, and the Setup wizard took the visit for a returning one. */
   seeded?: boolean
+}
+
+/** The models listed and counted as the user's, wherever models are (the
+ *  Welcome screen's Recent and counts, the Models dialog): every one but the
+ *  one a first visit seeded and nobody has used (DocumentMeta.seeded). The
+ *  Models dialog listed that "Untitled" while the Welcome screen counted 0. */
+export function usersModels(docs: DocumentMeta[]): DocumentMeta[] {
+  return docs.filter((d) => !d.seeded)
 }
 
 interface DocumentsIndex {
@@ -506,16 +517,31 @@ function enqueueSave(id: string, data: DiagramData): Promise<void> {
  *  names the Radical model the folder holds, which the write replaces. */
 export type ConfirmFolder = (folderName: string, model?: string) => boolean | Promise<boolean>
 
+/** A folder no model is written into, and why. */
+class FolderRefused extends Error {}
+
+/** What a folder picked to write a model into holds: its model files, the
+ *  names of all its entries, and the model below it that Open finds in its
+ *  place (modelBelow), with that model's name. */
+interface PickedFolder {
+  files: FolderFiles
+  names: string[]
+  below?: { path: string; model?: string }
+}
+
 /** Whether "Move to a folder…" or New model may write into a folder that
  *  already holds these files: always for an empty folder, otherwise only when
  *  the user confirms, also for a Radical model, which the write replaces.
- *  Another model's folder was replaced without a question (item 235). */
+ *  Another model's folder was replaced without a question (item 235). Throws
+ *  why for a repository whose model is below the folder (modelBelowRefusal):
+ *  the model written was opened in its place (F-0164). */
 async function mayWriteInto(
-  files: FolderFiles,
+  { files, names, below }: PickedFolder,
   folderName: string,
   confirmForeign?: ConfirmFolder,
 ): Promise<boolean> {
-  if (Object.keys(files).length === 0) return true
+  if (below && !isMdFolder(files)) throw new FolderRefused(modelBelowRefusal(folderName, below.path, below.model))
+  if (Object.keys(files).length === 0 && startsEmpty(names)) return true
   if (!confirmForeign) return false
   if (!isMdFolder(files)) return await confirmForeign(folderName)
   let model = folderName
@@ -545,6 +571,18 @@ async function forgetReplaced(written: WrittenFolder, keepId: string): Promise<v
   for (const id of ids) documents.deleteDocument(id)
 }
 
+/** The name radical.md gives the model in folder `folderPath` on disk
+ *  (Electron), if it reads. */
+async function modelNameAt(folderPath: string): Promise<string | undefined> {
+  const manifest = await host().readFile?.(`${folderPath}/${MD_MANIFEST_FILE}`)
+  if (!manifest?.success || manifest.content === undefined) return undefined
+  try {
+    return deserializeFromMdFolder({ [MD_MANIFEST_FILE]: manifest.content }).name
+  } catch {
+    return undefined
+  }
+}
+
 /** A folder `pickAndWriteFolder` wrote: a path on disk (Electron), or a
  *  browser directory handle with its live session (web). */
 type WrittenFolder =
@@ -553,9 +591,10 @@ type WrittenFolder =
 
 /** Pick a folder (Electron or web) and write `data` into it as a Markdown
  *  model named `modelName`, else after the folder (`fallbackName` when the browser gives no
- *  name). A folder that already holds `.md` / `.json` files but is not a
+ *  name). A folder that already holds files (any, not only `.md` / `.json`) but is not a
  *  Radical model is written into only if `confirmForeign` returns true.
- *  Returns null on cancel, refusal or a failed write. */
+ *  Returns null on cancel, refusal or a failed write; throws why for a
+ *  repository whose model is below the folder (mayWriteInto). */
 async function pickAndWriteFolder(
   data: DiagramData,
   fallbackName: string,
@@ -570,8 +609,9 @@ async function pickAndWriteFolder(
     const folderName = defaultNameFromFolder(picked.folderPath)
     const name = modelName ?? folderName
     const present = h.readFolder ? await h.readFolder(picked.folderPath) : null
-    if (present?.success && present.files && !(await mayWriteInto(present.files, folderName, confirmForeign))) {
-      return null
+    if (present?.success && present.files) {
+      const below = picked.modelAt ? { path: picked.modelAt, model: await modelNameAt(`${picked.folderPath}/${picked.modelAt}`) } : undefined
+      if (!(await mayWriteInto({ files: present.files, names: picked.entries ?? Object.keys(present.files), below }, folderName, confirmForeign))) return null
     }
     const res = await h.writeFolder(picked.folderPath, serializeToMdFolder(data, name))
     if (!res.success) {
@@ -589,10 +629,11 @@ async function pickAndWriteFolder(
     const name = modelName ?? folderName
     const session = new MdFolderSession(handleFolderStorage(handle))
     try {
-      if (!(await mayWriteInto(await session.readAll(), folderName, confirmForeign))) return null
+      if (!(await mayWriteInto({ files: await session.readAll(), ...(await pickedFolderHolds(handle)) }, folderName, confirmForeign))) return null
       const res = await session.write(serializeToMdFolder(data, name))
       if (!res.ok) return null // changed while we were writing; nothing written
     } catch (e) {
+      if (e instanceof FolderRefused) throw e
       console.warn('[documentStore] web folder write failed:', e)
       return null
     }

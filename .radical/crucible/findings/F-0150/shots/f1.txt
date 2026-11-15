@@ -1,0 +1,31 @@
+
+1. add_relation derives quoting "A basket holds at most 20 items and is kept for 30 days." (requirement says 25 and 7)
+  reported as brought in: 
+  - Requirement "Basket limit" does not say "20", "30", which the words it quotes from "Basket brief" say.
+  - Requirement "Basket limit" says "25", "7", which none of the words it quotes say: correct it to what the person said, or say in its rationale that they are the model's decision.
+
+2. update_node: correct 25 to 20 (7 days still wrong, as before)
+  reported as brought in: 
+  - Requirement "Basket limit" does not say "30", which the words it quotes from "Basket brief" say.
+  - Requirement "Basket limit" says "7", which none of the words it quotes say: correct it to what the person said, or say in its rationale that it is the model's decision.
+
+3. update_node: correct 7 to 30
+  reported as brought in: (nothing)
+
+4. add_relation: "Member delivery" quotes the first of the two paragraphs of an answer no requirement quoted
+  reported as brought in: 
+  - No requirement quotes 1 of the 2 parts of this answer in need "Basket brief": "A guest pays 5 € for delivery.". Quote each on a requirement's derives relation, or mark the answer (no requirement).
+
+5. add_relation: scenario "Full basket" verifies "Basket limit" (names neither 20 nor 30)
+  reported as brought in: 
+  - Requirement "Basket limit" takes "20", "30" from the words it quotes, which its scenario "Full basket" does not say: a scenario that checks the requirement names the values the person gave.
+
+6. update_node: the scenario names 20 (30 still missing, as before)
+  reported as brought in: 
+  - Requirement "Basket limit" takes "30" from the words it quotes, which its scenario "Full basket" does not say: a scenario that checks the requirement names the values the person gave.
+
+7. add_relation: a second scenario "Old basket" verifies "Basket limit"
+  reported as brought in: 
+  - Requirement "Basket limit" takes "30" from the words it quotes, which none of its 2 scenarios says: a scenario that checks the requirement names the values the person gave.
+
+5 findings reported as brought in by writes (2, 3, 4, 6, 7) that only took findings away

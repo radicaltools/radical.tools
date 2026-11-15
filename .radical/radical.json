@@ -472,7 +472,8 @@
     ] },
     { "element": "6cefb957-2968-42d8-8375-acf47f1a5a79", "name": "Test ids matched", "tests": [
       "packages/common/tests/checkReports.test.ts › test reports › reads test ids one per line, leaving out comments; a title may hold \"; \"",
-      "packages/common/tests/checkReports.test.ts › test reports › finds a test by a path suffix either way and the end of its title"
+      "packages/common/tests/checkReports.test.ts › test reports › finds a test by a path suffix either way and the end of its title",
+      "packages/common/tests/checkReports.test.ts › test reports › reads a test id as Playwright and Vitest print it, with its project and its line, as the same test (F-0144)"
     ] },
     { "element": "2c49cda5-7f31-4593-a0df-22db5e41941a", "name": "Test results for Studio", "tests": [
       "apps/cli/src/cli.test.ts › radical check › reads test reports, fails on a failed test, and writes the evidence",
@@ -564,7 +565,8 @@
     { "element": "3955cbd0-4201-4fe2-a3cd-5b0032d3762e", "name": "Scripts verified", "tests": [
       "apps/cli/src/explore.test.ts › radical explore verify › serves the run's build, runs its scripts and stops the server",
       "apps/cli/src/explore.test.ts › serves each server on its port of the run, and stops them all",
-      "apps/cli/src/explore.test.ts › radical explore verify, what a script says › judges a script by its exit and by a line that says whether the bug shows, and says when they disagree"
+      "apps/cli/src/explore.test.ts › radical explore verify, what a script says › judges a script by its exit and by a line that says whether the bug shows, and says when they disagree",
+      "apps/cli/src/explore.test.ts › radical explore verify, what a bug line says › takes every BUG and FINDING line as saying the bug shows; only REPRODUCED says it does not (F-0146)"
     ] },
     { "element": "e40052a3-2bde-4650-b046-4c86941bc7cc", "name": "Survey writes findings", "tests": [
       "apps/cli/src/fuzz.test.ts › radical fuzz › records each new signature of a survey as an open finding, once",
@@ -807,7 +809,8 @@
     ] },
     { "element": "65e572c1-c846-4274-8a9a-146d07e73a40", "name": "A row held through tidying", "tests": [
       "packages/layout/tests/tidy/craft.test.ts › Tidy, the finer points › a row the author set holds through tidying, and a second run keeps the layout",
-      "packages/layout/tests/tidy/tidy.test.ts › Tidy › leaves nothing for a second or third run with a row, a column or a grid set on the view (F-0108)"
+      "packages/layout/tests/tidy/tidy.test.ts › Tidy › leaves nothing for a second or third run with a row, a column or a grid set on the view (F-0108)",
+      "packages/layout/tests/tidy/craft.test.ts › Tidy, the finer points › a move that shifts a line by less than a hair, its members unevenly, is taken back rather than fail"
     ] },
     { "element": "21880701-5b50-4a18-a807-e08959a48c74", "name": "A row reordered", "tests": [
       "packages/layout/tests/tidy/craft.test.ts › a row is reordered to uncross its lines"
@@ -2043,7 +2046,9 @@
       "apps/e2e/tests/studio/large-canvas.spec.ts › a canvas of more than 1,000 elements is not drawn: it offers a table or its filter",
       "packages/ui/tests/oversizedCanvas.test.ts › a canvas with more elements than a canvas draws › draws up to CANVAS_MAX_ELEMENTS, and says how many past them",
       "packages/ui/tests/oversizedCanvas.test.ts › a canvas with more elements than a canvas draws › leaves tables, wikis and All elements to show any number",
-      "packages/ui/tests/oversizedCanvas.test.ts › a canvas with more elements than a canvas draws › counts a view of type Explore by the elements it lists"
+      "packages/ui/tests/oversizedCanvas.test.ts › a canvas with more elements than a canvas draws › counts a view of type Explore by the elements it lists",
+      "packages/ui/tests/oversizedCanvas.test.ts › the canvas limit counts what the canvas draws › leaves out what lies in a container folded in the view, or on the model and not opened there; a frame is never folded",
+      "apps/e2e/tests/studio/large-canvas.spec.ts › a view per element of more than 1,000 elements offers its viewpoint, which every view of the group follows"
     ] },
     { "element": "c01b2fa5-1a14-4f36-94f0-775a353b38c6", "name": "Toolbar groups in place", "tests": [
       "apps/e2e/tests/studio/editing.spec.ts › the toolbar groups the branch's changes with the model open, undo, and navigation around Quick Search",
@@ -2324,7 +2329,8 @@
     ] },
     { "element": "7d1f9c2f-02a1-4ef9-a7e3-0f7a625b875d", "name": "Studio follows the agent's turns", "tests": [
       "apps/studio/tests/followAgent.test.ts › follow the agent",
-      "apps/e2e/tests/studio/folders.spec.ts › an agent's Forge run on the folder makes the Forge button pulse and opens read only"
+      "apps/e2e/tests/studio/folders.spec.ts › an agent's Forge run on the folder makes the Forge button pulse and opens read only",
+      "apps/studio/tests/followAgent.test.ts › follow the agent › waits only while the focus is in a field typed in: a drop-down, a checkbox or a button with the focus does not hold it back (F-0178)"
     ] },
     { "element": "ec44ff9b-d2db-4743-ba90-6c9c8ec2a44e", "name": "Studio's Forge run saves a base", "tests": [
       "apps/e2e/tests/studio/branch-changes.spec.ts › a Forge run in a folder without a base from git saves one, and Changes on branch shows the run"
@@ -2384,7 +2390,8 @@
       "apps/e2e/tests/studio/setup.spec.ts › first start › an AI provider set up in it offers Radical Forge"
     ] },
     { "element": "105c1efd-b898-431c-a02f-0fa75eb8d159", "name": "An agent binds tests", "tests": [
-      "apps/mcp/src/folderModel.test.ts › test bindings"
+      "apps/mcp/src/folderModel.test.ts › test bindings",
+      "apps/mcp/src/folderModel.test.ts › test bindings › binds a test once when the file has it written another way, as radical verify does (F-0157)"
     ] },
     { "element": "573106d9-3729-43e8-9bc8-bb1e3fbbc0d2", "name": "An agent maps the repository", "tests": [
       "apps/mcp/src/folderModel.test.ts › repository mapping"
@@ -2438,7 +2445,8 @@
       "packages/node-files/tests/diskFolderStorage.test.ts › diskFolderStorage › takes over a turn left by a process that is gone",
       "packages/node-files/tests/diskFolderStorage.test.ts › diskFolderStorage › takes over a lock file that names no turn once it is past being written, to read or to write",
       "apps/mcp/src/folderModel.test.ts › folder-backed MCP model › merges an edit made in the folder since the call started",
-      "apps/studio/tests/mdFolderWatch.test.ts › md-folder documents follow outside edits › merges edits not saved yet with an outside edit"
+      "apps/studio/tests/mdFolderWatch.test.ts › md-folder documents follow outside edits › merges edits not saved yet with an outside edit",
+      "packages/common/tests/modelMerge.test.ts › mergeModels › drops a relation to an element one side deleted without a word when the side that kept the element did not draw or change it (F-0177)"
     ] },
     { "element": "bc9ad026-86ec-4394-a51e-2983c2bae44f", "name": "Declined prompt changes nothing", "tests": [
       "apps/e2e/tests/studio/folders.spec.ts › declining the prompt leaves a non-model folder untouched"
@@ -2574,7 +2582,8 @@
       "apps/e2e/tests/studio/wiki.spec.ts › wiki text opened before an agent's edit takes the edit, and leaving it writes nothing",
       "apps/e2e/tests/studio/folders.spec.ts › an outside write during a drag waits for the drop, and the drop lands under the pointer",
       "apps/studio/tests/mdFolderWatch.test.ts › takes an outside edit in at the drop of a drag held when it came",
-      "apps/studio/tests/mdFolderWatch.test.ts › md-folder documents follow outside edits › keeps what is typed while an outside edit is read (F-0142)"
+      "apps/studio/tests/mdFolderWatch.test.ts › md-folder documents follow outside edits › keeps what is typed while an outside edit is read (F-0142)",
+      "apps/e2e/tests/studio/folders.spec.ts › an outside write keeps a requirement's sentence part open in its card, and what is typed in it"
     ] },
     { "element": "0b820fa7-ebc8-401c-82d9-eb566524ca24", "name": "Outside edit shows on canvas", "tests": [
       "apps/e2e/tests/studio/folders.spec.ts › an edit made outside the app shows up on the canvas"
@@ -2670,7 +2679,8 @@
     ] },
     { "element": "e8d74bec-159b-488c-9b19-d19aaf1ff3a6", "name": "Tests bound from the command line", "tests": [
       "apps/cli/src/verify.test.ts",
-      "apps/cli/src/setup.test.ts › radical setup › moves the tests a model names into .radical/radical.json"
+      "apps/cli/src/setup.test.ts › radical setup › moves the tests a model names into .radical/radical.json",
+      "apps/cli/src/verify.test.ts › radical verify › keeps a test written as Playwright prints it, with its project and line, as the file and titles (F-0144)"
     ] },
     { "element": "02904c28-afae-45e5-aab7-2f56c55d2aac", "name": "Tests bound outside the model", "tests": [
       "packages/common/tests/verifies.test.ts",
@@ -3620,11 +3630,16 @@
     ] },
     { "element": "0947887b-9884-49ee-8f00-3e5a85aa5d52", "name": "Values read in their forms", "tests": [
       "packages/common/tests/derivesQuotes.test.ts › reading the person's words › reads values in their forms (Values read in their forms)",
-      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › keeps the sign of a value: -18, −18 and minus 18 are not 18 (Values read in their forms)"
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › keeps the sign of a value: -18, −18 and minus 18 are not 18 (Values read in their forms)",
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › reads a minus written as a dash: –18 is -18, as −18 and -18 are, in values and limits alike (Values read in their forms)",
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › reads a discount and a subtraction without a sign: -10% off and total minus 5 € are 10% and 5 €; a balance of minus 50 € keeps it (Values read in their forms)"
     ] },
     { "element": "e25c7fc3-822e-484b-ab53-c17c17b512af", "name": "Limits, units and order kept", "tests": [
       "packages/common/tests/derivesQuotes.test.ts › reading the person's words › keeps the sense of a quoted value (Limits, units and order kept)",
-      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › reads a negated limit as the side it allows: cannot, can't, doesn't, must not exceed (Limits, units and order kept)"
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › reads a negated limit as the side it allows: cannot, can't, doesn't, must not exceed (Limits, units and order kept)",
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › reads a range as one limit before a sentence is cut into clauses: between 8 and 64, 1,000 to 5,000 (Limits, units and order kept)",
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › turns a limit round only by a negation of its own verb, not of a verb in a clause before it (Limits, units and order kept)",
+      "packages/common/tests/derivesQuotes.test.ts › reading the person's words › compares the unit of a value in years, months and currencies: 10 years is not 10 days, 5 € not 5 USD (Limits, units and order kept)"
     ] },
     { "element": "7b99eb7c-88b0-4e05-bda0-aa94f51265b9", "name": "Example missing from scenarios", "tests": [
       "packages/common/tests/derivesQuotes.test.ts › reading the person's words › asks a scenario for the person's example (Example missing from scenarios)"
@@ -3634,7 +3649,8 @@
     ] },
     { "element": "ae223863-1d1b-4cd4-85cb-67aa734d009a", "name": "Write tells of a lost value", "tests": [
       "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › tells an agent writing the model what it brings in of the person's words (Write tells of a lost value)",
-      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › tells nothing of the person's words after a rename: it brings in no finding (Write tells of a lost value)"
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › tells nothing of the person's words after a rename: it brings in no finding (Write tells of a lost value)",
+      "apps/mcp/src/folderModel.test.ts › requirements reviewed against their needs › tells nothing of the person's words after a write that only takes findings away: a value corrected, a part quoted, a scenario added (Write tells of a lost value)"
     ] },
     { "element": "1ed4224a-2df4-44a5-b366-7488721ae125", "name": "Word rules on a large model", "tests": [
       "packages/common/tests/derivesQuotes.test.ts › reading the person's words › checks a model of 5,000 requirements in under 2 seconds (Word rules on a large model)"
@@ -3656,10 +3672,12 @@
       "packages/layout/tests/tidy/frames.test.ts › a frame the view shows part of › a canvas whose frames already wrap what it shows is kept as it is"
     ] },
     { "element": "d0b247c4-77f4-4b0a-9726-bcb8d785b02d", "name": "First visit's model not listed", "tests": [
-      "apps/studio/tests/firstStart.test.ts › the model made on a first visit › is not the user's after a reload either, until it is saved"
+      "apps/studio/tests/firstStart.test.ts › the model made on a first visit › is not the user's after a reload either, until it is saved",
+      "apps/e2e/tests/studio/boot.spec.ts › first visit › the model a first visit seeds is listed nowhere: not in Open, nor in the Models dialog"
     ] },
     { "element": "e0d32b4d-46f1-422a-9667-9460bfdbff75", "name": "A Hub link waits for a model", "tests": [
-      "apps/e2e/tests/studio/hub-import.spec.ts › a Hub link with no model open waits on the Welcome screen, and its import opens over the model picked"
+      "apps/e2e/tests/studio/hub-import.spec.ts › a Hub link with no model open waits on the Welcome screen, and its import opens over the model picked",
+      "apps/e2e/tests/studio/hub-import.spec.ts › a Hub link waits across a reload of the Welcome screen until its import opens, and after that a reload asks nothing"
     ] },
     { "element": "73a10d21-ba23-42ef-92f0-08ca353e6867", "name": "One run panel at a time", "tests": [
       "apps/e2e/tests/studio/folders.spec.ts › the Forge and Assay buttons show their own run panel, one at a time, and closing it leaves none open"
@@ -3671,13 +3689,15 @@
       "apps/e2e/tests/studio/editing.spec.ts › Delete pressed in a dialog leaves the element selected behind it alone"
     ] },
     { "element": "0e71f972-c38e-4c0d-bff3-558a3d2e98ae", "name": "Ratchet leaves the model's baselines", "tests": [
-      "apps/cli/src/cli.test.ts › radical check › leaves the model's baselines alone in a repository that judges its part of a model kept elsewhere"
+      "apps/cli/src/cli.test.ts › radical check › leaves the model's baselines alone in a repository that judges its part of a model kept elsewhere",
+      "apps/cli/src/cli.test.ts › radical check › lowers no baseline from a check that leaves part out, with --alone or --trigger (F-0145)"
     ] },
     { "element": "46127bcf-0a6c-4286-9eca-803ab8086ff1", "name": "Help for every command", "tests": [
       "apps/cli/src/cli.test.ts › radical › answers --help for every command and subcommand its usage lists"
     ] },
     { "element": "d7431a7a-278a-4f88-b8e2-c117aa43b6d3", "name": "A consumer contract test is judged here", "tests": [
-      "apps/cli/src/federation.test.ts › radical federation › radical check judges a test this repository binds to a scenario of another model, and --trace shows its path"
+      "apps/cli/src/federation.test.ts › radical federation › radical check judges a test this repository binds to a scenario of another model, and --trace shows its path",
+      "packages/common/tests/checkTrace.test.ts › verification path › draws another model's requirement broken above a failed consumer contract test, as the check says (F-0149)"
     ] },
     { "element": "3483ef4d-5d7a-40f4-b29e-4f1e70d47001", "name": "Deleted elements' entries taken out", "tests": [
       "apps/mcp/src/folderModel.test.ts › entries of deleted elements › delete_node takes them out of .radical/radical.json, and remove: true takes out one whose element is gone (F-0110)"
@@ -3722,7 +3742,8 @@
     { "element": "75123b67-d8ca-4594-9572-9f081a376053", "name": "No exploration past the limit", "tests": [
       "packages/ui/tests/oversizedCanvas.test.ts › an exploration never draws more than a canvas draws › keeps a view too large for a canvas as it is when switched to Explore: the notice stays",
       "packages/ui/tests/oversizedCanvas.test.ts › an exploration never draws more than a canvas draws › adds no + past the limit: All of a need with more requirements than a canvas draws adds nothing",
-      "apps/e2e/tests/studio/large-canvas.spec.ts › no exploration draws more than 1,000 elements: neither a view switched to Explore nor a +"
+      "apps/e2e/tests/studio/large-canvas.spec.ts › no exploration draws more than 1,000 elements: neither a view switched to Explore nor a +",
+      "apps/e2e/tests/studio/large-canvas.spec.ts › a + menu whose every row would draw more than a canvas has the focus, and Esc closes it"
     ] },
     { "element": "e7d647ab-5d23-4bf1-8270-f19f504742ee", "name": "Too large a view for an agent", "tests": [
       "apps/mcp/src/folderModel.test.ts › long Smart Layout runs › lays out no view with more elements than a canvas draws, as Studio neither draws nor lays it out"
@@ -3736,6 +3757,60 @@
     { "element": "34624377-9988-4bb6-86a2-5c7359ba9db2", "name": "Viewer shows a canvas as it opens", "tests": [
       "packages/ui/tests/firstCanvasPositions.test.ts › a canvas opened in Viewer with an element placed as it opens (F-0139) › stands still in Viewer",
       "packages/ui/tests/firstCanvasPositions.test.ts › a canvas opened in Viewer with an element placed as it opens (F-0139) › stands still in Viewer on All elements, as the model opens"
+    ] },
+    { "element": "022fed80-e91d-446a-8c91-066da0d2859c", "name": "Refusal names the stage", "tests": [
+      "packages/common/tests/forgeProposals.test.ts › Forge proposals › refinementGuard names the stage a refused type belongs to, earlier or later (F-0156)"
+    ] },
+    { "element": "806d19ee-3b2d-4963-8a9d-3ae4a59a4582", "name": "Finish refused while a stage is open", "tests": [
+      "apps/mcp/src/forge.test.ts › concern packs in a Forge run › does not finish while a stage is open or a proposal waits, so a finished run guards no write (F-0156)"
+    ] },
+    { "element": "0219177d-c0dd-4025-a263-2be129721e78", "name": "Offered pack picks from Designer's model", "tests": [
+      "apps/e2e/tests/studio/hub-import.spec.ts › Import from Hub in Viewer showing a milestone offers the elements of the model the pack goes into"
+    ] },
+    { "element": "0fb4f51b-77ef-414b-8e06-42fdd47c2692", "name": "Answered concern in its own view", "tests": [
+      "apps/e2e/tests/studio/inspector.spec.ts › a concern answered in the Inspector goes into its own view, not into the view Designer has open"
+    ] },
+    { "element": "326240d4-586a-451b-851b-45d3cffba294", "name": "Prompt and menus keep the keys", "tests": [
+      "apps/studio/tests/dialogKeys.test.ts › one rule for the keys something else has › gives the keys to the Delete prompt while it asks, as to the other modal dialogs",
+      "apps/studio/tests/dialogKeys.test.ts › one rule for the keys something else has › keeps the canvas's keys out of a dialog or a menu that leaves the canvas usable, as Studio's shortcuts"
+    ] },
+    { "element": "370dd445-89b5-4ec7-9e26-eededa6b2b6a", "name": "Dialog over Forge's panel", "tests": [
+      "apps/e2e/tests/studio/forge.spec.ts › a dialog opened over Radical Forge is drawn over its panel, and Esc closes only that dialog"
+    ] },
+    { "element": "ad55850d-79cd-4728-9d51-90572218a799", "name": "Forge put aside keeps its run", "tests": [
+      "apps/e2e/tests/studio/forge.spec.ts › Radical Forge put aside for the agent's Assay panel between two stages comes back where it was"
+    ] },
+    { "element": "fa6cd96a-5c6b-4b55-86cd-e47e6ac2649c", "name": "Settings saved beside an agent", "tests": [
+      "apps/studio/tests/inspectorSave.test.ts › saving the Inspector's Settings › keeps what an agent wrote to radical.json and check.json since the poll, and writes only what Settings changed (F-0158)"
+    ] },
+    { "element": "9f5e7bea-de87-4d8d-a179-6abe58ab8d46", "name": "Pinned frames kept by a row", "tests": [
+      "packages/ui/tests/calmDrag.test.ts › Pins in the store › Keep in a row, a column or a grid leaves a pinned frame, and frames it has nothing to do with, at their place and size (F-0174)",
+      "packages/layout/tests/constraints.test.ts › enforceAlignments moves only what a line needs (F-0174, F-0175) › a row leaves the frames it has nothing to do with at their place and size, one of them pinned",
+      "packages/ui/tests/calmDrag.test.ts › Pins in the store › Keep in a row lines up the pinned elements it is set on, and pushes no other pinned element aside"
+    ] },
+    { "element": "7fb3ee02-53d8-4417-8425-58e035926a98", "name": "An agent's row through a Tidy around", "tests": [
+      "packages/layout/tests/tidy/craft.test.ts › Tidy, the finer points › tidy around leaves a row out of its reach as it stands, its members not put on each other (F-0175)",
+      "packages/layout/tests/constraints.test.ts › enforceAlignments moves only what a line needs (F-0174, F-0175) › a row whose members may not move is left as it is, its members not put on each other",
+      "apps/mcp/src/folderModel.test.ts › long Smart Layout runs › a row, column or grid an agent set and a Tidy round something else leave no siblings on each other (F-0175)"
+    ] },
+    { "element": "7868b008-1774-4b53-b6d6-2d4118474250", "name": "Too large a new view named", "tests": [
+      "apps/mcp/src/folderModel.test.ts › long Smart Layout runs › says which new views per element it laid out, and advises for one too large what the server accepts"
+    ] },
+    { "element": "f620e186-7ac5-4f14-90c7-889afff46677", "name": "A script outside the run refused", "tests": [
+      "apps/cli/src/explore.test.ts › radical explore verify, a script that is not there › runs no script that is not in the run's folder and records nothing; prepare refuses a run an earlier round has (F-0147)"
+    ] },
+    { "element": "0e7438b6-5cdf-4a02-853c-beef68c39ac5", "name": "Path before any results", "tests": [
+      "packages/common/tests/checkTrace.test.ts › verification path › lists the tests bound to a scenario before any results, with no outcome yet (F-0148)",
+      "apps/cli/src/verify.test.ts › radical verify › lists a bound test in the trace before any results, with no outcome yet (F-0148)"
+    ] },
+    { "element": "554972dd-c6d5-4fd5-a7d0-689fb533f349", "name": "Another model's group kept its own", "tests": [
+      "packages/common/tests/federation.test.ts › federation › keeps another model's group of views per element its own: it makes no view here (F-0163)"
+    ] },
+    { "element": "b1d0b30b-6c01-4468-8042-48920ada0d9b", "name": "Read-only bar above the view", "tests": [
+      "apps/e2e/tests/studio/federation.spec.ts › the read-only bar of another model's view covers none of the view's controls"
+    ] },
+    { "element": "7e3eb2bb-b51a-48c7-9667-0cc3090c9587", "name": "A repository's folder refused", "tests": [
+      "apps/e2e/tests/studio/folders.spec.ts › New model and Move to a folder… write no model in front of a repository's, and ask before a folder of other files"
     ] }
   ]
 }

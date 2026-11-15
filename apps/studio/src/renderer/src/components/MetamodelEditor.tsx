@@ -7,6 +7,8 @@ import { chainSummary, VIEW_KIND_LABELS, VIEWPOINT_KINDS, viewpointsOf, withView
 import { DEFAULT_SUMMARIES, nodeSummary, summaryTokens } from '@radical/common/nodeSummary'
 import { markdownToPlain } from '@radical/common/markdown'
 import { MarkdownText } from '@radical/ui/components/MarkdownText'
+import { isTypedField } from '@radical/ui/components/keysHere'
+import { takeViewpointToEdit } from '@radical/ui/components/LargeCanvasNotice'
 import type {
   NodeTypeDef,
   RelationTypeDef,
@@ -24,6 +26,7 @@ import {
 } from './metamodel/MetamodelDiagram'
 import { MetamodelInspector } from './metamodel/MetamodelInspector'
 import { CONTAINS_EDGE, type MetamodelGraphFilter } from './metamodel/metamodelGraph'
+import { keysOnTop } from '@radical/ui/components/keysHere'
 
 // ── small icon helpers ─────────────────────────────────────────────────────
 
@@ -779,18 +782,21 @@ function ViewpointCard({
   summary,
   viewCount,
   nodeTypes,
+  focusToken,
   onChange,
   onDelete,
 }: {
   def: ViewpointDef
   summary: string
   viewCount: number
+  focusToken?: number
   /** The metamodel's node types, for what a viewpoint draws one of. */
   nodeTypes: Array<{ id: string; label: string }>
   onChange: (next: ViewpointDef) => void
   onDelete: () => void
 }): React.ReactElement {
   const [open, setOpen] = useState(false)
+  const ref = useCardFocus(focusToken, setOpen)
   // A viewpoint keeps a name: an emptied field goes back to it.
   const [label, setLabel] = useState(def.label)
   useEffect(() => setLabel(def.label), [def.label])
@@ -800,7 +806,7 @@ function ViewpointCard({
   }
 
   return (
-    <div className="mm-card">
+    <div ref={ref} className={`mm-card${focusToken !== undefined ? ' focused' : ''}`}>
       <div className="mm-card-header" onClick={() => setOpen((v) => !v)} {...headerKeys(() => setOpen((v) => !v))} aria-expanded={open} aria-label={def.label}>
         <svg className={`mm-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10">
           <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -959,9 +965,8 @@ function readTab(): EditorTab {
   }
 }
 
-/** A field typed into: a text input or a text area. */
-const isTextField = (el: EventTarget): boolean =>
-  el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && ['text', 'number', 'search', ''].includes(el.type))
+/** A field typed into: a text input, a text area or editable text. */
+const isTextField = (el: EventTarget): boolean => isTypedField(el)
 
 export function MetamodelEditor(): React.ReactElement {
   const metamodel = useDiagramStore((s) => s.metamodel)
@@ -1054,21 +1059,31 @@ export function MetamodelEditor(): React.ReactElement {
   const [selection, setSelection] = useState<DiagramSelection>(null)
   const [diagramFilter, setDiagramFilter] = useState<MetamodelGraphFilter>(DEFAULT_DIAGRAM_FILTER)
   // Card to open + scroll to in the list; the counter re-triggers the same card.
-  const [focusCard, setFocusCard] = useState<{ kind: 'type' | 'relation'; id: string; token: number } | null>(null)
+  const [focusCard, setFocusCard] = useState<{ kind: 'type' | 'relation' | 'viewpoint'; id: string; token: number } | null>(null)
+  // Opened from a view's notice (Edit the viewpoint): on that viewpoint's card.
+  useEffect(() => {
+    const viewpoint = takeViewpointToEdit()
+    if (!viewpoint) return
+    setFocusCard((cur) => ({ kind: 'viewpoint', id: viewpoint, token: (cur?.token ?? 0) + 1 }))
+    setTab('list')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const editInList = (s: NonNullable<DiagramSelection>): void => {
     if (s.kind === 'relation' && s.id === CONTAINS_EDGE) return
     setFocusCard((cur) => ({ kind: s.kind, id: s.id, token: (cur?.token ?? 0) + 1 }))
     setTab('list')
   }
-  const focusTokenFor = (kind: 'type' | 'relation', id: string): number | undefined =>
+  const focusTokenFor = (kind: 'type' | 'relation' | 'viewpoint', id: string): number | undefined =>
     focusCard && focusCard.kind === kind && focusCard.id === id ? focusCard.token : undefined
 
-  // Esc clears the diagram selection first, then closes the editor.
+  // Esc clears the diagram selection first, then closes the editor; not
+  // under a dialog opened over it from the rail (About, AI providers…).
   const selectionRef = useRef(selection)
   selectionRef.current = selection
+  const backdropRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return
+      if (e.key !== 'Escape' || !keysOnTop(backdropRef.current, e)) return
       if (selectionRef.current) setSelection(null)
       else close()
     }
@@ -1080,6 +1095,7 @@ export function MetamodelEditor(): React.ReactElement {
   return createPortal(
     <div
       className="milestone-modal-backdrop mm-editor-backdrop"
+      ref={backdropRef}
       onMouseDown={(e) => {
         if (e.target !== e.currentTarget) return
         const start = e.currentTarget
@@ -1213,6 +1229,7 @@ export function MetamodelEditor(): React.ReactElement {
                 def={t}
                 summary={chainSummary(t.pipeline, viewpointCtx)}
                 viewCount={Object.values(views).filter((v) => v.viewpoint === t.id).length}
+                focusToken={focusTokenFor('viewpoint', t.id)}
                 nodeTypes={Object.entries(metamodel.nodeTypes).map(([id, n]) => ({ id, label: n.label }))}
                 onChange={(next) => (JSON.stringify(next.subject ?? null) === JSON.stringify(t.subject ?? null)
                   ? setMetamodel(withViewpoint(metamodel, next))

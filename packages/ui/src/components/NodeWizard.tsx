@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   composeEarsSentence,
   requirementStatePhrase,
@@ -23,6 +24,7 @@ import { useDiagramStore, type NodeWizardSession } from '../store/diagramStore'
 import { editAsDesigner } from '../store/designerEdit'
 import { EarsQuickEntry } from './EarsQuickEntry'
 import { RefPicker } from './RefPicker'
+import { keysOnTop } from './keysHere'
 
 /**
  * Step-by-step form for a node type with a `wizard` in the metamodel. Opens
@@ -138,11 +140,14 @@ function WizardDialog({ session, wizard, typeDef, type }: {
   }
   const next = (): void => (isLast ? done() : goTo(stepIndex + 1))
 
-  // Esc cancels, Ctrl/Cmd+Enter finishes from any step.
+  // Esc cancels, Ctrl/Cmd+Enter finishes from any step (unless a dialog
+  // was opened over the wizard).
+  const backdropRef = useRef<HTMLDivElement>(null)
   const doneRef = useRef(done)
   doneRef.current = done
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      if (!keysOnTop(backdropRef.current, e)) return
       if (e.key === 'Escape') { e.preventDefault(); cancel() }
       else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); doneRef.current() }
     }
@@ -160,8 +165,9 @@ function WizardDialog({ session, wizard, typeDef, type }: {
 
   const setValue = (key: string, value: unknown): void => setValues((v) => ({ ...v, [key]: value }))
 
-  return (
-    <div className="nw-backdrop" onMouseDown={cancel}>
+  // On the dialogs' layer in the body, over what was opened before it.
+  return createPortal(
+    <div className="nw-backdrop" ref={backdropRef} onMouseDown={cancel}>
       <div
         className="nw"
         role="dialog"
@@ -268,7 +274,8 @@ function WizardDialog({ session, wizard, typeDef, type }: {
           </footer>
         </section>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

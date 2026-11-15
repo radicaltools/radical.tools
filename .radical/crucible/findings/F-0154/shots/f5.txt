@@ -1,0 +1,20 @@
+years-to-days
+  need answer: Invoices are kept for 10 years.
+  requirement: keep invoices for 10 days
+  radical check: (no finding)
+
+months-to-weeks
+  need answer: An idle basket is kept for 6 months.
+  requirement: keep an idle basket for 6 weeks
+  radical check: (no finding)
+
+euro-to-usd
+  need answer: A guest pays 5 € for delivery.
+  requirement: charge a guest 5 USD for delivery
+  radical check: (no finding)
+
+control-days-to-minutes
+  need answer: An idle basket is kept for 30 days.
+  requirement: keep an idle basket for 30 minutes
+  radical check: 
+    quote-value-differs: Requirement "Requirement" says "30 minutes" where the words it quotes from "Brief" say "30 days".
