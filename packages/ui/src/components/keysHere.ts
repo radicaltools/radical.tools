@@ -37,25 +37,29 @@ export function modalDialogOpen(): boolean {
 }
 
 /** Where the focus keeps its keys: a dialog that leaves the canvas usable
- *  (Radical Forge, the agent's run panels, a popover) or an open menu. */
-const KEEPS_KEYS = '[role="dialog"], [role="menu"]'
+ *  (Radical Forge, the agent's run panels, a popover), and for the canvas's
+ *  keys an open menu too. */
+const KEEPS_KEYS = '[role="dialog"]'
+const KEEPS_CANVAS_KEYS = '[role="dialog"], [role="menu"]'
 
 /** Whether a key pressed on `target` is something else's: a modal dialog
- *  is open, or the key is pressed in a dialog or a menu. The one rule for
- *  the canvas's keys (canvasKeysOff) and Studio's shortcuts (dialogKeys.ts
- *  in Studio): Delete pressed in Radical Forge opened the delete prompt
- *  under the panel, for the element selected behind it. */
-export function keysTakenElsewhere(target: EventTarget | null): boolean {
+ *  is open, or the key is pressed in a dialog (or, with `menus`, a menu).
+ *  The one rule for the canvas's keys (canvasKeysOff, menus too) and
+ *  Studio's shortcuts (dialogKeys.ts in Studio, not menus): Delete pressed
+ *  in Radical Forge opened the delete prompt under the panel, for the
+ *  element selected behind it. A menu closes on F5, Cmd/Ctrl+P or undo
+ *  and lets them through: F5 with the Discuss menu open presents (F-0087). */
+export function keysTakenElsewhere(target: EventTarget | null, menus = false): boolean {
   if (modalDialogOpen()) return true
   const el = target as Element | null
-  return !!el && typeof el.closest === 'function' && !!el.closest(KEEPS_KEYS)
+  return !!el && typeof el.closest === 'function' && !!el.closest(menus ? KEEPS_CANVAS_KEYS : KEEPS_KEYS)
 }
 
 /** Whether the canvas leaves a key alone: something else has it
  *  (keysTakenElsewhere), or it is typed into a field (or something marked
  *  `nokey`), as React Flow tells. */
 export function canvasKeysOff(e: { target: EventTarget | null }): boolean {
-  if (keysTakenElsewhere(e.target)) return true
+  if (keysTakenElsewhere(e.target, true)) return true
   const el = e.target as HTMLElement | null
   if (!el || typeof el.closest !== 'function') return false
   return ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.nodeName) || el.hasAttribute('contenteditable') || !!el.closest('.nokey')

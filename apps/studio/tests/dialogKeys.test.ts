@@ -63,7 +63,9 @@ describe('one rule for the keys something else has', () => {
     const cases: Array<[string, FakeElement, { canvas: boolean; studio: boolean }]> = [
       ['a button of Radical Forge', element('BUTTON', {}, forgePanel), { canvas: true, studio: true }],
       ['Radical Forge\'s description', element('TEXTAREA', {}, forgePanel), { canvas: true, studio: true }],
-      ['a row of the Explore menu', element('BUTTON', { role: 'menuitem' }, exploreMenu), { canvas: true, studio: true }],
+      // A menu keeps the canvas's keys; F5 and Cmd/Ctrl+P go on to Studio,
+      // which closes it: F5 with the Discuss menu open presents (F-0087).
+      ['a row of the Explore menu', element('BUTTON', { role: 'menuitem' }, exploreMenu), { canvas: true, studio: false }],
       // A field keeps the canvas's keys; F5 and Cmd/Ctrl+P go on to Studio.
       ['a field of the properties card', element('INPUT', {}, element('DIV', { class: 'right-panel' })), { canvas: true, studio: false }],
       ['an element on the canvas', canvas, { canvas: false, studio: false }],
