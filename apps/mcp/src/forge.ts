@@ -314,7 +314,7 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'forge_finish',
-    description: 'End the Forge run: what each stage added (or that it was skipped) and the Gherkin .feature files built from the scenarios in the model.',
+    description: 'End the Forge run: what each stage added, which were skipped (with forge_skip_stage) and which not run, and the Gherkin .feature files built from the scenarios in the model.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1057,7 +1057,8 @@ export class Forge {
     const lines = FORGE_STAGES.map((stage) => {
       const state = run.stages[stage.id]
       const why = run.skipped.get(stage.id)
-      if (!state) return `- ${stage.title}: skipped${why ? ` (${why})` : ''}`
+      // Skipped only when left out with forge_skip_stage, as the run status says.
+      if (!state) return `- ${stage.title}: ${why !== undefined ? `skipped (${why})` : 'not run'}`
       if (state.status === 'generating') return `- ${stage.title}: begun but not completed`
       const refined = state.refinements?.length ? ` · ${state.refinements.length} refinements of earlier stages accepted` : ''
       return `- ${stage.title}: +${state.added!.nodes.length} nodes · +${state.added!.relations.length} relations${refined}`
@@ -1102,7 +1103,8 @@ export class Forge {
         if (state?.status === 'generating') return { id: stage.id, status: 'generating' as const, ...(state.pending ? { asking: true } : {}) }
         const why = run.skipped.get(stage.id)
         if (why !== undefined) return { id: stage.id, status: 'skipped' as const, reason: why }
-        return { id: stage.id, status: run.clarified.has(stage.id) ? 'clarifying' as const : 'pending' as const }
+        // A finished run asks nothing any more: a stage clarified but not run is pending.
+        return { id: stage.id, status: run.clarified.has(stage.id) && !run.finished ? 'clarifying' as const : 'pending' as const }
       }),
     }
   }

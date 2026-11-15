@@ -21,7 +21,7 @@ interface Props {
 
 const stageTitle = (id: string): string => FORGE_STAGES.find((s) => s.id === id)?.title ?? id
 
-function stageTip(stage: ForgeRunStageInfo): string {
+function stageTip(stage: ForgeRunStageInfo, finished: boolean): string {
   const title = stageTitle(stage.id)
   if (stage.status === 'done') {
     const refined = stage.refined ? `, ${stage.refined} refinement${stage.refined === 1 ? '' : 's'} of earlier stages` : ''
@@ -31,7 +31,8 @@ function stageTip(stage: ForgeRunStageInfo): string {
   if (stage.status === 'generating') return stage.asking ? `${title}: waiting for your answer to a proposed refinement` : `${title}: generating`
   if (stage.status === 'clarifying') return `${title}: asking you a few questions`
   if (stage.status === 'skipped') return `${title}: skipped${stage.reason ? ` — ${stage.reason}` : ''}`
-  return `${title}: not started`
+  // As forge_finish tells the agent of a stage neither run nor skipped.
+  return `${title}: ${finished ? 'not run' : 'not started'}`
 }
 
 export function AgentForgeModal({ open, onClose }: Props): React.ReactElement | null {
@@ -90,7 +91,7 @@ export function AgentForgeModal({ open, onClose }: Props): React.ReactElement | 
               role="listitem"
               data-status={stage.status}
               className={`forge-step${stage.status === 'done' ? ' done' : ''}${stage.status === 'skipped' ? ' skipped' : ''}${active ? ' active' : ''}${stage.status === 'clarifying' || stage.asking ? ' waiting' : ''}`}
-              title={stageTip(stage)}
+              title={stageTip(stage, status.state === 'finished')}
             >
               {stage.status === 'done' && <span className="forge-step-check" aria-hidden>✓</span>}
               {STEP_LABELS[stage.id]}
