@@ -7,6 +7,7 @@
 // made in Designer, as one undo step it saves. Made in the perspective, it
 // was counted and drawn there, never saved, and gone in Designer.
 
+import type { C4Node, C4Relation } from '@radical/common/c4'
 import { editsModel, useDiagramStore, type ParkedDesigner } from './diagramStore'
 
 /** Why an edit the Inspector offers cannot be made now, or null. Its edits
@@ -45,4 +46,17 @@ export function editAsDesigner<T>(edit: () => T): T | undefined {
     useDiagramStore.getState()._mergeStepsSince(mark)
     if (from === 'inspector') useDiagramStore.getState().setAppMode('inspector')
   }
+}
+
+/** The model an edit editAsDesigner makes goes into, for what the edit
+ *  offers to pick (the elements a concern pack is bound to): Designer's,
+ *  parked while Viewer or Presenter shows another (a milestone, a slide's).
+ *  The Inspector shows the live model its edits go into. Offered from the
+ *  model shown, an element only a milestone has was picked, and dropped
+ *  unsaid by the edit. */
+export function designerEditModel(s: Pick<ReturnType<typeof useDiagramStore.getState>, 'appMode' | 'c4Nodes' | 'c4Relations'>): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation> } {
+  const pre = s.appMode === 'viewer' || s.appMode === 'presenter'
+    ? (window as unknown as { __preModeLayout?: ParkedDesigner }).__preModeLayout
+    : undefined
+  return pre ? { nodes: pre.c4Nodes, relations: pre.c4Relations } : { nodes: s.c4Nodes, relations: s.c4Relations }
 }

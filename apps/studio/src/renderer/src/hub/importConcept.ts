@@ -19,21 +19,28 @@ export interface ImportHubConceptResult {
 
 /** Inserts the part of a concern pack the answers pick, bound to the
  *  elements `elementIds` (buildConcernInsert), in the free spot nearest the
- *  viewport centre, as one undo step. Throws when the answers or an element
- *  do not fit the pack. */
-export function importConcernPackIntoDiagram(concept: HubConcept, answers: Record<string, string>, elementIds: string[]): ImportHubConceptResult & { insert: ConceptInsert } {
+ *  viewport centre, as one undo step. It is listed in its own view and, with
+ *  `intoOpenView`, in the view open too: not for an import offered in
+ *  another perspective (editAsDesigner), where the view Designer has open is
+ *  none the user chose. Throws when the answers or an element do not fit
+ *  the pack, or an element is not in the model. */
+export function importConcernPackIntoDiagram(concept: HubConcept, answers: Record<string, string>, elementIds: string[], intoOpenView = true): ImportHubConceptResult & { insert: ConceptInsert } {
   const store = useDiagramStore.getState()
+  // As forge_import_hub_concept: an element the model does not have is refused, not dropped.
+  const missing = elementIds.find((id) => !store.c4Nodes[id])
+  if (missing) throw new Error(`The pack cannot be bound to an element this model does not have (${missing}).`)
+  const openView = intoOpenView && store.activeViewId && store.views[store.activeViewId] ? store.activeViewId : null
   const getViewport = (window as unknown as { __rfGetViewport?: () => { x: number; y: number; zoom: number } }).__rfGetViewport
   const vp = getViewport?.() ?? { x: 0, y: 0, zoom: 1 }
   const centre = { x: (-vp.x + window.innerWidth / 2) / vp.zoom, y: (-vp.y + window.innerHeight / 2) / vp.zoom }
-  const shown = store.activeViewId ? computeViewNodeSet(store.views[store.activeViewId], store.c4Nodes) : undefined
+  const shown = openView ? computeViewNodeSet(store.views[openView], store.c4Nodes) : undefined
   const taken = Object.values(store.c4Nodes)
     .filter((n) => !n.parentId && (!shown || shown.has(n.id)))
     .map((n) => ({ x: n.x, y: n.y, width: n.width, height: n.height }))
 
   const insert = buildConcernInsert(concept, {
     answers,
-    elements: elementIds.map((id) => store.c4Nodes[id]).filter(Boolean),
+    elements: elementIds.map((id) => store.c4Nodes[id]),
     nodes: store.c4Nodes,
     metamodel: store.metamodel,
     today: new Date().toISOString().slice(0, 10),
@@ -47,16 +54,14 @@ export function importConcernPackIntoDiagram(concept: HubConcept, answers: Recor
   // waits for its elements to reach the live model.
   const inMilestone = !!store.activeSnapshotId && !!store.liveBackup && store.appMode === 'designer'
   store._pushUndo()
-  if (store.activeViewId) store._milestoneViewEdit(store.activeViewId)
+  if (openView) store._milestoneViewEdit(openView)
   else store._markMilestoneEdit()
   useDiagramStore.setState((state) => {
     Object.assign(state.c4Nodes, insert.nodes)
     Object.assign(state.c4Relations, insert.relations)
     // The pack's own view, in the folder Concerns.
     if (!inMilestone) for (const v of insert.views) state.views[v.id] = v
-    if (state.activeViewId && state.views[state.activeViewId]) {
-      addToViewList(state.views[state.activeViewId], Object.keys(insert.nodes))
-    }
+    if (openView && state.views[openView]) addToViewList(state.views[openView], Object.keys(insert.nodes))
   })
   if (inMilestone) addViewsOnceLive(insert.views, Object.keys(insert.nodes))
   useDiagramStore.getState()._placeOnAllElements()
