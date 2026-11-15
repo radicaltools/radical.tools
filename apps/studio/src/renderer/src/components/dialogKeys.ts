@@ -7,13 +7,15 @@
 
 import { useEffect, type RefObject } from 'react'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { modalDialogOpen } from '@radical/ui/components/keysHere'
 
 /** A modal dialog is open (a node wizard, the Models dialog, About…):
- *  Studio's own shortcuts stay out of it. Ctrl/Cmd+Z in a wizard took back
- *  the element the wizard was creating its child in, and Create then saved a
- *  child of nothing (the model could not be opened again). */
+ *  Studio's own shortcuts stay out of it, as the canvas's keys do (the one
+ *  gate, modalDialogOpen). Ctrl/Cmd+Z in a wizard took back the element the
+ *  wizard was creating its child in, and Create then saved a child of
+ *  nothing (the model could not be opened again). */
 export function inModalDialog(): boolean {
-  return !!document.querySelector('[role="dialog"][aria-modal="true"]') || !!useDiagramStore.getState().nodeWizard
+  return modalDialogOpen()
 }
 
 /** Whether a key pressed on `target` is a dialog's: a modal one is open, or
