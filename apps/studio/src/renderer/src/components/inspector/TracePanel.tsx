@@ -1,8 +1,9 @@
 // ─── Inspector: verification path ───────────────────────────────────────────
 //
 // Every path through one element, drawn in columns from its root to what
-// the tests and measurements say: need → requirement → scenario → test, or
-// ADR → fitness function → (element it is measured for) → metric or test.
+// the tests and measurements say: need (→ need inside it) → requirement →
+// scenario → test, or ADR → fitness function → (element it is measured
+// for) → metric or test.
 // The paths come from traceOf in @radical/common/check, the function
 // `radical check --trace` and the MCP tool get_trace print. A click on an
 // element makes the path that element's (Back returns); Details opens the

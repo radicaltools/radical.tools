@@ -492,14 +492,16 @@ function unquotedBlocks(answer: string, fragments: string[][]): string[] {
 }
 
 /** The requirements a need leads to: those that derive from it, and those
- *  that derive from them. */
+ *  that derive from them, and those of the needs inside it (a need that
+ *  derives from it, Part of). */
 function requirementsOfNeed(model: CheckModel, needId: string): C4Node[] {
   const derives = relationsOf(model, 'derives')
-  const found = new Map<string, C4Node>(); const queue = [needId]
+  const found = new Map<string, C4Node>(); const parts = new Set([needId]); const queue = [needId]
   while (queue.length) {
     for (const r of derives.to.get(queue.shift()!) ?? []) {
       const n = model.nodes[r.sourceId]
       if (n?.type === 'requirement' && !found.has(n.id)) { found.set(n.id, n); queue.push(n.id) }
+      else if (n?.type === 'need' && !parts.has(n.id) && model.nodes[r.targetId]?.type === 'need') { parts.add(n.id); queue.push(n.id) }
     }
   }
   return [...found.values()]
@@ -573,10 +575,11 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'need-without-requirement',
-    description: 'Every need has at least one requirement derived from it.',
+    description: 'Every need has at least one requirement derived from it, or from a need inside it (a need that derives from it, Part of).',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => unlinked(model, 'need', 'derives', 'in', ['requirement'])
+      .filter((n) => !requirementsOfNeed(model, n.id).length)
       .map((n) => ({ nodeId: n.id, message: `No requirement derives from need ${quote(n)}.` })),
   },
   {

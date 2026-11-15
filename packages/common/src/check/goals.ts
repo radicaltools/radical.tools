@@ -102,7 +102,7 @@ export const CHECK_METRICS: CheckMetric[] = [
   byRule('elements-valid', 'Elements the metamodel allows', 'Elements no metamodel issue points at.', 'consistency', 'metamodel', (m) => Object.values(m.nodes)),
   byRule('requirements-complete', 'Complete requirements', 'Requirements with an action and every field their EARS type reads.', 'completeness', 'requirement-incomplete', (m) => nodesOf(m, 'requirement')),
   byRule('adrs-complete', 'Complete accepted ADRs', 'Accepted ADRs with a date, context, decision and consequences.', 'completeness', 'adr-incomplete', acceptedAdrs),
-  byRule('needs-with-requirement', 'Needs with a requirement', 'Needs at least one requirement derives from.', 'traceability', 'need-without-requirement', (m) => nodesOf(m, 'need')),
+  byRule('needs-with-requirement', 'Needs with a requirement', 'Needs at least one requirement derives from, directly or through a need inside them.', 'traceability', 'need-without-requirement', (m) => nodesOf(m, 'need')),
   byRule('requirements-with-origin', 'Requirements with an origin', 'Requirements that derive from a need or another requirement.', 'traceability', 'requirement-without-origin', (m) => nodesOf(m, 'requirement')),
   byRule('requirements-quoting-need', 'Requirements that quote their need', 'Requirements derived from a need whose Derives from relation quotes the words they rest on; measured once a relation of the model quotes.', 'traceability', 'derives-quote-missing', (m) => {
     const toNeed = Object.values(m.relations).filter((r) => r.relationType === 'derives' && m.nodes[r.targetId]?.type === 'need')
