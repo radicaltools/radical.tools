@@ -82,28 +82,37 @@ describe('route parse/format', () => {
     expect(parseHash('#/m/designer')).toMatchObject({ view: 'all' })
   })
 
-  it('round-trips the Inspector tab and the selected element, in one form', () => {
-    const inspector: Route = { doc: 'md:/repo/architecture', mode: 'inspector', view: 'v-arch', tab: 'branch', el: 'api' }
-    const hash = formatRoute(inspector)
-    expect(hash).toBe('#/d/md%3A%2Frepo%2Farchitecture/m/inspector/v/v-arch/t/branch/e/api')
-    expect(parseHash(hash)).toEqual(inspector)
+  it('round-trips the Inspector\'s tab, its path and the selected element, in one form', () => {
+    const panel: Route = { doc: 'md:/repo/architecture', mode: 'viewer', view: 'v-arch', panel: 'branch', el: 'api' }
+    const hash = formatRoute(panel)
+    expect(hash).toBe('#/d/md%3A%2Frepo%2Farchitecture/m/viewer/v/v-arch/i/branch/e/api')
+    expect(parseHash(hash)).toEqual(panel)
     expect(formatRoute(parseHash(hash)!)).toBe(hash)
     // On a canvas: the selection, after the view and before a milestone.
     const canvas: Route = { mode: 'designer', view: 'v-arch', el: 'api', snap: 's1' }
     expect(formatRoute(canvas)).toBe('#/m/designer/v/v-arch/e/api/s/s1')
     expect(parseHash(formatRoute(canvas))).toEqual(canvas)
-    // A tab names nothing outside the Inspector, nor an unknown one.
-    expect(formatRoute({ mode: 'designer', view: 'v-arch', tab: 'model' })).toBe('#/m/designer/v/v-arch')
-    expect(parseHash('#/m/inspector/v/v-arch/t/nope')?.tab).toBeUndefined()
-    // A link from before This branch was Changes still opens it.
-    expect(parseHash('#/m/inspector/v/v-arch/t/changes/e/api')).toMatchObject({ tab: 'branch', el: 'api' })
-    expect(parseHash('#/m/inspector/v/v-arch/t/overview')?.tab).toBe('overview')
-    expect(parseHash('#/m/designer/v/v-arch/t/model')?.tab).toBeUndefined()
-    // The verification path on screen, after the tab; only in the Inspector.
-    const path: Route = { mode: 'inspector', view: 'v-arch', tab: 'implementation', trace: 'req' }
-    expect(formatRoute(path)).toBe('#/m/inspector/v/v-arch/t/implementation/tr/req')
+    // An unknown tab names no panel: the route leaves it as it is.
+    expect(parseHash('#/m/designer/v/v-arch/i/nope')?.panel).toBeUndefined()
+    // The verification path on screen, after the tab; only with the panel.
+    const path: Route = { mode: 'designer', view: 'v-arch', panel: 'implementation', trace: 'req' }
+    expect(formatRoute(path)).toBe('#/m/designer/v/v-arch/i/implementation/tr/req')
     expect(parseHash(formatRoute(path))).toEqual(path)
     expect(parseHash('#/m/designer/v/v-arch/tr/req')?.trace).toBeUndefined()
+    expect(formatRoute({ mode: 'designer', view: 'v-arch', trace: 'req' })).toBe('#/m/designer/v/v-arch')
+  })
+
+  it('opens a link to the Inspector perspective of before in Viewer, with the Inspector on its tab', () => {
+    expect(parseHash('#/m/inspector/v/v-arch/t/model')).toEqual({ mode: 'viewer', view: 'v-arch', panel: 'model' })
+    expect(parseHash('#/m/inspector/v/v-arch')).toMatchObject({ mode: 'viewer', panel: 'overview' })
+    expect(parseHash('#/m/inspector/v/v-arch/t/nope')).toMatchObject({ mode: 'viewer', panel: 'overview' })
+    // This branch was Changes once; its element was the card open there.
+    expect(parseHash('#/m/inspector/v/v-arch/t/changes/e/api')).toMatchObject({ panel: 'branch', el: 'api' })
+    expect(parseHash('#/m/inspector/v/v-arch/t/model/e/api')?.el).toBeUndefined()
+    expect(parseHash('#/m/inspector/v/v-arch/t/implementation/tr/req')).toMatchObject({ panel: 'implementation', trace: 'req' })
+    // Its Settings tab is Check settings… now.
+    expect(parseHash('#/m/inspector/v/v-arch/t/settings')).toMatchObject({ mode: 'viewer', panel: 'overview', checkSettings: true })
+    expect(formatRoute(parseHash('#/m/inspector/v/v-arch/t/model')!)).toBe('#/m/viewer/v/v-arch/i/model')
   })
 
   it('parses doc + mode + view + focus', () => {

@@ -482,7 +482,8 @@ test('inspector', async ({ page, shot }) => {
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
   await expect(page.locator('.welcome-overlay')).toBeHidden()
-  const inspector = page.getByRole('button', { name: /^Inspector/ })
+  // The Inspector's button on the activity rail, above Settings.
+  const inspector = page.locator('.activity-rail').getByRole('button', { name: 'Inspector', exact: true })
   await expect(inspector).toBeEnabled({ timeout: 20_000 })
   await inspector.click()
   await expect(page.locator('.insp-verdict')).toBeVisible()
@@ -496,7 +497,7 @@ test('inspector', async ({ page, shot }) => {
 
   // The verification path of the need it was built for: need, requirements,
   // scenarios and the tests with their results, in columns.
-  await expect(page).toHaveURL(/\/t\/implementation/)
+  await expect(page).toHaveURL(/\/i\/implementation/)
   await page.evaluate(() => { location.hash = `${location.hash}/tr/b77fe22f-9dc0-4e07-b355-65cb4647a412` })
   await expect(page.getByTestId('trace-panel')).toBeVisible()
   await expect(page.locator('.trace-line').first()).toBeAttached()
@@ -504,8 +505,10 @@ test('inspector', async ({ page, shot }) => {
   await shot('inspector-path')
   await page.getByTestId('trace-panel').getByRole('button', { name: 'Close' }).click()
 
-  // Settings with one change that loosens the gate, as the bar and the row show it.
-  await page.getByRole('tab', { name: /^Settings/ }).click()
+  // Inspector settings (Settings → Inspector settings…) with one change that
+  // loosens the gate, as the bar and the row show it.
+  await page.locator('.activity-rail').getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('menuitem', { name: /Inspector settings/ }).click()
   const baseline = page.getByRole('spinbutton', { name: 'Baseline of requirement-without-scenario' })
   await baseline.fill(String(Number(await baseline.inputValue()) + 9))
   await expect(page.locator('.insp-savebar')).toBeVisible()

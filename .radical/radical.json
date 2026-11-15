@@ -382,7 +382,7 @@
     { "element": "bce2310f-1272-4996-bb91-1c683128a175", "name": "Inspector lists every change", "tests": [
       "apps/e2e/tests/studio/branch-changes.spec.ts › the Inspector lists every change since the base, and a click leads to the element",
       "apps/e2e/tests/studio/branch-changes.spec.ts › with a milestone open, the Inspector lists the changes of the model as it is",
-      "apps/studio/tests/inspector.test.ts › going to an element › offers every wiki view with a page for the element, and opens the one chosen"
+      "apps/studio/tests/inspector.test.ts › going to an element › stays in the perspective open, on the view that shows it, with it selected and its card open"
     ] },
     { "element": "8e0e8781-4143-4132-b23f-c38b55b1bc03", "name": "Inspector lists this change", "tests": [
       "apps/e2e/tests/studio/branch-changes.spec.ts › the Inspector lists this change with what the tests say",
@@ -461,7 +461,7 @@
       "apps/cli/src/sense.test.ts › radical sense › appends what an adapter measured to .state/measurements.json, judging nothing"
     ] },
     { "element": "f173dbd5-96f5-432a-84c6-999bdcdc3c2f", "name": "Settings kept until Save", "tests": [
-      "apps/e2e/tests/studio/inspector.spec.ts › Settings edits wait for Save on another tab and after Back, and the tab says so"
+      "apps/e2e/tests/studio/inspector.spec.ts › Inspector settings wait for Save while the dialog is closed and after Back, and the Settings menu says so"
     ] },
     { "element": "350c1117-6506-458b-b5c4-4f75d12b3f82", "name": "Settings saved to check.json", "tests": [
       "apps/e2e/tests/studio/inspector.spec.ts › Settings save goals and rules to check.json, and say when a change loosens the gate",
@@ -779,8 +779,8 @@
       "apps/e2e/tests/studio/physics.spec.ts › a canvas of the whole model keeps its own layout › nor does a reload while a milestone is shown in a view"
     ] },
     { "element": "5f72c968-5bd0-45bb-afdb-da2ebd7e5069", "name": "Without a base, how to save one", "tests": [
-      "apps/e2e/tests/studio/branch-changes.spec.ts › without a base the button says how to save one, and an old base is marked",
-      "packages/common/tests/branchChanges.test.ts › base file"
+      "packages/common/tests/branchChanges.test.ts › base file",
+      "apps/e2e/tests/studio/branch-changes.spec.ts › without a base This branch says how to save one, and an old base is marked"
     ] },
     { "element": "d1b02db2-eed6-4891-964f-97d27944ade7", "name": "A domain tidied", "tests": [
       "packages/layout/tests/tidy/conventions.test.ts › a domain: the aggregate root above its parts"
@@ -1364,13 +1364,13 @@
       "apps/mcp/src/catalogueTools.test.ts › MCP document tools › lays out each view per element as it is made: with its group, and for an element added later",
       "apps/e2e/tests/studio/viewpoints.spec.ts › a viewpoint that draws one element makes a group with a view of each, which a new element joins",
       "apps/studio/tests/quickSearchPick.test.ts › opens on its first view, as a click on it in the list does",
-      "apps/studio/tests/quickSearchPick.test.ts › is never the view a pick, Show on canvas or the choice of views opens",
       "apps/e2e/tests/studio/search.spec.ts › Quick Search opens a group of views per element on its first view",
       "packages/ui/tests/viewpointGroupActive.test.ts › the view shown becomes a group of views per element › by its viewpoint in View properties: the group opens its first view and keeps no canvas",
       "packages/ui/tests/viewpointGroupActive.test.ts › the view shown becomes a group of views per element › by its viewpoint getting a subject in the metamodel editor: the same",
       "packages/common/tests/viewpoints.test.ts › what a change of viewpoints takes from the views per element › a group keeps no places and no camera of a canvas",
       "packages/common/tests/viewpoints.test.ts › viewpoint tools › say when update_view makes a view a group of views per element, and that its picked elements go",
-      "apps/e2e/tests/studio/viewpoints.spec.ts › a view given a viewpoint of one element asks first, then opens the group's first view, also after a reload"
+      "apps/e2e/tests/studio/viewpoints.spec.ts › a view given a viewpoint of one element asks first, then opens the group's first view, also after a reload",
+      "apps/studio/tests/quickSearchPick.test.ts › a group of views per element › is never the view a pick or the Inspector's link opens"
     ] },
     { "element": "ccbc6834-edc8-44d5-b054-2279a553adee", "name": "A key-click after a box selection", "tests": [
       "apps/e2e/tests/studio/selection-focus.spec.ts › after a box selection, a click with the special key on one of the selected takes it out in designer",
@@ -1451,9 +1451,9 @@
     { "element": "d5067236-a05e-4d95-a09c-2d5e0a6b7ce2", "name": "Activity rail tabs and menus", "tests": [
       "apps/e2e/tests/studio/editing.spec.ts › the left panel's sections are tabs on the activity rail, one open beside it, and say what they hold",
       "apps/e2e/tests/studio/editing.spec.ts › the activity rail keeps the app's menus in the metamodel editor, without the panel's sections",
-      "apps/e2e/tests/studio/about.spec.ts › About Radical Studio › the folder at the top of the activity rail opens Models, the model open is named at the toolbar's left, and About is under Settings",
       "apps/e2e/tests/studio/editing.spec.ts › the activity rail's menus open over the metamodel editor, which stays open",
-      "apps/e2e/tests/studio/editing.spec.ts › Settings stays at the activity rail's foot where the rail has no sections"
+      "apps/e2e/tests/studio/editing.spec.ts › Settings stays at the activity rail's foot where the rail has no sections",
+      "apps/e2e/tests/studio/about.spec.ts › About Radical Studio › the folder at the top of the activity rail opens Models, which names the model open first, and About is under Settings"
     ] },
     { "element": "e140c110-780c-4b42-b68e-696cf8f27046", "name": "Add element from palette", "tests": [
       "apps/e2e/tests/studio/editing.spec.ts › add an element from the palette"
@@ -2040,7 +2040,7 @@
       "apps/e2e/tests/studio/editing.spec.ts › a relation's end dragged with the special key shows where it can go, keeping its type"
     ] },
     { "element": "79afbbbd-4127-4873-a0ef-48f653122580", "name": "The route names the place", "tests": [
-      "apps/studio/tests/route.test.ts › route parse/format › round-trips the Inspector tab and the selected element, in one form"
+      "apps/studio/tests/route.test.ts › route parse/format › round-trips the Inspector's tab, its path and the selected element, in one form"
     ] },
     { "element": "386f0c8b-8d0b-420c-82d7-910ed3e7e162", "name": "Too large a canvas offers a table", "tests": [
       "apps/e2e/tests/studio/large-canvas.spec.ts › a canvas of more than 1,000 elements is not drawn: it offers a table or its filter",
@@ -2051,8 +2051,8 @@
       "apps/e2e/tests/studio/large-canvas.spec.ts › a view per element of more than 1,000 elements offers its viewpoint, which every view of the group follows"
     ] },
     { "element": "c01b2fa5-1a14-4f36-94f0-775a353b38c6", "name": "Toolbar groups in place", "tests": [
-      "apps/e2e/tests/studio/editing.spec.ts › the toolbar groups the branch's changes with the model open, undo, and navigation around Quick Search",
-      "apps/e2e/tests/studio/editing.spec.ts › at every window width down to the desktop app's narrowest, nothing in the toolbar lies on top of anything clickable"
+      "apps/e2e/tests/studio/editing.spec.ts › at every window width down to the desktop app's narrowest, nothing in the toolbar lies on top of anything clickable",
+      "apps/e2e/tests/studio/editing.spec.ts › the toolbar holds undo, and navigation around Quick Search; the model open and the branch's changes are elsewhere"
     ] },
     { "element": "0165f89b-a8c3-44aa-9dad-41f5de8f60da", "name": "Traceability chain on requirements", "tests": [
       "apps/e2e/tests/studio/view-pipeline.spec.ts › needs → requirements → scenarios, built in the Filter panel, shown as a tree in the table",
@@ -3730,8 +3730,9 @@
       "packages/ui/tests/designerEdit.test.ts"
     ] },
     { "element": "74e1f02b-c50a-4a19-9306-2c402a759d19", "name": "Inspector with a milestone shown", "tests": [
-      "packages/ui/tests/inspectorLiveModel.test.ts › the Inspector with a milestone shown › holds the live model, and Designer gets its milestone back",
-      "apps/e2e/tests/studio/tracePath.spec.ts › with a milestone shown, the Inspector opens the live model's elements, and Path waits on what only the milestone has"
+      "apps/studio/tests/inspector.test.ts › going to an element › says so when the milestone shown lacks the element",
+      "packages/ui/tests/designerEdit.test.ts › an edit a perspective offers › of the live model is refused while a milestone is shown, in the perspective or parked in Designer",
+      "apps/e2e/tests/studio/tracePath.spec.ts › with a milestone shown, the Inspector checks the live model, its links and fixes wait for it, and Path waits on what only the milestone has"
     ] },
     { "element": "c38cc9d5-deb3-4fbd-b42a-6123d5f28476", "name": "A finding on a quote opens its requirement", "tests": [
       "packages/common/tests/derivesQuotes.test.ts › reading the person's words › leads each finding about a quote to its requirement, the source of the relation, as the Inspector opens it"
@@ -3811,6 +3812,20 @@
     ] },
     { "element": "7e3eb2bb-b51a-48c7-9667-0cc3090c9587", "name": "A repository's folder refused", "tests": [
       "apps/e2e/tests/studio/folders.spec.ts › New model and Move to a folder… write no model in front of a repository's, and ask before a folder of other files"
+    ] },
+    { "element": "895cb22f-31a9-48c0-9853-d0b48190f1d6", "name": "Inspector in place of the view", "tests": [
+      "apps/e2e/tests/studio/inspector-place.spec.ts › the Inspector is a place of the rail: its tabs in the left panel, its report in place of the view, folded as a section",
+      "apps/studio/tests/inspector.test.ts › the Inspector › is kept open or folded for the next start, and folding leaves its path"
+    ] },
+    { "element": "c5ee2274-53df-4e77-b7ff-8bb12e343a85", "name": "Link to the Inspector perspective", "tests": [
+      "apps/studio/tests/route.test.ts › route parse/format › opens a link to the Inspector perspective of before in Viewer, with the Inspector on its tab",
+      "apps/e2e/tests/studio/inspector.spec.ts › a link to the Inspector perspective of before opens Viewer with the Inspector on its tab"
+    ] },
+    { "element": "7c34dde6-5289-4338-a9f8-39078c609bed", "name": "Inspector in Viewer fixes in Designer", "tests": [
+      "apps/e2e/tests/studio/inspector.spec.ts › the Inspector opens on Overview with what needs attention, and each finding leads to its element or fixes it"
+    ] },
+    { "element": "5cf16eff-2c71-49c0-a2d9-445dc92367d2", "name": "Inspector settings from the Settings menu", "tests": [
+      "apps/e2e/tests/studio/inspector.spec.ts › Inspector settings wait for Save while the dialog is closed and after Back, and the Settings menu says so"
     ] }
   ]
 }

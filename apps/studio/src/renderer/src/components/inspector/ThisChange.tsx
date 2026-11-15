@@ -16,6 +16,8 @@ import type { ElementChange, FieldChange } from '@radical/common/modelChanges'
 import { Bar, Chip, SHORT_TYPE, type Ctx } from './shared'
 import { fieldLabel, valueText } from './attention'
 import { ago, BaseSince, SaveBaseHelp, changeBreakdown } from '../BranchChanges'
+import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { setBranchChangesShown, useBranchStore } from '../../persistence/branchChanges'
 
 const STATUS: Record<ChangeWorkStatus, [tone: string, text: string]> = {
   verified: ['ok', '✓ verified'],
@@ -156,6 +158,7 @@ export function ThisBranch({ work, changes, base, baseModel, ctx }: {
   ]
   return (
     <section className="insp-changes" aria-label="This branch">
+      <ShowOnCanvasSwitch />
       <p className="insp-lede insp-tab-lede">
         What changed in the model since <BaseSince base={base} />{base.source === 'forge' ? '' : ', uncommitted edits included'}; moving elements and editing views do not count. Base saved {ago(base.savedAt)} · {changeBreakdown(changes.counts)}.
       </p>
@@ -217,6 +220,33 @@ export function ThisBranch({ work, changes, base, baseModel, ctx }: {
           </section>
         )}
       </section>
+    </section>
+  )
+}
+
+/** Changes on branch, here only (the toolbar had it): the changes since the
+ *  base marked on the canvas, counted in the list of views and on the card,
+ *  until it is turned off. A milestone shown has its own diff. */
+export function ShowOnCanvasSwitch(): React.ReactElement {
+  const on = useBranchStore((s) => s.on)
+  const milestone = useDiagramStore((s) => !!s.activeSnapshotId)
+  return (
+    <label className={`insp-switch${milestone ? ' off' : ''}`} title={milestone ? 'A milestone is shown, with its own diff' : 'Mark the changes since the base on the canvas, count them in the list of views and show them on the card'}>
+      <input type="checkbox" role="switch" checked={on && !milestone} disabled={milestone} onChange={(e) => setBranchChangesShown(e.target.checked)} />
+      <span>Show the changes on the canvas</span>
+    </label>
+  )
+}
+
+/** This branch with no base beside the model: how to save one. */
+export function NoBase(): React.ReactElement {
+  return (
+    <section className="insp-changes" aria-label="This branch">
+      <div className="insp-notice">
+        <strong>Nothing to compare with yet</strong>
+        <p className="insp-muted">Studio compares the model with its version where the branch left main, which the command line saves beside the model in .state/base.json.</p>
+        <SaveBaseHelp old={false} />
+      </div>
     </section>
   )
 }

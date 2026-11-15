@@ -94,9 +94,9 @@ export function ElementVerification({ nodeId }: { nodeId: string }): React.React
   const entry = evidence?.[nodeId]
   const findings = useCardVerification((s) => s.findings[nodeId])
   const path = useVerificationPath()
-  const pathMode = useDiagramStore((s) => !s.presentationActive && (s.appMode === 'designer' || s.appMode === 'viewer' || s.appMode === 'inspector'))
+  const pathMode = useDiagramStore((s) => !s.presentationActive && (s.appMode === 'designer' || s.appMode === 'viewer'))
   // The path is the live model's, as the Inspector is: an element only the
-  // milestone shown has is on none (Path opened the Inspector with no path).
+  // milestone shown has is on none (Path opened the Inspector panel with no path).
   const onlyInMilestone = useDiagramStore((s) => !!s.activeSnapshotId && !!s.liveBackup && !s.liveBackup.nodes[nodeId])
   if (!node) return null
   const onPath = (TRACE_TYPES as readonly string[]).includes(node.type)

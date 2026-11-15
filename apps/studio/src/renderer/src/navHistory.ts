@@ -14,9 +14,9 @@ import { create } from 'zustand'
 /** One place in the history, as the History list shows it. */
 export interface NavEntry {
   hash: string
-  /** The view, or the Inspector's tab: "Architecture", "Inspector › Changes". */
+  /** The view, or with a verification path open: "Architecture", "Architecture › Verification path". */
   where: string
-  /** The perspective: Designer, Viewer, Presenter, Metamodel, Inspector. */
+  /** The perspective: Designer, Viewer, Presenter, Metamodel (Inspector in entries of before). */
   mode: string
   /** The element selected there, or whose card is open. */
   element?: { label: string; type: string; color?: string }

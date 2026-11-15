@@ -15,7 +15,7 @@ import { agentAssayPhase, useAgentAssayStore } from '../persistence/agentAssay'
 import { ASSAY_STAGES, assayRunCurrentStage } from '@radical/common/formats/assayRunStatus'
 import { AssayIcon } from './AgentAssayModal'
 import { useFollowAgentStore } from '../persistence/followAgent'
-import { pickViewFor, showOnPage, viewNodeSets as viewNodeSetsOf } from '../navigation'
+import { pickViewFor, showOnPage, toggleInspector, useInspectorNav, viewNodeSets as viewNodeSetsOf } from '../navigation'
 import { keysTakenByDialog } from './dialogKeys'
 import { FORGE_NEEDS_AI } from '../ai/settings'
 import { KIND_PREFIXES, SEARCH_KINDS, foldText, parseSearch, searchModel, searchSuggestions, searchWarmUp, viewTypeName, type Mark, type SearchData, type SearchHit, type SearchKind } from '@radical/common/search'
@@ -465,6 +465,8 @@ export function QuickSearch(): React.ReactElement | null {
   //   string     → open in that specific view id
   const pickHit = (r: SearchHit, viewOverride?: string | null, shift = false): void => {
     done()
+    // A pick is shown on a view: the Inspector, over it, gives it back.
+    if (useInspectorNav.getState().open) toggleInspector(false)
     // Bring back the properties card if ✕ hid it, so the freshly-selected
     // object's details show right after jumping.
     const expandRight = (window as unknown as { __radicalExpandRightPanel?: () => void }).__radicalExpandRightPanel

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useHubStore, type HubConcept, type HubConceptSummary } from '@radical/ui/store/hubStore'
 import { designerEditModel, editAsDesigner } from '@radical/ui/store/designerEdit'
+import { useInspectorNav } from '../navigation'
 import { editsModel, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { useDialogFocus } from './dialogKeys'
 import { bindProblem, bindSuggestions, CONCERN_GROUPS, isConcernPack, metamodelProblem, type BindSuggestion } from '@radical/common/concerns'
@@ -119,8 +120,13 @@ export function HubImportModal({ open, onClose, preselectedIds, bindTo }: Props)
   // edits (editAsDesigner) and list nothing in the view Designer has open,
   // which the user did not choose for them: each pack is in its own view.
   const offeredInDesigner = useRef(true)
+  // Opened from the Inspector, which shows no view: the pack goes into a
+  // view of its own, and the view under the Inspector stays as it was.
+  const fromInspector = useRef(false)
   useEffect(() => {
-    if (open) offeredInDesigner.current = editsModel(useDiagramStore.getState())
+    if (!open) return
+    fromInspector.current = useInspectorNav.getState().open
+    offeredInDesigner.current = editsModel(useDiagramStore.getState()) && !fromInspector.current
   }, [open])
 
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -356,7 +362,7 @@ export function HubImportModal({ open, onClose, preselectedIds, bindTo }: Props)
                 // pack's view, the one that lists it.
                 const s = useDiagramStore.getState()
                 const view = imported.insert.views[0]
-                if (!intoOpenView && s.appMode === 'designer' && view && s.views[view.id]) s.setActiveView(view.id)
+                if (!intoOpenView && !fromInspector.current && s.appMode === 'designer' && view && s.views[view.id]) s.setActiveView(view.id)
               } catch (error) {
                 useDiagramStore.getState().pushNotification((error as Error).message, 'error')
                 return

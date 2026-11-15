@@ -381,7 +381,7 @@
     "requirements-verified": { "min": 80 }
   }
 }</code></pre>
-        <p>The Inspector's Settings tab edits the same file.</p>
+        <p><em>Settings → Inspector settings…</em> in Studio edits the same file.</p>
       </section>
 
       <section class="doc-section" id="metrics">
@@ -686,15 +686,15 @@ radical-mcp --version</code></pre>
       <section class="doc-section" id="links">
         <h2>Deep links</h2>
         <p>Studio keeps the place on screen in the URL hash, so any place can be bookmarked or shared.</p>
-<pre class="code"><code>#/m/&lt;mode&gt;/v/&lt;viewId&gt;[/t/&lt;tab&gt;][/f/&lt;elementId&gt;][/e/&lt;elementId&gt;][/s/&lt;milestoneId&gt;]
+<pre class="code"><code>#/m/&lt;mode&gt;/v/&lt;viewId&gt;[/i/&lt;tab&gt;[/tr/&lt;elementId&gt;]][/f/&lt;elementId&gt;][/e/&lt;elementId&gt;][/s/&lt;milestoneId&gt;]
 #/d/&lt;docId&gt;/m/&lt;mode&gt;/v/&lt;viewId&gt;[/p/&lt;presentationId&gt;/play/1/sl/&lt;n&gt;]</code></pre>
         <div class="doc-table-wrap">
           <table class="doc-table">
             <thead><tr><th>Part</th><th>Meaning</th></tr></thead>
             <tbody>
-              <tr><td><code>m</code></td><td><code>designer</code> · <code>viewer</code> · <code>presenter</code> · <code>metamodel</code> · <code>inspector</code></td></tr>
+              <tr><td><code>m</code></td><td><code>designer</code> · <code>viewer</code> · <code>presenter</code> · <code>metamodel</code> (<code>inspector</code>, with its tab in <code>t</code>, opens Viewer with the Inspector, as links of before)</td></tr>
               <tr><td><code>v</code></td><td>A view id, or <code>canvas</code> for the default structure view</td></tr>
-              <tr><td><code>t</code></td><td>The Inspector's tab: <code>overview</code> · <code>model</code> · <code>implementation</code> · <code>branch</code> · <code>settings</code> (<code>changes</code>, its old name, opens <code>branch</code>)</td></tr>
+              <tr><td><code>i</code> · <code>tr</code></td><td>The Inspector open, on its tab: <code>overview</code> · <code>model</code> · <code>implementation</code> · <code>branch</code>; and the element whose verification path it shows. A link without <code>i</code> shows the view; opening and closing the Inspector are steps of Back</td></tr>
               <tr><td><code>f</code> · <code>e</code></td><td>The wiki page shown · the selected element</td></tr>
               <tr><td><code>s</code></td><td>The active milestone</td></tr>
               <tr><td><code>p</code> · <code>sl</code></td><td>The presentation and the 0-based slide while presenting</td></tr>
@@ -754,6 +754,7 @@ radical-mcp --version</code></pre>
               <tr><td><kbd>→</kbd> · <kbd>←</kbd></td><td>In Quick Search: list the views to open the highlighted element or relation in · back to the results</td></tr>
               <tr><td><kbd>⌘/Ctrl+F</kbd></td><td>Find in the view shown; <kbd>Enter</kbd> / <kbd>Shift+Enter</kbd> next / previous hit, <kbd>Esc</kbd> closes</td></tr>
               <tr><td><kbd>⌘/Ctrl+Z</kbd> · <kbd>⌘/Ctrl+⇧+Z</kbd></td><td>Undo · Redo (Designer)</td></tr>
+              <tr><td><kbd>⌘/Ctrl+J</kbd></td><td>Open the Inspector in place of the view, or go back to the view</td></tr>
               <tr><td>The special key: <kbd>Alt</kbd>/<kbd>⌥</kbd> (<em>Settings → Special key</em>)</td><td>Held with an element selected: mark where a relation from it, or nesting, can go</td></tr>
               <tr><td>Special key + drag from an element</td><td>Connect it (or the selected elements) to another, or nest them there, on a pill; to the empty canvas: take them out of their container (those the metamodel keeps there are named). One step for Undo; in Viewer and Presenter it only selects</td></tr>
               <tr><td>Special key + drag a relation's end</td><td>Move the end, keeping the relation's type</td></tr>

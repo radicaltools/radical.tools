@@ -210,12 +210,16 @@ export const useRailSlot = create<{ el: HTMLElement | null; top: HTMLElement | n
  *  each its icon and count, its name and what it holds on hover; the app's
  *  settings at the foot. A click on the open section folds the panel away
  *  and back, on another opens the panel on it. ↑/↓ move between the tabs.
- *  Without a left panel (the metamodel editor, the Inspector) it has the
- *  models and the settings only. */
-export function ActivityRail({ sections, collapsed = false, onToggleCollapsed }: {
+ *  Without a left panel (the metamodel editor) it has the models and the
+ *  settings only. `over`: a panel of the app's that lies over the left
+ *  panel while open (Studio's Inspector), one of the rail's places as the
+ *  sections are: while it is open no section is lit, and a click on one
+ *  closes it and shows that section. */
+export function ActivityRail({ sections, collapsed = false, onToggleCollapsed, over }: {
   sections: boolean
   collapsed?: boolean
   onToggleCollapsed?: () => void
+  over?: { open: boolean; close: () => void }
 }) {
   const open = useLeftPanelSection((s) => s.open)
   const railViews = useDiagramStore((s) => Object.keys(s.views).length)
@@ -230,7 +234,14 @@ export function ActivityRail({ sections, collapsed = false, onToggleCollapsed }:
     { id: 'milestones', title: 'Milestones', count: railMilestones, preview: latestMilestone ? `Latest: ${latestMilestone}` : 'None saved yet' },
     { id: 'sequences', title: 'Sequences', count: railSequences, preview: sequenceNames || 'None yet' },
   ]
+  const covered = !!over?.open
   const pick = (id: PanelSectionId) => {
+    if (covered) {
+      over!.close()
+      useLeftPanelSection.setState({ open: id })
+      if (collapsed) onToggleCollapsed?.()
+      return
+    }
     if (id === open && !collapsed) { onToggleCollapsed?.(); return }
     useLeftPanelSection.setState({ open: id })
     if (collapsed) onToggleCollapsed?.()
@@ -252,7 +263,7 @@ export function ActivityRail({ sections, collapsed = false, onToggleCollapsed }:
       {sections && (
         <div className="lp-rail" role="tablist" aria-orientation="vertical" aria-label="Panel sections" onKeyDown={onKeyDown}>
           {tabs.map((x) => {
-            const shown = x.id === open && !collapsed
+            const shown = x.id === open && !collapsed && !covered
             return (
               <button key={x.id} id={`lp-tab-${x.id}`} type="button" role="tab"
                 className={`lp-rail-tab${shown ? ' active' : ''}`}
@@ -1874,11 +1885,15 @@ function PanelToggle({ side, collapsed, onToggle }: {
 /** The left panel: the section open on the activity rail (ActivityRail),
  *  folded away by the rail's open section or the chevron on its edge, and
  *  opened again from the rail. */
-export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = false, onToggleCollapsed }: {
+export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = false, onToggleCollapsed, place }: {
   mode?: 'designer' | 'viewer' | 'presenter'
   readOnly?: boolean
   collapsed?: boolean
   onToggleCollapsed?: () => void
+  /** A place of the app's own on the rail, as a section (Studio's
+   *  Inspector): its list, shown in the panel in place of the sections,
+   *  with the panel's width, resize and fold. */
+  place?: React.ReactNode
 }) {
   const isReadOnly = readOnly || mode !== 'designer'
   const viewsCount = useDiagramStore((s) => Object.keys(s.views).length)
@@ -1929,7 +1944,8 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
 
   return (
     <div className={`left-panel${collapsed ? ' collapsed' : ''}`}>
-      <div className="panel-content">
+      {place && <div className="panel-content lp-place">{place}</div>}
+      <div className="panel-content" hidden={!!place}>
         <div className={`rp-slider${hasPaneContent ? ' show-props' : ''}`}>
 
           {/* Pane 1 — the open section */}

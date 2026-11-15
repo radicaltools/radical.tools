@@ -126,8 +126,10 @@ test('Settings save the repository\'s test files to .radical/radical.json', asyn
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
   await studio.ready()
-  await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
-  await page.getByRole('tab', { name: /^Settings/ }).click()
+  // Settings → Inspector settings…, once the test results are read.
+  await expect(page.locator('.activity-rail').getByRole('button', { name: 'Inspector', exact: true })).toBeEnabled({ timeout: 10_000 })
+  await page.locator('.activity-rail').getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('menuitem', { name: /Inspector settings/ }).click()
 
   await page.getByRole('textbox', { name: 'Add to Include' }).fill('apps/web/**')
   await page.getByRole('textbox', { name: 'Add to Include' }).press('Enter')

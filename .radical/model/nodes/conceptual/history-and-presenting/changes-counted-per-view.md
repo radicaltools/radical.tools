@@ -4,6 +4,6 @@ type: "requirement"
 label: "Changes counted per view"
 action: "the list of views shall show beside each view the number of elements changed since the base that the view shows"
 ears_type: "state-driven"
-precondition: "the open model folder holds .state/base.json and Changes on branch is on"
+precondition: "the open model folder holds .state/base.json and Show the changes on the canvas, in the Inspector's This branch, is on"
 rationale: "A change spreads over several views; the counts say where to look. A removed element counts in a view that listed it. Evidence: packages/common/src/branchChanges.ts (viewChangeCounts), packages/ui/src/components/RightPanel.tsx (useBranchViewCounts, BranchCount)"
 ---

@@ -1,6 +1,6 @@
 import { expect } from '../../support/fixtures'
 import { ModelFolder, test } from '../../support/folder'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { parseModelBase, serializeModelBase } from '@radical/common/formats/modelBase'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
@@ -9,9 +9,11 @@ import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 
 // Changes on branch: Studio compares a folder model with the base the CLI or
 // the MCP server saved beside it (.state/base.json, the model where the
-// branch left main) and shows the changes on the canvas, in the list of
-// views, on the properties card and in the Inspector. Studio has no git: the
-// tests write the base file as radical diff --save-base would.
+// branch left main) and lists the changes in the Inspector's This branch;
+// its switch Show the changes on the canvas marks them on the canvas, in the
+// list of views and on the properties card (the toolbar has no button of its
+// own). Studio has no git: the tests write the base file as radical diff
+// --save-base would.
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
   ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
@@ -33,6 +35,26 @@ async function openFolder(page: Page, studio: { ready(): Promise<void>; designer
   // Opened without a link, it starts in Viewer; these tests edit.
   await studio.designer()
   return folder
+}
+
+/** The Inspector's button on the activity rail. */
+const inspectorButton = (page: Page): Locator => page.locator('.activity-rail').getByRole('button', { name: 'Inspector', exact: true })
+/** A tab of the Inspector, a card in its list in the left panel. */
+const inspectorTab = (page: Page, name: RegExp): Locator => page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab', { name })
+/** Opens the Inspector on This branch; returns the tab's region. */
+async function openThisBranch(page: Page): Promise<Locator> {
+  const button = inspectorButton(page)
+  await expect(button).toBeEnabled({ timeout: 10_000 })
+  if (!(await page.getByRole('region', { name: 'Inspector' }).count())) await button.click()
+  await inspectorTab(page, /^This branch/).click()
+  return page.getByRole('region', { name: 'This branch', exact: true })
+}
+/** The switch at the top of This branch that marks the changes on the canvas. */
+const onCanvas = (page: Page): Locator => page.getByRole('switch', { name: 'Show the changes on the canvas' })
+/** Back from the Inspector to the view, by the rail's Views tab. */
+async function backToViews(page: Page): Promise<void> {
+  await page.locator('.activity-rail').getByRole('tab', { name: 'Views' }).click()
+  await expect(page.getByRole('region', { name: 'Inspector' })).toHaveCount(0)
 }
 
 const ARCH: DiagramData = {
@@ -60,20 +82,18 @@ const ARCH_BASE = base([
 test('the changes since the base show on the canvas, in the list of views and on the card', async ({ page, studio }) => {
   await openFolder(page, studio, ARCH, { '.state/base.json': ARCH_BASE })
 
-  const button = page.getByRole('button', { name: /^Changes on branch/ })
-  // Three elements and the relation Checkout API → Fraud check.
-  await expect(button.locator('.branch-count')).toHaveText('4', { timeout: 10_000 })
-  await expect(button).toHaveAttribute('aria-pressed', 'false')
+  // The toolbar has no Changes on branch: the Inspector's This branch has it.
+  await expect(page.locator('.toolbar').getByRole('button', { name: /Changes on branch/ })).toHaveCount(0)
   await expect(page.locator('.lp-branch-count')).toHaveCount(0)
-
-  await button.click()
-  await expect(button).toHaveAttribute('aria-pressed', 'true')
-  // On hover the name, and what the count is about.
-  await button.hover()
-  const tip = page.getByRole('tooltip')
-  await expect(tip).toBeVisible()
-  await expect(tip).toContainText('Changes on branch')
-  await expect(tip).toContainText('3 elements and 1 relation changed since main 534f32f')
+  const change = await openThisBranch(page)
+  // Three elements and the relation Checkout API → Fraud check.
+  await expect(inspectorTab(page, /^This branch/)).toContainText('4')
+  await expect(change).toContainText('since main 534f32f')
+  await expect(change).toContainText('3 elements changed: 1 added, 1 changed, 1 removed; 1 relation changed')
+  await expect(onCanvas(page)).not.toBeChecked()
+  await onCanvas(page).check()
+  await expect(inspectorTab(page, /^This branch/)).toContainText('on the canvas')
+  await backToViews(page)
 
   // Each view counts the changes it shows; All elements counts them all.
   const card = (name: string) => page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: name }) })
@@ -100,13 +120,16 @@ test('the changes since the base show on the canvas, in the list of views and on
   // An edit is a change at once.
   await studio.node('shop').click({ position: { x: 40, y: 12 } })
   await studio.properties.getByRole('textbox', { name: 'Name' }).fill('Book shop')
-  await expect(button.locator('.branch-count')).toHaveText('5')
+  await expect(card('All elements').locator('.lp-branch-count')).toHaveText('4')
   await expect(studio.node('shop')).toContainText('CHANGED')
   await expect(studio.properties.getByRole('region', { name: 'Changes on branch' }).locator('del')).toHaveText(['Shop'])
+  await expect(inspectorTab(page, /^This branch/)).toHaveCount(0)
+  await openThisBranch(page)
+  await expect(inspectorTab(page, /^This branch/)).toContainText('5')
 
   // Off: no marks, no ghost, no counts.
-  await button.click()
-  await expect(button).toHaveAttribute('aria-pressed', 'false')
+  await onCanvas(page).uncheck()
+  await backToViews(page)
   await expect(studio.node('legacy')).toHaveCount(0)
   await expect(studio.node('api')).not.toContainText('CHANGED')
   await expect(page.locator('.lp-branch-count')).toHaveCount(0)
@@ -134,10 +157,11 @@ test('a removed element is drawn inside its container on a view laid out its own
   // Legacy billing gone from every list, as a deletion leaves it.
   model.views = model.views!.map((v) => ({ ...v, nodeIds: v.nodeIds.filter((id) => id !== 'legacy') }))
   await openFolder(page, studio, model, { '.state/base.json': ARCH_BASE })
-  const button = page.getByRole('button', { name: /^Changes on branch/ })
+  await openThisBranch(page)
   // Three elements and the relation Checkout API → Fraud check.
-  await expect(button.locator('.branch-count')).toHaveText('4', { timeout: 10_000 })
-  await button.click()
+  await expect(inspectorTab(page, /^This branch/)).toContainText('4')
+  await onCanvas(page).check()
+  await backToViews(page)
   const card = (name: string) => page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: name }) })
   await expect(card('Containers').locator('.lp-branch-count')).toHaveText('3')
 
@@ -164,34 +188,30 @@ test('a removed element is drawn inside its container on a view laid out its own
 test('a base saved since HEAD says so', async ({ page, studio }) => {
   const sinceHead = serializeModelBase({ commit: COMMIT, described: 'HEAD', branch: 'main', nodes: JSON.parse(ARCH_BASE).nodes, relations: [] })
   await openFolder(page, studio, ARCH, { '.state/base.json': sinceHead })
-  const button = page.getByRole('button', { name: /^Changes on branch/ })
+  const changes = await openThisBranch(page)
   // Three elements and the relation Checkout API → Fraud check.
-  await expect(button.locator('.branch-count')).toHaveText('4', { timeout: 10_000 })
-  await button.hover()
-  await expect(page.getByRole('tooltip')).toContainText('3 elements and 1 relation changed since HEAD 534f32f')
-  await expect(page.getByRole('tooltip')).not.toContainText('main 534f32f')
-  await page.getByRole('button', { name: /^Inspector/ }).click()
-  await page.getByRole('tab', { name: /^This branch/ }).click()
-  const changes = page.getByRole('region', { name: 'This branch', exact: true })
+  await expect(inspectorTab(page, /^This branch/)).toContainText('4')
   await expect(changes).toContainText('since HEAD 534f32f (main), uncommitted edits included')
+  await expect(changes).toContainText('3 elements changed: 1 added, 1 changed, 1 removed; 1 relation changed')
+  await expect(changes).not.toContainText('main 534f32f')
 })
 
 test('the Inspector lists every change since the base, and a click leads to the element', async ({ page, studio }) => {
   await openFolder(page, studio, ARCH, { '.state/base.json': ARCH_BASE })
   // No test report, but a base: the Inspector has the branch's changes to show.
-  const inspector = page.getByRole('button', { name: /^Inspector/ })
+  const inspector = inspectorButton(page)
   await expect(inspector).toBeEnabled({ timeout: 10_000 })
   await inspector.click()
-  // The Inspector lists the changes itself: no toggle there.
-  await expect(page.getByRole('button', { name: /^Changes on branch/ })).toHaveCount(0)
+  // Changes on branch is the Inspector's own: no button in the toolbar.
+  await expect(page.locator('.toolbar').getByRole('button', { name: /Changes on branch/ })).toHaveCount(0)
   // It opens on Overview; This branch counts the changes.
-  await expect(page.getByRole('tab').first()).toHaveText(/^Overview/)
-  await expect(page.getByRole('tab', { name: /^Overview/ })).toHaveAttribute('aria-selected', 'true')
-  const tab = page.getByRole('tab', { name: /^This branch/ })
+  await expect(page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab').first()).toHaveText(/^Overview/)
+  await expect(inspectorTab(page, /^Overview/)).toHaveAttribute('aria-selected', 'true')
+  const tab = inspectorTab(page, /^This branch/)
   await expect(tab).toContainText('4')
   await tab.click()
   await expect(tab).toHaveAttribute('aria-selected', 'true')
-  await expect(page).toHaveURL(/\/t\/branch/)
+  await expect(page).toHaveURL(/\/i\/branch/)
 
   const changes = page.getByRole('region', { name: 'This branch', exact: true })
   await expect(changes).toContainText('since main 534f32f')
@@ -214,41 +234,27 @@ test('the Inspector lists every change since the base, and a click leads to the 
   await all.getByRole('button', { name: /^Relations/ }).click()
   await expect(all.getByRole('region', { name: 'Relations' })).toContainText('Checkout API → Fraud check')
 
-  // From the list to the element's card, Designer's own, read-only, with what changed.
-  const before = await page.locator('.insp-main').boundingBox()
+  // From the list to the element: on the view that shows it, in the
+  // perspective open, selected with its card and what changed (the switch on).
+  await onCanvas(page).check()
   await row('changed').getByRole('button', { name: /Checkout API/ }).click()
-  const card = page.getByRole('complementary', { name: 'Properties' })
-  await expect(card).toBeVisible()
-  // It lies over the page: nothing beneath moves.
-  expect(await page.locator('.insp-main').boundingBox()).toEqual(before)
-  await expect(card.locator('.pp-title')).toHaveText('Checkout API')
-  await expect(card.getByRole('textbox', { name: 'Name' })).toHaveCount(0)
-  await expect(card.getByRole('region', { name: 'Changes on branch' }).locator('ins')).toHaveText(['card ', ' and confirms the order'])
-  // One card: no panel of the Inspector's own beside it.
-  await expect(page.getByRole('complementary')).toHaveCount(1)
-  // No wiki view has a page for it: nothing to open there.
-  await expect(card.getByRole('button', { name: /^Open wiki page/ })).toBeDisabled()
-  // And on to a canvas that holds it.
-  await card.getByRole('button', { name: /^Show on canvas/ }).click()
-  await expect(page.getByRole('menuitem')).toHaveText([/^Architecture/])
-  await page.getByRole('menuitem', { name: /^Architecture/ }).click()
+  await expect(page.getByRole('region', { name: 'Inspector' })).toHaveCount(0)
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
   await expect(page.getByText(/^Structure:/)).toHaveText('Structure: Architecture')
   await expect(studio.node('api')).toHaveClass(/selected/)
+  const card = studio.properties
+  await expect(card.getByRole('textbox', { name: 'Name' })).toHaveValue('Checkout API')
+  await expect(card.getByRole('region', { name: 'Changes on branch' }).locator('ins')).toHaveText(['card ', ' and confirms the order'])
 })
 
 test('a branch that only adds a relation counts it', async ({ page, studio }) => {
   // The toolbar counted elements only: 0, and "0 elements changed".
   const nodes = ARCH.nodes.filter((n) => n.id !== 'fraud')
   await openFolder(page, studio, { ...ARCH, nodes, relations: [rel('r1', 'interacts', 'api', 'need')], views: [] }, { '.state/base.json': base(nodes, []) })
-  const button = page.getByRole('button', { name: /^Changes on branch/ })
-  await expect(button.locator('.branch-count')).toHaveText('1', { timeout: 10_000 })
-  await button.hover()
-  await expect(page.getByRole('tooltip')).toContainText('1 relation changed since main 534f32f')
-  await page.getByRole('button', { name: /^Inspector/ }).click()
-  await expect(page.getByRole('tab', { name: /^This branch/ })).toContainText('1')
-  await page.getByRole('tab', { name: /^This branch/ }).click()
-  await expect(page.getByRole('region', { name: 'This branch', exact: true })).toContainText('0 elements changed: 0 added, 0 changed, 0 removed; 1 relation changed')
+  const change = await openThisBranch(page)
+  await expect(inspectorTab(page, /^This branch/)).toContainText('1')
+  await expect(change).toContainText('since main 534f32f')
+  await expect(change).toContainText('0 elements changed: 0 added, 0 changed, 0 removed; 1 relation changed')
 })
 
 test('with a milestone open, the Inspector lists the changes of the model as it is', async ({ page, studio }) => {
@@ -267,8 +273,7 @@ test('with a milestone open, the Inspector lists the changes of the model as it 
   await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.locator('.lp-snap-card', { hasText: 'v1' }).click()
   await expect(page).toHaveURL(/\/s\/m-v1/)
-  await page.getByRole('button', { name: /^Inspector/ }).click({ timeout: 10_000 })
-  await page.getByRole('tab', { name: /^This branch/ }).click()
+  await openThisBranch(page)
   const all = page.getByRole('region', { name: 'Changed elements' })
   await expect(all.locator('.insp-branch-row[data-kind="added"] .insp-chip')).toHaveText([/Fraud check/])
   await expect(all.locator('.insp-branch-row[data-kind="changed"] .insp-chip')).toHaveText([/Checkout API/])
@@ -314,14 +319,14 @@ const SPEC_RESULTS = serializeTestResults([
 test('the Inspector lists this change with what the tests say', async ({ page, studio }) => {
   await openFolder(page, studio, SPEC_NOW, { '.state/base.json': SPEC_BASE, '.state/test-results.json': SPEC_RESULTS })
 
-  const inspector = page.getByRole('button', { name: /^Inspector/ })
+  const inspector = inspectorButton(page)
   await expect(inspector).toBeEnabled({ timeout: 10_000 })
   await inspector.click()
-  const tab = page.getByRole('tab', { name: /^This branch/ })
+  const tab = inspectorTab(page, /^This branch/)
   await expect(tab).toContainText('1 / 3 verified', { timeout: 10_000 })
   await tab.click()
   // Implementation does not repeat it.
-  await expect(page.getByRole('tab', { name: /^Implementation/ })).not.toContainText('verified')
+  await expect(inspectorTab(page, /^Implementation/)).not.toContainText('verified')
 
   const change = page.getByRole('region', { name: 'This branch', exact: true })
   await expect(change).toContainText('since main 534f32f')
@@ -351,38 +356,28 @@ test('the Inspector lists this change with what the tests say', async ({ page, s
   await expect(change.locator('.insp-branch-row')).toHaveCount(9)
 })
 
-test('without a base the button says how to save one, and an old base is marked', async ({ page, studio }) => {
+test('without a base This branch says how to save one, and an old base is marked', async ({ page, studio }) => {
   const folder = await openFolder(page, studio, ARCH)
-
-  const button = page.getByRole('button', { name: /^Changes on branch/ })
-  await expect(button).toHaveClass(/unavailable/)
-  await expect(button).toHaveAttribute('aria-expanded', 'false')
-  await button.click()
-  const help = page.getByRole('dialog', { name: 'Changes on branch' })
-  await expect(help).toContainText('Nothing to compare with yet')
-  await expect(help.locator('code')).toHaveText(['radical hooks install <model folder>', 'radical diff <model folder> --save-base'])
-  await button.click()
-  await expect(help).toBeHidden()
+  // Neither a report nor a base: nothing to inspect.
+  const inspector = inspectorButton(page)
+  await expect(inspector).toBeDisabled()
+  // A report, and no base: This branch says how to save one.
+  await folder.write('.state/test-results.json', serializeTestResults([tc('tests/pay.test.ts', 'pays by card', 'passed')], ['reports/unit.json']))
+  const change = await openThisBranch(page)
+  await expect(inspectorTab(page, /^This branch/)).toContainText('no base')
+  await expect(change).toContainText('Nothing to compare with yet')
+  await expect(change.locator('.branch-cmd code')).toHaveText(['radical hooks install <model folder>', 'radical diff <model folder> --save-base'])
 
   // A base saved two days ago, on another branch.
   await folder.write('.state/base.json', base(JSON.parse(ARCH_BASE).nodes, [], new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), 'feat/inspector-tabs'))
-  await expect(button.locator('.branch-count')).toHaveText('⚠ 4', { timeout: 10_000 })
-  await button.hover()
-  await expect(page.getByRole('tooltip')).toContainText('old base, saved 2 days ago on feat/inspector-tabs')
-  const inspector = page.getByRole('button', { name: /^Inspector/ })
-  await inspector.click()
-  await page.getByRole('tab', { name: /^This branch/ }).click()
-  const change = page.getByRole('region', { name: 'This branch', exact: true })
+  await expect(inspectorTab(page, /^This branch/)).toContainText('4', { timeout: 10_000 })
   await expect(change).toContainText('The base was saved 2 days ago, on feat/inspector-tabs.')
   await expect(change.locator('.branch-cmd code')).toHaveText(['radical hooks install <model folder>', 'radical diff <model folder> --save-base'])
-  await page.locator('.toolbar-mode-btn', { hasText: 'Designer' }).click()
 
   // A file that is no base counts as none.
   await folder.write('.state/base.json', '{ "version": 1 }')
-  await expect(button).toHaveClass(/unavailable/, { timeout: 10_000 })
-  await expect(button.locator('.branch-count')).toHaveCount(0)
-  // Neither a report nor a base: nothing to inspect.
-  await expect(inspector).toBeDisabled()
+  await expect(inspectorTab(page, /^This branch/)).toContainText('no base', { timeout: 10_000 })
+  await expect(change).toContainText('Nothing to compare with yet')
 })
 
 test('a Forge run in a folder without a base from git saves one, and Changes on branch shows the run', async ({ page, studio }) => {
@@ -404,10 +399,10 @@ test('a Forge run in a folder without a base from git saves one, and Changes on 
     })
   })
   const folder = await openFolder(page, studio, ARCH)
-  const button = page.getByRole('button', { name: /^Changes on branch/ })
-  await expect(button).toHaveClass(/unavailable/)
+  // No base yet, nor a report: nothing for the Inspector.
+  await expect(inspectorButton(page)).toBeDisabled()
 
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.locator('.activity-rail').getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
   await page.locator('.forge-textarea').fill('# Card payments\n\nShoppers pay by card.')
   await page.getByRole('button', { name: 'Start →' }).click()
@@ -419,8 +414,9 @@ test('a Forge run in a folder without a base from git saves one, and Changes on 
   expect(saved).toMatchObject({ source: 'forge', commit: '' })
   expect(saved.nodes.map((n) => n.id).sort()).toEqual(['api', 'fraud', 'need', 'shop'])
   // The run's need and requirement are what changed.
-  await expect(button.locator('.branch-count')).toHaveText('2', { timeout: 10_000 })
   await page.getByRole('button', { name: 'Close' }).first().click()
-  await button.hover()
-  await expect(page.getByRole('tooltip')).toContainText('2 elements changed since the start of the Forge run')
+  const change = await openThisBranch(page)
+  await expect(inspectorTab(page, /^This branch/)).toContainText('2', { timeout: 10_000 })
+  await expect(change).toContainText('since the start of the Forge run')
+  await expect(change).toContainText('2 elements changed: 2 added, 0 changed, 0 removed')
 })

@@ -4,12 +4,14 @@ import { useRailSlot } from '@radical/ui/components/RightPanel'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { host } from '../platform/host'
 import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
-import { BranchChangesButton } from './BranchChanges'
 import { OtherModelsButton } from './OtherModels'
 import { useOtherModelsStore } from '../persistence/otherModels'
 import { NavHistory } from './NavHistory'
-import { useInspectorStore } from '../persistence/inspector'
-import { useBranchStore } from '../persistence/branchChanges'
+import { inspectorAvailable, useInspectorAvailable, useInspectorStore, useSettingsUnsaved } from '../persistence/inspector'
+import { toggleInspector, useInspectorNav } from '../navigation'
+import { setLeftCollapsed, toggleLeftPanel } from '../leftPanelFold'
+import { INSPECTOR_KEYS } from './Inspector'
+import { openCheckSettings } from './inspector/checkSettingsOpen'
 import { dropPendingMode, placeGone, useShownMode } from '../route'
 import { useRegisterCommands } from '../commands'
 import { goBack, goForward } from '../navHistory'
@@ -135,16 +137,16 @@ const IconSmartFit = () => (
 )
 
 const IconUndo = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
-    <path d="M3 7h7a3 3 0 110 6H8" />
-    <path d="M6 4L3 7l3 3" />
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
   </svg>
 )
 
 const IconRedo = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
-    <path d="M13 7H6a3 3 0 100 6h2" />
-    <path d="M10 4l3 3-3 3" />
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="m15 14 5-5-5-5" />
+    <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" />
   </svg>
 )
 
@@ -269,6 +271,47 @@ const RailIconSettings = () => (
   </RailIcon>
 )
 
+const RailIconInspector = () => (
+  <RailIcon>
+    <circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /><path d="M7.5 10.5l2 2 3.5-4" />
+  </RailIcon>
+)
+
+/** The Inspector's button on the activity rail, just above Settings, drawn
+ *  as the left panel's sections are (icon, count under it): a place as a
+ *  section is, its tabs in the left panel and the tab picked in place of
+ *  the view; pressed again, it folds the left panel and opens it again, as
+ *  a section's tab does. A section's tab, or ⌘J, goes back to the view. As
+ *  the panel's verdict: red with the count of errors, green with none (the
+ *  warnings are in its tooltip). Greyed out
+ *  while there is nothing to inspect; not in the metamodel editor, which
+ *  shows no panel. */
+function InspectorRailButton(): React.ReactElement | null {
+  const check = useInspectorStore((s) => s.check)
+  const enabled = useInspectorAvailable()
+  const open = useInspectorNav((s) => s.open) && enabled
+  const metamodel = useDiagramStore((s) => s.appMode === 'metamodel')
+  if (metamodel) return null
+  const title = !enabled
+    ? 'Inspector — no check report or measurements beside this model yet. Run radical check <model folder> --report <test reports>, or radical sense, to make one; Studio picks it up by itself.'
+    : `Inspector — what radical check says about the model${check ? `: ${check.errors} errors, ${check.warnings} warnings` : ''} (${INSPECTOR_KEYS})`
+  const count = !enabled || !check ? null : check.errors
+  const tone = !enabled || !check ? 'none' : check.errors ? 'e' : 'ok'
+  const short = (n: number): string => n > 999 ? `${Math.floor(n / 100) / 10}k` : String(n)
+  return (
+    <button type="button" className={`lp-rail-tab rail-inspector ${tone}${open ? ' active' : ''}`} disabled={!enabled}
+      onClick={() => {
+        // As a section's tab: open, it shows its place with the left panel;
+        // lit, it folds the left panel and opens it again, the report staying.
+        if (!open) { toggleInspector(true); setLeftCollapsed(false) } else toggleLeftPanel()
+      }}
+      title={title} aria-label="Inspector" aria-pressed={open} aria-controls="insp-dock">
+      <span className="lp-section-icon"><RailIconInspector /></span>
+      <span className="lp-rail-count">{count === null ? '–' : short(count)}</span>
+    </button>
+  )
+}
+
 /** Where the open model is kept, as its badge says it and in words. */
 const DOC_BADGE: Record<DocumentSource, string> = { ls: 'LOCAL', fs: 'FILE', md: 'FOLDER' }
 const DOC_WHERE: Record<DocumentSource, string> = { ls: 'kept in this browser (local storage)', fs: 'a file on disk', md: 'a folder on disk' }
@@ -370,6 +413,8 @@ function AppMenu({
   const defaultEdgeStyle = useDiagramStore((s) => s.defaultEdgeStyle)
   const setDefaultEdgeStyle = useDiagramStore((s) => s.setDefaultEdgeStyle)
   const editable = useDiagramStore((s) => s.appMode === 'designer')
+  // Inspector settings changed and not saved to check.json yet.
+  const checkUnsaved = useSettingsUnsaved()
 
   // Studio-wide preferences (localStorage, not part of the .radical file).
   // A change writes only its own setting over the ones stored now: Focus and
@@ -393,21 +438,24 @@ function AppMenu({
   const modelsMenu = (
     <RailMenu id="models" label="Models" open={menu === 'models'} onOpen={setMenu} onClose={close} atTop
       icon={<IconModels />}>
+          {/* The model open and where it is kept, at the menu's top (the
+              toolbar named it before). */}
+          {activeDocLabel && (
+            <div className="app-menu-section app-menu-model-open">
+              <div className="app-menu-label">Open</div>
+              <div className="app-menu-model" title={`${activeDocLabel}: ${DOC_WHERE[activeDocSource ?? 'ls']}`}>
+                <span className="app-menu-model-name">{activeDocLabel}</span>
+                <span className={`toolbar-doc-badge ${activeDocSource ?? 'ls'}`}>{DOC_BADGE[activeDocSource ?? 'ls']}</span>
+              </div>
+              <div className="app-menu-model-where">{DOC_WHERE[activeDocSource ?? 'ls']}</div>
+            </div>
+          )}
+          {activeDocLabel && <div className="app-menu-divider" />}
           <div className="app-menu-section">
             <div className="app-menu-label">Models</div>
             <button className="app-menu-item" role="menuitem" onClick={run(onManage)}>
               <span className="app-menu-icon"><IconLoad /></span>
-              <span className="app-menu-text">
-                Manage models…
-                {activeDocLabel && (
-                  <span className="app-menu-current-doc-inline">
-                    <span className={`toolbar-doc-badge ${activeDocSource}`}>
-                      {DOC_BADGE[activeDocSource ?? 'ls']}
-                    </span>
-                    <span className="app-menu-current-doc-name">{activeDocLabel}</span>
-                  </span>
-                )}
-              </span>
+              <span className="app-menu-text">Manage models…</span>
             </button>
             <button className="app-menu-item" role="menuitem" onClick={run(onOpenHub)}>
               <span className="app-menu-icon"><IconHub /></span>
@@ -419,6 +467,7 @@ function AppMenu({
 
   const menus = (
     <>
+      <InspectorRailButton />
       {railMenu('settings', 'Settings', <RailIconSettings />, (<>
           <div className="app-menu-section">
             <div className="app-menu-label">View</div>
@@ -507,6 +556,19 @@ function AppMenu({
           </div>
           <div className="app-menu-divider" />
           <div className="app-menu-section">
+            <div className="app-menu-label">Inspector</div>
+            <button
+              className="app-menu-item"
+              role="menuitem"
+              onClick={run(openCheckSettings)}
+              title="What the Inspector and radical check ask of this model: goals, rules and baselines, the test files every test of which the model names (saved to check.json)"
+            >
+              <span className="app-menu-icon"><IconInspect /></span>
+              <span className="app-menu-text">Inspector settings…{checkUnsaved && <span className="insp-pill warn app-menu-pill">unsaved</span>}</span>
+            </button>
+          </div>
+          <div className="app-menu-divider" />
+          <div className="app-menu-section">
             <div className="app-menu-label">AI</div>
             <button
               className="app-menu-item"
@@ -582,19 +644,9 @@ function AppMenu({
 
   return (
     <>
-      {/* The model open, where it is kept and its changes on the branch: a
-          strip as the perspectives'. */}
-      {(activeDocLabel || branch) && (
-        <div className="app-brand-switch">
-          {activeDocLabel && (
-            <span className="app-brand-doc" title={`${activeDocLabel}: ${DOC_WHERE[activeDocSource ?? 'ls']}`}>
-              <span className="app-brand-doc-name">{activeDocLabel}</span>
-              <span className={`toolbar-doc-badge ${activeDocSource ?? 'ls'}`}>{DOC_BADGE[activeDocSource ?? 'ls']}</span>
-            </span>
-          )}
-          {branch}
-        </div>
-      )}
+      {/* The other models of a federation, in a strip as the perspectives';
+          the model open is named at the top of the Models menu. */}
+      {branch && <div className="app-brand-switch">{branch}</div>}
       {topSlot && createPortal(modelsMenu, topSlot)}
       {slot && createPortal(menus, slot)}
     </>
@@ -621,32 +673,8 @@ function letGoOfFocus(): void {
   if (el instanceof HTMLElement && el !== document.body) el.blur()
 }
 
-/** The Inspector perspective, with how many errors and warnings the check
- *  finds in the model now. Greyed out while the model has no report of
- *  `radical check --report` and nothing `radical sense` measured beside it:
- *  there is nothing to inspect yet. */
-function InspectorModeButton({ active, onClick }: { active: boolean; onClick: () => void }): React.ReactElement {
-  const check = useInspectorStore((s) => s.check)
-  const hasReport = useInspectorStore((s) => s.results !== null || s.measurements !== null)
-  // With a base beside the model, This change lists the branch's changes.
-  const hasBase = useBranchStore((s) => s.base !== null)
-  const enabled = hasReport || hasBase || active
-  const title = !enabled
-    ? 'Inspector — no check report or measurements beside this model yet. Run radical check <model folder> --report <test reports>, or radical sense, to make one; Studio picks it up by itself.'
-    : check
-      ? `Inspector — what radical check says about the model: ${check.errors} errors, ${check.warnings} warnings`
-      : 'Inspector — what radical check says about the model'
-  return (
-    <button className={`toolbar-mode-btn${active ? ' active' : ''}`} onClick={onClick} disabled={!enabled} title={title}>
-      <IconInspect /><span className="toolbar-label">Inspector</span>
-      {enabled && check && (check.errors > 0 || check.warnings > 0) && (
-        <span className="insp-count">{check.errors > 0 && <span className="e">✖ {check.errors}</span>}<span className="w">⚠ {check.warnings}</span></span>
-      )}
-    </button>
-  )
-}
-
-function IconInspect(): React.ReactElement {
+/** The Inspector's icon in the menus (Inspector settings…). */
+export function IconInspect(): React.ReactElement {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
       <circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" strokeLinecap="round" /><path d="M5 7l1.5 1.5L9 5.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -672,8 +700,7 @@ const NAV_GAP = 8
 const SIDE_GAP = 8
 
 /** Places the middle block; true while the perspectives go without their
- *  labels. `search`: Quick Search is shown (not in the Inspector, where the
- *  navigation meets in the middle). */
+ *  labels. `search`: Quick Search is shown. */
 function useMiddleRoom(bar: React.RefObject<HTMLDivElement>, search: boolean, appMode: string): boolean {
   const [compact, setCompact] = useState(false)
   const fit = useCallback(() => {
@@ -716,8 +743,8 @@ function useMiddleRoom(bar: React.RefObject<HTMLDivElement>, search: boolean, ap
     fit()
     const el = bar.current
     if (!el || typeof ResizeObserver === 'undefined') return
-    // The sides change width on their own (a count on Inspector or on
-    // Changes on branch, the fonts loading), the window by a resize.
+    // The sides change width on their own (a count on Changes on branch,
+    // the fonts loading), the window by a resize.
     const watch = new ResizeObserver(() => fit())
     for (const side of el.querySelectorAll(':scope > .app-brand-switch, :scope > .toolbar-edit, :scope > .toolbar-mode-switch, :scope > .toolbar-center > *')) watch.observe(side)
     window.addEventListener('resize', fit)
@@ -796,11 +823,17 @@ export function Toolbar(): React.ReactElement {
         e.preventDefault()
         if (undoKey) useDiagramStore.getState().undo()
         else useDiagramStore.getState().redo()
+      } else if (letter === 'j' && !e.shiftKey && !e.altKey) {
+        // The Inspector panel, as VS Code's ⌘J opens and closes its panel.
+        if (keysTakenByDialog(e.target)) return
+        const state = useDiagramStore.getState()
+        if (state.presentationActive) return
+        e.preventDefault()
+        if (inspectorAvailable()) toggleInspector()
       } else if ((e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') && (window as any).__radicalZoomIn
-        && useDiagramStore.getState().appMode !== 'inspector' && !keysTakenByDialog(e.target)) {
-        // The canvas and the Flow view register zoom; elsewhere (the
-        // Inspector shows no canvas, though the one left registered) the
-        // browser zooms the page.
+        && !keysTakenByDialog(e.target)) {
+        // The canvas and the Flow view register zoom; elsewhere the browser
+        // zooms the page.
         e.preventDefault()
         if (e.key === '+' || e.key === '=') useDiagramStore.getState().zoomIn()
         else useDiagramStore.getState().zoomOut()
@@ -922,7 +955,7 @@ export function Toolbar(): React.ReactElement {
   }, [showRunPanel])
 
   const bar = useRef<HTMLDivElement>(null)
-  const compact = useMiddleRoom(bar, appMode !== 'inspector', appMode)
+  const compact = useMiddleRoom(bar, true, appMode)
 
   // The toolbar's and the rail's actions, for `>` in Quick Search.
   useRegisterCommands('toolbar', () => {
@@ -934,8 +967,10 @@ export function Toolbar(): React.ReactElement {
       mode('designer', 'Designer: edit the model'),
       mode('viewer', 'Viewer: explore the model'),
       mode('presenter', 'Presenter: build and play presentations'),
-      mode('inspector', 'Inspector: model quality and changes'),
       mode('metamodel', 'Metamodel editor'),
+      { id: 'panel.inspector', title: useInspectorNav.getState().open ? 'Inspector: hide the panel' : 'Inspector: show the panel (model quality and changes)', group: 'Panels', keys: INSPECTOR_KEYS,
+        run: () => toggleInspector(), when: () => state().appMode !== 'metamodel' && inspectorAvailable() },
+      { id: 'check.settings', title: 'Inspector settings… (check.json: goals and rules)', group: 'Settings', run: openCheckSettings },
       { id: 'edit.undo', title: 'Undo', group: 'Edit', keys: '⌘Z', run: () => state().undo(), when: () => state().appMode === 'designer' && state().canUndo },
       { id: 'edit.redo', title: 'Redo', group: 'Edit', keys: '⌘⇧Z', run: () => state().redo(), when: () => state().appMode === 'designer' && state().canRedo },
       { id: 'nav.back', title: 'Go back', group: 'Navigate', keys: 'Alt+←', run: () => goBack(placeGone) },
@@ -967,10 +1002,9 @@ export function Toolbar(): React.ReactElement {
         onManage={handleManage}
         activeDocLabel={activeDoc?.name ?? null}
         activeDocSource={activeDoc?.source ?? null}
-        // The model's state on the branch, beside its name; not in the
-        // Inspector, which lists the changes itself and has no canvas to mark.
-        // Then the other models it depends on (a federation), everywhere.
-        branch={(appMode !== 'inspector' || dependsOnOthers) && <>{appMode !== 'inspector' && <BranchChangesButton />}<OtherModelsButton /></>}
+        // The other models it depends on (a federation), everywhere. The
+        // branch's changes are the Inspector's This branch.
+        branch={dependsOnOthers ? <OtherModelsButton /> : null}
         connectionModifier={connectionModifier}
         setConnectionModifier={setConnectionModifier}
         themePref={themePref}
@@ -990,8 +1024,8 @@ export function Toolbar(): React.ReactElement {
         onCopyToClipboard={copyToClipboard}
         exportBusy={exportBusy}
       />
-      {/* Undo belongs to Designer: Viewer, Presenter and the Inspector change
-          nothing of the model, and the metamodel editor's steps are undone
+      {/* Undo belongs to Designer: Viewer and Presenter change nothing of
+          the model, and the metamodel editor's steps are undone
           back in Designer (shown there, enabled, they did nothing). Fit, zoom
           and Smart Layout are on the canvas (CanvasControls). */}
       {appMode === 'designer' && (
@@ -1007,8 +1041,8 @@ export function Toolbar(): React.ReactElement {
 
       {/* As in VS Code, around Quick Search in the middle (App draws it):
           back and forward before it, the History list after it; in every
-          perspective. The Inspector has no Quick Search: they meet. */}
-      <div className={`toolbar-center${appMode === 'inspector' ? ' no-search' : ''}`}>
+          perspective. */}
+      <div className="toolbar-center">
         <div className="toolbar-group" role="group" aria-label="Navigate"><NavHistory part="arrows" /></div>
         <div className="toolbar-group"><NavHistory part="list" /></div>
       </div>
@@ -1037,7 +1071,6 @@ export function Toolbar(): React.ReactElement {
         >
           <IconPresentation /><span className="toolbar-label">Presenter</span>
         </button>
-        <InspectorModeButton active={appMode === 'inspector'} onClick={() => setAppMode('inspector')} />
       </div>
 
       <DocumentManagerModal open={managerOpen} onClose={() => setManagerOpen(false)} />

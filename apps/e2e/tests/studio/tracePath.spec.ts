@@ -4,10 +4,18 @@ import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
 import { serializeTestResults } from '@radical/common/check'
 import type { C4Node, DiagramData } from '@radical/common/c4'
+import type { Locator, Page } from '@playwright/test'
 
-// The Inspector's verification path: from the element panel of a
+// The Inspector's verification path: from the properties card of a
 // requirement, every path through it in columns, need → requirement →
-// scenario → test, the failing branch first with why its test failed.
+// scenario → test, the failing branch first with why its test failed. The
+// Inspector is a place of the activity rail: it shows the path in place of
+// the view, and a link in it shows the element on its view with its card.
+
+/** The Inspector's button on the activity rail. */
+const inspectorButton = (page: Page): Locator => page.locator('.activity-rail').getByRole('button', { name: 'Inspector', exact: true })
+/** A tab of the Inspector, a card in its list in the left panel. */
+const inspectorTab = (page: Page, name: RegExp): Locator => page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab', { name })
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
   ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
@@ -41,23 +49,29 @@ test('the verification path goes from a requirement to its need and to the test 
     { file: '/repo/tests/pay.test.ts', title: ['pays by card'], status: 'passed', durationMs: 40, line: 5 },
     { file: '/repo/tests/pay.test.ts', title: ['refunds'], status: 'failed', durationMs: 1200, line: 12, message: 'AssertionError: expected "pending" to be "refunded"' },
   ], ['reports/unit.json']))
-  const inspector = page.getByRole('button', { name: /^Inspector/ })
+  const inspector = inspectorButton(page)
   await expect(inspector).toBeEnabled({ timeout: 10_000 })
   await inspector.click()
-  await page.getByRole('tab', { name: /^Implementation/ }).click()
+  await inspectorTab(page, /^Implementation/).click()
   await page.locator('.insp-error .insp-chain').getByRole('button', { name: /Take card payments/ }).click()
 
-  // The element's card, as in every perspective, with a way to the whole path.
-  const peek = page.getByRole('complementary', { name: 'Properties' })
+  // The link shows the element on its view, in the perspective open, with
+  // its card, as in every perspective, and a way to the whole path.
+  const report = page.getByRole('region', { name: 'Inspector' })
+  await expect(report).toHaveCount(0)
+  await expect(studio.node('req')).toHaveClass(/selected/)
+  const peek = studio.properties
   const verification = peek.getByRole('region', { name: 'Verification' })
   await expect(verification.getByRole('group', { name: 'Checked by' })).toContainText('Refunding a card')
   await verification.getByRole('button', { name: 'Path', exact: true }).click()
 
   const panel = page.getByTestId('trace-panel')
   await expect(panel).toBeVisible()
-  // The path is a place of its own: a link opens it, Back leaves it.
-  await expect(page).toHaveURL(/\/m\/inspector\/.*\/tr\/req/)
-  await expect(page.getByRole('tab', { name: /^Implementation/ })).toBeHidden()
+  // The path is a place of its own: a link opens it, Back leaves it. It
+  // stands in place of the view, the Inspector's tabs in the left panel.
+  await expect(page).toHaveURL(/\/m\/viewer\/.*\/i\/implementation\/tr\/req/)
+  await expect(report).toBeVisible()
+  await expect(page.locator('.insp-main')).toBeHidden()
   await expect(panel.locator('.trace-col-head')).toHaveText(['Need', 'Requirement', 'Scenario', 'Test'])
   // The failing scenario first; the requirement asked for marked.
   await expect(panel.getByTestId('trace-node')).toHaveText([/Pay online/, /Take card payments/, /Refunding a card/, /Paying by card/])
@@ -83,6 +97,9 @@ test('the verification path goes from a requirement to its need and to the test 
   // (it said the scenario names no check).
   await panel.getByTestId('trace-node').filter({ hasText: 'Paying by card' }).locator('.trace-label').click()
   await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 's-green')
+  // Each path is a place of its own once its address is written (moves
+  // within 150 ms are one step), as a person's clicks always are.
+  await expect(page).toHaveURL(/\/tr\/s-green/)
   await panel.getByLabel('Only what does not pass').check()
   await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 's-green')
   await expect(panel.getByTestId('trace-result')).toHaveCount(0)
@@ -90,27 +107,35 @@ test('the verification path goes from a requirement to its need and to the test 
   await panel.getByLabel('Only what does not pass').uncheck()
   await panel.getByRole('button', { name: '← Back' }).click()
   await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 'req')
+  await expect(page).toHaveURL(/\/tr\/req/)
 
   // A click on the need makes the path the need's; Back returns.
   await panel.getByTestId('trace-node').filter({ hasText: 'Pay online' }).locator('.trace-label').click()
   await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 'need')
   await expect(panel.locator('.insp-meta')).toContainText('Pay online')
+  await expect(page).toHaveURL(/\/tr\/need/)
   await panel.getByRole('button', { name: '← Back' }).click()
   await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 'req')
-
-  // Details opens an element's panel beside the path.
-  await panel.getByTestId('trace-node').filter({ hasText: 'Refunding a card' }).getByRole('button', { name: 'Details' }).click()
-  await expect(peek.locator('.pp-title')).toHaveText('Refunding a card')
+  await expect(page).toHaveURL(/\/tr\/req/)
 
   await panel.getByRole('button', { name: 'Close' }).click()
   await expect(panel).toBeHidden()
-  await expect(page.getByRole('tab', { name: /^Implementation/ })).toBeVisible()
+  await expect(inspectorTab(page, /^Implementation/)).toHaveAttribute('aria-selected', 'true')
+  await expect(page.locator('.insp-main')).toBeVisible()
   await expect(page).not.toHaveURL(/\/tr\//)
   // Studio's Back returns to the path, Forward leaves it again.
   await page.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 'req')
   await page.getByRole('button', { name: 'Forward', exact: true }).click()
   await expect(panel).toBeHidden()
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 'req')
+
+  // Show shows an element of the path on its view, with its card.
+  await panel.getByTestId('trace-node').filter({ hasText: 'Refunding a card' }).getByRole('button', { name: 'Show' }).click()
+  await expect(report).toHaveCount(0)
+  await expect(studio.node('s-red')).toHaveClass(/selected/)
+  await expect(peek).toContainText('Refunding a card')
 })
 
 test('the properties card in Viewer opens the verification path in the Inspector', async ({ page, studio }) => {
@@ -155,22 +180,26 @@ test('the properties card in Viewer opens the verification path in the Inspector
   await expect(path).toBeEnabled({ timeout: 10_000 })
 
   await studio.properties.getByRole('button', { name: 'Path', exact: true }).click()
-  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Inspector/)
+  // In place of the view, in Viewer still.
+  await expect(page.getByRole('region', { name: 'Inspector' })).toBeVisible()
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
   const panel = page.getByTestId('trace-panel')
   await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 'req')
   await expect(panel.locator('.trace-message')).toHaveText('AssertionError: expected "pending" to be "refunded"')
   await expect(page).toHaveURL(/\/tr\/req/)
 
-  // Back returns to Viewer; the Inspector's button then opens its tabs.
+  // Back leaves the path for the view it was opened from, in Viewer still,
+  // with the requirement's card.
   await page.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
   await expect(page).not.toHaveURL(/\/tr\//)
-  await page.locator('.toolbar-mode-btn', { hasText: 'Inspector' }).click()
-  await expect(page.getByRole('tab', { name: /^Overview/ })).toBeVisible()
+  await expect(page).not.toHaveURL(/\/i\//)
   await expect(panel).toBeHidden()
+  await expect(page.getByRole('region', { name: 'Inspector' })).toHaveCount(0)
+  await expect(studio.properties).toContainText('Take card payments')
 })
 
-test('with a milestone shown, the Inspector opens the live model\'s elements, and Path waits on what only the milestone has', async ({ page, studio }) => {
+test('with a milestone shown, the Inspector checks the live model, its links and fixes wait for it, and Path waits on what only the milestone has', async ({ page, studio }) => {
   const folder = new ModelFolder(page)
   await folder.install()
   await page.goto('/')
@@ -192,7 +221,7 @@ test('with a milestone shown, the Inspector opens the live model\'s elements, an
   await page.getByRole('button', { name: 'Folder…' }).click()
   await expect(page.locator('.welcome-overlay')).toBeHidden()
   await studio.ready()
-  await expect(page.getByRole('button', { name: /^Inspector/ })).toBeEnabled({ timeout: 10_000 })
+  await expect(inspectorButton(page)).toBeEnabled({ timeout: 10_000 })
   await studio.designer()
   await page.getByRole('tab', { name: 'Milestones' }).click()
   await page.locator('.lp-snap-card', { hasText: 'v1 Cards' }).first().click()
@@ -206,16 +235,20 @@ test('with a milestone shown, the Inspector opens the live model\'s elements, an
   await expect(path).toBeDisabled()
   await expect(path).toHaveAttribute('title', /Only the milestone shown has this element/)
 
-  // The Inspector reads the live model, and so does the card it opens.
-  await page.locator('.toolbar-mode-btn', { hasText: 'Inspector' }).click()
+  // The Inspector checks the live model: it names the requirement added
+  // since. Its fix waits for the live model, and its link says the
+  // milestone shown lacks the element.
+  await inspectorButton(page).click()
   const missing = page.getByRole('region', { name: 'Needs attention' }).locator('details.insp-group[data-rule="requirement-without-scenario"]')
   await missing.locator('summary').click()
+  const fix = missing.getByRole('button', { name: /^Add scenario/ })
+  await expect(fix).toBeDisabled()
+  await expect(fix).toHaveAttribute('title', /The milestone "v1 Cards" is shown: this edits the live model/)
   await missing.getByRole('button', { name: 'Open Pay in instalments' }).click()
-  const peek = page.getByRole('complementary', { name: 'Properties' })
-  await expect(peek.locator('.pp-title')).toHaveText('Pay in instalments')
+  await expect(page.getByText(/The milestone shown has no such element/)).toBeVisible()
 
-  // Designer shows the milestone again.
-  await studio.designer()
+  // Designer shows the milestone all along.
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
   await expect(page).toHaveURL(/\/s\/m1/)
   await expect(studio.node('s-red')).toBeVisible()
 })
