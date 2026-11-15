@@ -2975,7 +2975,8 @@ function EarsSlot({
   const [draft, setDraft] = useState(value)
   const ref = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { setDraft(value) }, [value])
+  // An outside change of the part leaves the draft alone while it is typed in.
+  useEffect(() => { if (!editing) setDraft(value) }, [value, editing])
   useEffect(() => { if (editing && ref.current) ref.current.focus() }, [editing])
 
   if (readOnly || !editing) {
