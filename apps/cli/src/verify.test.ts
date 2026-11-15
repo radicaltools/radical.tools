@@ -72,6 +72,15 @@ describe('radical verify', () => {
     expect(none.err).toContain('No scenario or fitness-fn named "Refunds" in the model.')
   })
 
+  it('keeps a test written as Vitest prints it (with >) as Playwright does, and drops it written either way', async () => {
+    const root = await repository()
+    const bound = await run(root, 'verify', 'pay', '--test', 'src/pay.test.ts > pay > takes a card', '--test', 'src/pay.test.ts › pay › takes a card')
+    expect(bound.out).toContain('is checked by 1 test (.radical/radical.json):\n  src/pay.test.ts › pay › takes a card')
+    expect(JSON.parse(await readFile(join(root, '.radical', 'radical.json'), 'utf8')).verifies[0].tests).toEqual(['src/pay.test.ts › pay › takes a card'])
+    expect((await run(root, 'verify', 'pay', '--test', 'src/pay.test.ts › pay › declines', '--drop', 'src/pay.test.ts > pay > takes a card')).out)
+      .toBe('scenario "Pays by card" (pay) is checked by 1 test (.radical/radical.json):\n  src/pay.test.ts › pay › declines\n')
+  })
+
   it('in a model checked out in the repository, writes the repository\'s file and reads the model\'s history', async () => {
     const root = await repository()
     const model = join(root, '.radical', 'model')

@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
+import { testIdParts } from '@radical/common/check'
 import { findingTestName, readFindings, writeFinding, type Finding } from '@radical/crucible/findings'
 import type { Io } from './check'
 import { crucibleConfig } from './modelFolder'
@@ -246,12 +247,12 @@ function findingRun(finding: Finding, config: HardenConfig, root: string): TestR
 /** The run of "<file> › <name>": the runner crucible.json gives for the
  *  file's folder, else Vitest in the file's package. */
 function testRun(spec: string, config: HardenConfig, root: string): TestRun | string {
-  const at = spec.indexOf(' › ')
-  if (at < 0) return `--test takes "<file> › <name>", not "${spec}".`
-  const file = spec.slice(0, at).trim()
+  // Written with › or, as Vitest prints it, with >.
+  const [file, ...titles] = testIdParts(spec)
+  if (!titles.length) return `--test takes "<file> › <name>", not "${spec}".`
   // Vitest's -t and Playwright's -g match the title with its describe
   // blocks joined by spaces.
-  const name = spec.slice(at + 3).split(' › ').map((part) => escapeRegExp(part.trim())).join(' ')
+  const name = titles.map((part) => escapeRegExp(part)).join(' ')
   if (!existsSync(resolve(root, file))) return `No test file ${file}.`
   const runner = config.runners.find((r) => file.startsWith(r.files))
   if (runner) {

@@ -28,7 +28,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel, originOf, ownModel } from '@radical/common/model'
 import { REPOSITORY_FILE, builtIn, parseRepositoryFile, serializeRepositoryFile, testsBoundTo, type RepositoryFile } from '@radical/common/repositoryMapping'
-import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, WORD_RULES, computeEvidence, conditionsOf, formatAge, formatTrace, parseCheckConfig, parseMeasurementStore, parseTestResults, quoteValueGaps, testsRanAt, traceOf, verifiedHere, withBoundTests, wordFindings, type CheckModel } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, WORD_RULES, canonicalTestId, computeEvidence, conditionsOf, formatAge, formatTrace, parseCheckConfig, parseMeasurementStore, parseTestResults, quoteValueGaps, testsRanAt, traceOf, verifiedHere, withBoundTests, wordFindings, type CheckModel } from '@radical/common/check'
 import { mappingRoot } from '@radical/node-files/repositoryLayout'
 import { FEDERATION_FILE, parseFederationFile, withOtherModels } from '@radical/common/federation'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
@@ -137,7 +137,7 @@ const SERVER_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'set_verification',
-    description: 'Binds tests of the repository to a scenario or fitness function of the model, in its .radical/radical.json, which radical check, the Inspector and Studio read: it passes when every test bound to it passed and its metric conditions hold. tests (ids as "<file> › <describe> › <title>", or "<file>" for every test in it, from the repository\'s root) replace its tests; remove: true takes the entry out. Call it for each test you write for a scenario. It changes no model file.',
+    description: 'Binds tests of the repository to a scenario or fitness function of the model, in its .radical/radical.json, which radical check, the Inspector and Studio read: it passes when every test bound to it passed and its metric conditions hold. tests (ids as "<file> › <describe> › <title>" (Vitest\'s "<file> > <describe> > <title>" is kept with ›), or "<file>" for every test in it, from the repository\'s root) replace its tests; remove: true takes the entry out. Call it for each test you write for a scenario. It changes no model file.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -629,7 +629,8 @@ export class FolderModel {
       if (!Array.isArray(tests) || !tests.length || !tests.every((t) => typeof t === 'string' && t.trim())) {
         return { ok: false, text: 'set_verification: tests must be a list of test ids ("<file> › <title>"), or remove: true' }
       }
-      const entry = { element: node.id, name: node.label, tests: [...new Set((tests as string[]).map((t) => t.trim()))] }
+      // Kept with ›, also when written as Vitest prints them (with >).
+      const entry = { element: node.id, name: node.label, tests: [...new Set((tests as string[]).map(canonicalTestId))] }
       if (at < 0) repository.verifies.push(entry)
       else repository.verifies[at] = entry
     }

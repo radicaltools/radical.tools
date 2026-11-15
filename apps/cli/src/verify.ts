@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { parseArgs } from 'node:util'
+import { canonicalTestId } from '@radical/common/check'
 import { REPOSITORY_FILE, serializeRepositoryFile, testsBoundTo } from '@radical/common/repositoryMapping'
 import type { Io } from './check'
 import { openElement, shown } from './implement'
@@ -15,7 +16,8 @@ elements share needs the id.
 
   --test <id>      a test to bind, as Vitest and Playwright print it, from
                    the repository's root: <file> › <describe> › <title>, or
-                   <file> for every test in it; more than once for several
+                   <file> for every test in it; more than once for several.
+                   Vitest's <file> > <describe> > <title> is kept with ›
   --drop <id>      a test to take off
   --remove         takes the element's entry out
   --folder <dir>   the model folder (default: the working directory when it
@@ -37,8 +39,9 @@ export async function verifyCommand(args: string[], io: Io): Promise<number> {
   const { values, positionals } = parsed
   if (values.help) { io.out(VERIFY_USAGE); return 0 }
   const wanted = positionals.join(' ').trim()
-  const adds = (values.test ?? []).map((t) => t.trim()).filter(Boolean)
-  const drops = (values.drop ?? []).map((t) => t.trim()).filter(Boolean)
+  // One form of each id, so a test written either way is the same test.
+  const adds = [...new Set((values.test ?? []).map(canonicalTestId).filter(Boolean))]
+  const drops = (values.drop ?? []).map(canonicalTestId).filter(Boolean)
   if (!wanted || (values.remove && (adds.length || drops.length))) { io.err(VERIFY_USAGE); return 2 }
 
   const opened = await openElement(io, values.folder, wanted, ['scenario', 'fitness-fn'])
@@ -55,7 +58,8 @@ export async function verifyCommand(args: string[], io: Io): Promise<number> {
     if (at < 0) { io.out(`${where} has no entry for ${shown(node)}.`); return 0 }
     repository.verifies.splice(at, 1)
   } else {
-    const tests = [...bound.filter((t) => !drops.includes(t)), ...adds.filter((t) => !bound.includes(t))]
+    const kept = bound.filter((t) => !drops.includes(canonicalTestId(t)))
+    const tests = [...kept, ...adds.filter((t) => !kept.some((k) => canonicalTestId(k) === t))]
     const entry = { element: node.id, name: node.label, tests }
     if (!tests.length) repository.verifies.splice(at, 1)
     else if (at < 0) repository.verifies.push(entry)

@@ -23,7 +23,7 @@ import type { ConcernPack } from '../concerns'
 
 export { CHECK_RULES, hardValues, needAnswers, needParts, quoteFragments, quoteSenseGaps, quoteValueGaps, readValues, relationsOf, verifiedHere, WORD_RULES, wordFindings, type CheckRule, type CheckSeverity, type CheckModel, type RepositoryMapping, type RuleFinding } from './rules'
 export { splitTestId } from './testSource'
-export { MESSAGE_LINES, failureMessage, parseTestReport, parseTestIds, type TestCase, type TestId, type TestStatus } from './reports'
+export { MESSAGE_LINES, canonicalTestId, failureMessage, parseTestReport, parseTestIds, testIdParts, type TestCase, type TestId, type TestStatus } from './reports'
 export { TRACE_TYPES, formatTrace, rankOf, traceGap, traceOf, traceTypeLabel, type Trace, type TraceInput, type TraceNode, type TraceResult } from './trace'
 export { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, testsRanAt, type CiRun, type CiSource, type TestResults } from './files'
 export { BOUND_TESTS, ELEMENT_LABEL, TESTED_TYPES, appliedElements, computeEvidence, conditionResults, conditionsOf, measuredElements, withBoundTests, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome, type ConditionOutcome, type ConditionResult } from './evidence'
