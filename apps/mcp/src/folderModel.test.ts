@@ -1042,6 +1042,43 @@ describe('long Smart Layout runs', () => {
     expect((await model.call('grid_nodes', { viewId: 'w', nodeIds: ['r0', 'r1', 'r2', 'r3'], columns: 2 })).ok).toBe(true)
   }, 60_000)
 
+  it('says which new views per element it laid out, and advises for one too large what the server accepts', async () => {
+    // create_view said "Smart Layout arranged the 2 new views per element"
+    // when it had refused API, and the refusal advised update_view kind
+    // table, which update_view refuses for a view per element.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const node = (id: string, type: string, parentId?: string, i = 0) => ({ id, type, label: id === 'api' ? 'API' : id === 'small' ? 'Small' : id, ...(parentId ? { parentId } : {}), x: 20 + (i % 40) * 260, y: 60 + Math.floor(i / 40) * 160, width: 240, height: 140, collapsed: false })
+    data.nodes = [
+      node('shop', 'system'), node('api', 'container', 'shop'), node('small', 'container', 'shop'),
+      ...Array.from({ length: CANVAS_MAX_ELEMENTS }, (_, i) => node(`c${i}`, 'component', 'api', i)),
+      node('s0', 'component', 'small'), node('s1', 'component', 'small', 1),
+    ] as never
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const model = await FolderModel.open(folder)
+    const made = await model.call('create_view', { tempId: 'g', name: 'Components', viewpoint: 'container-components' })
+    expect(made.ok, made.text).toBe(true)
+    const stored = async () => deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data.views!
+    const api = (await stored()).find((v) => v.name === 'API')!
+    expect(made.text).toContain('Smart Layout arranged the new view Small.')
+    expect(made.text).toContain('Not laid out: "API" shows 1,001 elements')
+    expect(made.text).not.toContain('2 new views')
+    expect(Object.keys(api.positions ?? {})).toEqual([])
+    // Each advice the refusals give is a call the server takes.
+    for (const refused of [made.text, (await model.call('smart_layout', { viewId: api.id })).text]) {
+      expect(refused).not.toContain('update_view')
+      expect(refused).toContain('upsert_viewpoint with id "container-components" and kind "table"')
+    }
+    // update_view, which a view per element refuses, points there too.
+    expect((await model.call('update_view', { id: api.id, kind: 'table' })).text).toContain('change the viewpoint "container-components" with upsert_viewpoint')
+    const advised = await model.call('upsert_viewpoint', { id: 'container-components', kind: 'table' })
+    expect(advised.ok, advised.text).toBe(true)
+    expect((await stored()).find((v) => v.id === api.id)!.kind).toBe('table')
+  }, 120_000)
+
   it('takes a type that another writer added to the metamodel since its last call', async () => {
     // The client checks a call against the tool schema, whose list of types
     // is the metamodel the server saw last: a type added by Studio, another

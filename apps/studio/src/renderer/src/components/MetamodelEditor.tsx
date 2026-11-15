@@ -8,6 +8,7 @@ import { DEFAULT_SUMMARIES, nodeSummary, summaryTokens } from '@radical/common/n
 import { markdownToPlain } from '@radical/common/markdown'
 import { MarkdownText } from '@radical/ui/components/MarkdownText'
 import { isTypedField } from '@radical/ui/components/keysHere'
+import { takeViewpointToEdit } from '@radical/ui/components/LargeCanvasNotice'
 import type {
   NodeTypeDef,
   RelationTypeDef,
@@ -780,18 +781,21 @@ function ViewpointCard({
   summary,
   viewCount,
   nodeTypes,
+  focusToken,
   onChange,
   onDelete,
 }: {
   def: ViewpointDef
   summary: string
   viewCount: number
+  focusToken?: number
   /** The metamodel's node types, for what a viewpoint draws one of. */
   nodeTypes: Array<{ id: string; label: string }>
   onChange: (next: ViewpointDef) => void
   onDelete: () => void
 }): React.ReactElement {
   const [open, setOpen] = useState(false)
+  const ref = useCardFocus(focusToken, setOpen)
   // A viewpoint keeps a name: an emptied field goes back to it.
   const [label, setLabel] = useState(def.label)
   useEffect(() => setLabel(def.label), [def.label])
@@ -801,7 +805,7 @@ function ViewpointCard({
   }
 
   return (
-    <div className="mm-card">
+    <div ref={ref} className={`mm-card${focusToken !== undefined ? ' focused' : ''}`}>
       <div className="mm-card-header" onClick={() => setOpen((v) => !v)} {...headerKeys(() => setOpen((v) => !v))} aria-expanded={open} aria-label={def.label}>
         <svg className={`mm-chevron${open ? ' open' : ''}`} viewBox="0 0 16 16" width="10" height="10">
           <path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -1054,13 +1058,21 @@ export function MetamodelEditor(): React.ReactElement {
   const [selection, setSelection] = useState<DiagramSelection>(null)
   const [diagramFilter, setDiagramFilter] = useState<MetamodelGraphFilter>(DEFAULT_DIAGRAM_FILTER)
   // Card to open + scroll to in the list; the counter re-triggers the same card.
-  const [focusCard, setFocusCard] = useState<{ kind: 'type' | 'relation'; id: string; token: number } | null>(null)
+  const [focusCard, setFocusCard] = useState<{ kind: 'type' | 'relation' | 'viewpoint'; id: string; token: number } | null>(null)
+  // Opened from a view's notice (Edit the viewpoint): on that viewpoint's card.
+  useEffect(() => {
+    const viewpoint = takeViewpointToEdit()
+    if (!viewpoint) return
+    setFocusCard((cur) => ({ kind: 'viewpoint', id: viewpoint, token: (cur?.token ?? 0) + 1 }))
+    setTab('list')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const editInList = (s: NonNullable<DiagramSelection>): void => {
     if (s.kind === 'relation' && s.id === CONTAINS_EDGE) return
     setFocusCard((cur) => ({ kind: s.kind, id: s.id, token: (cur?.token ?? 0) + 1 }))
     setTab('list')
   }
-  const focusTokenFor = (kind: 'type' | 'relation', id: string): number | undefined =>
+  const focusTokenFor = (kind: 'type' | 'relation' | 'viewpoint', id: string): number | undefined =>
     focusCard && focusCard.kind === kind && focusCard.id === id ? focusCard.token : undefined
 
   // Esc clears the diagram selection first, then closes the editor.
@@ -1213,6 +1225,7 @@ export function MetamodelEditor(): React.ReactElement {
                 def={t}
                 summary={chainSummary(t.pipeline, viewpointCtx)}
                 viewCount={Object.values(views).filter((v) => v.viewpoint === t.id).length}
+                focusToken={focusTokenFor('viewpoint', t.id)}
                 nodeTypes={Object.entries(metamodel.nodeTypes).map(([id, n]) => ({ id, label: n.label }))}
                 onChange={(next) => (JSON.stringify(next.subject ?? null) === JSON.stringify(t.subject ?? null)
                   ? setMetamodel(withViewpoint(metamodel, next))

@@ -303,6 +303,17 @@ function settleGeometry(before: DiagramData, after: DiagramData): void {
   }
 }
 
+/** What a write's layout of the views per element it made did: the views
+ *  Smart Layout arranged, and why it left the others (`notLaidOut`, its
+ *  refusals: a view larger than a canvas draws). It said every new view
+ *  was arranged (F-0160). */
+function freshLayoutNote(arranged: DiagramView[], notLaidOut: string[]): string {
+  const done = arranged.length
+    ? ` Smart Layout arranged ${arranged.length === 1 ? `the new view ${arranged[0].name}` : `the ${arranged.length} new views per element`}.`
+    : ''
+  return done + notLaidOut.map((why) => ` Not laid out: ${why}`).join('')
+}
+
 /** Whether `view` draws `node` folded: folded there, or on the model and
  *  not opened there. */
 const foldedOn = (view: DiagramView, node: C4Node): boolean =>
@@ -974,11 +985,15 @@ export class FolderModel {
       // is laid out at once, as Studio does when it is first opened.
       const known = new Set((data.views ?? []).map((v) => v.id))
       const fresh = (changed.views ?? []).filter((v) => v.partOf && !known.has(v.id) && (v.kind ?? 'static') === 'static' && !Object.keys(v.positions ?? {}).length)
+      const arranged: DiagramView[] = []
+      const notLaidOut: string[] = []
       for (const view of fresh) {
         const laidOut = await this.smartLayout(changed, metamodel, view.id)
         if (laidOut.changed) changed = laidOut.changed
+        if (laidOut.ok) arranged.push(view)
+        else notLaidOut.push(laidOut.text.replace(/^smart_layout: /, ''))
       }
-      const note = fresh.length ? ` Smart Layout arranged ${fresh.length === 1 ? `the new view ${fresh[0].name}` : `the ${fresh.length} new views per element`}.` : ''
+      const note = freshLayoutNote(arranged, notLaidOut)
       const outcome = await this.commit(session, before, data, changed, metamodel, result.resultText + note, metamodelBefore)
       if (!outcome.ok) {
         this.restoreTempIds(priorTempIds)
