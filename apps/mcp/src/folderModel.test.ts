@@ -1711,6 +1711,32 @@ describe('requirements reviewed against their needs', () => {
     expect(lost.text).toContain('Requirement "Basket size" says "25", "7"')
   })
 
+  it("tells nothing of the person's words after a write that only takes findings away: a value corrected, a part quoted, a scenario added (Write tells of a lost value)", async () => {
+    const model = await FolderModel.open(await fixture())
+    const words = "The person's words"
+    await model.call('add_node', { tempId: 'need', type: 'need', label: 'Basket brief', description: 'Q: What are the limits?\nA: A basket holds at most 20 items and is kept for 30 days.\n\nQ: What else?\nA: Members pay no delivery fee.\n\nA guest pays 5 € for delivery.' })
+    await model.call('add_node', { tempId: 'req', type: 'requirement', label: 'Basket limit', properties: { ears_type: 'ubiquitous', action: 'keep at most 25 items in a basket for 7 days' } })
+    const told = await model.call('add_relation', { sourceId: 'req', targetId: 'need', relationType: 'derives', properties: { quote: 'A basket holds at most 20 items and is kept for 30 days.' } })
+    expect(told.text).toContain('does not say "20", "30"')
+    const quiet = async (what: string, name: string, args: Record<string, unknown>) => {
+      const result = await model.call(name, args)
+      expect(result.ok, result.text).toBe(true)
+      expect(result.text, what).not.toContain(words)
+    }
+    await quiet('one of two wrong values corrected', 'update_node', { id: 'req', properties: { action: 'keep at most 20 items in a basket for 7 days' } })
+    // A wrong value in place of another is brought in, and told with the one left.
+    const other = await model.call('update_node', { id: 'req', properties: { action: 'keep at most 20 items in a basket for 8 days' } })
+    expect(other.text).toContain('Requirement "Basket limit" says "8"')
+    await quiet('the other corrected', 'update_node', { id: 'req', properties: { action: 'keep at most 20 items in a basket for 30 days' } })
+    await model.call('add_node', { tempId: 'req2', type: 'requirement', label: 'Member delivery', properties: { ears_type: 'ubiquitous', action: 'charge members no delivery fee' } })
+    await quiet('one of two parts of an answer quoted', 'add_relation', { sourceId: 'req2', targetId: 'need', relationType: 'derives', properties: { quote: 'Members pay no delivery fee.' } })
+    await model.call('add_node', { tempId: 'sc', type: 'scenario', label: 'Full basket', properties: { given: 'a basket', when: 'adding an item', then: 'it is refused' } })
+    expect((await model.call('add_relation', { sourceId: 'sc', targetId: 'req', relationType: 'verifies' })).text).toContain('takes "20", "30"')
+    await quiet('the scenario names one of two values', 'update_node', { id: 'sc', properties: { given: 'a basket with 20 items' } })
+    await model.call('add_node', { tempId: 'sc2', type: 'scenario', label: 'Old basket', properties: { given: 'a basket', when: 'time passes', then: 'it is gone' } })
+    await quiet('a second scenario that names neither', 'add_relation', { sourceId: 'sc2', targetId: 'req', relationType: 'verifies' })
+  })
+
   it('asks agents for the person\'s words in the need and a review before the code (Agent told to keep answers and review)', async () => {
     const folder = await fixture()
     const model = await FolderModel.open(folder)

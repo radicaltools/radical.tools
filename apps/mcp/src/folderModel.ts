@@ -1182,11 +1182,14 @@ export class FolderModel {
     } catch { /* no check.json: every rule on */ }
     const findings = (d: DiagramData) => wordFindings({ nodes: byId(d.nodes), relations: byId(d.relations), metamodel }, off)
     // A finding is the same one by its rule, what it is about and what it
-    // says; the model before is read with the names the change gives, so a
-    // rename brings in nothing.
-    const key = (f: { rule: string; message: string; nodeId?: string; relationId?: string }) => `${f.rule}\0${f.nodeId ?? ''}\0${f.relationId ?? ''}\0${f.message}`
-    const before = new Set(findings(withLabelsOf(data, changed)).map(key))
-    return findings(changed).filter((f) => !before.has(key(f)))
+    // says, or, when it names values or parts, by each of them: one that
+    // only names fewer (a value corrected, a part quoted) is not new. The
+    // model before is read with the names the change gives, so a rename
+    // brings in nothing.
+    const place = (f: { rule: string; nodeId?: string; relationId?: string }) => `${f.rule}\0${f.nodeId ?? ''}\0${f.relationId ?? ''}`
+    const keys = (f: { rule: string; message: string; nodeId?: string; relationId?: string; about?: string[] }) => f.about?.length ? f.about.map((a) => `${place(f)}\0${a}`) : [`${place(f)}\0${f.message}`]
+    const before = new Set(findings(withLabelsOf(data, changed)).flatMap(keys))
+    return findings(changed).filter((f) => keys(f).some((k) => !before.has(k)))
   }
 
   /** Tell Studio, open on the folder, that an agent is writing it: it holds
