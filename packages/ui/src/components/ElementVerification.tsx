@@ -95,6 +95,9 @@ export function ElementVerification({ nodeId }: { nodeId: string }): React.React
   const findings = useCardVerification((s) => s.findings[nodeId])
   const path = useVerificationPath()
   const pathMode = useDiagramStore((s) => !s.presentationActive && (s.appMode === 'designer' || s.appMode === 'viewer' || s.appMode === 'inspector'))
+  // The path is the live model's, as the Inspector is: an element only the
+  // milestone shown has is on none (Path opened the Inspector with no path).
+  const onlyInMilestone = useDiagramStore((s) => !!s.activeSnapshotId && !!s.liveBackup && !s.liveBackup.nodes[nodeId])
   if (!node) return null
   const onPath = (TRACE_TYPES as readonly string[]).includes(node.type)
   const offerPath = onPath && !!path.open && pathMode
@@ -107,8 +110,8 @@ export function ElementVerification({ nodeId }: { nodeId: string }): React.React
         <span>Verification</span>
         {entry && <span className={`pp-ver-status ${tone(entry.status)}`}>{MARK[entry.status] ?? '○'} {say(entry.status)}</span>}
         {offerPath && (
-          <button type="button" className="pp-head-btn pp-ver-path" disabled={!!path.unavailable} onClick={() => path.open?.(nodeId)}
-            title={path.unavailable ?? 'Verification path: from its need or ADR to the tests and measurements that check it, in the Inspector'}>Path</button>
+          <button type="button" className="pp-head-btn pp-ver-path" disabled={!!path.unavailable || onlyInMilestone} onClick={() => path.open?.(nodeId)}
+            title={path.unavailable ?? (onlyInMilestone ? 'Only the milestone shown has this element; the verification path is the live model\'s' : 'Verification path: from its need or ADR to the tests and measurements that check it, in the Inspector')}>Path</button>
         )}
       </div>
       {conditions.length > 0 && (
