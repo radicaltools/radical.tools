@@ -45,6 +45,23 @@ test('a concept added from a Hub link in Viewer reaches the model', async ({ pag
   expect((await studio.storedDoc()).nodes.length).toBe(before + 20)
 })
 
+test('a concept added from a Hub link in Presenter reaches the model, as from Viewer', async ({ page, studio }) => {
+  // Presenter is a perspective for looking too: the pack was drawn there,
+  // never saved, and gone in Designer.
+  const doc = JSON.parse(fixture('bookstore'))
+  doc.metamodel = { id: 'c4-ddd-governance-builtin', name: 'Radical', nodeTypes: {}, relationTypes: {} }
+  await studio.seedDocument(JSON.stringify(doc))
+  await page.goto(`/?hub=concern-authentication#/d/${encodeURIComponent(`ls:${DOC_ID}`)}/m/presenter/v/canvas`)
+  await studio.ready()
+  const before = (await studio.storedDoc()).nodes.length
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Presenter/)
+  await page.getByTestId('concern-wizard').getByRole('button', { name: 'Add to model' }).click()
+  await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(before + 20)
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+  await studio.settle()
+  expect((await studio.storedDoc()).nodes.length).toBe(before + 20)
+})
+
 test('a concern pack is imported with its answers and bound to the element in one undo step', async ({ page, studio }) => {
   const box = { x: 0, y: 0, width: 200, height: 100, collapsed: false }
   await studio.seedDocument(JSON.stringify({

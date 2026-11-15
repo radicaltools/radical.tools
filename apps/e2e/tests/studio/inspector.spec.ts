@@ -205,6 +205,17 @@ test('the Inspector opens on Overview with what needs attention, and each findin
   await expect(undecided).toBeVisible()
   await attention.getByRole('button', { name: 'All', exact: true }).click()
   await expect(attention.locator('details.insp-group[data-rule="test-failed"]')).toBeVisible()
+
+  // Made as Designer makes it: saved to the folder, and in Designer one
+  // Undo takes it back (the scenario, its link and its place in the view).
+  const saved = async (): Promise<boolean> => Object.values(await folder.files()).some((text) => text.includes('Refunding a payment'))
+  await expect.poll(saved, { timeout: 10_000 }).toBe(true)
+  await page.locator('.toolbar-mode-btn', { hasText: 'Designer' }).click()
+  const undo = page.getByRole('button', { name: 'Undo', exact: true })
+  await expect(undo).toBeEnabled()
+  await undo.click()
+  await expect(undo).toBeDisabled()
+  await expect.poll(saved, { timeout: 10_000 }).toBe(false)
 })
 
 test('the Inspector header says how old the test results are, and how to read them again', async ({ page, studio }) => {
@@ -577,4 +588,17 @@ test('the Inspector asks the questions of an unaddressed concern and the import 
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Inspector/)
   await expect(page.locator('.insp-item').filter({ hasText: 'Authentication:' })).toHaveCount(0, { timeout: 10_000 })
   await expect(page.getByTestId('concern-finding').first()).toBeVisible()
+
+  // Made as Designer makes it: the pack's elements and its view are saved to
+  // the folder, and in Designer they are there, one Undo taking them back.
+  const decision = async (): Promise<boolean> => Object.values(await folder.files()).some((text) => text.includes('Public by design'))
+  const packView = async (): Promise<boolean> => ((await folder.files())['views.json'] ?? '').includes('Concerns')
+  await expect.poll(decision, { timeout: 10_000 }).toBe(true)
+  await expect.poll(packView, { timeout: 10_000 }).toBe(true)
+  await page.locator('.toolbar-mode-btn', { hasText: 'Designer' }).click()
+  const undo = page.getByRole('button', { name: 'Undo', exact: true })
+  await expect(undo).toBeEnabled()
+  await undo.click()
+  await expect(undo).toBeDisabled()
+  await expect.poll(decision, { timeout: 10_000 }).toBe(false)
 })

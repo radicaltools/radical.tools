@@ -14,7 +14,7 @@ import type { C4Node, C4Relation, DiagramData, DiagramSequence, DiagramSnapshot,
 import { MD_FOLDER_JSON_FILES, MD_MANIFEST_FILE, deserializeFromMdFolder, isValidMdFolderManifest, mdFolderNodeFiles, type FolderFiles } from '../formats/mdFolder'
 import { documentMetamodel, milestoneViews, originOf } from '../model'
 import { repositoryPart } from '../repositoryMapping'
-import { CHECK_RULES, type CheckSeverity, type RepositoryMapping, type RuleFinding } from './rules'
+import { CHECK_RULES, type CheckModel, type CheckSeverity, type RepositoryMapping, type RuleFinding } from './rules'
 import { BOUND_TESTS, computeEvidence, withBoundTests, type Evidence } from './evidence'
 import { GOAL_RULE, isMetricId, measureGoals, type CheckDimension, type CheckMetricResult, type GoalSetting } from './goals'
 import type { TestCase } from './reports'
@@ -251,6 +251,16 @@ export function runCheck(files: FolderFiles, given: CheckConfig = {}, options: C
   return model.evidence ? { ...result, evidence: model.evidence } : result
 }
 
+/** A finding about a relation leads to an element too, its source (the
+ *  requirement whose quote it is): Studio draws the element's chip and Open
+ *  and lists it on the element's card. Said of the relation alone, it had
+ *  neither, though the Inspector says each finding leads to its element. */
+function withElement(finding: RuleFinding, model: Pick<CheckModel, 'nodes' | 'relations'>): RuleFinding {
+  if (finding.nodeId || !finding.relationId) return finding
+  const source = model.relations[finding.relationId]?.sourceId
+  return source && model.nodes[source] ? { ...finding, nodeId: source } : finding
+}
+
 interface ModelCheck {
   found: Array<RuleFinding & { rule: string }>
   nodeCount: number
@@ -335,7 +345,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
   const boundHere = (rule: { readsReports?: true }, id: string | undefined): boolean => !!rule.readsReports && !!id && BOUND_TESTS in (nodes[id] ?? {})
   for (const rule of CHECK_RULES) {
     rule.run(model).forEach((finding) => {
-      if (!(finding.nodeId && theirs.has(finding.nodeId) && !boundHere(rule, finding.nodeId)) && !(finding.relationId && theirs.has(finding.relationId))) found.push({ rule: rule.id, ...finding })
+      if (!(finding.nodeId && theirs.has(finding.nodeId) && !boundHere(rule, finding.nodeId)) && !(finding.relationId && theirs.has(finding.relationId))) found.push({ rule: rule.id, ...withElement(finding, model) })
     })
   }
   // On the whole model: another model's fitness function counts where its

@@ -78,6 +78,18 @@ test('the verification path goes from a requirement to its need and to the test 
   await panel.getByLabel('Only what does not pass').check()
   await expect(panel.getByTestId('trace-node')).toHaveText([/Pay online/, /Take card payments/, /Refunding a card/])
   await panel.getByLabel('Only what does not pass').uncheck()
+  // On the path of a scenario that passes, what passes is left out and the
+  // scenario kept as asked for, with no gap where the whole path has none
+  // (it said the scenario names no check).
+  await panel.getByTestId('trace-node').filter({ hasText: 'Paying by card' }).locator('.trace-label').click()
+  await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 's-green')
+  await panel.getByLabel('Only what does not pass').check()
+  await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 's-green')
+  await expect(panel.getByTestId('trace-result')).toHaveCount(0)
+  await expect(panel.locator('.trace-gap')).toHaveCount(0)
+  await panel.getByLabel('Only what does not pass').uncheck()
+  await panel.getByRole('button', { name: '← Back' }).click()
+  await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 'req')
 
   // A click on the need makes the path the need's; Back returns.
   await panel.getByTestId('trace-node').filter({ hasText: 'Pay online' }).locator('.trace-label').click()
@@ -156,4 +168,54 @@ test('the properties card in Viewer opens the verification path in the Inspector
   await page.locator('.toolbar-mode-btn', { hasText: 'Inspector' }).click()
   await expect(page.getByRole('tab', { name: /^Overview/ })).toBeVisible()
   await expect(panel).toBeHidden()
+})
+
+test('with a milestone shown, the Inspector opens the live model\'s elements, and Path waits on what only the milestone has', async ({ page, studio }) => {
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  // Since the milestone v1 Cards the refund scenario was deleted and a
+  // requirement without a scenario added.
+  const model: DiagramData = {
+    ...MODEL,
+    nodes: [...MODEL.nodes.filter((n) => n.id !== 's-red'), node('later', 'requirement', 'Pay in instalments', { x: 300, y: 220, ears_type: 'ubiquitous', action: 'pay in instalments' })],
+    relations: [...MODEL.relations.filter((r) => r.id !== 'r3'), { id: 'r4', relationType: 'derives', sourceId: 'later', targetId: 'need' }],
+    views: [{ id: 'v-spec', name: 'Specification', nodeIds: [], positions: {} }],
+    snapshots: [{ id: 'm1', name: 'v1 Cards', timestamp: Date.now() - 86400e3, nodes: Object.fromEntries(MODEL.nodes.map((n) => [n.id, n])), relations: Object.fromEntries(MODEL.relations.map((r) => [r.id, r])) }],
+  }
+  for (const [path, content] of Object.entries(serializeToMdFolder(model, 'Shop'))) await folder.write(path, content)
+  await folder.write('.state/test-results.json', serializeTestResults([
+    { file: '/repo/tests/pay.test.ts', title: ['pays by card'], status: 'passed' },
+    { file: '/repo/tests/pay.test.ts', title: ['refunds'], status: 'failed' },
+  ], ['reports/unit.json']))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await expect(page.locator('.welcome-overlay')).toBeHidden()
+  await studio.ready()
+  await expect(page.getByRole('button', { name: /^Inspector/ })).toBeEnabled({ timeout: 10_000 })
+  await studio.designer()
+  await page.getByRole('tab', { name: 'Milestones' }).click()
+  await page.locator('.lp-snap-card', { hasText: 'v1 Cards' }).first().click()
+  await expect(page).toHaveURL(/\/s\/m1/)
+
+  // The refund scenario is the milestone's alone: its path, the live
+  // model's, has no place for it.
+  await studio.node('s-red').dblclick()
+  await expect(studio.properties.locator('.pp-title')).toHaveValue('Refunding a card')
+  const path = studio.properties.getByRole('button', { name: 'Path', exact: true })
+  await expect(path).toBeDisabled()
+  await expect(path).toHaveAttribute('title', /Only the milestone shown has this element/)
+
+  // The Inspector reads the live model, and so does the card it opens.
+  await page.locator('.toolbar-mode-btn', { hasText: 'Inspector' }).click()
+  const missing = page.getByRole('region', { name: 'Needs attention' }).locator('details.insp-group[data-rule="requirement-without-scenario"]')
+  await missing.locator('summary').click()
+  await missing.getByRole('button', { name: 'Open Pay in instalments' }).click()
+  const peek = page.getByRole('complementary', { name: 'Properties' })
+  await expect(peek.locator('.pp-title')).toHaveText('Pay in instalments')
+
+  // Designer shows the milestone again.
+  await studio.designer()
+  await expect(page).toHaveURL(/\/s\/m1/)
+  await expect(studio.node('s-red')).toBeVisible()
 })

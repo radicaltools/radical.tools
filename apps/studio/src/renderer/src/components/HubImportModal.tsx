@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useHubStore, type HubConcept, type HubConceptSummary } from '@radical/ui/store/hubStore'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { editAsDesigner } from '@radical/ui/store/designerEdit'
 import { useDialogFocus } from './dialogKeys'
 import { bindProblem, bindSuggestions, CONCERN_GROUPS, isConcernPack, metamodelProblem, type BindSuggestion } from '@radical/common/concerns'
 import { categoryTheme, hubGroupOf } from '@radical/ui/types/hubTheme'
@@ -332,12 +333,12 @@ export function HubImportModal({ open, onClose, preselectedIds, bindTo }: Props)
               else setConcernConcept(null)
             }}
             onImport={(answers, elementIds) => {
-              // Viewer shows a model that is never saved; elsewhere (the
-              // Inspector, which opened it) the user stays to see the
+              // Viewer, Presenter and the Inspector show a model that is
+              // never saved: the import is Designer's edit. From the
+              // Inspector, which opened it, the user stays to see the
               // concern settled.
-              if (useDiagramStore.getState().appMode === 'viewer') useDiagramStore.getState().setAppMode('designer')
               try {
-                importConcernPackIntoDiagram(concernConcept, answers, elementIds)
+                if (!editAsDesigner(() => importConcernPackIntoDiagram(concernConcept, answers, elementIds))) return
               } catch (error) {
                 useDiagramStore.getState().pushNotification((error as Error).message, 'error')
                 return

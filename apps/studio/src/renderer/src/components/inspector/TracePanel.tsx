@@ -47,14 +47,19 @@ export const vscodeLink = (root: string, path: string, line?: number): string =>
 
 const failing = (status: string | undefined): boolean => !!status && !PASSING.has(status)
 
+/** An element of the path as drawn, with the gap of the whole path under
+ *  it when what passes was left out. */
+type PathNode = TraceNode & { gap?: string | null }
+
 /** The path with only what does not pass, the element asked for and what
- *  leads to it kept. */
-function onlyFailing(n: TraceNode): TraceNode | null {
-  const children = n.children.map(onlyFailing).filter((c): c is TraceNode => !!c)
+ *  leads to it kept. Each keeps the gap it has on the whole path: emptied of
+ *  what passes, a verified requirement said no scenario verified it. */
+function onlyFailing(n: TraceNode): PathNode | null {
+  const children = n.children.map(onlyFailing).filter((c): c is PathNode => !!c)
   const results = n.results.filter((r) => r.outcome !== 'passed')
   const elements = n.elements?.filter((e) => failing(e.status)).map((e) => ({ ...e, results: e.results.filter((r) => r.outcome !== 'passed') }))
   const keep = failing(n.status) || n.target || children.length > 0
-  return keep ? { ...n, children, results, ...(elements ? { elements } : {}) } : null
+  return keep ? { ...n, children, results, ...(elements ? { elements } : {}), gap: traceGap(n) } : null
 }
 
 /** Each element, result and gap at its column and row: a child in the
@@ -77,7 +82,7 @@ function layout(roots: TraceNode[], folded: Set<string>): { items: Item[]; cols:
       el.results.forEach((r, j) => { if (j) row++; items.push({ kind: 'result', key: `${ek}#r${j}`, col: col + 2, row, parent: ek, r }) })
     }
     for (const c of n.children) { next(); visit(c, col + 1, key, `${key}/${c.id}`) }
-    const gap = traceGap(n)
+    const gap = (n as PathNode).gap !== undefined ? (n as PathNode).gap : traceGap(n)
     if (gap) { next(); items.push({ kind: 'gap', key: `${key}#gap`, col: col + 1, row, parent: key, text: gap }) }
   }
   roots.forEach((r, i) => { if (i) row++; visit(r, 0, undefined, r.id) })

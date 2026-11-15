@@ -1008,6 +1008,35 @@ function parkDesigner(state: DiagramStore): ParkedDesigner {
   }
 }
 
+/** What the Inspector set aside to show the live model: the milestone shown
+ *  where it was opened from, put back on the way to Viewer or Presenter
+ *  (Designer gets its parked model back). */
+let _inspectorAside: ParkedDesigner | null = null
+
+/** The Inspector is about the live model: its lists read it, and so do the
+ *  card it opens and the edits it offers. A milestone shown is set aside
+ *  while it is open; its card showed the milestone's element, or nothing. */
+function _liveInInspector(): void {
+  const s = useDiagramStore.getState()
+  const backup = s.liveBackup
+  if (!s.activeSnapshotId || !backup) return
+  _inspectorAside = parkDesigner(s)
+  useDiagramStore.setState((state) => {
+    state.c4Nodes = backup.nodes as any
+    state.c4Relations = backup.relations as any
+    if (backup.sequences) state.sequences = backup.sequences as any
+    if (backup.hubTemplates) state.hubTemplates = backup.hubTemplates as any
+    unparkLiveViews(state as DiagramStore, backup)
+    state.activeSnapshotId = null
+    state.liveBackup = null
+    state.milestoneDirty = false
+    state.diffHighlight = {} as any
+    state.diffBaseSnapshotId = null
+    state.diffGhostNodes = {} as any
+    state.diffGhostRelations = {} as any
+  })
+}
+
 /** The live model of a parked Designer: its nodes, unless it was showing a
  *  milestone and had the live model set aside. */
 export function parkedLiveModel(pre: ParkedDesigner): { nodes: Record<string, C4Node>; relations: Record<string, C4Relation>; sequences: Record<string, DiagramSequence> } {
@@ -8759,11 +8788,13 @@ export const useDiagramStore = create<DiagramStore>()(
           // Edits of a milestone not yet kept or dropped stay Designer's
           // question: Viewer and Presenter browse without being asked.
           set((state) => { state.milestoneDirty = false; state.milestonePromptOpen = false })
-        } else if (!editing(prevMode) && (editing(mode) || prevMode === 'presenter') && W.__preModeLayout) {
+        } else if (!editing(prevMode) && (editing(mode) || prevMode === 'presenter' || (prevMode === 'inspector' && _inspectorAside)) && W.__preModeLayout) {
           // Back to Designer: its parked model. From Presenter to Viewer as
           // well, kept parked: what the last slide showed (its places, its
-          // folds, its model) stayed in Viewer until a view switch.
-          const pre = W.__preModeLayout as ParkedDesigner
+          // folds, its model) stayed in Viewer until a view switch. From the
+          // Inspector to Viewer or Presenter, the milestone it set aside.
+          const pre = (!editing(mode) && _inspectorAside) || W.__preModeLayout as ParkedDesigner
+          _inspectorAside = null
           set((state) => {
             state.c4Nodes = pre.c4Nodes as any
             state.c4Relations = pre.c4Relations as any
@@ -8824,6 +8855,7 @@ export const useDiagramStore = create<DiagramStore>()(
         } else {
           get().startLiveLayout()
         }
+        if (mode === 'inspector') _liveInInspector()
         set((state) => { state.appMode = mode as any; state.slideTreemapFocus = null; state.slideWikiPage = null })
         // Rebuild rfNodes so per-node draggable/selectable flags reflect
         // the new mode (designer = editable, viewer/presenter = locked).
