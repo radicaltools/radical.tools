@@ -17,7 +17,7 @@ import { create } from 'zustand'
 import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
 import { AGENT_ACTIVE_MS } from '@radical/common/formats/agentActivity'
 import { viewShownNodes } from '@radical/common/viewPipeline'
-import { computeSnapDiff, useDiagramStore } from '@radical/ui/store/diagramStore'
+import { computeSnapDiff, typingInField, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { onUserCamera } from '@radical/ui/store/userCamera'
 import { loadingDocumentId, onOutsideEditLoaded } from './autosave'
 import { agentForgePhase, useAgentForgeStore } from './agentForge'
@@ -49,10 +49,14 @@ let paused = false
 let switching = false
 /** The framing waiting for the canvas to draw the view. */
 let frameTimer: ReturnType<typeof setTimeout> | null = null
+/** What the agent's writes touched while a field had the focus: followed
+ *  once it lets the focus go (followHeld). */
+let held: { ends: Set<string>; touched: string[] } | null = null
 
 export function setFollowAgent(on: boolean): void {
   turn = new Set()
   unseen = new Set()
+  held = null
   paused = false
   useFollowAgentStore.setState({ on })
 }
@@ -117,7 +121,28 @@ onOutsideEditLoaded((before) => {
   // view of that far end.
   for (const id of ends) if (!touched.includes(id)) unseen.add(id)
   for (const id of unseen) if (!nodes[id]) unseen.delete(id)
+  if (held) {
+    for (const id of held.ends) ends.add(id)
+    touched.push(...held.touched.filter((id) => !touched.includes(id)))
+    held = null
+  }
+  // While the user types into a field (an element's name in its card),
+  // following waits until the field lets the focus go: a view opened then
+  // closed the card, and the next keys were lost (F-0131).
+  if (fieldHasFocus()) {
+    held = { ends, touched }
+    return
+  }
+  follow(ends, touched)
+})
 
+/** Opens the view that shows what is still to be shown and frames the
+ *  turn there; `ends` are the far ends of the relations the agent touched,
+ *  `touched` what it added or changed. */
+function follow(ends: Set<string>, touched: string[]): void {
+  const s = useDiagramStore.getState()
+  const nodes = s.c4Nodes as Record<string, C4Node>
+  const relations = s.c4Relations as Record<string, C4Relation>
   // What is still to be shown; a change of views alone (Forge filing a
   // stage) may be what shows it.
   const target = viewFor([...unseen], nodes, relations)
@@ -141,7 +166,31 @@ onOutsideEditLoaded((before) => {
       ;(window as unknown as { __rfFocusNodes?: (ids: string[], opts?: { duration?: number }) => void }).__rfFocusNodes?.(ids, { duration: 600 })
     }
   }, 120)
-})
+}
+
+/** A text field has the focus: the card's Name (typingInField), or any
+ *  other input, text area or editable text on the page. */
+function fieldHasFocus(): boolean {
+  if (typingInField()) return true
+  const el = typeof document !== 'undefined' ? document.activeElement as HTMLElement | null : null
+  if (!el) return false
+  return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable
+}
+
+/** Once the field has let the focus go (and no other field took it), what
+ *  waited for it is followed. */
+function followHeld(): void {
+  if (!held || fieldHasFocus()) return
+  const { ends, touched } = held
+  held = null
+  if (!useFollowAgentStore.getState().on || paused) return
+  const s = useDiagramStore.getState()
+  if (s.activeSnapshotId || s.presentationActive) return
+  for (const id of unseen) if (!s.c4Nodes[id]) unseen.delete(id)
+  follow(ends, touched)
+}
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('focusout', () => setTimeout(followHeld, 0))
 
 /** The user takes the camera or the view: following waits for the next turn. */
 function pause(): void {
