@@ -651,7 +651,7 @@ test('Delete pressed in a dialog leaves the element selected behind it alone', a
   for (const d of dialogs) {
     await studio.nodeByLabel('Payment Provider').click()
     await page.getByRole('button', { name: d.menu, exact: true }).click()
-    await page.getByRole('menuitem', { name: d.item }).click()
+    await page.getByRole('menuitem', { name: d.item, exact: typeof d.item === 'string' }).click()
     const dialog = page.getByRole('dialog', { name: d.name })
     await expect(dialog).toBeVisible()
     await page.keyboard.press('Delete')
