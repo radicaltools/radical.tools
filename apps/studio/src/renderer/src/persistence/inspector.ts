@@ -101,8 +101,13 @@ export async function saveCheckConfig(edited: CheckConfig): Promise<void> {
   if (repository && await documents.canWriteRepositoryFile(id)) {
     const unbound = edited.rules?.['test-unbound']
     const lists = typeof unbound === 'object' ? { ...(unbound.include?.length ? { include: unbound.include } : {}), ...(unbound.exclude?.length ? { exclude: unbound.exclude } : {}) } : {}
+    // What else the file says, and keys of its own that Settings do not edit, stay.
     const { tests: _tests, ci: _ci, ...rest } = repository
-    const next: RepositoryFile = { ...rest, ...(Object.keys(lists).length ? { tests: lists } : {}), ...(edited.ci?.artifacts?.length ? { ci: { artifacts: edited.ci.artifacts } } : {}) }
+    const { include: _include, exclude: _exclude, ...testsRest } = repository.tests ?? {}
+    const { artifacts: _artifacts, ...ciRest } = repository.ci ?? {}
+    const tests = { ...testsRest, ...lists }
+    const ci = { ...ciRest, ...(edited.ci?.artifacts?.length ? { artifacts: edited.ci.artifacts } : {}) }
+    const next: RepositoryFile = { ...rest, ...(Object.keys(tests).length ? { tests } : {}), ...(Object.keys(ci).length ? { ci } : {}) }
     await documents.writeRepositoryFile(id, serializeRepositoryFile(next))
     useDiagramStore.setState({ repository: next })
     config = withoutRepositorySettings(edited)
