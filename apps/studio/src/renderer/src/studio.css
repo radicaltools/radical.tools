@@ -39,6 +39,17 @@
     "rail timetravel timetravel";
 }
 .app-layout.mode-presentation.lp-collapsed { grid-template-columns: var(--rail-w) 0 1fr; }
+/* Another model's view: its read-only bar (OtherModelViewBar) has a row of
+   its own above the view, where it covers none of the view's controls. */
+.app-layout.other-model-shown,
+.app-layout.mode-presentation.other-model-shown {
+  grid-template-rows: 48px auto 1fr auto;
+  grid-template-areas:
+    "rail toolbar    toolbar"
+    "rail leftpanel  otherbar"
+    "rail leftpanel  canvas"
+    "rail timetravel timetravel";
+}
 /* Active presenting — canvas only, HUD is a fixed overlay */
 .app-layout.mode-presenting {
   grid-template-columns: 1fr;
