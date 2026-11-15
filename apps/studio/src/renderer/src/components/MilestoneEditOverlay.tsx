@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
 import { keepKeysHere } from '@radical/ui/components/keysHere'
 
@@ -37,7 +38,8 @@ export function MilestoneEditOverlay(): React.ReactElement | null {
 
   if (!shown) return null
 
-  return (
+  // On the dialogs' layer in the body, over what was opened before it.
+  return createPortal(
     <div className="milestone-modal-backdrop" onClick={dismiss}>
       {/* A modal dialog: Studio's shortcuts stay out of it (dialogKeys). F5
           started a presentation behind it, and its Propagate then took
@@ -91,6 +93,7 @@ export function MilestoneEditOverlay(): React.ReactElement | null {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

@@ -577,7 +577,7 @@ div.milestone-option { cursor: default; }
   transform: translateX(-50%);
   width: min(640px, 90vw);
   max-height: min(78vh, 720px);
-  z-index: 4000;
+  z-index: var(--z-dialog);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1099,7 +1099,7 @@ div.milestone-option { cursor: default; }
 }
 /* ─── Document manager modal ─────────────────────────────────────────────── */
 .docmgr-backdrop {
-  position: fixed; inset: 0; z-index: 2000;
+  position: fixed; inset: 0; z-index: var(--z-dialog);
   background: rgba(0, 0, 0, 0.45);
   display: flex; align-items: center; justify-content: center;
   backdrop-filter: blur(2px);
@@ -4082,7 +4082,6 @@ div.milestone-option { cursor: default; }
 /* ── Concern pack wizard (components/ConcernWizard.tsx) ───────────────────
    The node wizard's dialog (.nw, packages/ui index.css), a little larger,
    over the Hub dialog; answers and scopes as single-choice cards. */
-.cw-backdrop { z-index: 9100; }
 .nw.cw { width: min(980px, 100%); height: min(680px, 100%); }
 .cw-step-text { display: flex; flex-direction: column; min-width: 0; }
 .cw-step-answer {
@@ -4332,7 +4331,6 @@ div.milestone-option { cursor: default; }
    The concern wizard's dialog (.nw.cw) at the same size, so the wizard
    opens over it in the same frame and a group with few packs keeps it:
    groups with their counts on the side, the search and the packs in front. */
-.hi-backdrop { z-index: 9000; }
 .nw.hi { width: min(980px, 100%); height: min(680px, 100%); }
 .hi-groups {
   flex: 1;

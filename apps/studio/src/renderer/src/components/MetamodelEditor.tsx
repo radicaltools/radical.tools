@@ -24,6 +24,7 @@ import {
 } from './metamodel/MetamodelDiagram'
 import { MetamodelInspector } from './metamodel/MetamodelInspector'
 import { CONTAINS_EDGE, type MetamodelGraphFilter } from './metamodel/metamodelGraph'
+import { keysOnTop } from '@radical/ui/components/keysHere'
 
 // ── small icon helpers ─────────────────────────────────────────────────────
 
@@ -1063,12 +1064,14 @@ export function MetamodelEditor(): React.ReactElement {
   const focusTokenFor = (kind: 'type' | 'relation', id: string): number | undefined =>
     focusCard && focusCard.kind === kind && focusCard.id === id ? focusCard.token : undefined
 
-  // Esc clears the diagram selection first, then closes the editor.
+  // Esc clears the diagram selection first, then closes the editor; not
+  // under a dialog opened over it from the rail (About, AI providers…).
   const selectionRef = useRef(selection)
   selectionRef.current = selection
+  const backdropRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return
+      if (e.key !== 'Escape' || !keysOnTop(backdropRef.current, e)) return
       if (selectionRef.current) setSelection(null)
       else close()
     }
@@ -1080,6 +1083,7 @@ export function MetamodelEditor(): React.ReactElement {
   return createPortal(
     <div
       className="milestone-modal-backdrop mm-editor-backdrop"
+      ref={backdropRef}
       onMouseDown={(e) => {
         if (e.target !== e.currentTarget) return
         const start = e.currentTarget

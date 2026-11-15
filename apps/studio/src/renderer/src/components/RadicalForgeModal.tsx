@@ -58,6 +58,7 @@ import { downloadGherkinFiles } from '../export/downloadGherkinFiles'
 import { AIReportLine } from './AIReportLine'
 import { useHubStore } from '@radical/ui/store/hubStore'
 import { concernPacks, type ConcernPack } from '@radical/common/concerns'
+import { keysOnTop } from '@radical/ui/components/keysHere'
 import { importConcernPackIntoDiagram } from '../hub/importConcept'
 import { askClarifyingQuestions } from '../ai/forgeClarify'
 import { addTokenUsage, type AISettings, type TokenUsage } from '../ai/types'
@@ -262,6 +263,7 @@ export function RadicalForgeModal({ open, onClose, onBusy }: Props): React.React
   const [customising, setCustomising] = useState(false)
   const progressIdRef = useRef(0)
   const progressListRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   // Stages the clarify effect below has already started for this wizard run
   // — a ref, not state, so starting a fetch doesn't itself change an effect
@@ -339,7 +341,8 @@ export function RadicalForgeModal({ open, onClose, onBusy }: Props): React.React
 
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape' && !busy) onClose() }
+    // Not under a dialog opened over the panel: Esc is that dialog's.
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape' && !busy && keysOnTop(panelRef.current, e)) onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, busy, onClose])
@@ -911,6 +914,7 @@ export function RadicalForgeModal({ open, onClose, onBusy }: Props): React.React
   return createPortal(
     <div
       className="forge-panel"
+      ref={panelRef}
       role="dialog"
       aria-label="Radical Forge"
     >

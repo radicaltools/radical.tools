@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { otherModelViewShown, useDiagramStore, type SmartLayoutReport } from '../store/diagramStore'
 import type { SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { useOutsideClick } from '../hooks/useOutsideClick'
+import { keysOnTop } from './keysHere'
 import { formatPart } from '@radical/layout/tidy'
 
 const IconSmartLayout = () => (
@@ -72,7 +73,7 @@ function SmartLayoutReportButton({ report, held = false }: { report: SmartLayout
   useOutsideClick([wrapRef], open, useCallback(() => setOpen(false), []))
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && keysOnTop(wrapRef.current, e)) setOpen(false) }
     window.addEventListener('keydown', onKey)
     return () => { window.removeEventListener('keydown', onKey) }
   }, [open])

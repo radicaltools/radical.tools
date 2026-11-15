@@ -99,3 +99,19 @@ test('no exploration draws more than 1,000 elements: neither a view switched to 
   await all.click({ force: true })
   await expect(studio.nodes).toHaveCount(1)
 })
+
+test('a + menu whose every row would draw more than a canvas has the focus, and Esc closes it', async ({ page, studio }) => {
+  // F-0161: the menu focused its first row that adds something; with every
+  // row off the focus stayed on the page, and Esc, which the menu answers,
+  // left it open.
+  await openLarge(page, studio)
+  await viewCard(page, 'Brief').click()
+  await studio.node('need').dblclick()
+  await studio.properties.getByRole('button', { name: 'Explore', exact: true }).click()
+  const menu = page.getByRole('menu', { name: 'Add to The brief' })
+  await expect(menu).toBeVisible()
+  for (const row of await menu.getByRole('menuitem').all()) await expect(row).toBeDisabled()
+  await expect(menu).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(menu).toHaveCount(0)
+})

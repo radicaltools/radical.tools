@@ -5,6 +5,7 @@ import { listAdapters, getAdapter } from '../ai/registry'
 import type { AIProviderId, AISettings } from '../ai/types'
 import { textOf } from '../ai/types'
 import { useDialogFocus } from './dialogKeys'
+import { keysOnTop } from '@radical/ui/components/keysHere'
 
 interface Props {
   open: boolean
@@ -51,7 +52,7 @@ export function AISettingsModal({ open, onClose }: Props): React.ReactElement | 
   // Esc to close.
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape' && keysOnTop(dialogRef.current, e)) onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])

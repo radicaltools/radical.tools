@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { CHANGELOG_URL, aboutRows, aboutText } from '../about'
 import { host } from '../platform/host'
 import { useDialogFocus } from './dialogKeys'
+import { keysOnTop } from '@radical/ui/components/keysHere'
 
 interface Props {
   open: boolean
@@ -19,7 +20,7 @@ export function AboutDialog({ open, onClose }: Props): React.ReactElement | null
   useEffect(() => {
     if (!open) return
     setCopied(false)
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape' && keysOnTop(dialogRef.current, e)) onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])

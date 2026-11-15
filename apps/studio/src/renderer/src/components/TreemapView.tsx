@@ -6,7 +6,7 @@ import { computeViewNodeSet } from '@radical/layout/viewInput'
 import { pipelineOf, viewShownNodes } from '@radical/common/viewPipeline'
 import { propertiesPanelCover } from '@radical/ui/components/propertiesCover'
 import { editingControl } from '@radical/ui/components/editingControl'
-import { modalDialogOpen } from '@radical/ui/components/keysHere'
+import { canvasKeysOff } from '@radical/ui/components/keysHere'
 
 // ─── Color palette per C4 type ──────────────────────────────────────────────
 const TYPE_COLORS_LIGHT: Record<string, readonly [string, string, string]> = {
@@ -486,10 +486,9 @@ export function TreemapView(): React.ReactElement {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (focusId === null) return
-      const target = e.target as HTMLElement | null
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
-      // A modal dialog over the view has the keys.
-      if (modalDialogOpen()) return
+      // A field, a dialog over the view or a menu has the keys, as the
+      // canvas's (canvasKeysOff).
+      if (canvasKeysOff(e)) return
       // Esc ends a playing presentation (its HUD): it drilled out as well.
       if (e.key === 'Escape' && useDiagramStore.getState().presentationActive) return
       if (e.key === 'Escape' || e.key === 'Backspace') {

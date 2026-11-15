@@ -9,6 +9,7 @@ import { categoryTheme, hubGroupOf } from '@radical/ui/types/hubTheme'
 import { NODE_COLORS, NODE_FG, TYPE_ICON_PATHS } from '@radical/common/c4'
 import { ConcernWizard } from './ConcernWizard'
 import { importConcernPackIntoDiagram } from '../hub/importConcept'
+import { keysOnTop } from '@radical/ui/components/keysHere'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ export function HubImportModal({ open, onClose, preselectedIds, bindTo }: Props)
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && keysOnTop(dialogRef.current, e)) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

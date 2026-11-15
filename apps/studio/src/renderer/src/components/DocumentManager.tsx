@@ -8,6 +8,7 @@ import { host } from '../platform/host'
 import { reloadActiveDocument } from '../persistence/autosave'
 import { NewModelStep, OpenSources, SourceIcon, fileSupported, folderSupported, shortDate } from './ModelSteps'
 import { useDialogFocus } from './dialogKeys'
+import { keysOnTop } from '@radical/ui/components/keysHere'
 
 interface Props {
   open: boolean
@@ -154,7 +155,7 @@ export function DocumentManagerModal({ open, onClose }: Props): React.ReactEleme
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape' || renamingId) return
+      if (e.key !== 'Escape' || renamingId || !keysOnTop(dialogRef.current, e)) return
       if (view === 'list') onClose()
       else setView('list')
     }

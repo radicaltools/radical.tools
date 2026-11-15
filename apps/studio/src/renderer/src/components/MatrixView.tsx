@@ -15,6 +15,7 @@ import { viewShowsEveryNode } from '@radical/common/c4'
 import { chainDrawn, chainRelationFor, viewShownNodes } from '@radical/common/viewPipeline'
 import { viewExpandedSet } from '@radical/layout/viewInput'
 import { editingControl } from '@radical/ui/components/editingControl'
+import { keysOnTop } from '@radical/ui/components/keysHere'
 
 // ─── Tree ordering helper (hierarchical, parents before children) ────────────
 
@@ -90,7 +91,7 @@ export function MatrixView(): React.ReactElement {
 
   useEffect(() => {
     if (!popup) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPopup(null) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && keysOnTop(popupRef.current, e)) setPopup(null) }
     const onClickOutside = (e: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) setPopup(null)
     }
