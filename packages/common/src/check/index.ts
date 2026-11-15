@@ -15,7 +15,7 @@ import { MD_FOLDER_JSON_FILES, MD_MANIFEST_FILE, deserializeFromMdFolder, isVali
 import { documentMetamodel, milestoneViews, originOf } from '../model'
 import { repositoryPart } from '../repositoryMapping'
 import { CHECK_RULES, type CheckSeverity, type RepositoryMapping, type RuleFinding } from './rules'
-import { computeEvidence, withBoundTests, type Evidence } from './evidence'
+import { BOUND_TESTS, computeEvidence, withBoundTests, type Evidence } from './evidence'
 import { GOAL_RULE, isMetricId, measureGoals, type CheckDimension, type CheckMetricResult, type GoalSetting } from './goals'
 import type { TestCase } from './reports'
 import type { Measurement } from './metrics'
@@ -23,7 +23,7 @@ import type { ConcernPack } from '../concerns'
 
 export { CHECK_RULES, hardValues, needAnswers, needParts, quoteFragments, quoteSenseGaps, quoteValueGaps, readValues, relationsOf, verifiedHere, WORD_RULES, wordFindings, type CheckRule, type CheckSeverity, type CheckModel, type RepositoryMapping, type RuleFinding } from './rules'
 export { splitTestId } from './testSource'
-export { MESSAGE_LINES, failureMessage, parseTestReport, parseTestIds, type TestCase, type TestId, type TestStatus } from './reports'
+export { MESSAGE_LINES, canonicalTestId, failureMessage, parseTestReport, parseTestIds, testIdParts, type TestCase, type TestId, type TestStatus } from './reports'
 export { TRACE_TYPES, formatTrace, rankOf, traceGap, traceOf, traceTypeLabel, type Trace, type TraceInput, type TraceNode, type TraceResult } from './trace'
 export { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, testsRanAt, type CiRun, type CiSource, type TestResults } from './files'
 export { BOUND_TESTS, ELEMENT_LABEL, TESTED_TYPES, appliedElements, computeEvidence, conditionResults, conditionsOf, measuredElements, withBoundTests, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome, type ConditionOutcome, type ConditionResult } from './evidence'
@@ -330,9 +330,12 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
   const ownModel = theirs.size
     ? { nodes: byId(data.nodes.filter((n) => !theirs.has(n.id))), relations: byId(data.relations.filter((r) => !theirs.has(r.id))), ...settings }
     : model
+  // The tests this repository binds to another model's scenario or fitness
+  // function are its own: what the reports say of them is found here.
+  const boundHere = (rule: { readsReports?: true }, id: string | undefined): boolean => !!rule.readsReports && !!id && BOUND_TESTS in (nodes[id] ?? {})
   for (const rule of CHECK_RULES) {
     rule.run(model).forEach((finding) => {
-      if (!(finding.nodeId && theirs.has(finding.nodeId)) && !(finding.relationId && theirs.has(finding.relationId))) found.push({ rule: rule.id, ...finding })
+      if (!(finding.nodeId && theirs.has(finding.nodeId) && !boundHere(rule, finding.nodeId)) && !(finding.relationId && theirs.has(finding.relationId))) found.push({ rule: rule.id, ...finding })
     })
   }
   // On the whole model: another model's fitness function counts where its

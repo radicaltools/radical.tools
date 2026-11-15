@@ -3,8 +3,10 @@
 // the reports name it; radical check reads the file (a test's fixtures sit
 // beside it, not in its body).
 
+import { testIdParts } from './reports'
+
 /** The test id's file and titles: "a.test.ts › suite › title". */
 export function splitTestId(id: string): { file: string; titles: string[] } {
-  const [file, ...titles] = id.split(/\s+›\s+|\s+>\s+/).map((part) => part.trim())
+  const [file, ...titles] = testIdParts(id)
   return { file, titles: titles.filter(Boolean) }
 }

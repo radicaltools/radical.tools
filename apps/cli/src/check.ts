@@ -55,8 +55,9 @@ its own ("model": { "repo": … }), it judges that repository's part of the mode
                       without --metrics too, and the metric conditions of
                       scenarios and fitness functions are evaluated against
                       the latest measurement each matches. The reviews
-                      radical sense review keeps in the model folder's
-                      reviews.json are read as measurements too
+                      radical sense review keeps in the repository's
+                      .radical/reviews.json (and a model folder's
+                      reviews.json from before) are read as measurements too
   --baseline <path>   earlier radical-metrics/1 files (a file, or a directory of
                       them; repeat for more) that a condition stated against a
                       baseline (<metric> <= baseline + 20%) compares with: the
@@ -71,7 +72,10 @@ its own ("model": { "repo": … }), it judges that repository's part of the mode
   --ratchet           lower each baseline (max) in the config to the count found
                       now, so a rule that got better cannot get worse again
                       (the test rules only with --report: without it they
-                      do not run and keep their baselines)
+                      do not run and keep their baselines). Where only this
+                      repository's part of a model is judged, it lowers no
+                      baseline of the model's check.json (exit 2): only one
+                      --config names
   --alone             check without the models deps.json names; with a
                       deps.json the model is checked composed with them, at
                       their pinned refs (radical federation --help)
@@ -81,7 +85,9 @@ its own ("model": { "repo": … }), it judges that repository's part of the mode
                       that check it, each with its status and why a test
                       failed, instead of the check's findings. Without
                       --report or --from-ci it reads the test results kept
-                      beside the model. With --format json, the paths as JSON
+                      beside the model. With --format json, the paths as JSON.
+                      With deps.json, also an element of a model it depends
+                      on (a scenario of theirs this repository's tests check)
   --verbose           list every warning, not the first five of each rule
   --list-rules        list the rules and their default severity, and the
                       metrics check.json can set goals for ("goals":
@@ -116,7 +122,7 @@ export interface Io {
    *  command that started it (radical check --detach); absent when nothing
    *  can be started. */
   background?: (args: string[]) => void
-  /** Stops a command that runs until stopped (radical federation watch). */
+  /** Stops a command that runs until stopped. */
   signal?: AbortSignal
 }
 
@@ -215,6 +221,12 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     }
   } catch (error) {
     io.err(`Cannot read the repository's mapping: ${(error as Error).message}`)
+    return 2
+  }
+  // The model's check.json holds the whole model's baselines: the part this
+  // repository judges must not lower them (a config of its own may).
+  if (values.ratchet && repository?.model && !relative(root, await realpath(dirname(configPath)).catch(() => dirname(configPath))).startsWith('..')) {
+    io.err(`radical check --ratchet: ${configPath} holds the baselines of the whole model of ${repository.model.repo}, and this repository judges only its part of it. Ratchet in the model's repository, or name a config of this repository's own with --config.`)
     return 2
   }
   let tests: TestCase[] | undefined
@@ -363,9 +375,13 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   }
   if (values.evidence && result.evidence) await writeBeside(resolve(io.cwd, values.evidence), JSON.stringify(result.evidence, null, 2) + '\n')
   if (values.trace) {
-    const { nodes, relations } = deserializeFromMdFolder(files).data
+    // With the models it depends on: a path may go through their elements
+    // (a scenario of theirs this repository's tests check).
+    const own = deserializeFromMdFolder(files).data
+    const nodes = [...own.nodes, ...others?.nodes ?? []]
+    const relations = [...own.relations, ...others?.relations ?? []]
     const byId = Object.fromEntries(nodes.map((n) => [n.id, n]))
-    if (!byId[values.trace]) { io.err(`radical check --trace: no element ${values.trace} in ${folder}.`); return 2 }
+    if (!byId[values.trace]) { io.err(`radical check --trace: no element ${values.trace} in ${folder}${others?.nodes.length ? ' or the models it depends on' : ''}.`); return 2 }
     const trace = traceOf({ nodes: byId, relations: Object.fromEntries(relations.map((r) => [r.id, r])), evidence: result.evidence, cases: tests }, values.trace)
     if (!values.quiet) io.out(values.format === 'json' ? JSON.stringify(trace, null, 2) : formatTrace(trace, byId))
     return 0

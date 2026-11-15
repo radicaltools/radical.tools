@@ -32,7 +32,10 @@ checks what comes back; the agent session starts the agents
     --no-build        copy what is built already
   verify <run> …      serves the run's build on its ports, runs each script
                       ("<script> [args]", from the run's folder) and stops the
-                      servers; the results go into round.json
+                      servers; the results go into round.json. A script
+                      shows the bug when it exits 1, or when a line of its
+                      output says so (REPRODUCED: yes, BUG: …, FINDING: …;
+                      REPRODUCED: no says it does not), which wins
   record <report>     writes the findings of a run's report (its JSON block)
                       as findings, with a copy of each one's script and
                       screenshot; warns about a script that names the
@@ -74,7 +77,7 @@ interface RunEntry {
   area?: string
   folder: string
   ports: { app: number; hub: number; other: number }
-  verified: { at: string; script: string; exit: number }[]
+  verified: { at: string; script: string; exit: number; shown?: boolean; says?: string[] }[]
 }
 
 interface Round {
@@ -249,7 +252,7 @@ async function prepare(settings: Settings, count: number, areas: string[], since
   const commits = since ? git(root, ['log', '--oneline', '--no-decorate', `${since}..HEAD`]).stdout.trim().split('\n').filter(Boolean) : []
   const modelAreas = since && explore.model ? await changedAreas(root, explore.model, since) : []
   const open = readFindings(resolve(root, settings.findings)).filter((f) => f.status === 'open' || f.status === 'question' || f.status === 'hardened')
-  const earlierRuns = earlier.flatMap((r) => r.runs.map((x) => x.folder)).slice(-20)
+  const earlierRuns = earlier.flatMap((r) => r.runs.map((x) => runFolder(roundsDir, r, x))).slice(-20)
 
   const serve = (entry: RunEntry) => serveCommands(settings, dir, entry)
   const brief = [
@@ -277,6 +280,7 @@ async function prepare(settings: Settings, count: number, areas: string[], since
     `- The build of ${commit}: \`${dir}/build\`${Object.keys(explore.copy).length ? ` (${Object.keys(explore.copy).join(', ')})` : ''}.`,
     ...(explore.serve.length ? [`- Serve it for your run with the command${explore.serve.length === 1 ? '' : 's'} in your prompt.`] : []),
     '- Your folder and your ports are in your prompt: a run NN has the ports of NN. Write scripts, screenshots and notes only in your folder.',
+    '- A script exits 1 while the bug shows and 0 when it does not, and says which in a line of its own, `REPRODUCED: yes` or `REPRODUCED: no`: `radical explore verify` reads both (a script that throws exits 1 too) and says when they disagree.',
     `- Scripts name no absolute path: a finding's script is copied into \`${settings.findings}/F-NNNN/\` with the helpers it imports and must run from there too. Find the repository by walking up from the script's own folder to the one that holds \`.radical/crucible/crucible.json\`, and take your ports and anything of the round's folder as arguments.`,
     `- ${count} run${count === 1 ? '' : 's'} share this machine: keep one browser open at a time and close it when a script ends; do not run the project's whole test suites.`,
     '',
@@ -340,12 +344,20 @@ async function changedAreas(root: string, model: string, since: string): Promise
 }
 const count = (c: { added: string[]; changed: string[]; removed: string[] }) => c.added.length + c.changed.length + c.removed.length
 
-/** The round that holds `run`, and the run. */
+/** A run's folder: run-NN in its round's folder. The path round.json keeps
+ *  is where the round was prepared, and the rounds folder may have moved
+ *  since (crucible/rounds to .radical/crucible/rounds). */
+const runFolder = (roundsDir: string, round: Round, entry: RunEntry): string => join(roundsDir, round.round, `run-${entry.run}`)
+
+/** The round that holds `run`, and the run, its folder where it is now. */
 function findRun(settings: Settings, run: number): { dir: string; round: Round; entry: RunEntry } | undefined {
   const roundsDir = resolve(settings.root, settings.explore.rounds)
   for (const round of rounds(roundsDir)) {
     const entry = round.runs.find((r) => r.run === run)
-    if (entry) return { dir: join(roundsDir, round.round), round, entry }
+    if (entry) {
+      entry.folder = runFolder(roundsDir, round, entry)
+      return { dir: join(roundsDir, round.round), round, entry }
+    }
   }
   return undefined
 }
@@ -367,15 +379,23 @@ async function verify(settings: Settings, run: number, scripts: string[], io: Io
       const ports = servers.map((s) => s.port)
       io.out(`Serving run ${run}'s build on port${ports.length === 1 ? '' : 's'} ${ports.length === 1 ? ports[0] : `${ports.slice(0, -1).join(', ')} and ${ports[ports.length - 1]}`}.`)
     }
+    const shown: string[] = []
+    const notShown: string[] = []
     for (const line of scripts) {
       const [script, ...args] = line.trim().split(/\s+/)
       const r = spawnSync('node', [script, ...args], { cwd: entry.folder, encoding: 'utf8', timeout: 10 * 60_000, maxBuffer: 64 * 1024 * 1024 })
-      const output = `${r.stdout ?? ''}${r.stderr ?? ''}`.trimEnd().split('\n').slice(-20)
+      const all = `${r.stdout ?? ''}${r.stderr ?? ''}`.trimEnd().split('\n')
       io.out(`=== ${line}`)
-      for (const l of output) if (l) io.out(`  ${l}`)
+      for (const l of all.slice(-20)) if (l) io.out(`  ${l}`)
       io.out(`  (exit ${r.status ?? 'killed'})`)
-      entry.verified.push({ at: new Date().toISOString(), script: line, exit: r.status ?? -1 })
+      const says = [...new Set(all.filter((l) => SAYS.test(l)).map((l) => l.trim()))]
+      const judged = judgeScript(r.status, says)
+      for (const l of says) io.out(`  says: ${l}`)
+      io.out(`  → ${judged.text}`)
+      if (judged.shown !== undefined) (judged.shown ? shown : notShown).push(line)
+      entry.verified.push({ at: new Date().toISOString(), script: line, exit: r.status ?? -1, ...(judged.shown !== undefined ? { shown: judged.shown } : {}), ...(says.length ? { says } : {}) })
     }
+    if (shown.length || notShown.length) io.out(`Shows the bug: ${shown.join(', ') || 'none'}. Does not: ${notShown.join(', ') || 'none'}.`)
     writeFileSync(join(dir, 'round.json'), JSON.stringify(round, null, 2) + '\n')
     return 0
   } finally {
@@ -385,6 +405,27 @@ async function verify(settings: Settings, run: number, scripts: string[], io: Io
     }
     for (const server of started) await waitClosed(server.port)
   }
+}
+
+/** A line in which a script says whether the bug shows (REPRODUCED: yes,
+ *  BUG: …, FINDING: …); one saying no (REPRODUCED: no) says it does not. */
+const SAYS = /^\s*(REPRODUCED|BUG|FINDING)\b/
+const SAYS_NO = /^\s*\w+\s*[:=]?\s*(no|false|none|0)\b/i
+
+/** Whether a script showed the bug. The brief's convention: it exits 1
+ *  while the bug shows and 0 when it does not, and says so in a line
+ *  (REPRODUCED: yes|no). A line that says decides, as a script that throws
+ *  exits 1 too; without one, the exit does. Undefined when neither says. */
+function judgeScript(exit: number | null, says: string[]): { shown?: boolean; text: string } {
+  const fromLines = says.length ? says.some((l) => !SAYS_NO.test(l)) : undefined
+  const fromExit = exit === 1 ? true : exit === 0 ? false : undefined
+  const shown = fromLines ?? fromExit
+  if (shown === undefined) return { text: `it did not run to the end (exit ${exit ?? 'killed'}): neither its exit nor a line says whether the bug shows` }
+  const text = shown ? 'the bug shows' : 'the bug does not show'
+  if (fromLines !== undefined && fromExit !== undefined && fromLines !== fromExit) {
+    return { shown, text: `${text}, as its output says; its exit ${exit} says otherwise (a script exits 1 while the bug shows, 0 when it does not)` }
+  }
+  return { shown, text: fromLines === undefined ? `${text} (exit ${exit})` : text }
 }
 
 /** Whether something answers on the port within `ms`. */

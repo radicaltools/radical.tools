@@ -283,7 +283,7 @@ installs the hooks for `.radical/model/` and saves its base once.
 ## radical federation
 
 ```sh
-node apps/cli/dist/index.js federation open|sync|watch path/to/model [--force]
+node apps/cli/dist/index.js federation fetch [path/to/model] [--quiet] [--detach]
 ```
 
 One model across many repositories. A model folder names the models it
@@ -299,27 +299,22 @@ depends on in `deps.json`:
 ```
 
 `repo` is a git address or a path relative to the model folder, `path` the
-model folder in that repository, `ref` a branch, tag or commit.
+model folder in that repository, `ref` a branch, tag or commit, or `latest`
+(the newest version tag, else the default branch, at each fetch).
 
-- `open` fetches each dependency at its ref into the cache (`$RADICAL_CACHE`,
-  else the user's cache directory; one bare partial clone per repository, so
-  only the model files are downloaded) and composes one model folder in
-  `.radical/federation/`: the folder's own elements, relations, views and
-  metamodel as they are, and every dependency's elements and relations with
-  `origin: "<name>@<commit>"`. Studio and the MCP server open that folder;
-  they draw elements with an origin dashed and refuse every change to them
-  but their place. The composed folder gets a base composed the same way
-  (Changes on branch shows only this model's changes), `check.json` and the
-  test results. Changes not carried home yet are carried first.
-- `sync` writes what has no origin back to the model folder, and names each
-  change to an element or relation with an origin, which it keeps out and
-  undoes in the composed folder (exit 1). When the model folder changed too,
-  nothing is carried unless `--force`; `open --force` composes again from the
-  model folder and drops the composed folder's changes.
-- `watch` opens, then keeps both in step until stopped (Ctrl-C).
-
-Dependencies are not composed transitively. With a `deps.json`,
-`radical check` checks the model composed with its dependencies (see below).
+`fetch` fetches each dependency at its ref into the cache (`$RADICAL_CACHE`,
+else the user's cache directory; one bare partial clone per repository, so
+only the model files are downloaded), and the models it depends on in turn
+(a model pinned twice at the nearest pin: the folder's own `deps.json`
+first). It writes their elements, relations and views, each with
+`origin: "<name>@<commit>"`, into `.state/federation.json` in the model
+folder, out of git. Studio and the MCP server open the model folder itself
+and show them beside its own, read-only; they never write them into the
+folder. Without a `deps.json` there is nothing to fetch (exit 0). `--quiet`
+prints nothing, `--detach` fetches in the background and returns at once:
+`radical hooks install` runs `fetch --quiet --detach` after a checkout, a
+commit, a pull and a rebase. With a `deps.json`, `radical check` checks the
+model composed with its dependencies (see below).
 
 ## radical check
 
@@ -374,7 +369,12 @@ check, so an existing model can adopt a rule before every gap is closed.
 `--ratchet` lowers each `max` to the count found now and writes the config
 back; it never raises one. A rule that did not run keeps its `max`: the
 `test-*` rules without `--report` (the output marks them `–` and "not run"),
-every rule but the folder's when the folder is no model.
+every rule but the folder's when the folder is no model. In a repository
+that judges only its part of a model kept in a repository of its own
+(`"model": { "repo": … }` in `.radical/radical.json`), the model's
+`check.json` holds the whole model's baselines: `--ratchet` refuses to lower
+them (exit 2), and lowers only a config of the repository's own named with
+`--config`.
 
 ### Goals
 
@@ -421,7 +421,8 @@ The model names no test: the repository binds its tests to the model's
 scenarios and fitness functions in `.radical/radical.json` ("verifies"), and
 a scenario or fitness function passes when every test bound to it passed and
 its `metrics` (metric conditions only) hold. A test is named as Vitest and
-Playwright print it, from the repository's root:
+Playwright print it, from the repository's root, its parts joined by `›`
+(Vitest's `>` is read too, and `radical verify` keeps it with `›`):
 
 ```sh
 radical verify "Prints JSON" --test "apps/cli/src/cli.test.ts › radical check › prints the result as JSON"
@@ -431,6 +432,11 @@ radical verify "E2E regression" --test apps/e2e/tests
 radical verify "Prints JSON"                     # its tests
 radical verify "Prints JSON" --drop "<test>"     # take one off
 ```
+
+A test may be bound to a scenario or fitness function of another model of
+the federation (a consumer contract test): it is this repository's, so
+`radical check` judges it with the model's own (a failed or missing test is
+an error here), and `--trace` shows that scenario's path.
 
 `radical check` warns about a scenario the repository must verify (an
 element it builds satisfies its requirement) that has no test bound and no
@@ -763,7 +769,13 @@ that scripts name no absolute path (they find the repository by walking up to
 `.radical/crucible/crucible.json`), since a finding's script is copied out of the round.
 `verify` serves a run's build on its ports (each server `serve` lists, on the
 run's port it names: `app`, `hub` or `other`), runs its scripts from its
-folder and stops the servers. `record` writes a report's findings (`open`, or
+folder and stops the servers. A script shows the bug when it exits 1, and
+says so in a line of its own (`REPRODUCED: yes` or `REPRODUCED: no`; `BUG: …`
+and `FINDING: …` count as yes): `verify` prints those lines and whether the
+bug shows for each script (the line wins, as a script that throws exits 1
+too, and it says when exit and line disagree), keeps both in `round.json`, and
+ends with the scripts that show the bug and those that do not. A run's folder
+is `run-NN` in its round's folder, wherever the rounds folder is now. `record` writes a report's findings (`open`, or
 `question`) with copies of their scripts and of the screenshot each names,
 and warns about a copied script that names the repository's or the round's
 absolute paths.

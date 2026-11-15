@@ -83,19 +83,24 @@ export function withBoundTests<T extends C4Node>(nodes: T[], verifies: Array<{ e
   return nodes.map((n) => (bound.has(n.id) ? { ...n, [BOUND_TESTS]: bound.get(n.id) } : n))
 }
 
-/** A node's conditions: its Metrics' lines, and a `test(<id>) passed` for
- *  each test bound to it. */
-export const conditionsOf = (node: C4Node): Condition[] => {
+/** A `test(<id>) passed` for each test the repository binds to a node. */
+const boundConditions = (node: C4Node): Condition[] => {
   const bound = (node as unknown as Props)[BOUND_TESTS]
-  return [
-    ...parseConditions((node as unknown as Props).metrics),
-    ...(Array.isArray(bound) ? bound.map((id) => parseCondition(`test(${id}) passed`)) : []),
-  ]
+  return Array.isArray(bound) ? bound.map((id) => parseCondition(`test(${id}) passed`)) : []
 }
 
-/** The tests a node's test() conditions name. */
+/** A node's conditions: its Metrics' lines, and a `test(<id>) passed` for
+ *  each test bound to it. */
+export const conditionsOf = (node: C4Node): Condition[] => [
+  ...parseConditions((node as unknown as Props).metrics),
+  ...boundConditions(node),
+]
+
+/** The tests a node's test() conditions name. Of another model's node only
+ *  those this repository binds to it (a consumer contract test): the tests
+ *  its Metrics name are its own repository's. */
 export const testIdsOf = (node: C4Node): TestId[] =>
-  conditionsOf(node).flatMap((c) => c.kind === 'test' ? [c.id] : [])
+  (originOf(node) ? boundConditions(node) : conditionsOf(node)).flatMap((c) => c.kind === 'test' ? [c.id] : [])
 
 const testOutcome = (id: TestId, model: CheckModel): TestOutcome => {
   const { fileSeen, matches } = findTests(id, model.tests ?? [])
@@ -122,6 +127,12 @@ export function conditionResults(node: C4Node, model: CheckModel, element?: C4No
     return { condition: c.raw, outcome: e.outcome, ...(e.measurement ? { measurement: e.measurement } : {}), ...(e.detail ? { detail: e.detail } : {}) }
   })
 }
+
+/** The outcomes of the tests this repository binds to another model's node. */
+const boundResults = (node: C4Node, model: CheckModel): ConditionResult[] =>
+  boundConditions(node).map((c): ConditionResult => c.kind === 'test'
+    ? { condition: c.raw, test: c.id.raw, outcome: testOutcome(c.id, model) }
+    : { condition: c.raw, outcome: 'invalid', ...(c.kind === 'invalid' ? { detail: c.problem } : {}) })
 
 const PASSED = (o: ConditionOutcome): boolean => o === 'passed'
 const FAILING = (o: ConditionOutcome): boolean => o === 'failed' || o === 'not-found' || o === 'invalid'
@@ -220,7 +231,8 @@ export function linkedNodes(model: CheckModel, id: string, relationType: string,
 /** What the reports and measurements say about the model's own scenarios,
  *  fitness functions, requirements and ADRs. Another model's elements (a
  *  federation) count only as a fitness function judged here on the model's
- *  own elements: a standard its ADR makes theirs. */
+ *  own elements (a standard its ADR makes theirs), and as a scenario or
+ *  fitness function this repository binds tests to, judged on those. */
 export function computeEvidence(model: CheckModel): Evidence {
   const nodes: Record<string, EvidenceEntry> = {}
   for (const node of Object.values(model.nodes)) {
@@ -230,18 +242,20 @@ export function computeEvidence(model: CheckModel): Evidence {
       const conditions = elementConditions(node, model, element)
       return { id: element.id, label: element.label, status: checkedStatus(conditions, combineOf(node)), conditions }
     })
-    if (origin && !elements.length) continue
+    // Another model's: only the tests this repository binds to it.
+    const bound = origin ? boundResults(node, model) : []
+    if (origin && !elements.length && !bound.length) continue
     // Measured for each element, its metrics are judged per element and its
     // tests (its own model's, never another's) once; it holds when all do.
-    const conditions = elements.length
-      ? origin ? [] : conditionResults(node, model).filter((r) => r.test)
-      : conditionResults(node, model)
+    const conditions = origin ? bound
+      : elements.length ? conditionResults(node, model).filter((r) => r.test)
+        : conditionResults(node, model)
     const own = elements.length && conditions.length ? [checkedStatus(conditions)] : []
     nodes[node.id] = {
       type: node.type,
       label: node.label,
-      status: elements.length ? combineElements([...own, ...elements.map((e) => e.status)]) : checkedStatus(conditions, combineOf(node)),
-      tests: origin ? [] : testOutcomes(node, model).map((o) => ({ id: o.id.raw, outcome: o.outcome })),
+      status: elements.length ? combineElements([...own, ...elements.map((e) => e.status)]) : checkedStatus(conditions, origin ? undefined : combineOf(node)),
+      tests: testOutcomes(node, model).map((o) => ({ id: o.id.raw, outcome: o.outcome })),
       conditions,
       ...(elements.length ? { elements } : {}),
       ...(origin ? { origin } : {}),

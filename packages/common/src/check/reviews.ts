@@ -2,7 +2,8 @@
 //
 // A manual fitness function is checked by a person: a security review before
 // a release, an audit every quarter. `radical sense review <name> --passed`
-// records the result in reviews.json in the model folder, kept in git (the one
+// records the result in the repository's .radical/reviews.json (a model
+// folder's reviews.json from before is still read), kept in git (the one
 // exception to measurements out of git: a review is rare, has an author and
 // is a decision, and reaches CI with the pull request that records it). The
 // engine reads each review as a measurement of the metric `review`, 1 passed
@@ -12,7 +13,7 @@
 
 import { REVIEW_METRIC, type Measurement } from './metrics'
 
-/** The file in the model folder. */
+/** The file in a model folder from before .radical/reviews.json. */
 export const REVIEWS_FILE = 'reviews.json'
 
 export const REVIEWS_FORMAT = 'radical-reviews'

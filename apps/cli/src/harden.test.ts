@@ -217,6 +217,19 @@ describe('radical harden --gate', () => {
     expect(code).toBe(0)
   })
 
+  it('finds a test named as Vitest prints it, with > between its parts', async () => {
+    const cwd = await repository()
+    await writeFile(join(cwd, 'tests/named.mjs'), [
+      "if (process.argv[2] !== 'calc adds') { console.log('no test matches ' + process.argv[2]); process.exit(3) }",
+      "const { add } = await import('../src/calc.mjs')",
+      'process.exit(add(2, 3) === 5 ? 0 : 1)',
+    ].join('\n') + '\n')
+    await writeFile(join(cwd, 'crucible.json'), JSON.stringify({ runners: [{ files: 'tests/', command: ['node', 'tests/named.mjs', '{name}'] }] }))
+    const { code, out } = await run(cwd, '--gate', '--test', 'tests/calc.test.mjs > calc > adds', '--base', 'main', '--runs', '2')
+    expect(out).not.toContain('no test matches')
+    expect(code).toBe(0)
+  })
+
   // Ctrl+C sends SIGINT to the whole process group, the test with it; kill
   // sends SIGTERM to radical alone. Node ended on either without running
   // the finally that puts the fix back.

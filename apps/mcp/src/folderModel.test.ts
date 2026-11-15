@@ -1283,7 +1283,7 @@ describe('test bindings', () => {
 
     expect(JSON.parse((await model.call('get_verification', {})).text).toVerify).toEqual([{ id: 's-pay', label: 'Pays' }])
     expect((await model.call('get_verification', { id: 's-pay' })).text).toBe('.radical/radical.json binds no test to scenario "Pays" (s-pay): bind its tests with set_verification.')
-    expect((await model.call('set_verification', { id: 's-pay', tests: ['tests/pay.test.ts › pays', 'tests/pay.test.ts › pays', 'tests/pay.test.ts › declines'] })).text)
+    expect((await model.call('set_verification', { id: 's-pay', tests: ['tests/pay.test.ts › pays', 'tests/pay.test.ts > pays', 'tests/pay.test.ts › declines'] })).text)
       .toBe('scenario "Pays" (s-pay) is checked by 2 test(s) (.radical/radical.json).')
     expect(JSON.parse((await model.call('get_verification', {})).text).toVerify).toEqual([])
     // The mapping of elements is kept beside the tests.

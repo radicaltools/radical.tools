@@ -138,6 +138,15 @@ describe('test reports', () => {
     expect(parseTestIds(undefined)).toEqual([])
   })
 
+  it('reads a test id as Vitest prints it, with > between its parts, as it reads one with ›', () => {
+    const cases: TestCase[] = [{ file: '/repo/src/pay.test.ts', title: ['pay', 'takes a card'], status: 'passed' }]
+    const [vitest] = parseTestIds('src/pay.test.ts > pay > takes a card')
+    expect([vitest.file, vitest.title]).toEqual(['src/pay.test.ts', ['pay', 'takes a card']])
+    expect(findTests(vitest, cases)).toEqual({ fileSeen: true, matches: cases })
+    // An id with a › splits only on it: its title may hold " > ".
+    expect(parseTestIds('src/a.test.ts › compares a > b')[0].title).toEqual(['compares a > b'])
+  })
+
   it('finds a test by a path suffix either way and the end of its title', () => {
     const cases: TestCase[] = [
       { file: '/repo/apps/cli/src/cli.test.ts', title: ['radical check', 'prints JSON'], status: 'passed' },
