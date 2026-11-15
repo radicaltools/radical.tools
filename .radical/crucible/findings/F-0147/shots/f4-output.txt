@@ -1,0 +1,42 @@
+$ (A) radical explore verify 1 f1-dragg.mjs  → exit 0
+    === f1-dragg.mjs
+      node:internal/modules/cjs/loader:1210
+        throw err;
+        ^
+      Error: Cannot find module '/private/var/folders/pn/fh62qrjd1xx840kyv7dyk4tw0000gn/T/radical-218-typo-NaAwUJ/.radical/crucible/rounds/round-1-1/run-1/f1-dragg.mjs'
+          at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+          at Module._load (node:internal/modules/cjs/loader:1038:27)
+          at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+          at node:internal/main/run_main_module:28:49 {
+        code: 'MODULE_NOT_FOUND',
+        requireStack: []
+      }
+      Node.js v20.19.5
+      (exit 1)
+      → the bug shows (exit 1)
+    Shows the bug: f1-dragg.mjs. Does not: none.
+$ (B) radical explore prepare --runs 2 --from 4 --no-build  → exit 0
+    Prepared runs 4–5 at 41f5100 in .radical/crucible/rounds/round-4-5:
+      run 4: port 4504, area of its choice — .radical/crucible/rounds/round-4-5/run-4/PROMPT.md
+      run 5: port 4505, area of its choice — .radical/crucible/rounds/round-4-5/run-5/PROMPT.md
+$ (B) radical explore verify 4 f2-pin.mjs  → exit 0
+    === f2-pin.mjs
+      node:internal/modules/cjs/loader:1210
+        throw err;
+        ^
+      Error: Cannot find module '/private/var/folders/pn/fh62qrjd1xx840kyv7dyk4tw0000gn/T/radical-218-overlap-SPLEiM/.radical/crucible/rounds/round-3-4/run-4/f2-pin.mjs'
+          at Module._resolveFilename (node:internal/modules/cjs/loader:1207:15)
+          at Module._load (node:internal/modules/cjs/loader:1038:27)
+          at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+          at node:internal/main/run_main_module:28:49 {
+        code: 'MODULE_NOT_FOUND',
+        requireStack: []
+      }
+      Node.js v20.19.5
+      (exit 1)
+      → the bug shows (exit 1)
+    Shows the bug: f2-pin.mjs. Does not: none.
+
+Expected: verify says it found no such script (and prepare refuses run numbers a round has), never "the bug shows".
+Actual: A typo → shown true (exit 1); B prepare --from 4 exit 0, verify 4 → shown true (exit 1).
+REPRODUCED: yes

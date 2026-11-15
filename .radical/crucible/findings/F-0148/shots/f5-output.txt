@@ -1,0 +1,42 @@
+$ () radical verify "Order taken" --test "tests/orders.test.ts › places an order"  → exit 0
+    scenario "Order taken" (scen) is checked by 1 test (.radical/radical.json):
+      tests/orders.test.ts › places an order
+$ () radical check --trace scen  → exit 0
+    Verification path of Order taken [scen]
+    - Need: Order [need] — no results
+      - Requirement: Take orders [req] — no results
+        ▶ Scenario: Order taken [scen] — no results
+            (names no check)
+MCP get_trace scen:
+    No test results beside the model: run radical check <folder> --report <reports> (or --from-ci) for the outcomes.
+    Verification path of Order taken [scen]
+    - Need: Order [need] — no results
+      - Requirement: Take orders [req] — no results
+        ▶ Scenario: Order taken [scen] — no results
+            (names no check)
+$ () radical check --report report.json  → exit 0
+    radical check: .radical/model (5 elements, 3 relations)
+    
+    ⚠ concern-unaddressed  29
+        warning  .radical/model/nodes/orders/api/_index.md  Architecture style: code lives in these deployables, so how it is structured inside, and where its business logic goes, has to be decided. No accepted ADR marked "architecture-style" settles it for "Orders API".
+        warning  .radical/model/nodes/orders/api/_index.md  Audit trail: these elements run the operations a regulator, an auditor or an investigation may ask about, so how their audit trail is recorded, protected, kept and read has to be decided. No accepted ADR marked "audit-trail" settles it for "Orders API".
+        warning  .radical/model/nodes/orders/api/_index.md  Backend stack: these are server-side services, so what they are built on and how they are kept on supported versions has to be decided. No accepted ADR marked "backend-stack" settles it for "Orders API".
+        warning  .radical/model/nodes/orders/api/_index.md  Capacity and scaling: these elements run on capacity of their own (instances, connections, storage, throughput), so the load they must carry, how they scale and what they do when overloaded has to be decided. No accepted ADR marked "capacity" settles it for "Orders API".
+        warning  .radical/model/nodes/orders/api/_index.md  Code documentation: code lives in these elements, so what is written down about it, where, and how it is kept true has to be decided; one decision usually covers a whole repository and is bound to every element built from it. No accepted ADR marked "code-documentation" settles it for "Orders API".
+        … 24 more (--verbose shows them)
+    
+    Test reports: 1 test case
+      Requirements: 1 verified
+      Scenarios: 1 passed
+    
+    ✓ 0 errors, 29 warnings
+$ () radical check --trace scen  → exit 0
+    Verification path of Order taken [scen]
+    - Need: Order [need] — verified
+      - Requirement: Take orders [req] — verified
+        ▶ Scenario: Order taken [scen] — passed
+            · tests/orders.test.ts › places an order — passed
+
+Expected: with no results kept, the trace lists the bound test with no outcome yet (as the trace after a report lists it), never "names no check".
+Actual: before a report: CLI says "names no check" = true, lists the test = false; MCP get_trace "names no check" = true; after check --report: "names no check" = false, lists the test = true.
+REPRODUCED: yes

@@ -1,0 +1,55 @@
+$ (federated) radical federation fetch  → exit 0
+    Fetched orders@205ebbc (v1.0.0): 4 elements into .radical/model/.state/federation.json.
+$ (federated) radical verify "Order taken" --test "tests/orders.contract.test.ts › places an order"  → exit 0
+    scenario "Order taken" (oscen) of orders is checked by 1 test (.radical/radical.json):
+      tests/orders.contract.test.ts › places an order
+$ (federated) radical check --report report.json  → exit 1
+    Checked with orders@205ebbc (v1.0.0) (deps.json).
+    radical check: .radical/model (2 elements, 1 relation)
+    
+    ✖ test-failed  1
+        error    node oscen  Scenario "Order taken" of orders@205ebbc: test tests/orders.contract.test.ts › places an order failed. Not verified now: requirement "Take orders".
+    
+    Test reports: 1 test case
+      Scenarios: 1 failed
+    
+    ✖ 1 error, 0 warnings
+$ (federated) radical check --trace oscen  → exit 0
+    Verification path of Order taken [oscen]
+    - Requirement: Take orders [oreq] — no results
+      ▶ Scenario: Order taken [oscen] — failed
+          · tests/orders.contract.test.ts › places an order — failed
+              expected 201, got 500
+$ (own) radical verify "Order taken" --test "tests/orders.contract.test.ts › places an order"  → exit 0
+    scenario "Order taken" (oscen) is checked by 1 test (.radical/radical.json):
+      tests/orders.contract.test.ts › places an order
+$ (own) radical check --report report.json  → exit 1
+    radical check: .radical/model (4 elements, 2 relations)
+    
+    ⚠ requirement-without-origin  1
+        warning  .radical/model/nodes/oreq.md  Requirement "Take orders" derives from no need and no other requirement.
+    ⚠ concern-unaddressed  29
+        warning  .radical/model/nodes/orders/api/_index.md  Architecture style: code lives in these deployables, so how it is structured inside, and where its business logic goes, has to be decided. No accepted ADR marked "architecture-style" settles it for "Orders API".
+        warning  .radical/model/nodes/orders/api/_index.md  Audit trail: these elements run the operations a regulator, an auditor or an investigation may ask about, so how their audit trail is recorded, protected, kept and read has to be decided. No accepted ADR marked "audit-trail" settles it for "Orders API".
+        warning  .radical/model/nodes/orders/api/_index.md  Backend stack: these are server-side services, so what they are built on and how they are kept on supported versions has to be decided. No accepted ADR marked "backend-stack" settles it for "Orders API".
+        warning  .radical/model/nodes/orders/api/_index.md  Capacity and scaling: these elements run on capacity of their own (instances, connections, storage, throughput), so the load they must carry, how they scale and what they do when overloaded has to be decided. No accepted ADR marked "capacity" settles it for "Orders API".
+        warning  .radical/model/nodes/orders/api/_index.md  Code documentation: code lives in these elements, so what is written down about it, where, and how it is kept true has to be decided; one decision usually covers a whole repository and is bound to every element built from it. No accepted ADR marked "code-documentation" settles it for "Orders API".
+        … 24 more (--verbose shows them)
+    ✖ test-failed  1
+        error    .radical/model/nodes/oscen.md  Scenario "Order taken": test tests/orders.contract.test.ts › places an order failed. Not verified now: requirement "Take orders".
+    
+    Test reports: 1 test case
+      Requirements: 1 broken
+      Scenarios: 1 failed
+    
+    ✖ 1 error, 30 warnings
+$ (own) radical check --trace oscen  → exit 0
+    Verification path of Order taken [oscen]
+    - Requirement: Take orders [oreq] — broken
+      ▶ Scenario: Order taken [oscen] — failed
+          · tests/orders.contract.test.ts › places an order — failed
+              expected 201, got 500
+
+Question: above a failed consumer contract test, should the trace call the other model's requirement broken, as the check's message and the same model kept here do?
+Actual: check says "Not verified now: requirement Take orders" = true; trace in the federation: no results; trace of the same model kept here: broken.
+REPRODUCED: yes
