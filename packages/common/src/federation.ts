@@ -205,9 +205,14 @@ export function withOtherModels<T extends DiagramData>(data: T, file: Federation
     walk(name)
     return [...scope]
   }
-  const views = (file.views ?? []).filter((v) => !ownViews.has(v.id) && originOf(v)).map((v): DiagramView => {
+  const kept = (file.views ?? []).filter((v) => !ownViews.has(v.id) && originOf(v))
+  // A view of their group of views per element stays in it; in no group
+  // when the group is not theirs here.
+  const groups = new Set(kept.filter((v) => !v.partOf).map((v) => `${v.origin}\n${v.id}`))
+  const views = kept.map((v): DiagramView => {
     const model = originModel(v.origin!)
-    return { ...v, folder: normalizeViewFolder(v.folder ? `${model}/${v.folder}` : model), originScope: scopeOf(model) }
+    const { partOf, ...rest } = v
+    return { ...rest, ...(partOf && groups.has(`${v.origin}\n${partOf}`) ? { partOf } : {}), folder: normalizeViewFolder(v.folder ? `${model}/${v.folder}` : model), originScope: scopeOf(model) }
   })
   return {
     ...data,
@@ -241,11 +246,12 @@ export function otherModelsAt(file: FederationFile | null, pins: ModelPin[] | un
 }
 
 /** Another model's view as it is kept in .state/federation.json: what it
- *  shows, its filter, places and settings, without what this model cannot
- *  have of it (its sequence, its exploration). */
+ *  shows, its filter, places and settings, its group of views per element,
+ *  without what this model cannot have of it (its sequence, its
+ *  exploration). */
 export function otherModelView(view: DiagramView, origin: string): DiagramView | null {
   if (view.kind === 'explore') return null
-  const { sequenceId: _sequence, explore: _explore, partOf: _partOf, ...kept } = view
+  const { sequenceId: _sequence, explore: _explore, ...kept } = view
   return { ...kept, origin }
 }
 

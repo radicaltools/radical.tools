@@ -4,7 +4,7 @@ import { builtInC4Metamodel } from '../src/metamodel/index'
 import { createModelFacade } from '../src/ai/modelFacade'
 import {
   checkAddNode, checkAddRelation, checkNodeUpdate, checkPatchRelation, checkRemove, checkReparent, checkUnwrap,
-  copyOtherModelView, originModel, originOf, otherModelFolder, ownModel, viewFolderRefusal, viewRefusal, type ModelState,
+  copyOtherModelView, originModel, originOf, otherModelFolder, ownModel, planViewGroups, syncViewGroups, syncViewpoints, viewFolderRefusal, viewRefusal, viewsOfGroup, type ModelState,
 } from '../src/model'
 import { composeFederation, otherModelView, otherModelsAt, parseDeps, parseFederationFile, serializeFederationFile, withOtherModels, type FetchedDependency } from '../src/federation'
 import { chainDrawn, structureRows, viewShownNodes } from '../src/viewPipeline'
@@ -223,6 +223,41 @@ describe('federation', () => {
     expect(otherModelsAt(file, [older])).toEqual({ nodes: [], relations: [], missing: [older] })
     // A milestone made before keeps no versions: the other models as fetched now.
     expect(otherModelsAt(file, undefined).nodes).toHaveLength(3)
+  })
+
+  it("keeps another model's group of views per element its own: it makes no view here (F-0163)", () => {
+    const at = 'orders@abc1234'
+    const member = (id: string, subject: string, name: string): DiagramView =>
+      ({ id, name, viewpoint: 'system-containers', subject, partOf: 'v-group', nodeIds: [], positions: {}, expandedNodeIds: [subject] }) as DiagramView
+    const theirViews = [
+      { id: 'v-group', name: 'Containers of a system', viewpoint: 'system-containers', nodeIds: [], positions: {} } as DiagramView,
+      member('v-ord', 'ord', 'Orders'),
+    ]
+    const file = parseFederationFile(serializeFederationFile({
+      version: 2, name: 'payments', fetchedAt: '2026-11-01T10:00:00Z', notes: [],
+      dependencies: [{ name: 'orders', repo: '../orders', path: 'architecture', ref: 'main', commit: COMMIT }],
+      nodes: [node('ord', 'system', 'Orders', { origin: at }), node('cust', 'person', 'Customer', { origin: at })],
+      relations: [],
+      views: theirViews.map((v) => otherModelView(v, at)!),
+    }))!
+    const data = withOtherModels(payments(), file)
+    const before = structuredClone(data.views)
+    const views = Object.fromEntries(data.views!.map((v) => [v.id, v]))
+    // Neither a sync on load nor one after an element added makes or changes a view.
+    const state: ModelState = { c4Nodes: Object.fromEntries(data.nodes.map((n) => [n.id, n])), c4Relations: {}, views, activeViewId: null, metamodel: data.metamodel }
+    expect(planViewGroups(state)).toEqual({ add: [], remove: [], refolder: [], unlist: [], rename: [] })
+    expect(syncViewGroups(state, () => 'new')).toBe(false)
+    expect(syncViewpoints(state)).toEqual([])
+    let next = 0
+    const facade = createModelFacade(data, { newId: () => `new${++next}` })
+    facade.addNode({ type: 'system', label: 'Ledger', x: 0, y: 0, width: 200, height: 100, collapsed: false } as Omit<C4Node, 'id'>)
+    expect(facade.toDiagramData().views).toEqual(before)
+    // Their group lists its views, as in their model.
+    expect(viewsOfGroup(views, 'v-group').map((v) => v.id)).toEqual(['v-ord'])
+    // A copy of one of their views is this model's own view, of no group.
+    copyOtherModelView({ views }, 'v-ord', 'copy')
+    expect(views.copy.partOf).toBeUndefined()
+    expect(planViewGroups(state).remove).toEqual([])
   })
 
   it("keeps the views of the model's own out of another model's folders", () => {

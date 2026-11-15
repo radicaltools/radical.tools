@@ -350,7 +350,7 @@ export function copyOtherModelView(state: Pick<ModelState, 'views'>, viewId: str
   for (let n = 2; taken.has(name); n++) name = `${view.name} (${model} ${n})`
   // The folder it has in its model: the one here, without the model's name first.
   const folder = view.folder && view.folder !== model ? view.folder.slice(model.length + 1) : undefined
-  const { origin: _origin, originScope: _scope, folder: _folder, ...kept } = view
+  const { origin: _origin, originScope: _scope, folder: _folder, partOf: _partOf, ...kept } = view
   state.views[newId] = structuredClone({ ...kept, id: newId, name, ...(folder ? { folder } : {}) }) as DiagramView
   return { name }
 }
@@ -1446,7 +1446,8 @@ export function applyViewpoint(state: ModelState, viewId: string, typeId: string
 // A view of a viewpoint that draws one element (ViewpointDef.subject) is a
 // group: it holds a view of each element of the viewpoint's types that is not
 // external (partOf, subject), named after it, made when the element is added
-// and removed with it. syncViewGroups keeps the groups in step with the model.
+// and removed with it. syncViewGroups keeps the groups in step with the model;
+// another model's group and its views are as that model made them.
 
 /** Whether `view` is a group of views of one element. */
 export function isViewGroup(view: DiagramView | undefined, metamodel: Metamodel | undefined): boolean {
@@ -1499,7 +1500,7 @@ export function planViewGroups(state: Pick<ModelState, 'c4Nodes' | 'views' | 'me
   const defs = new Map(viewpointsOf(state.metamodel).map((t) => [t.id, t]))
   const add: Array<{ groupId: string; subjectId: string }> = []
   const remove: string[] = []
-  const views = Object.values(state.views)
+  const views = Object.values(state.views).filter((v) => !originOf(v))
   const groups = new Map(views.filter((v) => isViewGroup(v, state.metamodel)).map((v) => [v.id, v]))
   const members = new Map<string, Set<string>>()
   const refolder: string[] = []
@@ -1636,7 +1637,8 @@ export function syncViewpoints(state: ModelState): string[] {
   const types = viewpointsOf(state.metamodel)
   const changed: string[] = []
   for (const view of Object.values(state.views)) {
-    if (!view.viewpoint) continue
+    // Another model's view is of that model's viewpoint.
+    if (!view.viewpoint || originOf(view)) continue
     const type = types.find((t) => t.id === view.viewpoint)
     if (!type) {
       delete view.viewpoint

@@ -55,7 +55,12 @@ function ModelMenu({ doc, onRename }: { doc: DocumentMeta; onRename: () => void 
     await documents.saveAsFile(doc.id, saveDiagram())
   }
   const moveToFolder = async (): Promise<void> => {
-    await documents.saveAsFolder(doc.id, saveDiagram(), confirmForeignFolder)
+    try {
+      await documents.saveAsFolder(doc.id, saveDiagram(), confirmForeignFolder)
+    } catch (e) {
+      // A folder no model is written into says why (a repository's model below it).
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
   }
   // Back from a file or folder: the model on screen is kept in this
   // browser, and the file or folder stays on disk as it is.

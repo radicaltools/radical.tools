@@ -4468,6 +4468,14 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 }
 /* Over another model's view, and in its properties: whose it is, and Copy
    to this model. */
+.other-model-strip {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  padding: 6px 12px;
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-color);
+}
 .other-model-bar {
   display: flex;
   align-items: center;
