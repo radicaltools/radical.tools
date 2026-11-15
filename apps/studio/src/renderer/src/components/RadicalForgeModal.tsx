@@ -147,6 +147,9 @@ const PROGRESS_VISIBLE_COUNT = 7
 
 interface Props {
   open: boolean
+  /** Opened again after another run panel took its place: the run goes on
+   *  where it was, not afresh. */
+  resume?: boolean
   onClose: () => void
   /** Told when a stage starts or stops generating: the panel then stays. */
   onBusy?: (busy: boolean) => void
@@ -209,7 +212,7 @@ const isCanvas = (view: DiagramView | undefined): boolean => !!view && (!view.ki
 const NO_NODES: Record<string, C4Node> = {}
 const NO_RELATIONS: Record<string, C4Relation> = {}
 
-export function RadicalForgeModal({ open, onClose, onBusy }: Props): React.ReactElement | null {
+export function RadicalForgeModal({ open, resume = false, onClose, onBusy }: Props): React.ReactElement | null {
   const [step, setStep] = useState<WizardStep>('input')
   const [description, setDescription] = useState('')
   /** The `need` node the description lives in — picked on the Description
@@ -288,9 +291,12 @@ export function RadicalForgeModal({ open, onClose, onBusy }: Props): React.React
     [structureKind, chosenViewpoints],
   )
 
-  // Reset to a clean run every time the wizard is (re)opened.
+  // Reset to a clean run every time the wizard is (re)opened, unless it
+  // was only put aside for another run panel.
+  const resumeRef = useRef(resume)
+  resumeRef.current = resume
   useEffect(() => {
-    if (!open) return
+    if (!open || resumeRef.current) return
     setStep('input')
     setDescription('')
     setNeedId(null)
