@@ -70,11 +70,6 @@ const LS_LEGACY_KEY = 'radical-diagram-v1'
  *  empty/stale model after a reload. */
 const connectedWebHandles = new Set<string>()
 
-/** Id of the document ensureActive() seeded on this boot because the index was
- *  empty, i.e. a first visit. The welcome screen hides it from "recent" so a
- *  newcomer is not greeted by a model they never made. */
-let bootSeededId: string | null = null
-
 /** Per-document chain of disk writes (fs / md docs). A folder write is many
  *  files followed by a prune, so two overlapping writes can each prune what the
  *  other just wrote — a renamed node would lose both its old and new file.
@@ -242,6 +237,11 @@ export interface DocumentMeta {
   folderPath?: string
   /** Epoch ms of last successful save through this layer. */
   lastModified: number
+  /** Made by Studio on a first visit (ensureActive) and not saved, renamed
+   *  or moved since: not the user's work. Kept in the index, as a reload
+   *  forgot it: the Welcome screen then listed an "Untitled" model the user
+   *  never made, and the Setup wizard took the visit for a returning one. */
+  seeded?: boolean
 }
 
 interface DocumentsIndex {
@@ -614,6 +614,7 @@ async function bindFolder(meta: DocumentMeta, written: WrittenFolder): Promise<v
   meta.filePath = undefined
   meta.name = written.name
   meta.lastModified = Date.now()
+  delete meta.seeded
 }
 
 /** Turn `meta` into the file-backed document of a file handle just written. */
@@ -627,6 +628,7 @@ async function bindWebFile(meta: DocumentMeta, handle: FsFileHandle): Promise<vo
   meta.folderPath = undefined
   meta.name = stripModelExtension(handle.name) || meta.name
   meta.lastModified = Date.now()
+  delete meta.seeded
 }
 
 /** Write a disk-backed (fs / md) document. Called only through `enqueueSave`. */
@@ -986,7 +988,8 @@ export interface DocumentsAPI {
    *  doc if the index is empty. Returns the active doc. */
   ensureActive(seedIfEmpty: () => DiagramData): { meta: DocumentMeta; seeded: boolean }
 
-  /** True for the document ensureActive() seeded on this boot (first visit). */
+  /** True for the document ensureActive() seeded on a first visit, while it
+   *  is not the user's work (DocumentMeta.seeded). */
   isBootSeeded(id: string): boolean
 }
 
@@ -1151,6 +1154,7 @@ export const documents: DocumentsAPI = {
     if (meta.source !== 'ls') return enqueueSave(id, data)
     if (!writeLSPayload(id, data)) throw new StorageFullError()
     meta.lastModified = Date.now()
+    delete meta.seeded
     writeIndex(idx)
     notify()
   },
@@ -1160,6 +1164,7 @@ export const documents: DocumentsAPI = {
     const meta = idx.docs.find(d => d.id === id)
     if (!meta) return
     meta.name = newName.trim() || meta.name
+    delete meta.seeded
     // Refused by full storage, the rename did nothing and said nothing.
     if (!writeIndex(idx)) throw new StorageFullError()
     notify()
@@ -1295,6 +1300,7 @@ export const documents: DocumentsAPI = {
       meta.filePath = res.filePath
       meta.name = defaultNameFromPath(res.filePath)
       meta.lastModified = Date.now()
+      delete meta.seeded
       writeIndex(idx)
       notify()
       return meta
@@ -1337,6 +1343,7 @@ export const documents: DocumentsAPI = {
     writeLSPayload(id, data)
     meta.name = defaultNameFromPath(usedName)
     meta.lastModified = Date.now()
+    delete meta.seeded
     writeIndex(idx)
     notify()
     return meta
@@ -1741,7 +1748,12 @@ export const documents: DocumentsAPI = {
       } catch {
         meta = this.createLSDocument('Untitled')
       }
-      bootSeededId = meta.id
+      const after = readIndex()
+      const stored = after.docs.find(d => d.id === meta.id)
+      if (stored) {
+        stored.seeded = meta.seeded = true
+        writeIndex(after)
+      }
       return { meta, seeded: true }
     }
     if (!idx.activeId || !idx.docs.some(d => d.id === idx.activeId)) {
@@ -1754,7 +1766,7 @@ export const documents: DocumentsAPI = {
   },
 
   isBootSeeded(id) {
-    return id === bootSeededId
+    return !!readIndex().docs.find(d => d.id === id)?.seeded
   },
 }
 
