@@ -602,6 +602,9 @@ function AppMenu({
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
+/** The panels that show a run, in one place over the canvas (Toolbar). */
+type RunPanel = 'forge' | 'agent-forge' | 'agent-assay'
+
 /** Input kinds that hold no text: Ctrl/Cmd+Z there is not about typing. */
 const NOT_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file', 'image'])
 
@@ -822,15 +825,35 @@ export function Toolbar(): React.ReactElement {
   const handleOpenAbout = useCallback(() => { setAboutOpen(true) }, [])
   const handleCloseAbout = useCallback(() => { setAboutOpen(false) }, [])
 
-  const [forgeOpen, setForgeOpen] = useState(false)
+  // Radical Forge, an agent's Forge run and an agent's Assay run show in one
+  // place, one at a time: the one last asked for shows, and closing it leaves
+  // none open. Each had a flag of its own, and the one open hid the others:
+  // the Assay button did nothing under the agent's Forge panel, and the Assay
+  // panel opened by itself once that closed. Radical Forge generating stays:
+  // closed, its run would be lost.
+  const [runPanel, setRunPanel] = useState<RunPanel | null>(null)
+  const runPanelShown = useRef(runPanel)
+  runPanelShown.current = runPanel
+  const forgeBusy = useRef(false)
+  const showRunPanel = useCallback((panel: RunPanel) => {
+    if (runPanelShown.current === 'forge' && panel !== 'forge' && forgeBusy.current) {
+      useDiagramStore.getState().pushNotification('Radical Forge is generating: its panel stays open until it is done.', 'info')
+      return
+    }
+    setRunPanel(panel)
+  }, [])
+  const closeRunPanel = useCallback((panel: RunPanel) => {
+    setRunPanel((open) => (open === panel ? null : open))
+  }, [])
+  const onForgeBusy = useCallback((busy: boolean) => { forgeBusy.current = busy }, [])
   const handleOpenForge = useCallback(() => {
     if (!aiReady(loadAISettings())) {
       useDiagramStore.getState().pushNotification(FORGE_NEEDS_AI, 'info')
       return
     }
-    setForgeOpen(true)
-  }, [])
-  const handleCloseForge = useCallback(() => { setForgeOpen(false) }, [])
+    showRunPanel('forge')
+  }, [showRunPanel])
+  const handleCloseForge = useCallback(() => closeRunPanel('forge'), [closeRunPanel])
 
   const [hubOpen, setHubOpen] = useState(false)
   const [hubPreselectedIds, setHubPreselectedIds] = useState<string[] | undefined>(undefined)
@@ -896,23 +919,21 @@ export function Toolbar(): React.ReactElement {
 
   // The Forge button opens a read-only view instead while an agent runs
   // Forge on this folder over MCP (see persistence/agentForge).
-  const [agentForgeOpen, setAgentForgeOpen] = useState(false)
-  const closeAgentForge = useCallback(() => setAgentForgeOpen(false), [])
+  const closeAgentForge = useCallback(() => closeRunPanel('agent-forge'), [closeRunPanel])
   useEffect(() => {
-    const onOpen = () => setAgentForgeOpen(true)
+    const onOpen = () => showRunPanel('agent-forge')
     window.addEventListener('radical:open-agent-forge', onOpen as EventListener)
     return () => window.removeEventListener('radical:open-agent-forge', onOpen as EventListener)
-  }, [])
+  }, [showRunPanel])
 
   // The Assay button, shown only while an agent runs Assay with this folder
   // as its central model, opens a read-only view of that run (persistence/agentAssay).
-  const [agentAssayOpen, setAgentAssayOpen] = useState(false)
-  const closeAgentAssay = useCallback(() => setAgentAssayOpen(false), [])
+  const closeAgentAssay = useCallback(() => closeRunPanel('agent-assay'), [closeRunPanel])
   useEffect(() => {
-    const onOpen = () => setAgentAssayOpen(true)
+    const onOpen = () => showRunPanel('agent-assay')
     window.addEventListener('radical:open-agent-assay', onOpen as EventListener)
     return () => window.removeEventListener('radical:open-agent-assay', onOpen as EventListener)
-  }, [])
+  }, [showRunPanel])
 
   const bar = useRef<HTMLDivElement>(null)
   const compact = useMiddleRoom(bar, appMode !== 'inspector', appMode)
@@ -953,9 +974,9 @@ export function Toolbar(): React.ReactElement {
       <AISettingsModal open={aiSettingsOpen} onClose={handleCloseAISettings} />
       <AboutDialog open={aboutOpen} onClose={handleCloseAbout} />
       <HubImportModal open={hubOpen} onClose={handleCloseHub} preselectedIds={hubPreselectedIds} bindTo={hubBindTo} />
-      <RadicalForgeModal open={forgeOpen} onClose={handleCloseForge} />
-      <AgentForgeModal open={agentForgeOpen && !forgeOpen} onClose={closeAgentForge} />
-      <AgentAssayModal open={agentAssayOpen && !forgeOpen && !agentForgeOpen} onClose={closeAgentAssay} />
+      <RadicalForgeModal open={runPanel === 'forge'} onClose={handleCloseForge} onBusy={onForgeBusy} />
+      <AgentForgeModal open={runPanel === 'agent-forge'} onClose={closeAgentForge} />
+      <AgentAssayModal open={runPanel === 'agent-assay'} onClose={closeAgentAssay} />
       <AppMenu
         onManage={handleManage}
         activeDocLabel={activeDoc?.name ?? null}

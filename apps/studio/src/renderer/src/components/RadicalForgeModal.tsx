@@ -147,6 +147,8 @@ const PROGRESS_VISIBLE_COUNT = 7
 interface Props {
   open: boolean
   onClose: () => void
+  /** Told when a stage starts or stops generating: the panel then stays. */
+  onBusy?: (busy: boolean) => void
 }
 
 type WizardStep = 'input' | ForgeStageId | 'export'
@@ -206,7 +208,7 @@ const isCanvas = (view: DiagramView | undefined): boolean => !!view && (!view.ki
 const NO_NODES: Record<string, C4Node> = {}
 const NO_RELATIONS: Record<string, C4Relation> = {}
 
-export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement | null {
+export function RadicalForgeModal({ open, onClose, onBusy }: Props): React.ReactElement | null {
   const [step, setStep] = useState<WizardStep>('input')
   const [description, setDescription] = useState('')
   /** The `need` node the description lives in — picked on the Description
@@ -214,6 +216,7 @@ export function RadicalForgeModal({ open, onClose }: Props): React.ReactElement 
    *  null = a new need will be created. */
   const [needId, setNeedId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  useEffect(() => { onBusy?.(busy) }, [busy, onBusy])
   const [error, setError] = useState<string | null>(null)
   const [stageReports, setStageReports] = useState<Partial<Record<ForgeStageId, ApplyReport>>>({})
   const [stageSummaries, setStageSummaries] = useState<Partial<Record<ForgeStageId, string>>>({})
