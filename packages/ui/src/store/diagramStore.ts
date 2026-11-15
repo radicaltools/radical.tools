@@ -64,7 +64,7 @@ import * as model from '@radical/common/model'
 import { originFor, otherModelsAt, type FederationFile } from '@radical/common/federation'
 import type { RepositoryFile } from '@radical/common/repositoryMapping'
 import { canBeSubject, newViewName, viewpointsOf } from '@radical/common/viewpoints'
-import { canvasCount, canvasOverflow, chainRelationFor, pipelineOf, viewDrawnIds, viewShownNodes } from '@radical/common/viewPipeline'
+import { canvasOverflow, chainRelationFor, explorationCount, pipelineOf, viewDrawnIds, viewShownNodes } from '@radical/common/viewPipeline'
 import { relationRefusal, relationTypesAccepted } from '@radical/common/relationRules'
 import { mergeModels, mergeNotices, mergeSteps } from '@radical/common/modelMerge'
 import { markdownToPlain } from '@radical/common/markdown'
@@ -3862,7 +3862,7 @@ export function oversizedCanvas(s: Pick<DiagramStore, 'activeViewId' | 'views' |
  *  notice stays. */
 export function tooLargeToExplore(s: Pick<DiagramStore, 'views' | 'c4Nodes' | 'c4Relations'>, viewId: string): boolean {
   const view = s.views[viewId]
-  return !!view && view.kind !== 'explore' && canvasCount(view, s.c4Nodes, s.c4Relations) > CANVAS_MAX_ELEMENTS
+  return !!view && view.kind !== 'explore' && explorationCount(view, s.c4Nodes, s.c4Relations) > CANVAS_MAX_ELEMENTS
 }
 
 function continuousShape(s: DiagramStore): string | null {

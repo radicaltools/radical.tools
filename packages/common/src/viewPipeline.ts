@@ -879,11 +879,57 @@ export function viewDrawnIds(view: DiagramView | undefined, nodes: Record<string
 /** How many elements `view` draws on a canvas: those it lists when it is
  *  of type Explore (an exploration draws them flat, each on its own), else
  *  those it shows (viewShownNodes), every element of the model when it
- *  shows every one. Also what a view turned into an exploration lists. */
+ *  shows every one, but none inside a container folded there: its box
+ *  stands for them (F-0162). */
 export function canvasCount(view: DiagramView, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): number {
+  if (view.kind === 'explore') return view.nodeIds.filter((id) => id in nodes).length
+  return unfoldedCount(view, viewShownNodes(view, nodes, relations), nodes)
+}
+
+/** How many elements a view turned into an exploration lists: every one
+ *  it shows, folded or not. */
+export function explorationCount(view: DiagramView, nodes: Record<string, C4Node>, relations: Record<string, C4Relation>): number {
   if (view.kind === 'explore') return view.nodeIds.filter((id) => id in nodes).length
   return viewShownNodes(view, nodes, relations)?.size ?? Object.keys(nodes).length
 }
+
+/** How many of `shown` (every element when undefined) lie in no container
+ *  `view` draws folded: one folded in the view, or on the model and not
+ *  opened in it, as the canvas folds (isEffectivelyCollapsed). A container
+ *  drawn only as a frame round what the view shows is never folded, and is
+ *  not among `shown`. Kept for frozen data while the folds and what they
+ *  read stay the same: the canvas asks every frame. */
+function unfoldedCount(view: DiagramView, shown: Set<string> | undefined, nodes: Record<string, C4Node>): number {
+  const key: object = shown ?? view.nodeIds
+  const cacheable = Object.isFrozen(nodes)
+  const hit = cacheable ? unfoldedCache.get(key) : undefined
+  if (hit && hit.folded === view.collapsedNodeIds && hit.opened === view.expandedNodeIds && sameForChain(hit.nodes, nodes, FOLD_KEYS)) {
+    hit.nodes = nodes
+    return hit.count
+  }
+  const ids = shown ? [...shown] : Object.keys(nodes)
+  const opened = new Set(view.expandedNodeIds ?? [])
+  const foldedHere = new Set(view.collapsedNodeIds ?? [])
+  const folds = new Set(ids.filter((id) => !opened.has(id) && (nodes[id]?.collapsed || foldedHere.has(id))))
+  let count = ids.length
+  if (folds.size) {
+    const hidden = new Map<string, boolean>()
+    const isHidden = (id: string): boolean => {
+      const known = hidden.get(id)
+      if (known !== undefined) return known
+      const parent = nodes[id]?.parentId
+      const out = !!parent && !!nodes[parent] && (folds.has(parent) || isHidden(parent))
+      hidden.set(id, out)
+      return out
+    }
+    count = ids.filter((id) => !isHidden(id)).length
+  }
+  if (cacheable) unfoldedCache.set(key, { nodes, folded: view.collapsedNodeIds, opened: view.expandedNodeIds, count })
+  return count
+}
+
+const FOLD_KEYS = 'type,parentId,collapsed'
+const unfoldedCache = new WeakMap<object, { nodes: Record<string, C4Node>; folded: unknown; opened: unknown; count: number }>()
 
 /** How many elements the canvas of `view` would draw, when that is more
  *  than a canvas draws (CANVAS_MAX_ELEMENTS): such a view is neither drawn
