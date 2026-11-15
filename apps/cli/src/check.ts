@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/pro
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, formatTrace, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, splitTestId, testsRanAt, traceOf, type CheckConfig, type CiSource, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, formatTrace, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, splitTestId, testsRanAt, traceOf, withBoundTests, type CheckConfig, type CiSource, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { DEPS_FILE } from '@radical/common/federation'
 import { STATE_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
@@ -389,7 +389,8 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     const own = deserializeFromMdFolder(files).data
     const nodes = [...own.nodes, ...others?.nodes ?? []]
     const relations = [...own.relations, ...others?.relations ?? []]
-    const byId = Object.fromEntries(nodes.map((n) => [n.id, n]))
+    // With the tests the repository binds, listed before any results too.
+    const byId = Object.fromEntries(withBoundTests(nodes, repository?.verifies).map((n) => [n.id, n]))
     if (!byId[values.trace]) { io.err(`radical check --trace: no element ${values.trace} in ${folder}${others?.nodes.length ? ' or the models it depends on' : ''}.`); return 2 }
     const trace = traceOf({ nodes: byId, relations: Object.fromEntries(relations.map((r) => [r.id, r])), evidence: result.evidence, cases: tests }, values.trace)
     if (!values.quiet) io.out(values.format === 'json' ? JSON.stringify(trace, null, 2) : formatTrace(trace, byId))

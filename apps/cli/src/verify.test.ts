@@ -88,6 +88,15 @@ describe('radical verify', () => {
     expect((await run(root, 'verify', 'pay', '--drop', '[firefox] › tests/pay.spec.ts:9:1 › pay › takes a card')).out).toContain('is checked by no test')
   })
 
+  it('lists a bound test in the trace before any results, with no outcome yet (F-0148)', async () => {
+    const root = await repository()
+    await run(root, 'verify', 'pay', '--test', 'tests/pay.test.ts › pays')
+    const { code, out } = await run(root, 'check', '--trace', 'pay')
+    expect(code).toBe(0)
+    expect(out).toContain('▶ Scenario: Pays by card [pay] — no results\n    · tests/pay.test.ts › pays — no results')
+    expect(out).not.toContain('names no check')
+  })
+
   it('takes out the entry of a scenario the model no longer has, and drops nothing of another entry', async () => {
     const root = await repository()
     const file = join(root, '.radical', 'radical.json')

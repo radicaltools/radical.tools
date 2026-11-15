@@ -85,7 +85,7 @@ export function withBoundTests<T extends C4Node>(nodes: T[], verifies: Array<{ e
 }
 
 /** A `test(<id>) passed` for each test the repository binds to a node. */
-const boundConditions = (node: C4Node): Condition[] => {
+export const boundConditions = (node: C4Node): Condition[] => {
   const bound = (node as unknown as Props)[BOUND_TESTS]
   return Array.isArray(bound) ? bound.map((id) => parseCondition(`test(${id}) passed`)) : []
 }

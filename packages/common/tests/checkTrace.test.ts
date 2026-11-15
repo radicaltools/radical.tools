@@ -144,6 +144,41 @@ describe('verification path', () => {
     expect(formatTrace(traceOf(f, 'ff'), f.nodes, NOW)).toContain('      for CLI [c2] — failed\n        · deps.cycles <= 0 — failed · 2 cycles by madge, 2 h ago')
   })
 
+  it('lists the tests bound to a scenario before any results, with no outcome yet (F-0148)', () => {
+    const f = fixture()
+    const input = { nodes: f.nodes, relations: f.relations, evidence: null, cases: null }
+    for (const [id, test] of [['s-fail', 'a.test.ts › sum › adds'], ['s-sub', 'a.test.ts › sum › zero']]) {
+      const find = (n: TraceNode): TraceNode | undefined => n.target ? n : n.children.map(find).find(Boolean)
+      const scenario = find(traceOf(input, id).roots[0])!
+      expect(scenario.results.map((r) => [r.test, r.outcome]), id).toEqual([[test, undefined]])
+      expect(traceGap(scenario), id).toBeNull()
+    }
+    // A fitness function lists its metric conditions; one with nothing bound still names no check.
+    expect(traceOf(input, 'ff').roots[0].children[0].results.map((r) => r.condition)).toEqual(['deps.cycles <= 0', 'test(a.test.ts › sum › zero) passed'])
+    expect(traceGap(traceOf(input, 'ff-none').roots[0].children[0])).toBe('names no check')
+    expect(formatTrace(traceOf(input, 's-fail'), f.nodes, NOW)).toContain('    ▶ Scenario: Red on failure [s-fail] — no results\n        · a.test.ts › sum › adds — no results')
+  })
+
+  it('draws another model\'s requirement broken above a failed consumer contract test, as the check says (F-0149)', () => {
+    const nodes = Object.fromEntries(withBoundTests([
+      node('oreq', 'requirement', 'Take orders', { action: 'a', origin: 'orders@abc1234' }),
+      node('oscen', 'scenario', 'Order taken', { given: 'g', when: 'w', then: 't', origin: 'orders@abc1234' }),
+      node('other', 'scenario', 'Order listed', { given: 'g', when: 'w', then: 't', origin: 'orders@abc1234' }),
+      node('oadr', 'adr', 'Idempotent writes', { status: 'accepted', origin: 'orders@abc1234' }),
+      node('off', 'fitness-fn', 'Retries are safe', { origin: 'orders@abc1234' }),
+    ], [{ element: 'oscen', tests: ['c.test.ts › places an order'] }, { element: 'off', tests: ['c.test.ts › retries'] }]).map((n) => [n.id, n]))
+    const relations = Object.fromEntries([rel('v', 'verifies', 'oscen', 'oreq'), rel('v2', 'verifies', 'other', 'oreq'), rel('i', 'implements', 'off', 'oadr')].map((r) => [r.id, r]))
+    const trace = (outcome: string, id: string) => {
+      const cases = parseTestReport(JSON.stringify({ testResults: [{ name: '/repo/c.test.ts', assertionResults: [{ ancestorTitles: [], title: 'places an order', status: outcome }, { ancestorTitles: [], title: 'retries', status: outcome }] }] }), 'v.json')
+      return traceOf({ nodes, relations, evidence: computeEvidence({ nodes, relations, metamodel: builtInGovernanceMetamodel(), tests: cases }), cases }, id).roots.map(shape)
+    }
+    expect(trace('failed', 'oscen')).toEqual([['oreq', 'broken', [['oscen', 'failed', '◀', []]]]])
+    expect(trace('failed', 'off')).toEqual([['oadr', 'broken', [['off', 'failed', '◀', []]]]])
+    // Passed here, it is not verified: the other scenario is no test's of this repository.
+    expect(trace('passed', 'oscen')).toEqual([['oreq', 'unverified', [['oscen', 'passed', '◀', []]]]])
+    expect(trace('passed', 'off')).toEqual([['oadr', 'verified', [['off', 'passed', '◀', []]]]])
+  })
+
   it('goes up through a need inside a broader one (Part of) to the broadest need, its status rolled up', () => {
     const f = fixture()
     // Sell online ⊃ Pay online ⊃ Take card payments, and a part of it with nothing yet.

@@ -9,7 +9,8 @@
 // print it (formatTrace), all from this one function.
 
 import type { C4Node, C4Relation } from '../c4'
-import type { ConditionOutcome, ConditionResult, Evidence, EvidenceEntry } from './evidence'
+import { TESTED_TYPES, boundConditions, conditionsOf, type ConditionOutcome, type ConditionResult, type Evidence, type EvidenceEntry } from './evidence'
+import { originOf } from '../model'
 import type { Measurement } from './metrics'
 import { findTests, parseTestIds, type TestCase } from './reports'
 
@@ -32,7 +33,8 @@ export interface TraceResult {
   condition: string
   /** For a test: its id (`<file> › <title>`). */
   test?: string
-  outcome: ConditionOutcome
+  /** Undefined before any results: what checks it, with no outcome yet. */
+  outcome?: ConditionOutcome
   measurement?: Measurement
   detail?: string
   /** For a test: the cases of the reports it names, with why they failed. */
@@ -113,6 +115,25 @@ function resultsOf(conditions: ConditionResult[] | undefined, cases: TestCase[] 
     .sort((a, b) => rankOf(a.outcome) - rankOf(b.outcome))
 }
 
+/** What checks a scenario or fitness function the evidence has no entry
+ *  for (before any results), with no outcome: its conditions; another
+ *  model's, only the tests this repository binds to it. */
+const unjudged = (node: C4Node): TraceResult[] => (originOf(node) ? boundConditions(node) : conditionsOf(node))
+  .map((c) => ({ condition: c.raw, ...(c.kind === 'test' ? { test: c.id.raw } : {}) }))
+
+/** Another model's requirement or ADR, which the evidence leaves out, from
+ *  the scenarios or fitness functions under it that it has (those this
+ *  repository's tests check), as computeEvidence judges the model's own:
+ *  broken when one failed. Undefined when it has none of them. */
+function verifiedFrom(checkers: Array<string | undefined>): string | undefined {
+  if (!checkers.some((s) => s)) return undefined
+  if (checkers.includes('failed')) return 'broken'
+  return checkers.every((s) => s === 'passed') ? 'verified' : 'unverified'
+}
+
+/** The type of what checks a requirement or ADR. */
+const CHECKER: Record<string, string> = { requirement: 'scenario', adr: 'fitness-fn' }
+
 /** Every path through `id`, from its roots to the results. */
 export function traceOf(input: TraceInput, id: string): Trace {
   const { nodes, relations } = input
@@ -154,11 +175,13 @@ export function traceOf(input: TraceInput, id: string): Trace {
       .sort((a, b) => rankOf(a.status) - rankOf(b.status) || Number(a.type === b.type ? 0 : a.type === 'requirement') - Number(a.type === b.type ? 0 : b.type === 'requirement') || a.label.localeCompare(b.label))
     const elements = e?.elements?.map((el) => ({ id: el.id, label: el.label, status: el.status, results: resultsOf(el.conditions, input.cases) }))
       .sort((a, b) => rankOf(a.status) - rankOf(b.status))
+    // Every checker below it, also those left out above the target.
+    const checkers = !e && ev && CHECKER[node.type] ? (down.get(n) ?? []).filter((k) => nodes[k].type === CHECKER[node.type]).map((k) => ev[k]?.status) : []
     return {
       ...base,
-      status: e?.status ?? (node.type === 'need' && ev ? rollUp(children) : undefined),
+      status: e?.status ?? (node.type === 'need' && ev ? rollUp(children) : checkers.length ? verifiedFrom(checkers) : undefined),
       children,
-      results: resultsOf(e?.conditions, input.cases),
+      results: e || !(TESTED_TYPES as readonly string[]).includes(node.type) ? resultsOf(e?.conditions, input.cases) : unjudged(node),
       ...(elements?.length ? { elements } : {}),
     }
   }
@@ -187,7 +210,7 @@ function resultLine(r: TraceResult, now: number): string {
   const what = r.test ?? r.condition
   const m = r.measurement
   const measured = m ? ` · ${m.value}${m.unit ? ` ${m.unit}` : ''} by ${m.source}, ${Math.max(0, Math.round((now - Date.parse(m.at)) / 3_600_000))} h ago` : ''
-  return `${what} — ${r.outcome}${measured}${r.detail && !m ? ` (${r.detail})` : ''}`
+  return `${what} — ${r.outcome ?? 'no results'}${measured}${r.detail && !m ? ` (${r.detail})` : ''}`
 }
 
 /** The paths as indented text, for the CLI and the MCP server. */
