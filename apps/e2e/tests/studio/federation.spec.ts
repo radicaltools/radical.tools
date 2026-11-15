@@ -242,6 +242,26 @@ test('another model\'s view is listed in its folder, read-only, and copied into 
   expect(views.some((v) => v.id === 'v-containers')).toBe(true)
 })
 
+test('another model\'s table and matrix of every element list that model\'s elements only', async ({ page, studio }) => {
+  // F-0119: orders' table listed payments' own elements too, though its card counted orders' alone.
+  const file = JSON.parse(fetched()) as FederationFile
+  file.views = [
+    ...(file.views ?? []),
+    { id: 'v-ord-table', name: 'Element Table', kind: 'table', nodeIds: [], positions: {}, origin: 'orders@abc1234' },
+    { id: 'v-ord-matrix', name: 'Element Matrix', kind: 'matrix', nodeIds: [], positions: {}, origin: 'orders@abc1234' },
+  ]
+  await openComposed(page, studio, 'Landscape', { federation: serializeFederationFile(file) })
+  const card = (name: string) => page.locator('.lp-view-card').filter({ has: page.locator('.lp-card-title', { hasText: name }) })
+
+  await card('Element Table').click()
+  await expect(page.locator('.other-model-bar')).toContainText('A view of the model orders')
+  await expect(page.locator('tr.tv-row')).toHaveCount(1)
+  await expect(page.locator('tr.tv-row[data-node-id="ord"]')).toHaveCount(1)
+
+  await card('Element Matrix').click()
+  await expect(page.locator('.mx-rowhead-text')).toHaveText(['Orders'])
+})
+
 test('a milestone shows the other models as they were when it was made', async ({ page, studio }) => {
   // orders at a commit A has Orders and Orders API; payments reads Orders API.
   const ordersAt = (commit: string, api: string, extra: Partial<FederationFile> = {}): string => serializeFederationFile({
