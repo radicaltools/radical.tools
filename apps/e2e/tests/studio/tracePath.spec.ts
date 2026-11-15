@@ -78,6 +78,18 @@ test('the verification path goes from a requirement to its need and to the test 
   await panel.getByLabel('Only what does not pass').check()
   await expect(panel.getByTestId('trace-node')).toHaveText([/Pay online/, /Take card payments/, /Refunding a card/])
   await panel.getByLabel('Only what does not pass').uncheck()
+  // On the path of a scenario that passes, what passes is left out and the
+  // scenario kept as asked for, with no gap where the whole path has none
+  // (it said the scenario names no check).
+  await panel.getByTestId('trace-node').filter({ hasText: 'Paying by card' }).locator('.trace-label').click()
+  await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 's-green')
+  await panel.getByLabel('Only what does not pass').check()
+  await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 's-green')
+  await expect(panel.getByTestId('trace-result')).toHaveCount(0)
+  await expect(panel.locator('.trace-gap')).toHaveCount(0)
+  await panel.getByLabel('Only what does not pass').uncheck()
+  await panel.getByRole('button', { name: '← Back' }).click()
+  await expect(panel.locator('[data-testid="trace-node"].target')).toHaveAttribute('data-id', 'req')
 
   // A click on the need makes the path the need's; Back returns.
   await panel.getByTestId('trace-node').filter({ hasText: 'Pay online' }).locator('.trace-label').click()

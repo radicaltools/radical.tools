@@ -714,7 +714,7 @@ npx @radicaltools/cli setup</code></pre>
           <li>A <strong>test</strong> shows its file and title, its outcome, how long it ran and, when it failed, the message from the report. In the desktop app, <em>Open in VS Code</em> opens the file at the test's line.</li>
           <li>A <strong>metric condition</strong> shows the value measured, the sensor that measured it and how old the measurement is.</li>
           <li>From the properties card Studio switches to the Inspector, and Back returns to the canvas. Until there are test results, measurements or a base beside the model, <em>Path</em> is greyed out, as the Inspector's button is. The path is the live model's: on a milestone, <em>Path</em> is greyed out for an element only the milestone has.</li>
-          <li>A click on an element makes the path that element's, <em>Back</em> returns; <em>Details</em> opens its card beside the path, and <em>Only what does not pass</em> leaves the rest out. The path is part of the address, so a link opens it.</li>
+          <li>A click on an element makes the path that element's, <em>Back</em> returns; <em>Details</em> opens its card beside the path, and <em>Only what does not pass</em> leaves the rest out; an element kept with nothing left under it is no gap unless the whole path has one there. The path is part of the address, so a link opens it.</li>
           <li>Agents get the same paths: <code>radical check --trace &lt;id&gt;</code> prints them, and the MCP tool <code>get_trace</code> returns them.</li>
         </ul>
         <figure class="doc-shot">
