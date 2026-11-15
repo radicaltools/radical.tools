@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -72,5 +73,41 @@ describe('radical implement', () => {
     // Without an entry of its own, where its system is.
     expect((await run(root, 'implement', 'Billing API')).out).toContain('container "Billing API" (billing) is built in ., as system "Shop" (shop) is')
     expect((await run(root, 'implement', 'Legacy')).out).toContain('system "Legacy" (legacy) is built nowhere .radical/radical.json says: radical implement legacy --path <folder>')
+  })
+
+  it('keeps the keys of the file it does not know', async () => {
+    const root = await repository()
+    const file = join(root, '.radical', 'radical.json')
+    await writeFile(file, JSON.stringify({ $schema: 'https://radical.tools/schema/radical.json', owner: 'team-shop', implements: [{ element: 'orders', paths: ['services/orders'], owner: 'team-orders' }] }))
+    expect((await run(root, 'implement', 'orders', '--path', 'services/orders', '--path', 'services/billing')).code).toBe(0)
+    await run(root, 'implement', 'Shop', '--path', '.')
+    expect(JSON.parse(await readFile(file, 'utf8'))).toEqual({
+      $schema: 'https://radical.tools/schema/radical.json', owner: 'team-shop',
+      implements: [{ element: 'orders', name: 'Orders API', paths: ['services/orders', 'services/billing'], owner: 'team-orders' }, { element: 'shop', name: 'Shop', paths: ['.'] }],
+    })
+  })
+
+  it('takes out the entry of an element the model no longer has, by its id or its name', async () => {
+    const root = await repository()
+    const file = join(root, '.radical', 'radical.json')
+    await writeFile(file, JSON.stringify({ implements: [{ element: 'gone', name: 'Payments API', paths: ['services/pay'] }, { element: 'went', name: 'Old API', paths: ['services/old'] }, { element: 'orders', paths: ['services/orders'] }] }))
+    expect((await run(root, 'implement', 'gone', '--remove')).out).toContain('- "Payments API" (gone), no element of the model, taken out of .radical/radical.json')
+    expect((await run(root, 'implement', 'old api', '--remove')).out).toContain('- "Old API" (went), no element of the model, taken out of .radical/radical.json')
+    expect(JSON.parse(await readFile(file, 'utf8')).implements.map((m: { element: string }) => m.element)).toEqual(['orders'])
+    // An element neither the model nor the file has is still refused.
+    expect((await run(root, 'implement', 'nothing', '--remove')).err).toContain('No element named "nothing" in the model.')
+  })
+
+  it('outside a git repository, writes the file beside the model folder, where the MCP server reads it', async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'radical-implement-')))
+    dirs.push(root)
+    const folder = join(root, 'shop', 'arch')
+    for (const [path, content] of Object.entries(serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes: [node('shop', 'system', 'Shop')], relations: [] }, 'shop'))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    expect((await run(join(root, 'shop'), 'implement', 'Shop', '--folder', 'arch', '--path', '.')).code).toBe(0)
+    expect(JSON.parse(await readFile(join(root, 'shop', '.radical', 'radical.json'), 'utf8')).implements).toEqual([{ element: 'shop', name: 'Shop', paths: ['.'] }])
+    expect(existsSync(join(root, '.radical', 'radical.json'))).toBe(false)
   })
 })

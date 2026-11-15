@@ -132,6 +132,18 @@ export async function mappingRoot(folder: string): Promise<string> {
   return await repositoryRoot(at) ?? (basename(dirname(at)) === RADICAL_DIR ? dirname(dirname(at)) : dirname(at))
 }
 
+/** The repository's .radical/radical.json for the model in `folder`: the
+ *  one its readers find (from the folder up to the repository's root), else
+ *  where a new one goes (in mappingRoot's .radical/); with the root its paths
+ *  are from. Every writer of the file, the CLI's, the MCP server's and
+ *  Studio's, writes this one. */
+export async function repositoryFileOf(folder: string): Promise<{ file: string; root: string }> {
+  const found = await findRepositoryFile(folder, REPOSITORY_FILE, REPOSITORY_FILE)
+  if (found) return { file: found.path, root: repositoryFileRoot(found.path) }
+  const root = await mappingRoot(folder)
+  return { file: join(root, REPOSITORY_FILE), root }
+}
+
 /** The repository's .radical/radical.json, found from `from` up to the
  *  repository's root: the file, the root its paths are from, what it maps
  *  and the tests it binds; null without one. Throws, naming the file, when it does not read. */

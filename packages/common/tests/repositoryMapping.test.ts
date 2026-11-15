@@ -148,3 +148,22 @@ describe('a repository of one system model', () => {
     expect(findings.some((f) => f.nodeId === 'scenB')).toBe(true)
   })
 })
+
+describe('a written .radical/radical.json', () => {
+  it('keeps the keys it does not know, top-level and on entries', () => {
+    const text = JSON.stringify({
+      $schema: 'https://radical.tools/schema/radical.json', owner: 'team-shop',
+      model: { repo: 'https://example.com/arch.git', mirror: 'https://mirror.example.com/arch.git' },
+      tests: { include: ['apps/**'], retries: 2 },
+      implements: [{ element: 'api', name: 'API', paths: ['apps/api'], owner: 'team-api', since: { version: 2 } }],
+      verifies: [{ element: 'sc', tests: ['a.test.ts › pays'], flaky: true }],
+      later: ['a newer version\'s key'],
+    })
+    const file = parseRepositoryFile(text)
+    // A writer changes an entry, as radical implement does.
+    file.implements[0] = { ...file.implements[0], paths: ['apps/api', 'apps/shared'] }
+    const back = JSON.parse(serializeRepositoryFile(file))
+    expect(back).toEqual({ ...JSON.parse(text), implements: [{ element: 'api', name: 'API', paths: ['apps/api', 'apps/shared'], owner: 'team-api', since: { version: 2 } }] })
+    expect(serializeRepositoryFile(file).startsWith('{\n  "$schema": ')).toBe(true)
+  })
+})

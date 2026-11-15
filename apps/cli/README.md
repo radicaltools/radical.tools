@@ -214,13 +214,19 @@ radical implement "Orders API" --path services/orders-api
 radical implement 8c66e024-… --path apps/cli --path apps/cli-shared
 radical implement "Orders API"            # where it is built
 radical implement "Orders API" --remove
+radical implement 8c66e024-… --remove     # an element the model no longer has
 ```
 
 The element is its id or its name (an element of another model of the
 federation, as fetched, too); a name two elements share needs the id. Paths
 are from the working directory and kept from the repository's root; they
 replace the element's paths. An element without an entry is built where its
-nearest parent with one is.
+nearest parent with one is. `--remove` also takes out an entry whose element
+the model no longer has, by its id or name (`radical verify --remove` too).
+The file is the one `radical check` reads: found from the model folder up to
+the repository's root, else a new one in the repository's `.radical/` (outside
+a repository, beside the model folder), where the MCP server and Studio write
+it too. Keys the command does not know (`$schema`, an `owner`) stay.
 
 ## radical diff
 
