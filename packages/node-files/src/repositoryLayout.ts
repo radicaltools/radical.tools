@@ -8,14 +8,12 @@
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { MD_MANIFEST_FILE } from '@radical/common/formats/mdFolder'
+import { MODEL_FOLDER, OLD_MODEL_FOLDER, RADICAL_DIR, modelFolderCandidates, startsEmpty } from '@radical/common/modelFolders'
 import { REPOSITORY_FILE, elementPaths, parseRepositoryFile, type MappedElement, type RepositoryFile } from '@radical/common/repositoryMapping'
 
-/** The folder of everything Radical keeps in a repository. */
-export const RADICAL_DIR = '.radical'
-/** The model folder, from the repository's root. */
-export const MODEL_FOLDER = `${RADICAL_DIR}/model`
-/** The model folder of the old layout. */
-export const OLD_MODEL_FOLDER = 'architecture'
+/** The folder of everything Radical keeps in a repository, the model
+ *  folder in it, and the model folder of the old layout. */
+export { RADICAL_DIR, MODEL_FOLDER, OLD_MODEL_FOLDER }
 /** The repository's sensors (their scripts beside them), and where the old
  *  layout had them. */
 export const SENSORS_FILE = `${RADICAL_DIR}/sensors/sensors.json`
@@ -72,13 +70,18 @@ export async function findModelFolder(cwd: string): Promise<string | null> {
   return await isModel(old) ? old : null
 }
 
-/** The model a folder picked to open holds: the folder itself when it is
- *  one, else the .radical/model of a repository picked (an open dialog
- *  hides .radical/), or of the .radical/ folder itself. */
-export async function repositoryModel(picked: string): Promise<string> {
-  if (await isModel(picked)) return picked
-  if (basename(resolve(picked)) === RADICAL_DIR && await isModel(join(picked, 'model'))) return join(picked, 'model')
-  return await isModel(join(picked, MODEL_FOLDER)) ? join(picked, MODEL_FOLDER) : picked
+/** The model a folder picked to open holds (modelFolderCandidates): the
+ *  folder itself when it is one, else the .radical/model of a repository
+ *  picked (an open dialog hides .radical/) or of the .radical/ folder
+ *  itself, else its architecture/ (the old layout); the folder itself when
+ *  it is empty, for a new model. Null for a folder of other files: no
+ *  model is started beside a repository's code. */
+export async function repositoryModel(picked: string): Promise<string | null> {
+  for (const candidate of modelFolderCandidates(basename(resolve(picked)))) {
+    const folder = candidate ? join(picked, candidate) : picked
+    if (await isModel(folder)) return folder
+  }
+  return startsEmpty(await readdir(picked).catch(() => [])) ? picked : null
 }
 
 /** A file of the repository in .radical/ (`file`) or where the old layout

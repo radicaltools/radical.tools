@@ -20,6 +20,7 @@ import { OLD_STATE_DIR, STATE_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/
 import { MODEL_CACHE_DIR, MODEL_CACHE_NAMES } from '@radical/common/formats/modelCache'
 import { readEach, type MdFolderStorage } from '@radical/common/formats/mdFolderSync'
 import { DEPS_FILE, FEDERATION_FILE } from '@radical/common/federation'
+import { RADICAL_DIR, modelFolderCandidates, noModelIn, startsEmpty } from '@radical/common/modelFolders'
 
 // Minimal structural typings for the File System Access API (avoids depending
 // on lib.dom variants that may not ship these definitions).
@@ -69,21 +70,33 @@ export async function pickWebDirectory(): Promise<FsDirHandle | null> {
 }
 
 /** What a picked folder opens: the model, and the repository's .radical/
- *  folder that holds its radical.json, when there is one. The model is the
- *  folder itself when it has a radical.md; else the .radical/model of a
- *  repository picked (the picker hides .radical/), or of the .radical/
- *  folder itself (a picker showing hidden folders may pick it). */
+ *  folder that holds its radical.json, when there is one. The model is
+ *  where the CLI finds it (modelFolderCandidates): the folder itself when it
+ *  has a radical.md; else the model of the .radical/ folder itself (a
+ *  picker showing hidden folders may pick it), the .radical/model of a
+ *  repository picked (the picker hides .radical/), or its architecture/,
+ *  the old layout; else the folder itself when it is empty, for a new
+ *  model. A folder of other files with no model is refused (noModelIn):
+ *  opened as an empty model, it got .state/ at once and a second model
+ *  beside its code at the first edit. */
 export async function openedFolder(picked: FsDirHandle): Promise<{ model: FsDirHandle; radical: FsDirHandle | null }> {
   const hasManifest = (dir: FsDirHandle) => dir.getFileHandle('radical.md').then(() => true, () => false)
-  const modelIn = async (radical: FsDirHandle) => {
-    // MODEL_FOLDER of @radical/node-files' repositoryLayout.
-    const model = await radical.getDirectoryHandle('model').catch(() => null)
-    return model && await hasManifest(model) ? { model, radical } : null
+  const folderAt = async (path: string): Promise<FsDirHandle | null> => {
+    let dir: FsDirHandle | null = picked
+    for (const part of path ? path.split('/') : []) dir = dir && await dir.getDirectoryHandle(part).catch(() => null)
+    return dir
   }
-  if (await hasManifest(picked)) return { model: picked, radical: null }
-  if (picked.name === '.radical') return await modelIn(picked) ?? { model: picked, radical: null }
-  const radical = await picked.getDirectoryHandle('.radical').catch(() => null)
-  return (radical && await modelIn(radical)) ?? { model: picked, radical: null }
+  for (const candidate of modelFolderCandidates(picked.name)) {
+    const model = await folderAt(candidate)
+    if (!model || !(await hasManifest(model))) continue
+    if (!candidate) return { model, radical: null }
+    const radical = picked.name === RADICAL_DIR ? picked : await picked.getDirectoryHandle(RADICAL_DIR).catch(() => null)
+    return { model, radical }
+  }
+  const names: string[] = []
+  for await (const [name] of picked.entries()) names.push(name)
+  if (!startsEmpty(names)) throw new Error(noModelIn(picked.name))
+  return { model: picked, radical: null }
 }
 
 /** The model a picked folder holds (see openedFolder). */

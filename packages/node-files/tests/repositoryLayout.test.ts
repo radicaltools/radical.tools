@@ -50,9 +50,13 @@ describe('repository layout', () => {
     // What a pull left behind, out of git: the rounds and the model's state.
     const pulled = await repository(['.radical/model/radical.md', '.crucible/rounds/round-1-2/', 'architecture/.radical/base.json'])
     expect(await oldLayout(pulled)).toEqual(['.crucible/rounds', 'architecture/.radical'])
-    // Without a model anywhere, none.
+    // A repository picked to open: its architecture/ (F-0120).
+    expect(await repositoryModel(root)).toBe(join(root, 'architecture'))
+    // Without a model anywhere, none; picked, it is refused, and an empty folder starts one.
     const empty = await repository(['src/'])
     expect(await findModelFolder(join(empty, 'src'))).toBeNull()
+    expect(await repositoryModel(empty)).toBeNull()
+    expect(await repositoryModel(join(empty, 'src'))).toBe(join(empty, 'src'))
   })
 })
 

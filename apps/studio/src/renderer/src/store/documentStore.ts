@@ -1350,6 +1350,8 @@ export const documents: DocumentsAPI = {
     // ── Electron: native directory dialog → read via IPC. ──
     if (h.openFolder) {
       const res = await h.openFolder()
+      // A folder refused (one that holds no model) is said, not taken for a cancel.
+      if (!res.success && res.error) throw new Error(res.error)
       if (!res.success || !res.folderPath) return null
       const idx = readIndex()
       const existing = idx.docs.find((d) => d.source === 'md' && d.folderPath === res.folderPath)
