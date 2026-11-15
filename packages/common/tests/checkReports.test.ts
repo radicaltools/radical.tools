@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { checkModel, formatCheckGithub, formatCheckText, parseCheckConfig, parseTestIds, parseTestReport, parseTestResults, ratchetConfig, runCheck, serializeTestResults, type TestCase } from '../src/check'
-import { findTests, globMatch } from '../src/check/reports'
+import { canonicalTestId, checkModel, formatCheckGithub, formatCheckText, parseCheckConfig, parseTestIds, parseTestReport, parseTestResults, ratchetConfig, runCheck, serializeTestResults, type TestCase } from '../src/check'
+import { findTests, globMatch, rebindTests } from '../src/check/reports'
 import { serializeToMdFolderWithPaths } from '../src/formats/mdFolder'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
 import type { C4Node, C4Relation, DiagramData } from '../src/c4'
@@ -145,6 +145,33 @@ describe('test reports', () => {
     expect(findTests(vitest, cases)).toEqual({ fileSeen: true, matches: cases })
     // An id with a › splits only on it: its title may hold " > ".
     expect(parseTestIds('src/a.test.ts › compares a > b')[0].title).toEqual(['compares a > b'])
+  })
+
+  it('reads a test id as Playwright and Vitest print it, with its project and its line, as the same test (F-0144)', () => {
+    const cases = parseTestReport(JSON.stringify({ config: { rootDir: '/repo' }, suites: [{ title: 'tests/pay.spec.ts', file: 'tests/pay.spec.ts', specs: [], suites: [{ title: 'pay', file: 'tests/pay.spec.ts', specs: [{ title: 'takes a card', file: 'tests/pay.spec.ts', line: 2, tests: [{ projectName: 'chromium', status: 'expected' }] }] }] }] }), 'pw.json')
+    for (const printed of [
+      'tests/pay.spec.ts › pay › takes a card',
+      'tests/pay.spec.ts:2:3 › pay › takes a card',
+      'tests/pay.spec.ts:2 › pay › takes a card',
+      '[chromium] › tests/pay.spec.ts:2:3 › pay › takes a card',
+      '[1/4] [chromium] › tests/pay.spec.ts:2:3 › pay › takes a card',
+      '[1/4] tests/pay.spec.ts:2:3 › pay › takes a card',
+      'tests/pay.spec.ts > pay > takes a card',
+      '|e2e| tests/pay.spec.ts > pay > takes a card',
+    ]) {
+      expect(canonicalTestId(printed), printed).toBe('tests/pay.spec.ts › pay › takes a card')
+      expect(findTests(parseTestIds(printed)[0], cases).matches.map((c) => c.status), printed).toEqual(['passed'])
+    }
+    // A file alone, and a title that only looks like a project, stay as written.
+    expect(canonicalTestId('tests/pay.spec.ts')).toBe('tests/pay.spec.ts')
+    expect(canonicalTestId('tests/pay.spec.ts › [chromium] only')).toBe('tests/pay.spec.ts › [chromium] only')
+  })
+
+  it('binds a test once however it is written, and drops it written another way (F-0157)', () => {
+    expect(rebindTests(['tests/pay.test.ts > checkout > pays by card'], ['tests/pay.test.ts › checkout › pays by card'], []))
+      .toEqual(['tests/pay.test.ts > checkout > pays by card'])
+    expect(rebindTests(['a.test.ts › t', 'a.test.ts > t'], ['[chromium] › b.spec.ts:1:2 › u', 'b.spec.ts › u'], ['a.test.ts:3 › t']))
+      .toEqual(['b.spec.ts › u'])
   })
 
   it('finds a test by a path suffix either way and the end of its title', () => {

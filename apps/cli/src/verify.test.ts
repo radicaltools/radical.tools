@@ -81,6 +81,13 @@ describe('radical verify', () => {
       .toBe('scenario "Pays by card" (pay) is checked by 1 test (.radical/radical.json):\n  src/pay.test.ts › pay › declines\n')
   })
 
+  it('keeps a test written as Playwright prints it, with its project and line, as the file and titles (F-0144)', async () => {
+    const root = await repository()
+    const bound = await run(root, 'verify', 'pay', '--test', 'tests/pay.spec.ts:2:3 › pay › takes a card', '--test', '[chromium] › tests/pay.spec.ts:2:3 › pay › takes a card')
+    expect(bound.out).toContain('is checked by 1 test (.radical/radical.json):\n  tests/pay.spec.ts › pay › takes a card')
+    expect((await run(root, 'verify', 'pay', '--drop', '[firefox] › tests/pay.spec.ts:9:1 › pay › takes a card')).out).toContain('is checked by no test')
+  })
+
   it('takes out the entry of a scenario the model no longer has, and drops nothing of another entry', async () => {
     const root = await repository()
     const file = join(root, '.radical', 'radical.json')

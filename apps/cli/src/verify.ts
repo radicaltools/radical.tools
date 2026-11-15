@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { parseArgs } from 'node:util'
-import { canonicalTestId } from '@radical/common/check'
+import { canonicalTestId, rebindTests } from '@radical/common/check'
 import { REPOSITORY_FILE, serializeRepositoryFile, testsBoundTo } from '@radical/common/repositoryMapping'
 import type { Io } from './check'
 import { openElement, shown, shownOrphan } from './implement'
@@ -17,7 +17,9 @@ elements share needs the id.
   --test <id>      a test to bind, as Vitest and Playwright print it, from
                    the repository's root: <file> › <describe> › <title>, or
                    <file> for every test in it; more than once for several.
-                   Vitest's <file> > <describe> > <title> is kept with ›
+                   Vitest's <file> > <describe> > <title> is kept with ›,
+                   without the [project] or |project| and :line:col
+                   printed around the file
   --drop <id>      a test to take off
   --remove         takes the element's entry out; one the model no longer
                    has too, by its id or name
@@ -66,8 +68,7 @@ export async function verifyCommand(args: string[], io: Io): Promise<number> {
     if (at < 0) { io.out(`${where} has no entry for ${shown(node)}.`); return 0 }
     repository.verifies.splice(at, 1)
   } else {
-    const kept = bound.filter((t) => !drops.includes(canonicalTestId(t)))
-    const tests = [...kept, ...adds.filter((t) => !kept.some((k) => canonicalTestId(k) === t))]
+    const tests = rebindTests(bound, adds, drops)
     const entry = { element: node.id, name: node.label, tests }
     if (!tests.length) { if (at >= 0) repository.verifies.splice(at, 1) }
     else if (at < 0) repository.verifies.push(entry)

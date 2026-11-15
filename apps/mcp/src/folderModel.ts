@@ -28,7 +28,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel, originOf, ownModel } from '@radical/common/model'
 import { REPOSITORY_FILE, builtIn, parseRepositoryFile, serializeRepositoryFile, testsBoundTo, type RepositoryFile } from '@radical/common/repositoryMapping'
-import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, WORD_RULES, canonicalTestId, computeEvidence, conditionsOf, formatAge, formatTrace, parseCheckConfig, parseMeasurementStore, parseTestResults, quoteValueGaps, testsRanAt, traceOf, verifiedHere, withBoundTests, wordFindings, type CheckModel } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, WORD_RULES, computeEvidence, conditionsOf, formatAge, formatTrace, parseCheckConfig, parseMeasurementStore, parseTestResults, quoteValueGaps, rebindTests, testsRanAt, traceOf, verifiedHere, withBoundTests, wordFindings, type CheckModel } from '@radical/common/check'
 import { mappingRoot, repositoryFileOf } from '@radical/node-files/repositoryLayout'
 import { FEDERATION_FILE, parseFederationFile, withOtherModels } from '@radical/common/federation'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
@@ -636,10 +636,8 @@ export class FolderModel {
         return { ok: false, text: 'set_verification: tests and drop must be lists of test ids ("<file> › <title>"), one of them given, or remove: true alone' }
       }
       // Added beside those bound, as radical verify --test does, and kept with ›,
-      // also when written as Vitest prints them (with >).
-      const dropped = drops.map(canonicalTestId)
-      const bound = testsBoundTo(repository.verifies, node.id).filter((t) => !dropped.includes(canonicalTestId(t)))
-      const entry = { element: node.id, name: node.label, tests: [...new Set([...bound, ...adds.map(canonicalTestId)])] }
+      // also when written as Vitest or Playwright prints them; each test once.
+      const entry = { element: node.id, name: node.label, tests: rebindTests(testsBoundTo(repository.verifies, node.id), adds, drops) }
       if (!entry.tests.length) { if (at >= 0) repository.verifies.splice(at, 1) }
       else if (at < 0) repository.verifies.push(entry)
       else repository.verifies[at] = { ...repository.verifies[at], ...entry }

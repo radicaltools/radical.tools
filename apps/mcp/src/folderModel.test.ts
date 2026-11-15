@@ -1436,6 +1436,30 @@ describe('test bindings', () => {
     expect(await model.call('set_verification', { id: 's-pay', tests: [] })).toMatchObject({ ok: false })
     expect(await model.call('set_verification', { id: 's-pay', tests: ['x'], remove: true })).toMatchObject({ ok: false })
   })
+
+  it('binds a test once when the file has it written another way, as radical verify does (F-0157)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'radical-mcp-verify-'))
+    folders.push(root)
+    await promisify(execFile)('git', ['init', '-q'], { cwd: root })
+    const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
+      ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
+    const folder = join(root, '.radical', 'model')
+    const files = serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), relations: [], nodes: [node('s-pay', 'scenario', 'Pays', { given: 'a cart', when: 'paying', then: 'paid' })] }, 'shop')
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    const file = join(root, '.radical', 'radical.json')
+    const model = await FolderModel.open(folder)
+    for (const [boundAs, given] of [
+      ['tests/pay.test.ts > checkout > pays by card', 'tests/pay.test.ts › checkout › pays by card'],
+      ['tests/pay.spec.ts › checkout › pays by card', '[chromium] › tests/pay.spec.ts:2:3 › checkout › pays by card'],
+    ]) {
+      await writeFile(file, JSON.stringify({ implements: [], verifies: [{ element: 's-pay', name: 'Pays', tests: [boundAs] }] }))
+      expect((await model.call('set_verification', { id: 's-pay', tests: [given] })).text, given).toBe('scenario "Pays" (s-pay) is checked by 1 test(s) (.radical/radical.json).')
+      expect(JSON.parse(await readFile(file, 'utf8')).verifies[0].tests, given).toEqual([boundAs])
+    }
+  })
 })
 
 describe('entries of deleted elements', () => {

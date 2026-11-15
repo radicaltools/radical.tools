@@ -428,7 +428,9 @@ scenarios and fitness functions in `.radical/radical.json` ("verifies"), and
 a scenario or fitness function passes when every test bound to it passed and
 its `metrics` (metric conditions only) hold. A test is named as Vitest and
 Playwright print it, from the repository's root, its parts joined by `›`
-(Vitest's `>` is read too, and `radical verify` keeps it with `›`):
+(Vitest's `>` is read too, and `radical verify` keeps it with `›`; the
+project Playwright or Vitest prints before the file, `[chromium] › ` or
+`|unit| `, and the line and column after it, `:2:3`, are left out):
 
 ```sh
 radical verify "Prints JSON" --test "apps/cli/src/cli.test.ts › radical check › prints the result as JSON"
