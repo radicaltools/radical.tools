@@ -233,3 +233,46 @@ describe('the first layout of a view (decided 2026-10-21)', () => {
     expect(Object.keys(s().views.containers.positions).length).toBeGreaterThan(0)
   }, 60_000)
 })
+
+describe('a canvas opened in Viewer with an element placed as it opens (F-0139)', () => {
+  // DB lies far outside Bookstore in All elements' places (added on another
+  // canvas): the view places it in Bookstore as it opens. The live layout
+  // took that for an element to settle, with its surroundings, and moved
+  // the view for seconds, nothing touched.
+  const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+  const places = (): string => JSON.stringify(Object.values(s().c4Nodes).map((n) => [n.id, Math.round(n.x), Math.round(n.y), Math.round(n.width), Math.round(n.height)]))
+  const stray = (): DiagramData => {
+    const m = model()
+    delete m.defaultPositions
+    m.nodes.push(node('reader', 'person', undefined, pos(300, -300, 150, 170)))
+    Object.assign(m.nodes.find((n) => n.id === 'db')!, { x: 5200, y: 3100 })
+    m.views!.find((v) => v.id === 'containers')!.nodeIds.push('reader')
+    m.relations = [
+      { id: 'r1', sourceId: 'reader', targetId: 'api' }, { id: 'r2', sourceId: 'api', targetId: 'db' }, { id: 'r3', sourceId: 'api', targetId: 'pay' },
+    ] as DiagramData['relations']
+    return m
+  }
+
+  it('stands still in Viewer', async () => {
+    s().setAppMode('viewer')
+    s().loadDiagram(stray())
+    s().startLiveLayout({ skipBulk: true })
+    s().setActiveView('containers')
+    expect(inside('db')).toBe(true)
+    const shown = places()
+    await wait(1500)
+    expect(places()).toBe(shown)
+  })
+
+  it('stands still in Viewer on All elements, as the model opens', async () => {
+    const m = stray()
+    m.defaultPositions = Object.fromEntries(m.nodes.map((n) => [n.id, pos(n.x, n.y, n.width, n.height)]))
+    s().setAppMode('viewer')
+    s().loadDiagram(m)
+    s().startLiveLayout({ skipBulk: true })
+    expect(inside('db')).toBe(true)
+    const shown = places()
+    await wait(1500)
+    expect(places()).toBe(shown)
+  })
+})

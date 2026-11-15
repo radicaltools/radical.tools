@@ -90,6 +90,8 @@ import {
   viewExpandedSet,
   fitAndSeparateBottomUp,
   isEffectivelyCollapsed,
+  keptFrames,
+  placeOnViewCanvas,
   viewLayoutInput,
   type LayoutInput,
 } from '@radical/layout/viewInput'
@@ -1629,21 +1631,14 @@ function showCanvasPositions(
   // Only a canvas draws positions: a table, wiki, matrix, hierarchy or flow
   // view keeps what it was given.
   if (view && view.kind && view.kind !== 'static') return []
-  const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
-  // Folded as the view draws it: its own folds over the model's, and a
-  // container none of whose children it shows.
-  const childless = computeViewCollapsedSet(shown, nodes)
-  const folded = view ? (n: C4Node): boolean => nodeEffectivelyCollapsedInView(n, view.id, view) || childless.has(n.id) : undefined
-  // The containers the view draws only to hold what it shows: a new one
-  // goes tightly round what it holds there, and nothing is astray in one.
-  const frames = viewFrames(view, nodes, relations)
-  const placed = placeUnplaced(nodes, positions, shown, folded, { frames, wrap: wrap?.ids, wrapped: wrap?.wrapped })
+  // The MCP server lays a view never laid out out from this canvas too.
+  const placed = placeOnViewCanvas(nodes, positions, view, relations, wrap)
   // One whose parent got a place of its own too moved with it, at a place
   // that was not its own in it: it is placed in it now.
   const left = own.filter((id) => nodes[id] && !placed.includes(id))
   if (!left.length) return placed
   const known = Object.fromEntries(Object.keys(nodes).filter((id) => !left.includes(id)).map((id) => [id, true]))
-  return [...placed, ...placeUnplaced(nodes, known, shown, folded, { frames })]
+  return [...placed, ...placeOnViewCanvas(nodes, known, view, relations)]
 }
 
 /**
@@ -1772,6 +1767,15 @@ function firstCanvasPositions(
   if (isExploration(view) && !Object.keys(view.positions ?? {}).length) return {}
   if (!view || (view.kind ?? 'static') !== 'static' || Object.keys(view.positions ?? {}).length > 0) return undefined
   return milestoneAllPositions ?? defaultPositions
+}
+
+/** What a canvas just opened leaves to the live layout to settle: what it
+ *  placed (showCanvasPositions, placeUnplaced) settles with its
+ *  surroundings in Designer; Viewer and Presenter show the canvas as it
+ *  opens, still (a view never laid out glided there for seconds, nothing
+ *  touched). */
+function settlesOnOpen(placed: string[]): string[] {
+  return useDiagramStore.getState().appMode === 'designer' ? placed : []
 }
 
 /** The page a slide of a wiki view shows: the element whose page it is
@@ -3661,7 +3665,7 @@ interface DiagramStore {
    *  an edit of the milestone: marks it, and parks the live version first
    *  (liveBackup.views). No-op on the live model. */
   _milestoneViewEdit: (viewId: string | null | 'every') => void
-  _resizeParentsBottomUp: (viewFilter?: Set<string>, viewCollapsedSet?: Set<string>, expandedSet?: Set<string>) => void
+  _resizeParentsBottomUp: (viewFilter?: Set<string>, viewCollapsedSet?: Set<string>, expandedSet?: Set<string>, keep?: ReadonlySet<string>) => void
   /** Moves the active canvas's elements so its layout constraints hold
    *  (no undo step of its own). */
   _enforceLayoutConstraints: () => void
@@ -6071,7 +6075,7 @@ export const useDiagramStore = create<DiagramStore>()(
           arrangeOnFirstOpen()
           const shown = get().rfNodes.filter((n) => !n.hidden).map((n) => n.id)
           ;(window as any).__rfPlaceCamera?.(incomingViewport, shown)
-          _liveLayout?.reset(placed)
+          _liveLayout?.reset(settlesOnOpen(placed))
           return
         }
 
@@ -7297,7 +7301,7 @@ export const useDiagramStore = create<DiagramStore>()(
       // ── layout ───────────────────────────────────────────────────────────
 
       /** Resize every parent container bottom-up after children have moved. */
-      _resizeParentsBottomUp(viewFilter, viewCollapsedSet, expandedSet) {
+      _resizeParentsBottomUp(viewFilter, viewCollapsedSet, expandedSet, keep) {
         const allNodes = Object.values(get().c4Nodes)
         // Only process parents that are in the view (or all if no filter)
         const relevantNodes = viewFilter
@@ -7312,6 +7316,7 @@ export const useDiagramStore = create<DiagramStore>()(
         }
         parentIds.sort((a, b) => nodeDepth(b) - nodeDepth(a)) // deepest first
         for (const pid of parentIds) {
+          if (keep?.has(pid)) continue
           get().fitParentToChildren(pid, viewFilter, viewCollapsedSet, expandedSet)
         }
       },
@@ -7578,7 +7583,13 @@ export const useDiagramStore = create<DiagramStore>()(
             const settled = settleMoveOnShownCanvas(get(), reparented, oldParents)
             set((state) => { writeGeometry(state, settled) })
           }
-          get()._resizeParentsBottomUp(vf, vcs, expandedSet)
+          // A frame Tidy kept as it was (pinned, or out of its reach round a
+          // selection) keeps its size too; one that gained or lost an
+          // element meanwhile is fitted.
+          const kept = ensemble || unpins ? new Set<string>() : keptFrames(input.nodes, result.winner.positions, input.frames)
+          for (const id of changed) for (let p = get().c4Nodes[id]?.parentId; p; p = get().c4Nodes[p]?.parentId) kept.delete(p)
+          for (const id of reparented) for (let p = present.get(id); p; p = get().c4Nodes[p]?.parentId) kept.delete(p)
+          get()._resizeParentsBottomUp(vf, vcs, expandedSet, kept)
 
           // Final collision-safety pass at root level (same as ELK/Radical
           // paths) for the ensemble, and for what was added or moved while
@@ -9825,7 +9836,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // skipBulk=true: the loaded positions stand, the live layout only
         // moves what is added or dragged from here on.
         get().startLiveLayout({ skipBulk: true })
-        if (placedOnLoad.length > 0) _liveLayout?.reset(placedOnLoad)
+        if (settlesOnOpen(placedOnLoad).length > 0) _liveLayout?.reset(placedOnLoad)
         suggestSmartLayoutIfUnarranged(true)
         // Apply restored camera (loaded as activeViewId=null → default view).
         // The camera of the canvas shown now: one switched to during the load

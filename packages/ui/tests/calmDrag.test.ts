@@ -1037,6 +1037,43 @@ describe('Pins in the store', () => {
     expect(s().notifications[s().notifications.length - 1]?.message).toContain('around the selection')
   }, 60_000)
 
+  it('Tidy around leaves a pinned frame, and a frame it does not reach, at their place and size (F-0138)', async () => {
+    const s = useDiagramStore.getState
+    // Frames holding their children 58 px below their top, as the sample's do, in one system; Access & Security pinned.
+    useDiagramStore.setState({
+      c4Nodes: {
+        core: node('core', 'system', { x: 0, y: 0, width: 1700, height: 1400 }),
+        pay: node('pay', 'group', { parentId: 'core', x: 30, y: 58, width: 900, height: 568 }),
+        val: node('val', 'container', { parentId: 'pay', x: 57, y: 58 }),
+        ledger: node('ledger', 'container', { parentId: 'pay', x: 67, y: 68 }),
+        notify: node('notify', 'container', { parentId: 'pay', x: 57, y: 338 }),
+        acc: node('acc', 'group', { parentId: 'core', x: 1100, y: 58, width: 520, height: 568 }),
+        auth: node('auth', 'container', { parentId: 'acc', x: 57, y: 58 }),
+        gw: node('gw', 'container', { parentId: 'acc', x: 57, y: 338 }),
+        risk: node('risk', 'group', { parentId: 'core', x: 30, y: 800, width: 658, height: 498 }),
+        db: node('db', 'container', { parentId: 'risk', x: 57, y: 58 }),
+        dw: node('dw', 'container', { parentId: 'risk', x: 357, y: 58 }),
+      },
+      c4Relations: {
+        r1: { id: 'r1', sourceId: 'val', targetId: 'ledger' }, r2: { id: 'r2', sourceId: 'gw', targetId: 'auth' }, r3: { id: 'r3', sourceId: 'db', targetId: 'dw' },
+      },
+      defaultLayoutConstraints: [{ id: 'p', type: 'pin', nodeIds: ['acc'] }],
+    } as any)
+    s()._sync()
+    // On the canvas: the system round them is refitted round what moved, and their places in it change with it.
+    const geometry = (id: string) => {
+      const n = s().c4Nodes[id]
+      let x = n.x, y = n.y
+      for (let p = n.parentId; p; p = s().c4Nodes[p].parentId) { x += s().c4Nodes[p].x; y += s().c4Nodes[p].y }
+      return { x, y, width: n.width, height: n.height }
+    }
+    const was = Object.fromEntries(['acc', 'auth', 'gw', 'risk', 'db', 'dw'].map((id) => [id, geometry(id)]))
+    await s().runSmartLayout({ around: ['val'] })
+    expect(s().notifications[s().notifications.length - 1]?.message).toContain('around the selection')
+    for (const id of Object.keys(was)) expect(geometry(id), id).toEqual(was[id])
+    expect(pinnedNodeIds(s().defaultLayoutConstraints)).toEqual(['acc'])
+  }, 60_000)
+
   it('pins in the active view only', () => {
     const s = useDiagramStore.getState
     const vid = s().addView('Context')
