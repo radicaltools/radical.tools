@@ -1,0 +1,46 @@
+
+=== bound as "src/pay.test.ts > pay > takes a card"
+$ (gt) radical verify "Pays by card" --test "src/pay.test.ts > pay > takes a card"  → exit 0
+    scenario "Pays by card" (pay) is checked by 1 test (.radical/radical.json):
+      src/pay.test.ts > pay > takes a card
+$ (gt) radical check --report vitest.json  → exit 0
+    radical check: .radical/model (5 elements, 3 relations)
+    
+    ⚠ test-not-run  1
+        warning  .radical/model/nodes/pays-by-card.md  Scenario "Pays by card": no report has the file of test src/pay.test.ts > pay > takes a card.
+    
+    Test reports: 1 test case
+      Requirements: 1 unverified
+      Scenarios: 1 not-run
+    
+    ✓ 0 errors, 1 warning
+$ (gt) radical check --trace pay  → exit 0
+    Verification path of Pays by card [pay]
+    - Need: Pay [need] — unverified
+      - Requirement: Take card payments [req] — unverified
+        ▶ Scenario: Pays by card [pay] — not-run
+            · src/pay.test.ts > pay > takes a card — not-run
+
+=== bound as "src/pay.test.ts › pay › takes a card"
+$ (arrow) radical verify "Pays by card" --test "src/pay.test.ts › pay › takes a card"  → exit 0
+    scenario "Pays by card" (pay) is checked by 1 test (.radical/radical.json):
+      src/pay.test.ts › pay › takes a card
+$ (arrow) radical check --report vitest.json  → exit 0
+    radical check: .radical/model (5 elements, 3 relations)
+    
+    
+    Test reports: 1 test case
+      Requirements: 1 verified
+      Scenarios: 1 passed
+    
+    ✓ 0 errors, 0 warnings
+$ (arrow) radical check --trace pay  → exit 0
+    Verification path of Pays by card [pay]
+    - Need: Pay [need] — verified
+      - Requirement: Take card payments [req] — verified
+        ▶ Scenario: Pays by card [pay] — passed
+            · src/pay.test.ts › pay › takes a card — passed
+
+Expected: both bindings name the same passed test: Scenarios: 1 passed, the trace says passed.
+Actual: with ">" not-run = true, passed = false; with "›" not-run = false, passed = true.
+REPRODUCED: yes

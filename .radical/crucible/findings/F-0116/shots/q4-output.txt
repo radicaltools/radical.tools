@@ -1,0 +1,40 @@
+before:
+{
+  "$schema": "https://example.invalid/radical.schema.json",
+  "owner": "team-payments",
+  "implements": [
+    {
+      "element": "api",
+      "name": "API",
+      "paths": [
+        "src"
+      ],
+      "owner": "alice"
+    }
+  ]
+}
+
+$ (repo) radical implement Shop --path src  → exit 0
+    + system "Shop" (sys) is built in src (.radical/radical.json)
+after:
+{
+  "implements": [
+    {
+      "element": "api",
+      "name": "API",
+      "paths": [
+        "src"
+      ]
+    },
+    {
+      "element": "sys",
+      "name": "Shop",
+      "paths": [
+        "src"
+      ]
+    }
+  ]
+}
+
+Expected (?): the keys the command does not change stay. Actual: lost $schema, owner, implements[api].owner.
+REPRODUCED: yes

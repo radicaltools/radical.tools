@@ -1,0 +1,19 @@
+1. Committed: need "Basket brief"; "Basket limit" quotes "A basket holds at most 20 items."; "Idle baskets" derives from nothing yet.
+2. update_relation: the quote of "Basket limit" -> "An idle basket is kept for 30 days."
+3. add_relation: "Idle baskets" derives from "Basket brief", quoting "An idle basket is kept for 30 days."
+
+get_changes since HEAD:
+Model changes since HEAD (59ef527), uncommitted edits included; elements and relations only, views and layout left out.
+Elements: 0 added, 0 changed, 0 removed. Relations: 1 added, 1 changed, 0 removed.
+
+Relations added (1):
+- requirement "Idle baskets" (3e88715b-b4ab-42fd-85cd-1459866e03d5) → need "Basket brief" (8af9eea3-6919-428e-a6fe-3ff7546700d0) [derives] (bd8e3741-0815-4e97-92b7-16c62763e08c)
+    quote: An idle basket is kept for 30 days.
+
+Relations changed (1):
+- requirement "Basket limit" (bf86626a-44c8-4718-b3d6-84d600d4e261) → need "Basket brief" (8af9eea3-6919-428e-a6fe-3ff7546700d0) [derives] (566e2db8-3284-4de1-b853-2544f69e85b9)
+
+review_requirements since HEAD:
+Nothing to review: no requirement among the requirements added or changed since HEAD, and those a need changed since then leads to.
+
+2 of 2 requirements whose derives relation changed are left out of the review
