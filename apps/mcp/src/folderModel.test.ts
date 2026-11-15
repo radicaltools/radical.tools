@@ -16,12 +16,12 @@ import { serializeSelection } from '@radical/common/formats/canvasSelection'
 import { parseModelBase } from '@radical/common/formats/modelBase'
 import { AGENT_ACTIVE_MS, AGENT_ACTIVITY_FILE, parseAgentActivity } from '@radical/common/formats/agentActivity'
 import { FolderModel } from './folderModel'
-import { drawnSize } from '@radical/layout/geometry'
+import { drawnSize, placeUnplaced } from '@radical/layout/geometry'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, type C4Node } from '@radical/common/c4'
 import { documentMetamodel } from '@radical/common/model'
 import { serializeTestResults } from '@radical/common/check'
 import { TIDY_BUDGET, costRows, formatPart, runTidyLayout } from '@radical/layout/tidy'
-import { viewLayoutInput } from '@radical/layout/viewInput'
+import { computeViewNodeSet, viewLayoutInput } from '@radical/layout/viewInput'
 
 const folders: string[] = []
 afterEach(async () => { await Promise.all(folders.splice(0).map((folder) => rm(folder, { recursive: true, force: true }))) })
@@ -849,6 +849,49 @@ describe('long Smart Layout runs', () => {
     const apart = Object.keys(positions).filter((id) => Math.hypot(positions[id].x - studio.winner.positions[id].x, positions[id].y - studio.winner.positions[id].y) > 1)
     expect(apart).toEqual([])
   }, 180_000)
+
+  it('lays a view never laid out out from the canvas Studio opens it on (F-0140)', async () => {
+    // B lies far outside its system in All elements' places (added on
+    // another canvas): Studio opens the view with B placed in the system,
+    // beside its siblings, and lays it out from there.
+    const folder = await fixture()
+    const data = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    data.nodes = [
+      { id: 'sys', type: 'system', label: 'Sys', x: 0, y: 0, width: 900, height: 420, collapsed: false },
+      { id: 'a', type: 'container', label: 'A', parentId: 'sys', x: 40, y: 120, width: 240, height: 160, collapsed: false },
+      { id: 'c', type: 'container', label: 'C', parentId: 'sys', x: 600, y: 120, width: 240, height: 160, collapsed: false },
+      { id: 'b', type: 'container', label: 'B', parentId: 'sys', x: 4000, y: 2600, width: 240, height: 160, collapsed: false },
+      { id: 'x', type: 'system', label: 'X', x: 0, y: 700, width: 240, height: 160, collapsed: false },
+    ]
+    data.relations = [
+      { id: 'ab', sourceId: 'a', targetId: 'b', relationType: 'interacts' }, { id: 'bc', sourceId: 'b', targetId: 'c', relationType: 'interacts' },
+      { id: 'xa', sourceId: 'x', targetId: 'a', relationType: 'interacts' },
+    ]
+    data.views = [{ id: 'v', name: 'Sys', kind: 'static', nodeIds: ['sys', 'a', 'b', 'c', 'x'], expandedNodeIds: ['sys'], positions: {} } as never]
+    for (const [path, content] of Object.entries(serializeToMdFolder(data))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    // The canvas Studio opens the view on (showCanvasPositions), and its Smart Layout from there.
+    const saved = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const view = saved.views!.find((v) => v.id === 'v')!
+    const relations = Object.fromEntries(saved.relations.map((r) => [r.id, r]))
+    const nodes = Object.fromEntries(saved.nodes.map((n) => [n.id, { ...n }]))
+    const all = Object.fromEntries(saved.nodes.map((n) => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }]))
+    expect(placeUnplaced(nodes, all, computeViewNodeSet(view, nodes, relations))).toContain('b')
+    const input = viewLayoutInput(view, nodes, relations, view.layoutConstraints)
+    const studio = runTidyLayout(input.nodes, input.relations, {
+      alignments: input.alignments, edgeStyle: 'curved', metamodel: documentMetamodel(saved.metamodel, saved.nodes), pinned: [], budget: TIDY_BUDGET, frames: [...input.frames],
+    })
+
+    const model = await FolderModel.open(folder)
+    const outcome = await model.call('smart_layout', { viewId: 'v' })
+    expect(outcome.ok, outcome.text).toBe(true)
+    const after = deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data
+    const positions = after.views!.find((v) => v.id === 'v')!.positions
+    const apart = Object.keys(studio.winner.positions).filter((id) => Math.hypot(positions[id].x - studio.winner.positions[id].x, positions[id].y - studio.winner.positions[id].y) > 1)
+    expect(apart).toEqual([])
+  }, 60_000)
 
   it('tells the agent the numbers Studio shows for the same layout (F-0082)', async () => {
     // Four in a row above four below, the top row in reverse order. It

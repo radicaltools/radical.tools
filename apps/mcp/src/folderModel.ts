@@ -23,7 +23,7 @@ import { bindSuggestions, concernStatuses, holdsConcerns, suggestedCover, unboun
 import { fitShown, growFrameLeftUp, growWithRoom, makeRoomAround, modelCanvas, placeNewNode, settleMovedNodes } from '@radical/layout/geometry'
 import { runSmartLayoutCore } from '@radical/layout/smartLayout'
 import { TIDY_BUDGET, runTidyLayout, tidySummary, type TidyReport } from '@radical/layout/tidy'
-import { computeViewNodeSet, viewFrames, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, keptFrames, resizeParentsBottomUp } from '@radical/layout/viewInput'
+import { computeViewNodeSet, viewFrames, viewLayoutInput, applyAlignments, applyLayoutPositions, fitAndSeparateBottomUp, keptFrames, placeOnViewCanvas, resizeParentsBottomUp } from '@radical/layout/viewInput'
 import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel, originOf, ownModel } from '@radical/common/model'
@@ -972,6 +972,10 @@ export class FolderModel {
       const node = nodes[id]
       if (node) Object.assign(node, { x: pos.x, y: pos.y, width: pos.width, height: pos.height })
     }
+    // A view never laid out opens on All elements' places, with what lies
+    // outside its parent there placed in it, as Studio opens it: both lay
+    // it out from the same canvas.
+    if (view && (view.kind ?? 'static') === 'static' && !Object.keys(view.positions ?? {}).length) placeOnViewCanvas(nodes, positionsOf(nodes), view, byId(changed.relations))
     const constraints = view ? view.layoutConstraints : changed.defaultLayoutConstraints
     const input = viewLayoutInput(view, nodes, byId(changed.relations), constraints)
     if (!Object.keys(input.nodes).length) return { ok: true, text: 'Smart Layout: there are no nodes to lay out.' }

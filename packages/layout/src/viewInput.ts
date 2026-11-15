@@ -18,7 +18,7 @@ export function chainHiddenRelations(view: DiagramView | undefined, nodes: Recor
   if (!chain?.relationIds) return []
   return Object.keys(relations).filter((id) => !chain.relationIds!.has(id))
 }
-import { fittedParentSize, projectToVisibleGraph } from './geometry'
+import { fittedParentSize, placeUnplaced, projectToVisibleGraph } from './geometry'
 
 /** The elements a canvas puts on React Flow for a view: those it shows
  *  (viewShownNodes: its chain's, or its list) and the containers they sit
@@ -206,6 +206,35 @@ export function viewLayoutInput(
     if (!hidden.has(id)) relations[id] = r
   }
   return { nodes, relations, viewFilter, viewCollapsedSet, expandedSet, alignments: resolveAlignments(constraints, nodes), frames: new Set([...frames].filter((id) => nodes[id])) }
+}
+
+/**
+ * The canvas a view opens with, from the places it has (`positions` already
+ * on `nodes`: the view's own, or All elements' for a view never laid out):
+ * what it has no place for, or what lies mostly outside its parent there,
+ * placed in its parent beside its siblings (placeUnplaced), as the view
+ * folds and frames it. Studio opens a view on it, and the MCP server lays a
+ * view never laid out out from it, so both start from the same canvas.
+ * Mutates `nodes`; returns the ids placed.
+ */
+export function placeOnViewCanvas(
+  nodes: Record<string, C4Node>,
+  positions: Record<string, unknown>,
+  view: DiagramView | undefined,
+  relations: Record<string, C4Relation>,
+  wrap?: { ids: ReadonlySet<string>; wrapped: string[] },
+): string[] {
+  const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
+  // Folded as the view draws it: its own folds over the model's, and a
+  // container none of whose children it shows.
+  const childless = computeViewCollapsedSet(shown, nodes)
+  const folded = view
+    ? (n: C4Node): boolean => (n.collapsed && !(view.expandedNodeIds?.includes(n.id) ?? false)) || (view.collapsedNodeIds?.includes(n.id) ?? false) || childless.has(n.id)
+    : undefined
+  // The containers the view draws only to hold what it shows: a new one
+  // goes tightly round what it holds there, and nothing is astray in one.
+  const frames = viewFrames(view, nodes, relations)
+  return placeUnplaced(nodes, positions, shown, folded, { frames, wrap: wrap?.ids, wrapped: wrap?.wrapped })
 }
 
 /**

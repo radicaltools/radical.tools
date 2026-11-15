@@ -91,6 +91,7 @@ import {
   fitAndSeparateBottomUp,
   isEffectivelyCollapsed,
   keptFrames,
+  placeOnViewCanvas,
   viewLayoutInput,
   type LayoutInput,
 } from '@radical/layout/viewInput'
@@ -1596,21 +1597,14 @@ function showCanvasPositions(
   // Only a canvas draws positions: a table, wiki, matrix, hierarchy or flow
   // view keeps what it was given.
   if (view && view.kind && view.kind !== 'static') return []
-  const shown = view ? computeViewNodeSet(view, nodes, relations) ?? undefined : undefined
-  // Folded as the view draws it: its own folds over the model's, and a
-  // container none of whose children it shows.
-  const childless = computeViewCollapsedSet(shown, nodes)
-  const folded = view ? (n: C4Node): boolean => nodeEffectivelyCollapsedInView(n, view.id, view) || childless.has(n.id) : undefined
-  // The containers the view draws only to hold what it shows: a new one
-  // goes tightly round what it holds there, and nothing is astray in one.
-  const frames = viewFrames(view, nodes, relations)
-  const placed = placeUnplaced(nodes, positions, shown, folded, { frames, wrap: wrap?.ids, wrapped: wrap?.wrapped })
+  // The MCP server lays a view never laid out out from this canvas too.
+  const placed = placeOnViewCanvas(nodes, positions, view, relations, wrap)
   // One whose parent got a place of its own too moved with it, at a place
   // that was not its own in it: it is placed in it now.
   const left = own.filter((id) => nodes[id] && !placed.includes(id))
   if (!left.length) return placed
   const known = Object.fromEntries(Object.keys(nodes).filter((id) => !left.includes(id)).map((id) => [id, true]))
-  return [...placed, ...placeUnplaced(nodes, known, shown, folded, { frames })]
+  return [...placed, ...placeOnViewCanvas(nodes, known, view, relations)]
 }
 
 /**
