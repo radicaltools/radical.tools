@@ -367,6 +367,32 @@ feat/assay-syntax (2026-11-09, which does not touch Studio) and once in 4
 runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main.
 
+### Dogfooding (2026-11-15): exploratory round 201–210 and its fix round
+
+Ten exploratory runs on bb763a0c found 34 findings (F-0110…F-0143), all fixed on fix/round-201-210 in eight
+groups. Open after the fixes:
+
+- **`harden --gate` counts untracked files as changed sources.** A finding's script copied into the worktree's
+  `tmp/` was moved aside during the run without the fix; nested git work folders failed it with EISDIR. Gates ran
+  with the scripts moved out of the worktree. The gate should take only tracked changes (or honour .gitignore).
+- **No runner for the MCP tests that run against `dist`** (`apps/mcp/src/forge.test.ts`): the default gate cannot
+  prove them; a temporary `crucible.json` with a build step did. `--config` naming a file outside the repository
+  gives "No test file".
+- **`harden --test` cannot gate a test whose title contains `›`.**
+- **The words read "10-20" as the value 10 only** (the `\w-` lookbehind for codes); ranges are read by the limits.
+- **Canvas limit, to decide:** `smart_layout` with no `viewId` still lays out All elements on a model of more than
+  1,000 elements (Studio shows it as a table; refusing might break Assay or Forge on large models). Warnier (9.8 s,
+  66k DOM nodes) and the matrix (no answer in 30 s) on a view of 3,000 elements are not canvases and have no cap or
+  virtualisation. A temporary exploration grown one + at a time past 1,000 shows the notice, whose buttons do
+  nothing for an exploration that is not a saved view.
+- **Designer edits offered elsewhere** (`editAsDesigner`): an Inspector fix while Designer shows a milestone leaves
+  Designer on the live model even when the wizard is cancelled; Viewer → Inspector → an edit → Viewer gives Viewer
+  the edited live model back, not the milestone it showed.
+- **Keys:** Esc listeners on `window` other than the canvas's and the hierarchy's (the Delete prompt, popovers) are
+  not behind the dialog gate (`keysHere.ts`). The agent's run panels close when F5 starts a presentation (the
+  Toolbar unmounts while presenting).
+- **Electron's `folder:open` refusal** of a folder with no model has no test of its own (only `repositoryModel`).
+
 ### Dogfooding (2026-11-15): Smart Layout over every view of our own model
 
 Laying out each canvas of `.radical/model` through the worktree's own MCP server, after the view Crucible of
@@ -3112,7 +3138,8 @@ accepts a default its property refuses and a `refType` of no type, and
 `LIST VIEWS` counts no relations on rolled-up edges; "Add relation type"
 makes a type with no pairs, which allows every pair; pair min/max is
 stored but read by nothing, and the editor takes a maximum cardinality
-below 1; a fresh profile lists an "Untitled" model nobody made, and
+below 1; ~~a fresh profile lists an "Untitled" model nobody made~~ (fixed
+with F-0121, 2026-11-15: the first visit's model is marked `seeded`), and
 "Download as file…" names the file `.c4.json`; a propagated delete
 rewrites `views.json` and `_layout.json`; the milestone diff is not
 recomputed after an edit.
