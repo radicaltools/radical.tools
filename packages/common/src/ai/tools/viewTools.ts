@@ -383,7 +383,7 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
       }
       // One of a group's views follows the group: only its folding and lines are its own.
       if (view.partOf && (input.viewpoint !== undefined || input.kind !== undefined || input.pipeline !== undefined || input.folder !== undefined || input.name !== undefined)) {
-        return fail(`update_view: ${view.name} is one of the views of the group ${ctx.diagram.getViews()[view.partOf]?.name ?? view.partOf}: its name follows its element, and its viewpoint, kind, filter and folder are the group's (move the group's folder instead)`)
+        return fail(`update_view: ${view.name} is one of the views of the group ${ctx.diagram.getViews()[view.partOf]?.name ?? view.partOf}: its name follows its element, and its viewpoint, kind, filter and folder are the group's (move the group's folder instead, or change the viewpoint${view.viewpoint ? ` "${view.viewpoint}"` : ''} with upsert_viewpoint: every view of the group follows it)`)
       }
       // A group is one by its viewpoint: another kind, filter or viewpoint would end it.
       if (isViewGroup(view, ctx.diagram.getMetamodel?.()) && (input.viewpoint !== undefined || input.kind !== undefined || input.pipeline !== undefined)) {
