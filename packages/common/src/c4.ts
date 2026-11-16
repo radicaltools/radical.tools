@@ -242,7 +242,9 @@ export interface DiagramView {
   /**
    * Continuous layout: Studio tidies the whole view (Tidy, pins kept) after
    * each change to what it shows, the user's or an agent's, and glides the
-   * elements to their new places. Off when absent.
+   * elements to their new places (Keep smart). On or off is the view's own
+   * setting; absent, the view follows the Keep smart default of the
+   * Studio it is opened in (StudioSettings.keepSmart, off unless turned on).
    */
   continuousLayout?: boolean
   /**

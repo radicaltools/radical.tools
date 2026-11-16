@@ -32,7 +32,7 @@ export function useFixOffer(): { suffix: string; title: string; refused: string 
   const refused = liveModelEditRefused()
   return appMode === 'designer'
     ? { suffix: '', title: 'Make it now, as one undo step', refused }
-    : { suffix: ' in Designer', title: `${appMode === 'presenter' ? 'Presenter' : 'Viewer'} changes nothing: Studio makes it in Designer and shows it there`, refused }
+    : { suffix: ' in Designer', title: `${appMode === 'presenter' ? 'Presentations change' : 'Viewer changes'} nothing: Studio makes it in Designer and shows it there`, refused }
 }
 
 /** Lists `id` in the views that list `besideId`, and takes it out of the

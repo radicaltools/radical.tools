@@ -10,6 +10,7 @@ import { NavHistory } from './NavHistory'
 import { inspectorAvailable, useInspectorAvailable, useInspectorStore, useSettingsUnsaved } from '../persistence/inspector'
 import { toggleInspector, useInspectorNav } from '../navigation'
 import { setLeftCollapsed, toggleLeftPanel } from '../leftPanelFold'
+import { closePresentations, openPresentations, switchPerspective, usePresentationsFrom, usePresentationsOpen } from '../presentationsPlace'
 import { INSPECTOR_KEYS } from './Inspector'
 import { openCheckSettings } from './inspector/checkSettingsOpen'
 import { dropPendingMode, placeGone, useShownMode } from '../route'
@@ -167,13 +168,6 @@ const IconModelling = () => (
   </svg>
 )
 
-const IconPresentation = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
-    <rect x="1" y="2" width="14" height="10" rx="1.5" />
-    <path d="M5 14h6M8 12v2" strokeLinecap="round" />
-    <path d="M6 6.5L10 8.5 6 10.5V6.5z" fill="currentColor" stroke="none" />
-  </svg>
-)
 
 const IconView = () => (
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
@@ -190,12 +184,6 @@ const IconAI = () => (
   </svg>
 )
 
-const IconModels = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M2 4.5a1.2 1.2 0 0 1 1.2-1.2h2.9l1.4 1.4h5.3A1.2 1.2 0 0 1 14 5.9v6.3a1.2 1.2 0 0 1-1.2 1.2H3.2A1.2 1.2 0 0 1 2 12.2Z" />
-    <path d="M2 6.8h12" />
-  </svg>
-)
 
 const IconMetamodel = () => (
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
@@ -271,6 +259,57 @@ const RailIconSettings = () => (
   </RailIcon>
 )
 
+/** Models at the rail's top: the mark of radical.tools ("r." of
+ *  tools/brand/radical-mark.svg, its letter in the blue to violet ink), on
+ *  a tile tinted for the theme as the sections' icon squares are, not the
+ *  mark's own dark tile, which stood out in the light theme and sank into
+ *  the dark one. */
+const RailBrandMark = () => (
+  <span className="rail-brand-mark" aria-hidden>
+    <svg viewBox="24 24 80 80" width="24" height="24">
+      <defs>
+        <linearGradient id="rail-mark-ink" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" style={{ stopColor: 'var(--mark-ink-a)' }} />
+          <stop offset="1" style={{ stopColor: 'var(--mark-ink-b)' }} />
+        </linearGradient>
+      </defs>
+      <path d="M44 94V64A24 24 0 0 1 68 40H72" fill="none" stroke="url(#rail-mark-ink)" strokeWidth="18" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="86" cy="94" r="10" style={{ fill: 'var(--mark-ink-b)' }} />
+    </svg>
+  </span>
+)
+
+/** Drawn as the left panel's sections draw theirs (SectionIcon): a 16 grid,
+ *  one stroke of 1.5, 14 px in its tinted square. */
+const RailIconPresentations = () => (
+  <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M2 2.5 H14 V10.5 H2 Z M8 10.5 V13.5 M5.5 13.5 H10.5 M6.75 4.75 V8.25 L9.75 6.5 Z" />
+  </svg>
+)
+
+/** The Presentations button on the activity rail, just above the
+ *  Inspector's (ADR Presentations are a place of the rail), drawn as the
+ *  left panel's sections are, with the count of the open presentation's
+ *  slides: it shows the presentations and their slides in the left panel
+ *  and the slide picked on the canvas; lit, it folds the left panel and
+ *  opens it again, as a section's tab does. Not in the metamodel editor. */
+function PresentationsRailButton(): React.ReactElement | null {
+  const open = usePresentationsOpen()
+  const slides = useDiagramStore((s) => s.presentationSlides.length)
+  const name = useDiagramStore((s) => s.presentations.find((p) => p.id === s.activePresentationId)?.name)
+  const metamodel = useDiagramStore((s) => s.appMode === 'metamodel')
+  if (metamodel) return null
+  return (
+    <button type="button" className={`lp-rail-tab rail-presentations${open ? ' active' : ''}`}
+      onClick={() => { if (!open) openPresentations(); else toggleLeftPanel() }}
+      title={`Presentations — build and play slides of the model${name ? `: ${name}, ${slides} slide${slides === 1 ? '' : 's'}` : ''}`}
+      aria-label="Presentations" aria-pressed={open}>
+      <span className="lp-section-icon"><RailIconPresentations /></span>
+      <span className="lp-rail-count">{slides}</span>
+    </button>
+  )
+}
+
 const RailIconInspector = () => (
   <RailIcon>
     <circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /><path d="M7.5 10.5l2 2 3.5-4" />
@@ -303,7 +342,7 @@ function InspectorRailButton(): React.ReactElement | null {
       onClick={() => {
         // As a section's tab: open, it shows its place with the left panel;
         // lit, it folds the left panel and opens it again, the report staying.
-        if (!open) { toggleInspector(true); setLeftCollapsed(false) } else toggleLeftPanel()
+        if (!open) { closePresentations(); toggleInspector(true); setLeftCollapsed(false) } else toggleLeftPanel()
       }}
       title={title} aria-label="Inspector" aria-pressed={open} aria-controls="insp-dock">
       <span className="lp-section-icon"><RailIconInspector /></span>
@@ -403,6 +442,7 @@ function AppMenu({
   const close = useCallback(() => setMenu(null), [])
   const slot = useRailSlot((s) => s.el)
   const topSlot = useRailSlot((s) => s.top)
+  const placesSlot = useRailSlot((s) => s.places)
   // Radical Forge talks to an AI provider: without one it is offered
   // disabled (it saved the description, made its views and fetched the
   // Hub's index before saying so). Read each time the menu opens.
@@ -413,6 +453,9 @@ function AppMenu({
   const defaultEdgeStyle = useDiagramStore((s) => s.defaultEdgeStyle)
   const setDefaultEdgeStyle = useDiagramStore((s) => s.setDefaultEdgeStyle)
   const editable = useDiagramStore((s) => s.appMode === 'designer')
+  // Keep smart for the views that have no setting of their own.
+  const keepSmartDefault = useDiagramStore((s) => s.keepSmartDefault)
+  const setKeepSmartDefault = useDiagramStore((s) => s.setKeepSmartDefault)
   // Inspector settings changed and not saved to check.json yet.
   const checkUnsaved = useSettingsUnsaved()
 
@@ -437,7 +480,7 @@ function AppMenu({
 
   const modelsMenu = (
     <RailMenu id="models" label="Models" open={menu === 'models'} onOpen={setMenu} onClose={close} atTop
-      icon={<IconModels />}>
+      icon={<RailBrandMark />}>
           {/* The model open and where it is kept, at the menu's top (the
               toolbar named it before). */}
           {activeDocLabel && (
@@ -468,6 +511,7 @@ function AppMenu({
   const menus = (
     <>
       <InspectorRailButton />
+      <hr className="activity-rail-divider" aria-hidden />
       {railMenu('settings', 'Settings', <RailIconSettings />, (<>
           <div className="app-menu-section">
             <div className="app-menu-label">View</div>
@@ -510,6 +554,18 @@ function AppMenu({
                 <option value="orthogonal">Orthogonal</option>
               </select>
             </div>
+            <label
+              className="app-menu-row"
+              title="Tidy a view after each change (yours or an agent's), the elements gliding into place, when the view has no Keep smart setting of its own. A view switched on or off keeps its own setting. Kept in this browser"
+            >
+              <span className="app-menu-row-label">Keep smart by default</span>
+              <input
+                type="checkbox"
+                aria-label="Keep smart by default"
+                checked={keepSmartDefault}
+                onChange={(e) => setKeepSmartDefault(e.target.checked)}
+              />
+            </label>
           </div>
           <div className="app-menu-divider" />
           <div className="app-menu-section">
@@ -649,6 +705,7 @@ function AppMenu({
       {branch && <div className="app-brand-switch">{branch}</div>}
       {topSlot && createPortal(modelsMenu, topSlot)}
       {slot && createPortal(menus, slot)}
+      {placesSlot && createPortal(<PresentationsRailButton />, placesSlot)}
     </>
   )
 }
@@ -684,8 +741,8 @@ export function IconInspect(): React.ReactElement {
 
 // ── Room for Quick Search ────────────────────────────────────────────────────
 //
-// Quick Search stands in the window's middle, ‹ › before it and History after
-// it (App draws it; --qs-x is the block's middle, --qs-w Quick Search's
+// Quick Search stands in the window's middle, Undo and Redo before it, ‹ ›
+// and History after it (App draws it; --qs-x is the block's middle, --qs-w Quick Search's
 // width). With less room between the toolbar's two sides the block moves off
 // the middle, then Quick Search narrows, then the perspectives drop their
 // labels: nothing may lie on top of anything that takes a click (below about
@@ -709,7 +766,7 @@ function useMiddleRoom(bar: React.RefObject<HTMLDivElement>, search: boolean, ap
     const width = window.innerWidth
     const edges = (selector: string, side: 'left' | 'right'): number[] =>
       [...el.querySelectorAll<HTMLElement>(selector)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0).map((r) => r[side])
-    const start = Math.max(0, ...edges(':scope > .app-brand-switch, :scope > .toolbar-edit', 'right'))
+    const start = Math.max(0, ...edges(':scope > .app-brand-switch', 'right'))
     const end = Math.min(width, ...edges(':scope > .toolbar-mode-switch', 'left'))
     // How much wider the perspectives are with their labels than without
     // (a label left out keeps its width in scrollWidth).
@@ -720,7 +777,8 @@ function useMiddleRoom(bar: React.RefObject<HTMLDivElement>, search: boolean, ap
     }
     const endWithLabels = compact ? end - labels : end
     const endWithout = compact ? end : end + labels
-    const [before = 0, after = 0] = [...el.querySelectorAll<HTMLElement>(':scope > .toolbar-center > *')].map((g) => g.getBoundingClientRect().width)
+    const width_ = (selector: string): number => el.querySelector<HTMLElement>(selector)?.getBoundingClientRect().width ?? 0
+    const [before, after] = [width_(':scope > .toolbar-center > .toolbar-center-before'), width_(':scope > .toolbar-center > .toolbar-center-after')]
     // The navigation stands this far from Quick Search, or from the middle.
     const gap = search ? NAV_GAP : 3
     // Quick Search's room between the sides, the navigation taken out.
@@ -746,7 +804,7 @@ function useMiddleRoom(bar: React.RefObject<HTMLDivElement>, search: boolean, ap
     // The sides change width on their own (a count on Changes on branch,
     // the fonts loading), the window by a resize.
     const watch = new ResizeObserver(() => fit())
-    for (const side of el.querySelectorAll(':scope > .app-brand-switch, :scope > .toolbar-edit, :scope > .toolbar-mode-switch, :scope > .toolbar-center > *')) watch.observe(side)
+    for (const side of el.querySelectorAll(':scope > .app-brand-switch, :scope > .toolbar-mode-switch, :scope > .toolbar-center > *')) watch.observe(side)
     window.addEventListener('resize', fit)
     return () => { watch.disconnect(); window.removeEventListener('resize', fit) }
   }, [fit, appMode])
@@ -756,12 +814,16 @@ function useMiddleRoom(bar: React.RefObject<HTMLDivElement>, search: boolean, ap
 export function Toolbar(): React.ReactElement {
   // The perspective drawn, which a link still waiting for its document sets.
   const appMode = useShownMode()
+  // The perspective lit: the Presentations place lights the one it was opened over.
+  const presentationsFrom = usePresentationsFrom((x) => x.from)
+  const shownPerspective = appMode === 'presenter' ? presentationsFrom : appMode
   // A federation: the other models are listed beside the model in every perspective.
   const dependsOnOthers = useOtherModelsStore((s) => !!s.summary)
   const setStoreMode = useDiagramStore((s) => s.setAppMode)
   // Picking a perspective wins over a link still waiting.
   const setAppMode = useCallback((mode: Parameters<typeof setStoreMode>[0]) => { dropPendingMode(); setStoreMode(mode) }, [setStoreMode])
   const autoFitActive = useDiagramStore((s) => s.autoFitActive)
+  const keepSmartOn = useDiagramStore((s) => s.keepSmartDefault)
   const toggleAutoFit = useDiagramStore((s) => s.toggleAutoFit)
   const connectionModifier = useDiagramStore((s) => s.connectionModifier)
   const setConnectionModifier = useDiagramStore((s) => s.setConnectionModifier)
@@ -829,7 +891,9 @@ export function Toolbar(): React.ReactElement {
         const state = useDiagramStore.getState()
         if (state.presentationActive) return
         e.preventDefault()
-        if (inspectorAvailable()) toggleInspector()
+        // Open, it closes at once: after a reload it is drawn before the
+        // files beside the model are read, and ⌘J did nothing till then.
+        if (useInspectorNav.getState().open || inspectorAvailable()) toggleInspector()
       } else if ((e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') && (window as any).__radicalZoomIn
         && !keysTakenByDialog(e.target)) {
         // The canvas and the Flow view register zoom; elsewhere the browser
@@ -961,15 +1025,16 @@ export function Toolbar(): React.ReactElement {
   useRegisterCommands('toolbar', () => {
     const state = () => useDiagramStore.getState()
     const mode = (m: Parameters<typeof setAppMode>[0], title: string) => ({
-      id: `mode.${m}`, title, group: 'Perspective', run: () => setAppMode(m), when: () => state().appMode !== m,
+      id: `mode.${m}`, title, group: 'Perspective', when: () => state().appMode !== m,
+      run: () => m === 'designer' || m === 'viewer' ? switchPerspective(m) : setAppMode(m),
     })
     return [
       mode('designer', 'Designer: edit the model'),
       mode('viewer', 'Viewer: explore the model'),
-      mode('presenter', 'Presenter: build and play presentations'),
+      { id: 'place.presentations', title: 'Presentations: build and play slides', group: 'Perspective', run: openPresentations, when: () => state().appMode !== 'presenter' && state().appMode !== 'metamodel' },
       mode('metamodel', 'Metamodel editor'),
       { id: 'panel.inspector', title: useInspectorNav.getState().open ? 'Inspector: hide the panel' : 'Inspector: show the panel (model quality and changes)', group: 'Panels', keys: INSPECTOR_KEYS,
-        run: () => toggleInspector(), when: () => state().appMode !== 'metamodel' && inspectorAvailable() },
+        run: () => toggleInspector(), when: () => state().appMode !== 'metamodel' && (useInspectorNav.getState().open || inspectorAvailable()) },
       { id: 'check.settings', title: 'Inspector settings… (check.json: goals and rules)', group: 'Settings', run: openCheckSettings },
       { id: 'edit.undo', title: 'Undo', group: 'Edit', keys: '⌘Z', run: () => state().undo(), when: () => state().appMode === 'designer' && state().canUndo },
       { id: 'edit.redo', title: 'Redo', group: 'Edit', keys: '⌘⇧Z', run: () => state().redo(), when: () => state().appMode === 'designer' && state().canRedo },
@@ -986,9 +1051,11 @@ export function Toolbar(): React.ReactElement {
       { id: 'settings.theme', title: theme === 'dark' ? 'Switch to the light theme' : 'Switch to the dark theme', group: 'Settings', run: toggleTheme, when: () => !isVSCode },
       { id: 'settings.setup', title: 'Setup: theme, special key, canvas, AI', group: 'Settings', run: openSetup, when: () => !isVSCode },
       { id: 'settings.smartFit', title: autoFitActive ? 'Smart fit: turn off' : 'Smart fit: turn on', group: 'Settings', run: toggleAutoFit },
+      { id: 'settings.keepSmart', title: keepSmartOn ? 'Keep smart by default: turn off' : 'Keep smart by default: turn on', group: 'Settings',
+        run: () => state().setKeepSmartDefault(!state().keepSmartDefault) },
       { id: 'about', title: 'About Radical Studio', group: 'Help', run: handleOpenAbout },
     ]
-  }, [theme, autoFitActive, setAppMode, handleManage, handleOpenHub, handleOpenForge, handleOpenAISettings, handleExportPNG, handleExportSVG, copyToClipboard, toggleTheme, toggleAutoFit, handleOpenAbout, isVSCode])
+  }, [theme, autoFitActive, keepSmartOn, setAppMode, handleManage, handleOpenHub, handleOpenForge, handleOpenAISettings, handleExportPNG, handleExportSVG, copyToClipboard, toggleTheme, toggleAutoFit, handleOpenAbout, isVSCode])
 
   return (
     <div className={`toolbar${compact ? ' compact' : ''}`} ref={bar}>
@@ -1028,48 +1095,45 @@ export function Toolbar(): React.ReactElement {
           the model, and the metamodel editor's steps are undone
           back in Designer (shown there, enabled, they did nothing). Fit, zoom
           and Smart Layout are on the canvas (CanvasControls). */}
-      {appMode === 'designer' && (
-        <div className="toolbar-group toolbar-edit" role="group" aria-label="Edit">
-          <button className="toolbar-btn toolbar-icon-btn" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (⌘Z)">
-            <IconUndo />
-          </button>
-          <button className="toolbar-btn toolbar-icon-btn" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (⌘⇧Z)">
-            <IconRedo />
-          </button>
-        </div>
-      )}
-
-      {/* As in VS Code, around Quick Search in the middle (App draws it):
-          back and forward before it, the History list after it; in every
-          perspective. */}
+      {/* Around Quick Search in the middle (App draws it): Undo and Redo
+          before it, in Designer; Back, Forward and the History list after
+          it, in every perspective. */}
       <div className="toolbar-center">
-        <div className="toolbar-group" role="group" aria-label="Navigate"><NavHistory part="arrows" /></div>
-        <div className="toolbar-group"><NavHistory part="list" /></div>
+        {appMode === 'designer' && (
+          <div className="toolbar-group toolbar-edit toolbar-center-before" role="group" aria-label="Edit">
+            <button className="toolbar-btn toolbar-icon-btn" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (⌘Z)">
+              <IconUndo />
+            </button>
+            <button className="toolbar-btn toolbar-icon-btn" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (⌘⇧Z)">
+              <IconRedo />
+            </button>
+          </div>
+        )}
+        <div className="toolbar-center-after">
+          <div className="toolbar-group" role="group" aria-label="Navigate"><NavHistory part="arrows" /></div>
+          <div className="toolbar-group"><NavHistory part="list" /></div>
+        </div>
       </div>
 
       <div style={{ flex: 1 }} />
 
       <div className="toolbar-mode-switch">
+        {/* Presentations are a place of the rail: open over Designer or
+            Viewer, that one stays lit; a click on the other keeps them open
+            over it (made over Designer, played over Viewer). */}
         <button
-          className={`toolbar-mode-btn${appMode === 'designer' ? ' active' : ''}`}
-          onClick={() => setAppMode('designer')}
+          className={`toolbar-mode-btn${shownPerspective === 'designer' ? ' active' : ''}`}
+          onClick={() => switchPerspective('designer')}
           title="Designer perspective — edit the model"
         >
           <IconModelling /><span className="toolbar-label">Designer</span>
         </button>
         <button
-          className={`toolbar-mode-btn${appMode === 'viewer' ? ' active' : ''}`}
-          onClick={() => setAppMode('viewer')}
+          className={`toolbar-mode-btn${shownPerspective === 'viewer' ? ' active' : ''}`}
+          onClick={() => switchPerspective('viewer')}
           title="Viewer perspective — explore the model"
         >
           <IconView /><span className="toolbar-label">Viewer</span>
-        </button>
-        <button
-          className={`toolbar-mode-btn${appMode === 'presenter' ? ' active' : ''}`}
-          onClick={() => setAppMode('presenter')}
-          title="Presenter perspective — build and play presentations"
-        >
-          <IconPresentation /><span className="toolbar-label">Presenter</span>
         </button>
       </div>
 

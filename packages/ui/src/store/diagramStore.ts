@@ -3298,8 +3298,10 @@ interface DiagramStore {
   orderViews: (viewIds: string[]) => void
   /** How a view draws relations; null: the model's default. One undo step. */
   setViewEdgeStyle: (viewId: string, style: EdgeStyle | null) => void
-  /** Whether the view keeps itself tidied after each change; switched on, it is tidied at once. */
-  setViewContinuousLayout: (viewId: string, on: boolean) => void
+  /** Whether the view keeps itself tidied after each change (Keep smart),
+   *  saved with it; null: no setting of its own, the view follows
+   *  keepSmartDefault. Switched on, it is tidied at once. */
+  setViewContinuousLayout: (viewId: string, on: boolean | null) => void
   /** A view's pipeline (viewPipeline.ts): source, filters, grouping, order; one undo step, saved. */
   setViewPipeline: (viewId: string, pipeline: ViewPipeline) => void
   /** Makes the view one of the metamodel's viewpoint (its kind and chain,
@@ -3618,6 +3620,17 @@ interface DiagramStore {
   selectionFocus: boolean
   /** Flips Focus and saves it to the studio settings. */
   toggleSelectionFocus: () => void
+  /** Keep smart for the views without a setting of their own
+   *  (StudioSettings.keepSmart); see keepsSmart. */
+  keepSmartDefault: boolean
+  /** Sets keepSmartDefault and saves it to the studio settings. */
+  setKeepSmartDefault: (on: boolean) => void
+  /** Keep smart switched in Viewer, by view id: it holds there over the
+   *  view's setting and the default until Viewer closes, and is saved
+   *  nowhere (Viewer saves nothing of the model). */
+  viewerKeepSmart: Record<string, boolean>
+  /** Switches Keep smart for the view in Viewer only (viewerKeepSmart). */
+  setViewerKeepSmart: (viewId: string, on: boolean) => void
   /** Find in the view (⌘/Ctrl+F): the words typed, the elements of the
    *  view shown they find (in the view's order), the one stepped onto, and
    *  whether a table shows only those. While it is open the canvas dims the
@@ -3836,10 +3849,18 @@ export function tooLargeToExplore(s: Pick<DiagramStore, 'views' | 'c4Nodes' | 'c
   return !!view && view.kind !== 'explore' && explorationCount(view, s.c4Nodes, s.c4Relations) > CANVAS_MAX_ELEMENTS
 }
 
+/** Whether Keep smart is on for `view` (ADR "A view can keep itself
+ *  tidied"): in Viewer the switch made there, else the view's own setting,
+ *  else the Keep smart default of this Studio. */
+export function keepsSmart(s: Pick<DiagramStore, 'appMode' | 'keepSmartDefault' | 'viewerKeepSmart'>, view: DiagramView): boolean {
+  const viewer = s.appMode === 'viewer' ? s.viewerKeepSmart[view.id] : undefined
+  return viewer ?? view.continuousLayout ?? s.keepSmartDefault
+}
+
 function continuousShape(s: DiagramStore): string | null {
   if (s.appMode === 'metamodel' || s.presentationActive) return null
   const view = s.activeViewId ? s.views[s.activeViewId] : undefined
-  if (!view?.continuousLayout || (view.kind ?? 'static') !== 'static' || isExploration(view)) return null
+  if (!view || !keepsSmart(s, view) || (view.kind ?? 'static') !== 'static' || isExploration(view)) return null
   const input = layoutInputForView(s)
   const nodes = Object.values(input.nodes)
   const holders = new Set(nodes.map((n) => n.parentId))
@@ -4551,6 +4572,8 @@ export const useDiagramStore = create<DiagramStore>()(
       connectionModifier: loadStudioSettings().specialKey,
       autoFitActive: loadStudioSettings().smartFit,
       selectionFocus: loadStudioSettings().selectionFocus,
+      keepSmartDefault: loadStudioSettings().keepSmart,
+      viewerKeepSmart: {},
       findInView: null,
       canUndo: false,
       canRedo: false,
@@ -6401,7 +6424,7 @@ export const useDiagramStore = create<DiagramStore>()(
       // tidied at once (continuousCheck sees a shape where there was none).
       setViewContinuousLayout(viewId, on) {
         const view = get().views[viewId]
-        if (!view || !!view.continuousLayout === on) return
+        if (!view || (view.continuousLayout ?? null) === on) return
         get()._pushUndo()
         get()._milestoneViewEdit(viewId)
         set((state) => { model.setViewContinuousLayout(state, viewId, on) })
@@ -7807,6 +7830,18 @@ export const useDiagramStore = create<DiagramStore>()(
         updateStudioSettings({ selectionFocus: next })
       },
 
+      // A default switched on tidies the view shown at once when it follows
+      // the default (continuousCheck sees a shape where there was none).
+      setKeepSmartDefault(on) {
+        if (get().keepSmartDefault !== on) set((state) => { state.keepSmartDefault = on })
+        updateStudioSettings({ keepSmart: on })
+      },
+
+      setViewerKeepSmart(viewId, on) {
+        if (get().appMode !== 'viewer' || !get().views[viewId]) return
+        set((state) => { state.viewerKeepSmart[viewId] = on })
+      },
+
       setConnectionModifier(mod) {
         set((state) => { state.connectionModifier = mod })
         updateStudioSettings({ specialKey: mod })
@@ -8758,6 +8793,8 @@ export const useDiagramStore = create<DiagramStore>()(
         else if (onExploration(get())) get()._saveShownCanvas()
         // Views of type Explore grown in Viewer are as they were saved again.
         if (_viewerExplorations.size) set((state) => { restoreViewerExplorations(state as DiagramStore) })
+        // Keep smart switched in Viewer held only there.
+        if (Object.keys(get().viewerKeepSmart).length) set((state) => { state.viewerKeepSmart = {} })
         // The view on screen when Designer is entered again: Designer stays
         // on it (with its own layout) rather than going back to the one it left.
         const shownViewId = get().activeViewId
@@ -10095,7 +10132,8 @@ const INTO_FOLDER = { setViewFolder: 1, saveExploration: 1 } as const satisfies 
 useDiagramStore.subscribe((s, prev) => {
   if (s.c4Nodes !== prev.c4Nodes || s.c4Relations !== prev.c4Relations || s.views !== prev.views
     || s.activeViewId !== prev.activeViewId || s.defaultLayoutConstraints !== prev.defaultLayoutConstraints
-    || s.appMode !== prev.appMode) continuousSoon()
+    || s.appMode !== prev.appMode || s.keepSmartDefault !== prev.keepSmartDefault
+    || s.viewerKeepSmart !== prev.viewerKeepSmart) continuousSoon()
 })
 
 // Auto-start live cola layout (skip in test/SSR environments)

@@ -54,7 +54,9 @@ test('a concept added from a Hub link in Presenter reaches the model, as from Vi
   await page.goto(`/?hub=concern-authentication#/d/${encodeURIComponent(`ls:${DOC_ID}`)}/m/presenter/v/canvas`)
   await studio.ready()
   const before = (await studio.storedDoc()).nodes.length
-  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Presenter/)
+  // The Presentations place, over Viewer.
+  await expect(page.getByRole('button', { name: 'Presentations', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
   await page.getByTestId('concern-wizard').getByRole('button', { name: 'Add to model' }).click()
   await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(before + 20)
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)

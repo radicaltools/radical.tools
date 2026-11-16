@@ -196,8 +196,8 @@ test('the left panel\'s sections are tabs on the activity rail, one open beside 
   await expect(page.locator('.left-panel.collapsed')).toHaveCount(0)
   await expect(section('Views')).toBeHidden()
   await expect(section('Milestones')).toBeVisible()
-  // ↓ moves to the next tab and opens it.
-  await page.keyboard.press('ArrowDown')
+  // ↑ moves to the tab before (Views, Sequences, then Milestones) and opens it.
+  await page.keyboard.press('ArrowUp')
   await expect(tab('Sequences')).toBeFocused()
   await expect(section('Sequences')).toBeVisible()
   await expect(section('Milestones')).toBeHidden()
@@ -275,13 +275,16 @@ test('Undo and Redo are Designer\'s: Viewer, Presenter and the metamodel editor 
   const undo = toolbar.getByRole('button', { name: 'Undo', exact: true })
   const redo = toolbar.getByRole('button', { name: 'Redo', exact: true })
   await expect(undo).toBeEnabled()
-  for (const mode of ['Viewer', 'Presenter']) {
-    await toolbar.getByRole('button', { name: mode, exact: true }).click()
+  for (const mode of ['Viewer', 'Presentations']) {
+    // Presentations are a place of the activity rail, not a perspective.
+    await page.getByRole('button', { name: mode, exact: true }).click()
     await expect(undo).toHaveCount(0)
     await expect(redo).toHaveCount(0)
     // Nor do the keys take Designer's step behind the user's back.
     await page.keyboard.press('ControlOrMeta+z')
   }
+  // A section's tab leaves Presentations (the switch keeps them open).
+  await page.getByRole('tab', { name: 'Views' }).click()
   await toolbar.getByRole('button', { name: 'Designer', exact: true }).click()
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('menuitemcheckbox', { name: /Metamodel editor/ }).click()
@@ -327,14 +330,15 @@ for (const perspective of ['Viewer', 'Presenter']) {
     await studio.addFromPalette('Software System', await studio.nearBottom())
     await expect(studio.nodes).toHaveCount(4)
     await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
-    await page.getByRole('button', { name: perspective, exact: true }).click()
+    await page.getByRole('button', { name: perspective === 'Presenter' ? 'Presentations' : perspective, exact: true }).click()
     await studio.settle()
     await studio.pane.click({ position: { x: 5, y: 5 } })
     await page.keyboard.press('ControlOrMeta+z')
     await page.waitForTimeout(600)
     await expect(studio.nodes).toHaveCount(4)
     expect((await studio.storedDoc()).nodes.length).toBe(7)
-    // The step is still Designer's to undo.
+    // The step is still Designer's to undo (a section's tab leaves Presentations).
+    if (perspective === 'Presenter') await page.getByRole('tab', { name: 'Views' }).click()
     await page.getByRole('button', { name: 'Designer', exact: true }).click()
     await studio.settle()
     await expect(studio.nodes).toHaveCount(4)
@@ -588,7 +592,9 @@ test('a step turned to run the other way is drawn back as a response, kept, and 
   await expect(page.locator('.seq-diagram-step[data-backward="true"]')).toHaveCount(1)
 })
 
-for (const mode of ['viewer', 'presenter'] as const) {
+// The Sequences section is not shown beside the Presentations place: a
+// sequence is picked in Designer or Viewer.
+for (const mode of ['viewer'] as const) {
   test(`in ${mode}, a sequence picked is shown, and a click on a relation adds no step`, async ({ page, studio }) => {
     // Picking one turned on "Editing", and a click on a relation added a
     // step (never saved, gone back in Designer).
@@ -712,7 +718,7 @@ test('the activity rail\'s menus open over the metamodel editor, which stays ope
   }
 })
 
-test('the toolbar holds undo, and navigation around Quick Search; the model open and the branch\'s changes are elsewhere', async ({ page }) => {
+test('the toolbar holds undo before Quick Search and navigation after it; the model open and the branch\'s changes are elsewhere', async ({ page }) => {
   const box = async (l: import('@playwright/test').Locator) => (await l.boundingBox())!
   const edit = await box(page.getByRole('group', { name: 'Edit' }))
   const navigate = await box(page.getByRole('group', { name: 'Navigate' }))
@@ -722,15 +728,13 @@ test('the toolbar holds undo, and navigation around Quick Search; the model open
   // the Inspector's This branch, and the Inspector is on the rail.
   await expect(page.locator('.toolbar .app-brand-doc')).toHaveCount(0)
   await expect(page.locator('.toolbar').getByRole('button', { name: /Changes on branch|Inspector/ })).toHaveCount(0)
-  // Undo and Redo at the toolbar's left, before the navigation.
-  const toolbar = await box(page.locator('.toolbar'))
-  expect(edit.x - toolbar.x).toBeLessThan(24)
-  expect(edit.x + edit.width).toBeLessThan(navigate.x)
-  // ‹ › just before Quick Search, the clock just after it, as in VS Code.
-  expect(navigate.x + navigate.width).toBeLessThanOrEqual(search.x)
-  expect(search.x - (navigate.x + navigate.width)).toBeLessThan(16)
-  expect(history.x).toBeGreaterThanOrEqual(search.x + search.width)
-  expect(history.x - (search.x + search.width)).toBeLessThan(16)
+  // Undo and Redo just before Quick Search; ‹ › just after it, then the clock.
+  expect(edit.x + edit.width).toBeLessThanOrEqual(search.x)
+  expect(search.x - (edit.x + edit.width)).toBeLessThan(16)
+  expect(navigate.x).toBeGreaterThanOrEqual(search.x + search.width)
+  expect(navigate.x - (search.x + search.width)).toBeLessThan(16)
+  expect(history.x).toBeGreaterThanOrEqual(navigate.x + navigate.width)
+  expect(history.x - (navigate.x + navigate.width)).toBeLessThan(16)
 })
 
 // F-0001: below about 1160 px the toolbar's buttons lay on top of each

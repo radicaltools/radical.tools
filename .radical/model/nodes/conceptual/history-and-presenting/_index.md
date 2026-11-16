@@ -5,4 +5,4 @@ label: "History and presenting"
 kind: "supporting"
 ---
 
-The model over time and in front of an audience: milestones and their diff, editing a milestone, the Viewer and Presenter perspectives, presentations and their slides.
+The model over time and in front of an audience: milestones and their diff, editing a milestone, the Viewer perspective and the Presentations place (the Presenter perspective until 2026-11-16), presentations and their slides.

@@ -64,27 +64,18 @@
     "rail toolbar"
     "rail canvas";
 }
-/* ─── Presenter Dock (bottom slides bar in presenter mode) ─────────── */
-.pres-dock {
-  grid-area: timetravel;
-  display: flex;
-  align-items: stretch;
-  background: var(--bg-toolbar);
-  border-top: 1px solid var(--border-color);
-  box-shadow: 0 -2px 16px rgba(0,0,0,0.10);
-  height: 110px;
-  overflow: hidden;
-}
+/* ─── Presentations place (PresenterDock in the left panel) ────────── */
+/* A place of the activity rail, in the left panel in place of the
+   sections: the picker and its actions, then the slides one under another. */
+/* Its own colour, as each section has one: the rail button, the count, the head. */
+.rail-presentations, .pres-place { --sec-color: #ec4899; }
 .pres-dock-controls {
-  flex-shrink: 0;
-  width: 240px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: 6px;
-  padding: 8px 10px;
-  border-right: 1px solid var(--border-color);
-  background: var(--bg-toolbar);
+  padding-bottom: 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
 }
 .pres-dock-controls .pres-picker {
   padding: 0;
@@ -94,27 +85,19 @@
   display: flex;
   gap: 6px;
 }
+.pres-dock-actions .pres-panel-btn { flex: 1; justify-content: center; }
 .pres-dock-track {
-  flex: 1;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
-  padding: 6px 10px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
 }
-.pres-dock-card-wrap {
-  flex-shrink: 0;
-  min-width: 220px;
-  max-width: 280px;
-}
-.pres-dock-card-wrap .pres-slide-card {
-  height: 100%;
-}
+.pres-dock-card-wrap .pres-slide-card { width: 100%; flex-wrap: wrap; }
+/* In the panel's width a card's name takes the whole line: the slide picked
+   has its buttons on a line of their own under it, the others none. */
+.pres-place .pres-slide-card:not(.active) .pres-slide-actions { display: none; }
+.pres-place .pres-slide-card.active .pres-slide-actions { opacity: 1; width: 100%; padding-left: 30px; }
 .pres-dock-empty {
-  padding: 12px 16px;
-  white-space: nowrap;
+  padding: 12px 4px;
 }
 /* ─── App brand: the model open, at the toolbar's left ──────────────── */
 /* A strip like the perspective switch (the folder, the Models menu, is at the
@@ -149,7 +132,22 @@
   color: var(--text-secondary);
   transition: color 0.15s var(--ease-out), background 0.15s var(--ease-out);
 }
-.rail-action svg { width: 21px; height: 21px; }
+.rail-action svg { width: 22px; height: 22px; }
+/* Models at the rail's top: the mark of radical.tools on a tile tinted for
+   the theme, as large as a section's icon square. */
+.rail-action .rail-brand-mark {
+  /* The mark's ink: deeper on the light theme's tile, as bright as the
+     mark's own on the dark one. */
+  --mark-ink-a: #3b6fe0; --mark-ink-b: #6d4fe8;
+  width: 30px; height: 30px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, #6d6cf0 18%, transparent);
+}
+[data-theme="dark"] .rail-action .rail-brand-mark {
+  --mark-ink-a: #7cb1ff; --mark-ink-b: #9d8fff;
+  background: color-mix(in srgb, #8b7bff 26%, transparent);
+}
+.rail-action .rail-brand-mark svg { width: 22px; height: 22px; }
 .rail-action:hover { color: var(--text-primary); background: var(--hover-bg-faint); }
 .rail-action:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 /* Its menu open: lit as an open section is, in the accent, with the bar. */
@@ -3619,7 +3617,7 @@ div.milestone-option { cursor: default; }
 .rail-inspector { --sec-color: var(--accent); }
 .rail-inspector.e { --sec-color: var(--danger); }
 .rail-inspector.ok { --sec-color: var(--success); }
-.rail-inspector .lp-section-icon svg { width: 16px; height: 16px; }
+.rail-inspector .lp-section-icon svg { width: 17px; height: 17px; }
 .rail-inspector .lp-rail-count { color: var(--sec-color); }
 .rail-inspector:disabled { opacity: 0.4; cursor: default; }
 .rail-inspector:disabled:hover { background: none; }
@@ -4032,9 +4030,10 @@ div.milestone-option { cursor: default; }
 /* Too little room even for a narrow Quick Search: the perspectives keep
    their icons; the names stay for screen readers and the tooltip. */
 .toolbar.compact .toolbar-mode-btn .toolbar-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.toolbar-center > .toolbar-group { position: absolute; top: 0; transform: translateY(-50%); }
-.toolbar-center > .toolbar-group:first-child { right: calc(var(--qs-w) / 2 + 8px); }
-.toolbar-center > .toolbar-group:last-child { left: calc(var(--qs-w) / 2 + 8px); }
+.toolbar-center > * { position: absolute; top: 0; transform: translateY(-50%); }
+/* Undo and Redo before Quick Search; Back, Forward and History after it. */
+.toolbar-center > .toolbar-center-before { right: calc(var(--qs-w) / 2 + 8px); }
+.toolbar-center > .toolbar-center-after { left: calc(var(--qs-w) / 2 + 8px); display: flex; align-items: center; gap: 6px; }
 .nav-history-list .nav-menu { left: auto; right: 0; }
 .nav-history { position: relative; display: inline-flex; align-items: center; gap: 2px; }
 .nav-btn-wrap { position: relative; }

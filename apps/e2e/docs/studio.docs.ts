@@ -296,7 +296,10 @@ test('viewer', async ({ page, shot }) => {
 })
 
 test('presenter', async ({ page, shot }) => {
-  await open(page, 'view-ctx', 'presenter')
+  // Presentations opened over Designer, where they are made.
+  await open(page, 'view-ctx')
+  await page.getByRole('button', { name: 'Presentations', exact: true }).click()
+  await settle(page)
   await shot('presenter')
 })
 

@@ -242,11 +242,27 @@ test.describe('perspectives', () => {
 
   test('switching perspective keeps the view and updates the URL', async ({ page, studio }) => {
     await studio.open('v-containers')
-    await page.getByRole('button', { name: 'Presenter', exact: true }).click()
+    await page.getByRole('button', { name: 'Presentations', exact: true }).click()
     await studio.advance(500)
     await expect(page).toHaveURL(/\/m\/presenter\/v\/v-containers$/)
     await expect(page.getByRole('button', { name: 'Present', exact: true })).toBeVisible()
+    // The perspective switch keeps the Presentations place open, over the
+    // perspective clicked: played over Viewer, made over Designer.
+    const addSlide = page.getByRole('button', { name: 'Add slide' })
+    await expect(addSlide).toBeVisible()
+    await page.getByRole('button', { name: 'Viewer', exact: true }).click()
+    await studio.advance(500)
+    await expect(page).toHaveURL(/\/m\/presenter\/v\/v-containers$/)
+    await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
+    await expect(page.getByRole('button', { name: 'Present', exact: true })).toBeVisible()
+    await expect(addSlide).toHaveCount(0)
     await page.getByRole('button', { name: 'Designer', exact: true }).click()
+    await studio.advance(500)
+    await expect(page).toHaveURL(/\/m\/presenter\/v\/v-containers$/)
+    await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+    await expect(addSlide).toBeVisible()
+    // A section's tab goes back to Designer, on the view shown.
+    await page.getByRole('tab', { name: 'Views' }).click()
     await studio.advance(500)
     await expect(page).toHaveURL(/\/m\/designer\/v\/v-containers$/)
     await expect(page.locator('.palette-item').first()).toBeVisible()
@@ -354,7 +370,7 @@ test.describe('what is arranged in Viewer and Presenter stays there', () => {
       const designer = await studio.positions()
       const saved = await studio.storedJson()
 
-      await page.getByRole('button', { name: perspective, exact: true }).click()
+      await page.getByRole('button', { name: perspective === 'Presenter' ? 'Presentations' : perspective, exact: true }).click()
       await studio.settle()
       await studio.smartLayout()
       await page.waitForTimeout(1000)

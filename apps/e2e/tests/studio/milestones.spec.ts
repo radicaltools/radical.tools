@@ -227,30 +227,34 @@ test('F5 does not start behind the milestone question, and Propagate after a sli
   await expect.poll(() => storedCounts(studio, docId)).toBe('11 18 31 66 284')
 })
 
-test('in Presenter, a slide card names the milestone its slide shows, and none over the live model', async ({ page, studio }) => {
+test('in the Presentations place, a slide card names the milestone its slide shows, and none over the live model', async ({ page, studio }) => {
   // F-0029: with v1 picked, the card of a slide that shows the live model
   // (or one linked to v2) put that model on the canvas under a chip, an
-  // address and a Milestones list that still named v1.
+  // address and a Milestones list that still named v1. The Milestones list
+  // is a section of the left panel, the slides another place of the rail.
   await studio.openSample()
-  await studio.open('view-ctx', 'presenter', studio.activeDocId())
-  const cards = page.locator('.pres-dock .pres-slide-card')
-  await cards.nth(0).getByTitle('Link milestone').click()
-  await page.locator('.pres-snap-item', { hasText: 'v2' }).click()
+  // Made over Designer: a slide is linked to a milestone there.
+  await studio.open('view-ctx', 'designer', studio.activeDocId())
+  const presentations = page.getByRole('button', { name: 'Presentations', exact: true })
+  const cards = page.locator('.pres-place .pres-slide-card')
   const chip = page.locator('.milestone-chip:visible')
   const pickV1 = async (): Promise<void> => {
-    const tab = page.getByRole('tab', { name: 'Milestones', exact: true })
-    if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click()
+    await page.getByRole('tab', { name: 'Milestones', exact: true }).click()
     await page.locator('.lp-snap-card', { hasText: 'v1' }).first().click()
     await expect(page).toHaveURL(/\/s\/snap-v1/)
     await expect(chip).toContainText('Milestone: v1')
+    await presentations.click()
   }
+  await presentations.click()
+  await cards.nth(0).getByTitle('Link milestone').click()
+  await page.locator('.pres-snap-item', { hasText: 'v2' }).click()
 
   await pickV1()
+  await expect(chip, 'opened over v1, it is still shown').toContainText('Milestone: v1')
   await cards.nth(1).click()
   await studio.settle()
   await expect(chip).toHaveCount(0)
   await expect(page).not.toHaveURL(/\/s\//)
-  await expect(page.locator('.lp-snap-current')).toHaveClass(/active/)
 
   await pickV1()
   await cards.nth(0).click()

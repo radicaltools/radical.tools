@@ -182,7 +182,7 @@ export function createModelFacade(data: DiagramData, options: ModelFacadeOptions
     setViewEdgeStyle(id: string, style: EdgeStyle | null) {
       model.setViewEdgeStyle(state, id, style)
     },
-    setViewContinuousLayout(id: string, on: boolean) {
+    setViewContinuousLayout(id: string, on: boolean | null) {
       model.setViewContinuousLayout(state, id, on)
     },
     applyViewpoint(id: string, typeId: string, subjectId?: string | null) {

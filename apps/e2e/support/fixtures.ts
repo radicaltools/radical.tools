@@ -121,8 +121,14 @@ export class Studio {
 
   /** Open a view of the seeded document through a deep link. */
   async open(view: string, mode: Mode = 'designer', docId = DOC_ID): Promise<void> {
-    await this.page.goto(`/#/d/${encodeURIComponent(`ls:${docId}`)}/m/${mode}/v/${view}`)
+    // Presentations are a place of the rail, made over Designer: a link
+    // straight to /m/presenter opens them over Viewer, only to be played.
+    await this.page.goto(`/#/d/${encodeURIComponent(`ls:${docId}`)}/m/${mode === 'presenter' ? 'designer' : mode}/v/${view}`)
     await this.ready()
+    if (mode !== 'presenter') return
+    await this.page.getByRole('button', { name: 'Presentations', exact: true }).click()
+    await expect(this.page.locator('.pres-place')).toBeVisible()
+    await this.settle()
   }
 
   /** Open the bundled Fintech sample from the welcome screen, then `view`. */
