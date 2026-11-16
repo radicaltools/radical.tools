@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-16
+
 ### Added
 - The Inspector's verification path: *Path*, in the Verification of the properties card of a need, requirement, scenario, ADR or fitness function, in Designer, Viewer or the Inspector, opens every path through it in columns joined by lines, need → requirement → scenario → test, or ADR → fitness function → test and metric condition (for each element a fitness function is measured for), failing branches first. A test shows its outcome, its duration and the failure message from the report, and in the desktop app opens in VS Code at its line; a metric condition shows the value, the sensor and its age. A click on an element makes the path that element's, Back returns, *Only what does not pass* narrows it, and the path is part of the address. `radical check --trace <id>` prints the same paths and the MCP tool `get_trace` returns them, from one function of `@radical/common`. The report readers now keep each test case's failure message, duration and line (Vitest JSON with `--includeTaskLocation`, Playwright JSON, JUnit XML).
 - A requirement quotes the words it rests on. The Derives from relation has a Quote (verbatim fragments of the need, one per line); `radical check` and the Inspector measure the share of requirements that quote their need (goal `requirements-quoting-need`; the rule `derives-quote-missing` is off until `check.json` gives it a severity), and report a quote the need does not hold (`derives-quote-not-in-need`, an error) and an answer of a person in a need that no requirement quotes (`need-answer-unquoted`, a warning). `review_requirements` shows each requirement next to the words it quotes. The check compares their hard values too (numbers, percentages, null, true and false, identifiers): a value a quote says that its requirement does not (`quote-value-missing`), and one the requirement says that no quote or its rationale does (`requirement-value-unquoted`), both warnings, listed by `review_requirements` as well; and a value a requirement takes from its quote that no scenario verifying it names (`scenario-value-missing`, a warning). Concern packs quote their need, and importing a Hub concept keeps each relation's properties (until now a quote or a transition's guard was dropped).
@@ -443,7 +445,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Live physics: expanding a container in a grid of containers that sits in another alignment (a column of groups holding a grid of groups) could leave the canvas shaking for good, the groups flipping thousands of pixels between two places: a line inside a container now moves with it, and on a large diagram the elements aligned with a container that grows are no longer held in place. A run with an alignment of containers stops after 4 s if it has not come to rest by then
 - Presentation slides without a captured canvas (the sample model's walkthrough, imported slides) lay nodes out with their view's saved positions instead of whatever layout was on screen, so they no longer need a Smart Layout to look right; a slide after a milestone slide shows the live model again instead of the milestone's subset
 
-[Unreleased]: https://github.com/radicaltools/radical.tools/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/radicaltools/radical.tools/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/radicaltools/radical.tools/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/radicaltools/radical.tools/compare/v0.3.4...v0.4.0
 [0.3.4]: https://github.com/radicaltools/radical.tools/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/radicaltools/radical.tools/compare/v0.3.2...v0.3.3
