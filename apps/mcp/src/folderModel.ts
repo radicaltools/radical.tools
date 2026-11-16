@@ -896,7 +896,8 @@ export class FolderModel {
             ...(view.kind === 'explore' && view.explore?.start ? { start: view.explore.start } : {}),
             ...(view.folder ? { folder: view.folder } : {}),
             ...(view.edgeStyle ? { edgeStyle: view.edgeStyle } : {}),
-            ...(view.continuousLayout ? { continuousLayout: true } : {}),
+            // Keep smart saved with the view; absent, each Studio's default.
+            ...(typeof view.continuousLayout === 'boolean' ? { continuousLayout: view.continuousLayout } : {}),
             ...(view.sequenceId ? { sequenceId: view.sequenceId } : {}),
             ...(view.layoutConstraints?.length ? { alignments: view.layoutConstraints } : {}),
           })),

@@ -1166,6 +1166,8 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
   display: flex; flex-direction: column; align-items: stretch;
   gap: 2px; padding: 8px 0;
 }
+/* Views and Sequences stand apart from Milestones, under a line. */
+.lp-rail > .activity-rail-divider { margin: 6px 8px; }
 .activity-rail-actions {
   display: flex; flex-direction: column; align-items: stretch;
   gap: 2px; padding: 8px 0;
@@ -1173,6 +1175,19 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
   margin-top: auto;
 }
 .activity-rail-actions:empty { padding: 0; }
+/* The app's places under the sections (Presentations), after a line. */
+.activity-rail-places {
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: 2px; padding: 8px 0;
+  margin: 0 8px; border-top: 1px solid var(--border-color);
+}
+.activity-rail-places:empty { display: none; }
+.activity-rail-places > .lp-rail-tab { margin: 0 -8px; }
+/* A line between groups of the rail's foot (the Inspector, Settings). */
+.activity-rail-divider {
+  height: 0; margin: 4px 8px; border: none; border-top: 1px solid var(--border-color);
+}
+.activity-rail-divider:first-child { display: none; }
 .lp-rail-tab {
   --sec-color: var(--accent);
   position: relative;
@@ -1195,12 +1210,14 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
 }
 .lp-rail-tab.active .lp-rail-count { color: var(--sec-color); }
 .lp-section-icon {
-  width: 26px; height: 26px; flex-shrink: 0; border-radius: 7px;
+  width: 28px; height: 28px; flex-shrink: 0; border-radius: 8px;
   display: inline-flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, var(--sec-color) 14%, transparent); color: var(--sec-color);
   transition: background 0.15s, color 0.15s;
 }
 .lp-rail-tab.active .lp-section-icon { background: var(--sec-color); color: #fff; }
+/* The rail's icons a little larger than the panel heads' own. */
+.lp-rail-tab .lp-section-icon svg { width: 16px; height: 16px; }
 
 .lp-sections { overflow: hidden; }
 .lp-section { --sec-color: var(--accent); flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }

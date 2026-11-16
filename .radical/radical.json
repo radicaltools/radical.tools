@@ -629,10 +629,10 @@
       "packages/ui/tests/presentation.test.ts › Present and Esc with a milestone's diff on › gives the milestone's diff back",
       "packages/ui/tests/milestonePresenting.test.ts › names the milestone the slide draws, and none over the live model",
       "apps/e2e/tests/studio/milestones.spec.ts › a slide that plays the live model while a milestone is open names no milestone, and offers neither its diff nor Propagate",
-      "apps/e2e/tests/studio/milestones.spec.ts › in Presenter, a slide card names the milestone its slide shows, and none over the live model",
       "packages/ui/tests/milestonePresenting.test.ts › of a slide that shows the live model names no milestone",
       "packages/ui/tests/milestonePresenting.test.ts › of a slide linked to another milestone names that one",
-      "packages/ui/tests/milestonePresenting.test.ts › of a slide with its own copy names no milestone, and a milestone picked after it keeps the live model under it"
+      "packages/ui/tests/milestonePresenting.test.ts › of a slide with its own copy names no milestone, and a milestone picked after it keeps the live model under it",
+      "apps/e2e/tests/studio/milestones.spec.ts › in the Presentations place, a slide card names the milestone its slide shows, and none over the live model"
     ] },
     { "element": "ac8deef2-157e-49fa-941a-cb3c16a8a339", "name": "Drill level survives milestone", "tests": [
       "apps/e2e/tests/studio/runs-13-24.spec.ts › a milestone without the treemap's drill element leaves the view's drill level alone"
@@ -844,8 +844,8 @@
       "packages/ui/tests/continuousLayout.test.ts › Continuous layout › undo, redo, a view switch and a move tidy nothing",
       "packages/ui/tests/continuousLayout.test.ts › Continuous layout › an outside reload that adds an element tidies the view",
       "packages/ui/tests/continuousLayout.test.ts › Continuous layout › switching it on tidies the view and is saved with it",
-      "apps/mcp/src/folderModel.test.ts › continuous layout › create_view and update_view set it on a view, saved in the folder and told in the summary",
-      "apps/e2e/tests/studio/layout.spec.ts › continuous layout glides the view into place after an add"
+      "apps/e2e/tests/studio/layout.spec.ts › continuous layout glides the view into place after an add",
+      "apps/mcp/src/folderModel.test.ts › continuous layout › create_view and update_view set it on or off on a view, or take it away, saved in the folder and told in the summary"
     ] },
     { "element": "eb72fe5a-c6c0-4a06-9f79-4cda0b39efbb", "name": "Adding moves only nearby", "tests": [
       "apps/e2e/tests/studio/physics.spec.ts › adding an element to a large diagram moves only its surroundings"
@@ -2002,7 +2002,6 @@
     { "element": "fae99b57-0571-4d6e-b596-7e6efb8f2cc1", "name": "Step notes stay true", "tests": [
       "apps/e2e/tests/studio/editing.spec.ts › a step note shows the note after Undo, and leaving it unchanged writes nothing",
       "apps/e2e/tests/studio/editing.spec.ts › in viewer, a sequence picked is shown, and a click on a relation adds no step",
-      "apps/e2e/tests/studio/editing.spec.ts › in presenter, a sequence picked is shown, and a click on a relation adds no step",
       "packages/ui/tests/sequences.test.ts › updateStepDescription › is no edit when the note stays as it was"
     ] },
     { "element": "621b0901-e8f1-463a-bb28-e03471d1acb2", "name": "Sub-need added from wiki", "tests": [
@@ -2052,7 +2051,7 @@
     ] },
     { "element": "c01b2fa5-1a14-4f36-94f0-775a353b38c6", "name": "Toolbar groups in place", "tests": [
       "apps/e2e/tests/studio/editing.spec.ts › at every window width down to the desktop app's narrowest, nothing in the toolbar lies on top of anything clickable",
-      "apps/e2e/tests/studio/editing.spec.ts › the toolbar holds undo, and navigation around Quick Search; the model open and the branch's changes are elsewhere"
+      "apps/e2e/tests/studio/editing.spec.ts › the toolbar holds undo before Quick Search and navigation after it; the model open and the branch's changes are elsewhere"
     ] },
     { "element": "0165f89b-a8c3-44aa-9dad-41f5de8f60da", "name": "Traceability chain on requirements", "tests": [
       "apps/e2e/tests/studio/view-pipeline.spec.ts › needs → requirements → scenarios, built in the Filter panel, shown as a tree in the table",
@@ -3826,6 +3825,25 @@
     ] },
     { "element": "5cf16eff-2c71-49c0-a2d9-445dc92367d2", "name": "Inspector settings from the Settings menu", "tests": [
       "apps/e2e/tests/studio/inspector.spec.ts › Inspector settings wait for Save while the dialog is closed and after Back, and the Settings menu says so"
+    ] },
+    { "element": "63f73cff-9e81-487c-abdc-bd6ae6a04df3", "name": "Keep smart by default and in Viewer", "tests": [
+      "packages/ui/tests/keepSmartDefault.test.ts › Keep smart by default and in Viewer › a view without a setting follows the default; its own on or off holds over it",
+      "packages/ui/tests/keepSmartDefault.test.ts › Keep smart by default and in Viewer › in Viewer the switch tidies the view after an agent's add and saves nothing",
+      "packages/ui/tests/keepSmartDefault.test.ts › Keep smart by default and in Viewer › the Viewer switch is refused outside Viewer",
+      "apps/mcp/src/folderModel.test.ts › continuous layout › create_view and update_view set it on or off on a view, or take it away, saved in the folder and told in the summary",
+      "apps/e2e/tests/studio/layout.spec.ts › Keep smart by default in Settings, and a switch of its own in Viewer",
+      "packages/ui/tests/studioSettings.test.ts › studio settings › keeps Keep smart by default, off unless turned on"
+    ] },
+    { "element": "a9632054-442b-49fd-8a7e-bfe5f3964fab", "name": "Presentations from the rail", "tests": [
+      "apps/e2e/tests/studio/presentation.spec.ts › presentations are a place of the activity rail, not a perspective"
+    ] },
+    { "element": "46c946f1-05d5-44f2-aa47-acb246461ecc", "name": "Presentations only played in Viewer", "tests": [
+      "apps/e2e/tests/studio/presentation.spec.ts › over Viewer presentations are only looked through and played; they are made over Designer"
+    ] },
+    { "element": "197e4b19-cfce-4a3d-8d67-ab88c31b62fd", "name": "Presentations place tests", "tests": [
+      "apps/e2e/tests/studio/presentation.spec.ts",
+      "packages/ui/tests/presenterMode.test.ts",
+      "packages/ui/tests/presenterSlides.test.ts"
     ] }
   ]
 }

@@ -68,7 +68,7 @@ export function createStoreFacade(): DiagramFacade {
     },
     setViewEdgeStyle: (id: string, style: 'curved' | 'orthogonal' | null) =>
       useDiagramStore.getState().setViewEdgeStyle(id, style),
-    setViewContinuousLayout: (id: string, on: boolean) =>
+    setViewContinuousLayout: (id: string, on: boolean | null) =>
       useDiagramStore.getState().setViewContinuousLayout(id, on),
     setViewPipeline: (id: string, pipeline: ViewPipeline) =>
       useDiagramStore.getState().setViewPipeline(id, pipeline),

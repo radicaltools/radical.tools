@@ -35,6 +35,97 @@ test('play through the slides', async ({ page, studio }) => {
   await expect(page.getByRole('button', { name: 'Present', exact: true })).toBeVisible()
 })
 
+test('presentations are a place of the activity rail, not a perspective', async ({ page, studio }) => {
+  // ADR Presentations are a place of the rail: opened over Designer, the
+  // slides in the left panel one under another, the slide picked on the
+  // canvas; a section's tab goes back to Designer.
+  await studio.open('v-containers', 'designer')
+  const toolbar = page.locator('.toolbar')
+  await expect(toolbar.locator('.toolbar-mode-btn')).toHaveText([/Designer/, /Viewer/])
+  const rail = page.getByRole('button', { name: 'Presentations', exact: true })
+  const inspector = page.getByRole('button', { name: 'Inspector', exact: true })
+  // The sections Views and Sequences, a line, Milestones; Presentations
+  // under them after a line; the Inspector, a line and Settings at the foot.
+  const labels = await page.getByRole('tablist', { name: 'Panel sections' }).getByRole('tab').evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))
+  expect(labels).toEqual(['Views', 'Sequences', 'Milestones'])
+  await expect(page.locator('.lp-rail > .activity-rail-divider')).toHaveCount(1)
+  const milestones = page.getByRole('tab', { name: 'Milestones' })
+  const [railBox, milestonesBox, inspectorBox] = [await rail.boundingBox(), await milestones.boundingBox(), await inspector.boundingBox()]
+  expect(railBox!.y, 'under the sections').toBeGreaterThan(milestonesBox!.y + milestonesBox!.height)
+  expect(railBox!.y - (milestonesBox!.y + milestonesBox!.height), 'right under them').toBeLessThan(30)
+  expect(inspectorBox!.y, 'the Inspector at the foot').toBeGreaterThan(railBox!.y + 100)
+  await expect(page.locator('.activity-rail-places')).toHaveCSS('border-top-style', 'solid')
+  await expect(page.locator('.activity-rail-actions .activity-rail-divider')).toBeVisible()
+  await expect(rail.locator('.lp-rail-count')).toHaveText('2')
+
+  await rail.click()
+  await studio.settle()
+  await expect(rail).toHaveAttribute('aria-pressed', 'true')
+  await expect(page).toHaveURL(/\/m\/presenter\/v\/v-containers$/)
+  await expect(toolbar.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
+  const place = page.locator('.lp-place .pres-place')
+  await expect(place.locator('.lp-section-title')).toHaveText('Presentations')
+  await expect(place.getByRole('button', { name: 'Present', exact: true })).toBeVisible()
+  const cards = place.locator('.pres-slide-card')
+  await expect(cards).toHaveCount(2)
+  const [first, second] = [await cards.nth(0).boundingBox(), await cards.nth(1).boundingBox()]
+  expect(second!.y, 'one under another').toBeGreaterThan(first!.y + first!.height - 1)
+  await expect(page.locator('.pres-dock')).toHaveCount(0)
+
+  await cards.nth(1).click()
+  await studio.settle()
+  await expect(cards.nth(1)).toHaveClass(/active/)
+  await place.getByRole('button', { name: 'Add slide' }).click()
+  await expect(cards).toHaveCount(3)
+
+  // Lit, it folds the left panel and opens it again on the slides.
+  await rail.click()
+  await expect(page.locator('.app-layout')).toHaveClass(/lp-collapsed/)
+  await rail.click()
+  await expect(page.locator('.app-layout')).not.toHaveClass(/lp-collapsed/)
+  await expect(cards).toHaveCount(3)
+
+  // A section's tab goes back to Designer, with its palette.
+  await page.getByRole('tab', { name: 'Views' }).click()
+  await studio.settle()
+  await expect(page).toHaveURL(/\/m\/designer\//)
+  await expect(rail).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.locator('.lp-place')).toHaveCount(0)
+  await expect.poll(async () => (JSON.parse(await studio.storedJson()) as { presentations?: Array<{ slides: unknown[] }> }).presentations?.[0]?.slides.length).toBe(3)
+})
+
+test('over Viewer presentations are only looked through and played; they are made over Designer', async ({ page, studio }) => {
+  // Presentations edited in Designer only (the author, 2026-11-16).
+  await studio.open('v-containers', 'viewer')
+  const rail = page.getByRole('button', { name: 'Presentations', exact: true })
+  await rail.click()
+  const place = page.locator('.lp-place .pres-place')
+  const cards = place.locator('.pres-slide-card')
+  await expect(cards).toHaveCount(2)
+  await expect(place.getByRole('button', { name: 'Present', exact: true })).toBeVisible()
+  await expect(place.getByRole('button', { name: 'Add slide' })).toHaveCount(0)
+  for (const title of ['Rename presentation', 'New presentation', 'Delete presentation', /^Capture canvas state/, 'Link milestone', 'Link view', 'Delete slide']) {
+    await expect(place.getByTitle(title)).toHaveCount(0)
+  }
+  await cards.nth(1).click()
+  await expect(cards.nth(1)).toHaveClass(/active/)
+  await cards.nth(1).locator('.pres-slide-name').dblclick()
+  await expect(place.locator('.pres-slide-name-input')).toHaveCount(0)
+  await place.getByRole('button', { name: 'Present', exact: true }).click()
+  await studio.settle()
+  await expect(page.getByText('2 / 2')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await studio.settle()
+
+  // Designer in the switch keeps the place open, now over Designer, where they are made.
+  await studio.designer()
+  await expect(page).toHaveURL(/\/m\/presenter\//)
+  await expect(rail).toHaveAttribute('aria-pressed', 'true')
+  await expect(place.getByRole('button', { name: 'Add slide' })).toBeVisible()
+  await expect(place.getByTitle('New presentation')).toBeVisible()
+  await expect(cards.nth(1).getByTitle(/^Capture canvas state/)).toBeVisible()
+})
+
 test('a slide deep link opens the running presentation', async ({ page, studio }) => {
   await page.goto('/#/d/ls%3Ae2e-doc/m/presenter/v/v-containers/p/pres-main/play/1/sl/1')
   await studio.ready()
@@ -143,10 +234,10 @@ test('a click in the middle of another slide\'s card shows that slide, it does n
   const card = page.locator('.pres-slide-card', { hasText: 'Containers' })
   await expect(card).not.toHaveClass(/active/)
   const box = (await card.boundingBox())!
-  const capture = card.getByTitle(/^Capture canvas state/)
-  // The hidden Capture button sat where the card's middle is.
-  const button = (await capture.boundingBox())!
-  await page.mouse.click(button.x + button.width / 2, box.y + box.height / 2)
+  // The hidden Capture button sat where the card's middle is; in the left
+  // panel another card has no buttons at all (display none).
+  await expect(card.getByTitle(/^Capture canvas state/)).toBeHidden()
+  await page.mouse.click(box.x + box.width - 60, box.y + box.height / 2)
   await expect(card).toHaveClass(/active/)
   await studio.settle()
   const slides = () => page.evaluate((k) => JSON.parse(localStorage.getItem(k)!).presentations[0].slides[1], `radical-doc:${DOC_ID}`)
@@ -160,7 +251,8 @@ test('a playing hierarchy slide is drilled on its own: Esc ends it, Designer\'s 
     doc.presentations[0].slides.push({ id: 'slide-tree', name: 'Tree', snapshotId: null, viewId: 'v-tree', viewport: { x: 0, y: 0, zoom: 0 } })
   }, 'v-tree')
   await page.locator('.pres-slide-card .pres-slide-name', { hasText: 'Tree' }).click()
-  await studio.designer()
+  // A section's tab leaves the place (the perspective switch keeps it open).
+  await page.getByRole('tab', { name: 'Views' }).click()
   await studio.settle()
   await expect(page).toHaveURL(/\/m\/designer\/v\/v-tree$/)
   await page.keyboard.press('F5')
@@ -217,12 +309,14 @@ test('a slide shown in Presenter leaves the view\'s camera Designer\'s, also aft
   await studio.settle()
   const designer = await transform()
 
-  await page.locator('.toolbar-mode-btn', { hasText: 'Presenter' }).click()
+  await page.getByRole('button', { name: 'Presentations', exact: true }).click()
   await page.locator('.pres-slide-card .pres-slide-name', { hasText: 'Context' }).click()
   await studio.settle()
   expect(await transform()).not.toBe(designer)
   await page.reload()
   await studio.ready()
+  // Back to Designer's view through a section's tab.
+  await page.getByRole('tab', { name: 'Views' }).click()
   await studio.designer()
   await studio.settle()
   expect(await transform()).toBe(designer)

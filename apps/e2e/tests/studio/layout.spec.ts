@@ -105,6 +105,46 @@ test('continuous layout glides the view into place after an add', async ({ page,
   expect(await studio.layoutViolations()).toEqual([])
 })
 
+test('Keep smart by default in Settings, and a switch of its own in Viewer', async ({ page, studio }) => {
+  // The default in Settings: a view without a setting of its own follows
+  // it, the button says so, and the model keeps no setting for it.
+  await studio.seed()
+  await studio.open('v-context')
+  const keepSmart = page.getByRole('button', { name: 'Keep smart' })
+  await expect(keepSmart).toHaveAttribute('aria-pressed', 'false')
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  const byDefault = page.locator('label.app-menu-row', { hasText: 'Keep smart by default' }).locator('input')
+  await byDefault.check()
+  await page.keyboard.press('Escape')
+  await expect(keepSmart).toHaveAttribute('aria-pressed', 'true')
+  await expect(keepSmart).toHaveAttribute('title', /the default in Settings/)
+  await studio.advance(3000)
+  expect((await studio.storedDoc()).views?.find((v) => v.id === 'v-context')).not.toHaveProperty('continuousLayout')
+
+  // Kept across a reload: it is this browser's setting.
+  await page.reload()
+  await studio.ready()
+  await expect(keepSmart).toHaveAttribute('aria-pressed', 'true')
+
+  // Switched off in Designer, off is saved with the view and holds over the default.
+  await keepSmart.click()
+  await expect(keepSmart).toHaveAttribute('aria-pressed', 'false')
+  await studio.advance(3000)
+  expect((await studio.storedDoc()).views?.find((v) => v.id === 'v-context')).toMatchObject({ continuousLayout: false })
+
+  // In Viewer the button is there and switches Keep smart while you view,
+  // saving nothing; back in Designer the view is off as saved.
+  await page.locator('.toolbar-mode-btn', { hasText: 'Viewer' }).click()
+  await expect(keepSmart).toHaveAttribute('aria-pressed', 'false')
+  await keepSmart.click()
+  await expect(keepSmart).toHaveAttribute('aria-pressed', 'true')
+  await expect(keepSmart).toHaveAttribute('title', /while you view/)
+  await studio.advance(3000)
+  expect((await studio.storedDoc()).views?.find((v) => v.id === 'v-context')).toMatchObject({ continuousLayout: false })
+  await studio.designer()
+  await expect(keepSmart).toHaveAttribute('aria-pressed', 'false')
+})
+
 test('the result is the same on every run', async ({ browser }) => {
   const prepare = async (s: Studio): Promise<void> => {
     await s.seed()

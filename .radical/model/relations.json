@@ -2383,6 +2383,12 @@
     "targetId": "a6fb0b37-f3ed-4e0c-84a5-1e2b313bed12"
   },
   {
+    "id": "1a7d6de7-97c2-4dcb-9f76-66b1d8f69549",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "5d58c3d6-6c32-4969-a88c-874de735ea7a"
+  },
+  {
     "id": "1a9164e6-dfcd-4b99-ab50-2720b0f47bbe",
     "relationType": "verifies",
     "sourceId": "4a1d36e1-c506-4875-9a26-03a9bf2f0e84",
@@ -2741,6 +2747,12 @@
     "relationType": "satisfies",
     "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
     "targetId": "3cb01e62-2beb-4bc8-bc1b-bcc93ff847f4"
+  },
+  {
+    "id": "1ec95759-0ab9-4e46-be23-8d7f24e52e75",
+    "relationType": "traces-to",
+    "sourceId": "49ebdea3-797d-4a0e-a36c-b40dd6f6f8e4",
+    "targetId": "0b366741-baea-4a3f-b8e7-e65521a33784"
   },
   {
     "id": "1edb05a9-d160-4958-9f7b-2c3e1eef113b",
@@ -4437,6 +4449,12 @@
     "targetId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e"
   },
   {
+    "id": "3177c2f3-d290-4644-a657-165ce2c7ec22",
+    "relationType": "constrains",
+    "sourceId": "0b366741-baea-4a3f-b8e7-e65521a33784",
+    "targetId": "6d563737-4cfb-4ccd-993e-2f1c5deaf753"
+  },
+  {
     "id": "31abd592-fd61-455e-bc95-70cbdf5412ac",
     "relationType": "verifies",
     "sourceId": "6b8ab2de-7f49-4c58-bd48-bee37578dcb4",
@@ -4853,6 +4871,13 @@
     "relationType": "satisfies",
     "sourceId": "08c445dd-e14d-47dd-b4b1-1776a539dcbc",
     "targetId": "b77d3b47-4b13-4dba-9453-2d12edb22f5a"
+  },
+  {
+    "id": "3584413e-13ae-4fce-a76a-7f162de53702",
+    "quote": "czhce aby byla on czescia panelu lewego tak jak inne rzeczy\nBez perspektywy (Recommended)\nprzechodze z viewer na designer ... otwiera sie kanwas, layout nie zostaje w trybie prezentacji\ndopasuj ikone ... w tym momencie nie jest idealnie w takim samym stylu jak inne",
+    "relationType": "derives",
+    "sourceId": "c8e2e282-69ff-47a3-8eae-edadc1616e02",
+    "targetId": "836ccef2-64a4-4d27-82f1-ba64413242d7"
   },
   {
     "id": "358c530c-c066-4ebb-a111-228c521b541c",
@@ -6449,6 +6474,12 @@
     "targetId": "cfd36cd7-d5a8-4116-b1c0-430128d5a218"
   },
   {
+    "id": "464f19ff-730f-43b2-8e17-d3e6119b71f2",
+    "relationType": "satisfies",
+    "sourceId": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
+    "targetId": "5d58c3d6-6c32-4969-a88c-874de735ea7a"
+  },
+  {
     "id": "4658eb7b-95f1-41e1-8216-d488735b205b",
     "relationType": "satisfies",
     "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
@@ -7797,6 +7828,12 @@
     "targetId": "da4e6672-a6b4-40d7-86ff-1a057b85f928"
   },
   {
+    "id": "548af08d-fdb7-4946-a413-853ab9624fc3",
+    "relationType": "implements",
+    "sourceId": "197e4b19-cfce-4a3d-8d67-ab88c31b62fd",
+    "targetId": "0b366741-baea-4a3f-b8e7-e65521a33784"
+  },
+  {
     "id": "548e387b-ebc0-4dc1-9759-0034a0585bff",
     "relationType": "verifies",
     "sourceId": "802e66fd-e758-467d-a730-4e206666325e",
@@ -8542,6 +8579,12 @@
     "relationType": "derives",
     "sourceId": "3b2debb1-bba6-493c-b7a2-a390f2009d7d",
     "targetId": "d5b9e72b-18f9-4675-bcb2-9c1253125570"
+  },
+  {
+    "id": "5d642587-2d3b-4c3e-b665-b5f94cd73d20",
+    "relationType": "constrains",
+    "sourceId": "0b366741-baea-4a3f-b8e7-e65521a33784",
+    "targetId": "32793ee9-a939-498b-a71e-77831ce7ef4c"
   },
   {
     "id": "5d65cc2c-5ccd-46f7-be9d-2291519c2bdb",
@@ -9509,6 +9552,13 @@
     "relationType": "verifies",
     "sourceId": "9f539754-f002-4492-bb89-d42189bbee1f",
     "targetId": "21d17477-69bd-4298-8903-35336632a002"
+  },
+  {
+    "id": "67f78aa5-1693-41b9-8005-84eaccb1d3a7",
+    "quote": "Tylko na czas oglądania (Recommended)",
+    "relationType": "derives",
+    "sourceId": "5d58c3d6-6c32-4969-a88c-874de735ea7a",
+    "targetId": "84182994-491c-4799-ba74-0f2ced3c0f9f"
   },
   {
     "id": "680dc48b-741b-4c0c-a30c-a111b20bedae",
@@ -10774,6 +10824,12 @@
     "targetId": "172925c1-4267-40ba-adf5-d6c0eae24a87"
   },
   {
+    "id": "75993338-76a4-46a5-b7a8-0394287cff79",
+    "relationType": "verifies",
+    "sourceId": "46c946f1-05d5-44f2-aa47-acb246461ecc",
+    "targetId": "49ebdea3-797d-4a0e-a36c-b40dd6f6f8e4"
+  },
+  {
     "id": "75a4883b-c2b3-4f14-803c-78f9ece19eac",
     "relationType": "verifies",
     "sourceId": "f0285b42-405c-4e10-bd9e-1df5673d5b69",
@@ -11506,6 +11562,12 @@
     "targetId": "1533ed1d-a405-4cb8-bc92-491e292d0cc8"
   },
   {
+    "id": "7b864fb4-dd73-4fc3-8dfc-db5fe81c3e05",
+    "relationType": "satisfies",
+    "sourceId": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
+    "targetId": "4b6b6f16-7b16-4e56-bcb9-edca1f583f3b"
+  },
+  {
     "id": "7b87a345-5d35-45ea-a05d-eb4756156dff",
     "relationType": "verifies",
     "sourceId": "1efa9dc2-0177-4f4c-9587-1c7cff22dafb",
@@ -11648,6 +11710,12 @@
     "relationType": "satisfies",
     "sourceId": "08c445dd-e14d-47dd-b4b1-1776a539dcbc",
     "targetId": "80ef8b05-8e97-481b-992f-0db7e32ca025"
+  },
+  {
+    "id": "7d5415f8-02a8-466a-bba3-23325497d25e",
+    "relationType": "verifies",
+    "sourceId": "a9632054-442b-49fd-8a7e-bfe5f3964fab",
+    "targetId": "c8e2e282-69ff-47a3-8eae-edadc1616e02"
   },
   {
     "id": "7d5d20a8-4b75-4f95-93b3-8273271c71e0",
@@ -11955,6 +12023,12 @@
     "targetId": "88fd21dd-e52d-44e3-a9f1-e6532151edba"
   },
   {
+    "id": "8143ea96-fa6a-4168-8b93-9108865388fb",
+    "relationType": "traces-to",
+    "sourceId": "c8e2e282-69ff-47a3-8eae-edadc1616e02",
+    "targetId": "0b366741-baea-4a3f-b8e7-e65521a33784"
+  },
+  {
     "id": "8148acf5-bd9e-4f35-9e2d-666608dfe37c",
     "relationType": "traces-to",
     "sourceId": "ad036309-e907-4b40-b459-921bd107712f",
@@ -12043,6 +12117,13 @@
     "relationType": "satisfies",
     "sourceId": "72ab7d8a-0466-44d3-a97b-8a5675f2dbed",
     "targetId": "1099eea0-6d6c-4baf-b60c-a1af3ad091c9"
+  },
+  {
+    "id": "8233a0d8-eca5-459e-8239-43797862a0bf",
+    "quote": "ok prezentacje - moga byc tworzone w trybie designera ... w trybie viewera tylko odtwrarzane i przegladane",
+    "relationType": "derives",
+    "sourceId": "49ebdea3-797d-4a0e-a36c-b40dd6f6f8e4",
+    "targetId": "836ccef2-64a4-4d27-82f1-ba64413242d7"
   },
   {
     "id": "82693f81-4350-4f2f-a91d-78a5c45a97b2",
@@ -12166,6 +12247,12 @@
     "targetId": "e8d2846a-cd7e-40d7-8837-7f17aa7cbfa2"
   },
   {
+    "id": "83a4762b-ed1c-4cf5-9cbe-048052474d96",
+    "relationType": "verifies",
+    "sourceId": "63f73cff-9e81-487c-abdc-bd6ae6a04df3",
+    "targetId": "5d58c3d6-6c32-4969-a88c-874de735ea7a"
+  },
+  {
     "id": "83d3384a-18f7-44b7-9998-5bef9c4919c3",
     "relationType": "satisfies",
     "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
@@ -12194,6 +12281,13 @@
     "relationType": "derives",
     "sourceId": "9e8381e7-8a36-4afe-80de-7ff09da2013b",
     "targetId": "7ef5cf61-e50b-4455-b7be-80ee13afafc2"
+  },
+  {
+    "id": "84773b40-c26b-495a-9e2a-d2ffa51da463",
+    "quote": "ikona folder w lewym gornym rogu jest ok ... ale zamien ja na logo radicala\nnie pasuje mi dopasuj do wersje ciemnej i jasne\nw menu po lewj ... zrob odstep pomiedzy views a reszta pozycji\ndaj tam krese\nsekwencje daj do sekcji z view\nzwieksz odrobine wszystkie ikoni w lewym menu",
+    "relationType": "derives",
+    "sourceId": "5af5eb12-a22c-45fa-bc72-2e71819d269f",
+    "targetId": "3d0449cc-f95e-4e4d-a012-7055e92c668c"
   },
   {
     "id": "847e7146-7481-4b63-a2cc-9bcafc39fb5a",
@@ -12687,6 +12781,13 @@
     "relationType": "verifies",
     "sourceId": "c619c194-0b2c-4792-a08b-b383277edf30",
     "targetId": "39163ca3-ee1f-46f9-ab5e-c1a2c302ba23"
+  },
+  {
+    "id": "89d7731e-3d43-41f7-9c9a-2d86d5641ca3",
+    "quote": "i teraz back forward daj po prawej stronie searcha ... a undo i redo po lewej",
+    "relationType": "derives",
+    "sourceId": "963cba85-ed07-4171-ab9c-e8038d2fd528",
+    "targetId": "3d0449cc-f95e-4e4d-a012-7055e92c668c"
   },
   {
     "id": "89f09daf-f686-4b07-b726-1faca1fbac3f",
@@ -13382,6 +13483,13 @@
     "relationType": "satisfies",
     "sourceId": "ca07e33c-43dc-48fc-b0aa-8bda8f97864e",
     "targetId": "fd7b9dab-3d6e-4a42-8749-c927c009114c"
+  },
+  {
+    "id": "90dd2b4b-f9cf-4cc7-aed0-274f916f29af",
+    "quote": "Dla widoków bez wyboru (Recommended)",
+    "relationType": "derives",
+    "sourceId": "4b6b6f16-7b16-4e56-bcb9-edca1f583f3b",
+    "targetId": "84182994-491c-4799-ba74-0f2ced3c0f9f"
   },
   {
     "id": "90dfc2a8-2070-4438-a81e-3e6f4931fbdc",
@@ -14611,6 +14719,13 @@
     "targetId": "b7b10084-f9fc-4115-b67f-4f0b068608da"
   },
   {
+    "id": "9eabd6d5-adf4-45f1-9cf3-6681e3c6179d",
+    "quote": "Kliknięcie Keep smart na widoku zapisuje w modelu wyraźne on/off, które ma pierwszeństwo przed domyślnym.",
+    "relationType": "derives",
+    "sourceId": "59751b19-a3ae-4125-8ace-28e709da6373",
+    "targetId": "84182994-491c-4799-ba74-0f2ced3c0f9f"
+  },
+  {
     "id": "9ed51974-221a-4642-97db-05e80e30ad31",
     "relationType": "verifies",
     "sourceId": "ce4f4718-4709-40c6-adc0-134e04da947d",
@@ -14699,6 +14814,12 @@
     "targetId": "27a0f3c8-055a-4a39-9040-656a0d192177"
   },
   {
+    "id": "9f856fa1-4d4a-4bfe-845e-18d132af14c6",
+    "relationType": "verifies",
+    "sourceId": "63f73cff-9e81-487c-abdc-bd6ae6a04df3",
+    "targetId": "4b6b6f16-7b16-4e56-bcb9-edca1f583f3b"
+  },
+  {
     "id": "9f889506-42c5-408b-a99d-f3254022eb1d",
     "relationType": "verifies",
     "sourceId": "80569cee-16e8-484d-895f-558faa6d353f",
@@ -14745,6 +14866,12 @@
     "relationType": "derives",
     "sourceId": "765f5535-f2aa-4118-a98f-7831e6feb1ef",
     "targetId": "0d5c705a-f262-43c3-a585-e61e0a925ef8"
+  },
+  {
+    "id": "9ff28389-c9dc-45ee-b85d-c308799852d8",
+    "relationType": "satisfies",
+    "sourceId": "32793ee9-a939-498b-a71e-77831ce7ef4c",
+    "targetId": "c8e2e282-69ff-47a3-8eae-edadc1616e02"
   },
   {
     "id": "9ff9180c-b67c-48a5-95c1-ac882720cd46",
@@ -16064,6 +16191,12 @@
     "targetId": "cc126186-6fbd-4fd3-b241-8f3333905236"
   },
   {
+    "id": "ae488b16-a6f6-44fa-b5cb-741b1be1b785",
+    "relationType": "derives",
+    "sourceId": "84182994-491c-4799-ba74-0f2ced3c0f9f",
+    "targetId": "a9394a73-6e11-43a8-a8af-1fa1e42ba31f"
+  },
+  {
     "id": "ae5d1c8a-d04c-4744-829b-9ba37f5d9864",
     "label": "serves studio.radical.tools",
     "relationType": "interacts",
@@ -16476,6 +16609,12 @@
     "relationType": "verifies",
     "sourceId": "fecca760-4ebb-4f40-9043-a51960d1e842",
     "targetId": "81aeb9d5-a134-408a-9c36-91a5c341b015"
+  },
+  {
+    "id": "b2f0a917-5117-413a-99c4-9662e8d72714",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "4b6b6f16-7b16-4e56-bcb9-edca1f583f3b"
   },
   {
     "id": "b2feaca1-9c28-4be4-9896-34e7d792cdbd",
@@ -17526,6 +17665,12 @@
     "relationType": "satisfies",
     "sourceId": "08c445dd-e14d-47dd-b4b1-1776a539dcbc",
     "targetId": "0aca864e-45f0-45ed-b38a-3da9eb61d68d"
+  },
+  {
+    "id": "bf32a3b4-2d7b-4a1c-96c1-e7d713363f9d",
+    "relationType": "derives",
+    "sourceId": "836ccef2-64a4-4d27-82f1-ba64413242d7",
+    "targetId": "0547a0d4-ee5c-4a35-a763-c3be86838039"
   },
   {
     "id": "bf4614a6-65a3-46e0-8053-b60acee6040e",
@@ -19100,6 +19245,12 @@
     "targetId": "5b7eedf4-c138-45d6-94c9-cd968c2bea5b"
   },
   {
+    "id": "cf06b488-8b2b-4180-a370-f2a2eaf101a9",
+    "relationType": "satisfies",
+    "sourceId": "6d563737-4cfb-4ccd-993e-2f1c5deaf753",
+    "targetId": "c8e2e282-69ff-47a3-8eae-edadc1616e02"
+  },
+  {
     "id": "cf082ea7-2290-405b-a8fe-e4796b88ff1c",
     "relationType": "derives",
     "sourceId": "1533ed1d-a405-4cb8-bc92-491e292d0cc8",
@@ -20427,6 +20578,12 @@
     "targetId": "fd5442de-d28a-43ca-b0cf-cdbefc46981e"
   },
   {
+    "id": "dcacaff4-1fc1-414d-893e-c1df8b3e1845",
+    "relationType": "derives",
+    "sourceId": "3d0449cc-f95e-4e4d-a012-7055e92c668c",
+    "targetId": "55d82cac-b5c1-4c67-b057-5324f620d60e"
+  },
+  {
     "id": "dcbdab7a-db7c-420e-b452-843b0e01b457",
     "relationType": "constrains",
     "sourceId": "2da47ec9-900f-45a0-ab4d-b976ebf465e8",
@@ -20486,6 +20643,13 @@
     "relationType": "verifies",
     "sourceId": "0a3cb598-b880-4c3c-8d42-e9974dd727dd",
     "targetId": "22cdc4c2-842e-445e-a736-5fe055b53897"
+  },
+  {
+    "id": "ddce2e9f-93ea-4e29-be21-df9940a353df",
+    "quote": "moze jakis poziomie kreski podzialu?\nPrezentacje pod sekcjami\nchce aby menu od gory wyglada tak:",
+    "relationType": "derives",
+    "sourceId": "5af5eb12-a22c-45fa-bc72-2e71819d269f",
+    "targetId": "836ccef2-64a4-4d27-82f1-ba64413242d7"
   },
   {
     "id": "ddcf4e05-e9f2-47c1-b1ff-f002b68a031f",
@@ -20685,6 +20849,12 @@
     "relationType": "derives",
     "sourceId": "ace11c09-df3f-4452-aa9f-0ee884c5c02a",
     "targetId": "491c9f6d-f241-4730-932a-64e72cbeec3e"
+  },
+  {
+    "id": "dfe8b772-892e-4c37-aa8c-6d7adde54317",
+    "relationType": "satisfies",
+    "sourceId": "6d563737-4cfb-4ccd-993e-2f1c5deaf753",
+    "targetId": "49ebdea3-797d-4a0e-a36c-b40dd6f6f8e4"
   },
   {
     "id": "dfec6e65-e364-47c7-a2ac-ff45223c883e",
@@ -21098,6 +21268,12 @@
     "relationType": "verifies",
     "sourceId": "acb669a6-8cef-45a8-9322-515c9a3b6a77",
     "targetId": "1440e22b-69af-4d76-b075-3413ee1dceb4"
+  },
+  {
+    "id": "e4e35939-5119-4fa2-82b3-0cf964b8a4e3",
+    "relationType": "constrains",
+    "sourceId": "197e4b19-cfce-4a3d-8d67-ab88c31b62fd",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "e4f18268-c1fc-4c28-b5f2-3fb80cd140f4",
@@ -23451,6 +23627,12 @@
     "relationType": "constrains",
     "sourceId": "a4d8d593-831c-4d4d-afe1-e2dd3984633c",
     "targetId": "d77d54b5-7c84-4c51-acd3-c63696271146"
+  },
+  {
+    "id": "ff4dfff9-81d9-4c44-a1d5-40f14c086f14",
+    "relationType": "constrains",
+    "sourceId": "0b366741-baea-4a3f-b8e7-e65521a33784",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "ff59ec6d-8b75-4c97-8f45-4f3b5690b172",

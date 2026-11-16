@@ -380,7 +380,7 @@ export function applyRoute(route: Route): void {
 
 // ─── State → URL ─────────────────────────────────────────────────────────────
 
-const MODE_NAMES: Record<Mode, string> = { designer: 'Designer', viewer: 'Viewer', presenter: 'Presenter', metamodel: 'Metamodel' }
+const MODE_NAMES: Record<Mode, string> = { designer: 'Designer', viewer: 'Viewer', presenter: 'Presentations', metamodel: 'Metamodel' }
 
 /** What the History list says of a route: where, in which perspective, on what. */
 export function describeRoute(route: Route, hash = formatRoute(route), at = Date.now()): NavEntry {

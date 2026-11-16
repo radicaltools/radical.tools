@@ -368,6 +368,20 @@ runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main. ~~Fixed on fix/round-211-220 (2026-11-15), where it failed in
 both full runs: the poll now asks again when a box is missing instead of failing.~~
 
+### Dogfooding (2026-11-16): Keep smart by default, Presentations as a place of the rail
+
+Fifteen rounds of the product owner's corrections (the rail's order alone changed five times), written into the model
+through the worktree's own MCP server.
+
+- **The ad hoc stdio client again.** Same as on 2026-11-15: `radical mcp call` would spare writing it once more.
+- **A list in a person's words cannot be quoted.** The author wrote the rail's order one word a line (views, milestones,
+  …); a quote is read line by line, each line too short, so `radical check` failed with four errors and only the line
+  before the list could be quoted. A quote spanning several lines of the need, kept as one, would let a requirement
+  rest on the list itself.
+- **A second derives relation to the same need.** `add_relation` made a second derives between a requirement and a need
+  it already derived from, where the quote of the first one was meant to grow; refusing the duplicate (or offering to
+  extend the quote) would have caught it.
+
 ### Dogfooding (2026-11-15): the Inspector as a place of the rail
 
 Thirteen rounds of the product owner's corrections on a test server, each written into the model through the

@@ -92,7 +92,7 @@ export interface DiagramFacade {
   /** Optional — how a view draws relations ('curved' | 'orthogonal'); null for the model's. */
   setViewEdgeStyle?(id: string, style: EdgeStyle | null): void
   /** Optional — whether Studio keeps the view tidied after each change. */
-  setViewContinuousLayout?(id: string, on: boolean): void
+  setViewContinuousLayout?(id: string, on: boolean | null): void
   /** Optional — how a wiki view writes its pages: one element per page
    *  ('single') or its children as chapters ('multi'), `depth` levels deep. */
   setWikiPages?(id: string, mode: 'single' | 'multi', depth: number): void

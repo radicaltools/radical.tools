@@ -25,6 +25,7 @@ import { revealViewFolder, useLeftPanelSection } from '@radical/ui/components/Ri
 import { availableCommands, useCommands, type Command } from '../commands'
 import { goTo, sinceText, useNavHistory, type NavEntry } from '../navHistory'
 import { dropPendingMode, placeGone } from '../route'
+import { openPresentations } from '../presentationsPlace'
 import { openFindInView } from './FindInView'
 
 /**
@@ -448,11 +449,11 @@ export function QuickSearch(): React.ReactElement | null {
     inputRef.current?.blur()
   }
 
-  // Presenter on a presentation, showing slide `index`; `play` plays it from there.
+  // The Presentations place on a presentation, showing slide `index`; `play` plays it from there.
   const openSlide = (presentationId: string, index: number, play: boolean): void => {
     dropPendingMode()
+    openPresentations()
     const s = useDiagramStore.getState()
-    s.setAppMode('presenter')
     s.setActivePresentation(presentationId)
     if (!useDiagramStore.getState().presentationSlides.length) return
     useDiagramStore.getState().previewSlide(index)

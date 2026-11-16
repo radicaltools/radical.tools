@@ -287,7 +287,7 @@ describe('folder-backed MCP model', () => {
 })
 
 describe('continuous layout', () => {
-  it('create_view and update_view set it on a view, saved in the folder and told in the summary', async () => {
+  it('create_view and update_view set it on or off on a view, or take it away, saved in the folder and told in the summary', async () => {
     const folder = await fixture()
     const model = await FolderModel.open(folder)
     const saved = async () => deserializeFromMdFolder(await new MdFolderSession(diskFolderStorage(folder)).readAll()).data.views ?? []
@@ -297,9 +297,17 @@ describe('continuous layout', () => {
     const summary = JSON.parse((await model.call('get_model_summary', {})).text.split('\n')[0])
     expect(summary.views.find((v: { name: string }) => v.name === 'Growing').continuousLayout).toBe(true)
     const id = (await saved()).find((v) => v.name === 'Growing')!.id
+    // Off is saved too: it holds over each Studio's Keep smart default.
     expect((await model.call('update_view', { id, continuousLayout: false })).ok).toBe(true)
-    expect((await saved()).find((v) => v.id === id)!.continuousLayout).toBeUndefined()
-    expect((await model.call('update_view', { id, continuousLayout: 'yes' })).text).toContain('continuousLayout must be true or false')
+    expect((await saved()).find((v) => v.id === id)!.continuousLayout).toBe(false)
+    const off = JSON.parse((await model.call('get_model_summary', {})).text.split('\n')[0])
+    expect(off.views.find((v: { name: string }) => v.name === 'Growing').continuousLayout).toBe(false)
+    // null takes the setting away: the view follows the default again.
+    expect((await model.call('update_view', { id, continuousLayout: null })).ok).toBe(true)
+    expect('continuousLayout' in (await saved()).find((v) => v.id === id)!).toBe(false)
+    expect((await model.call('create_view', { tempId: 'x', name: 'Never', continuousLayout: false })).ok).toBe(true)
+    expect((await saved()).find((v) => v.name === 'Never')!.continuousLayout).toBe(false)
+    expect((await model.call('update_view', { id, continuousLayout: 'yes' })).text).toContain('continuousLayout must be true, false or null')
   })
 })
 

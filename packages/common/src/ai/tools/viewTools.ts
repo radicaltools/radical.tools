@@ -148,7 +148,7 @@ export function buildViewToolDefs(): ToolDef[] {
       inputSchema: {
         type: 'object',
         properties: {
-          continuousLayout: { type: 'boolean', description: 'Static views: when true, Studio tidies the whole view after each change to what it shows (yours too, as it reloads the folder), keeping pinned elements, and glides the elements into place. Off by default.' },
+          continuousLayout: { type: 'boolean', description: 'Static views, Keep smart: true, Studio tidies the whole view after each change to what it shows (yours too, as it reloads the folder), keeping pinned elements, and glides the elements into place; false, it never does. Left out, the view follows the Keep smart default of each Studio that opens it (off unless its user turns it on).' },
           edgeStyle: { type: 'string', enum: ['curved', 'orthogonal', 'model'], description: 'How the view draws relations: curved, orthogonal (horizontal and vertical segments), or "model" for the model\'s default.' },
           folder: { type: 'string', description: 'The folder the view sits in in the list of views, a path such as "C4/Components"; "" puts it at the top.' },
           tempId: { type: 'string' },
@@ -174,7 +174,7 @@ export function buildViewToolDefs(): ToolDef[] {
       inputSchema: {
         type: 'object',
         properties: {
-          continuousLayout: { type: 'boolean', description: 'Static views: when true, Studio tidies the whole view after each change to what it shows (yours too, as it reloads the folder), keeping pinned elements, and glides the elements into place. Off by default.' },
+          continuousLayout: { type: ['boolean', 'null'], description: 'Static views, Keep smart: true, Studio tidies the whole view after each change to what it shows (yours too, as it reloads the folder), keeping pinned elements, and glides the elements into place; false, it never does; null takes the view\'s setting away, so it follows the Keep smart default of each Studio that opens it (off unless its user turns it on).' },
           edgeStyle: { type: 'string', enum: ['curved', 'orthogonal', 'model'], description: 'How the view draws relations: curved, orthogonal (horizontal and vertical segments), or "model" for the model\'s default.' },
           folder: { type: 'string', description: 'The folder the view sits in in the list of views, a path such as "C4/Components"; "" puts it at the top.' },
           id: { type: 'string' },
@@ -289,9 +289,9 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
         if (!ctx.diagram.setViewEdgeStyle) return fail('create_view: line styles are not available in this context')
         ctx.diagram.setViewEdgeStyle(realId, input.edgeStyle)
       }
-      if (input.continuousLayout === true) {
+      if (typeof input.continuousLayout === 'boolean') {
         if (!ctx.diagram.setViewContinuousLayout) return fail('create_view: continuous layout is not available in this context')
-        ctx.diagram.setViewContinuousLayout(realId, true)
+        ctx.diagram.setViewContinuousLayout(realId, input.continuousLayout)
       }
       if (typeof input.folder === 'string' && input.folder.trim()) {
         if (!ctx.diagram.setViewFolder) return fail('create_view: folders of views are not available in this context')
@@ -346,7 +346,7 @@ export function buildViewToolHandlers(): Record<string, ToolHandler> {
         changes.push(() => ctx.diagram.setViewEdgeStyle!(vId, style))
       }
       if (input.continuousLayout !== undefined) {
-        if (typeof input.continuousLayout !== 'boolean') return fail('update_view: continuousLayout must be true or false')
+        if (typeof input.continuousLayout !== 'boolean' && input.continuousLayout !== null) return fail('update_view: continuousLayout must be true, false or null')
         if (!ctx.diagram.setViewContinuousLayout) return fail('update_view: continuous layout is not available in this context')
         const on = input.continuousLayout
         changes.push(() => ctx.diagram.setViewContinuousLayout!(vId, on))

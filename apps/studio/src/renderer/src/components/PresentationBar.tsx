@@ -154,8 +154,10 @@ function ViewPicker({ anchor, currentId, views, onPick, onClose }: {
 
 // ── Slide thumbnail card ──────────────────────────────────────────────────────
 
-function SlideCard({ slide, index, isActive, snapshotNames, viewNames, views, onSelect, onDelete, onRename, onCapture, onLinkSnapshot, onLinkView }: {
+function SlideCard({ slide, index, isActive, readOnly = false, snapshotNames, viewNames, views, onSelect, onDelete, onRename, onCapture, onLinkSnapshot, onLinkView }: {
   slide: PresentationSlide
+  /** Over Viewer: looked through and played, not changed. */
+  readOnly?: boolean
   index: number
   isActive: boolean
   snapshotNames: Record<string, string>
@@ -201,8 +203,8 @@ function SlideCard({ slide, index, isActive, snapshotNames, viewNames, views, on
             onClick={e => e.stopPropagation()} />
         ) : (
           <span className="pres-slide-name"
-            onDoubleClick={e => { e.stopPropagation(); setEditing(true) }}
-            title="Double-click to rename">
+            onDoubleClick={readOnly ? undefined : e => { e.stopPropagation(); setEditing(true) }}
+            title={readOnly ? slide.name : 'Double-click to rename'}>
             {slide.name}
           </span>
         )}
@@ -217,7 +219,7 @@ function SlideCard({ slide, index, isActive, snapshotNames, viewNames, views, on
           </span>
         )}
       </div>
-      <div className="pres-slide-actions" onClick={e => e.stopPropagation()}>
+      {!readOnly && <div className="pres-slide-actions" onClick={e => e.stopPropagation()}>
         <button className="pres-icon-btn" title="Capture canvas state (positions, zoom, expanded/collapsed)" onClick={onCapture}>
           <IconCapture />
         </button>
@@ -240,7 +242,7 @@ function SlideCard({ slide, index, isActive, snapshotNames, viewNames, views, on
         <button className="pres-icon-btn danger" title="Delete slide" onClick={onDelete}>
           <IconDelete />
         </button>
-      </div>
+      </div>}
     </div>
   )
 }
@@ -297,7 +299,7 @@ function PresenterHUD() {
   )
 }
 
-function PresentationPicker() {
+function PresentationPicker({ readOnly = false }: { readOnly?: boolean }) {
   const presentations = useDiagramStore(s => s.presentations)
   const activeId = useDiagramStore(s => s.activePresentationId)
   const setActivePresentation = useDiagramStore(s => s.setActivePresentation)
@@ -346,6 +348,8 @@ function PresentationPicker() {
             ))}
           </select>
         )}
+        {/* Presentations are made in Designer; over Viewer only picked. */}
+        {!readOnly && <>
         <button className="pres-icon-btn" title="Rename presentation"
           onClick={() => setEditing(v => !v)}>
           ✎
@@ -358,6 +362,7 @@ function PresentationPicker() {
           onClick={handleDelete}>
           <IconDelete />
         </button>
+        </>}
       </div>
     </div>
   )
@@ -383,7 +388,7 @@ export function PresenterDock({ readOnly = false }: { readOnly?: boolean } = {})
 
   const activeRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+    activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [idx])
 
   const snapshotNames: Record<string, string> = {}
@@ -400,10 +405,19 @@ export function PresenterDock({ readOnly = false }: { readOnly?: boolean } = {})
     }
   }
 
+  // The Presentations place of the activity rail, in the left panel in
+  // place of the sections (ADR Presentations are a place of the rail): the
+  // picker, Present and Add slide, then the slides one under another.
   return (
-    <div className="pres-dock">
+    <div className="pres-place lp-section">
+      <div className="lp-section-head">
+        <span className="lp-section-title">Presentations</span>
+        <span className="lp-section-count" title="Slides in this presentation">{slides.length}</span>
+      </div>
+      <div className="lp-section-body">
+      <div className="lp-section-body-pad">
       <div className="pres-dock-controls">
-        <PresentationPicker />
+        <PresentationPicker readOnly={readOnly} />
         <div className="pres-dock-actions">
           <button className="pres-panel-btn primary" onClick={startPresentation}
             disabled={slides.length === 0} title="Start presentation (F5)">
@@ -425,7 +439,7 @@ export function PresenterDock({ readOnly = false }: { readOnly?: boolean } = {})
         )}
         {slides.map((slide, i) => (
           <div key={slide.id} ref={i === idx ? activeRef : null} className="pres-dock-card-wrap">
-            <SlideCard slide={slide} index={i} isActive={i === idx}
+            <SlideCard slide={slide} index={i} isActive={i === idx} readOnly={readOnly}
               snapshotNames={snapshotNames}
               viewNames={viewNames}
               views={views}
@@ -438,6 +452,8 @@ export function PresenterDock({ readOnly = false }: { readOnly?: boolean } = {})
             />
           </div>
         ))}
+      </div>
+      </div>
       </div>
     </div>
   )

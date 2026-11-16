@@ -18,7 +18,7 @@ describe('studio settings', () => {
     updateStudioSettings({ selectionFocus: false }, storage)
     updateStudioSettings({ smartFit: false }, storage)
     const next = updateStudioSettings({ nodeWizardOnCreate: false }, storage)
-    expect(next).toEqual({ nodeWizardOnCreate: false, smartFit: false, alignKeepsOrder: true, selectionFocus: false, specialKey: 'alt', setupDone: false })
+    expect(next).toEqual({ nodeWizardOnCreate: false, smartFit: false, alignKeepsOrder: true, selectionFocus: false, keepSmart: false, specialKey: 'alt', setupDone: false })
     expect(loadStudioSettings(storage)).toEqual(next)
   })
 
@@ -28,5 +28,15 @@ describe('studio settings', () => {
     expect(loadStudioSettings(storage)).toMatchObject({ specialKey: 'shift', setupDone: true })
     storage.setItem('radical-studio-settings', JSON.stringify({ specialKey: 'f13' }))
     expect(loadStudioSettings(storage)).toMatchObject({ specialKey: 'alt', setupDone: false })
+  })
+
+  it('keeps Keep smart by default, off unless turned on', () => {
+    const storage = memoryStorage()
+    expect(loadStudioSettings(storage).keepSmart).toBe(false)
+    updateStudioSettings({ keepSmart: true }, storage)
+    updateStudioSettings({ smartFit: false }, storage)
+    expect(loadStudioSettings(storage).keepSmart).toBe(true)
+    storage.setItem('radical-studio-settings', JSON.stringify({ keepSmart: 'yes' }))
+    expect(loadStudioSettings(storage).keepSmart).toBe(false)
   })
 })

@@ -38,6 +38,7 @@ import { DiscussionPanel, type DiscussionTarget } from './components/DiscussionP
 import { webFolderSupported } from './persist/webFolder'
 import { useNodeDiscussions } from './discussions/useNodeDiscussions'
 import { OPEN_HUB_EVENT, useInspectorMayShow } from './persistence/inspector'
+import { closePresentations, usePresentationsFrom } from './presentationsPlace'
 
 
 /** The Hub's packs a link asks to import (`?hub=id1,id2`, its Open in
@@ -117,7 +118,14 @@ function AppInner(): React.ReactElement {
   const showInspector = inspectorOpen && inspectorHas && !isPresenting && !isMetamodel
   // A click on a section of the rail goes back to the view and shows the section.
   useEffect(() => { setCanvasCovered(showInspector) }, [showInspector])
-  const inspectorOver = useMemo(() => ({ open: showInspector, close: () => toggleInspector(false) }), [showInspector])
+  // The Presentations place (ADR Presentations are a place of the rail):
+  // the slides in the left panel, the slide picked on the canvas.
+  const showPresentations = isPresenter && !showInspector && !isPresenting
+  // Made in Designer; over Viewer only looked through and played.
+  const presentationsReadOnly = usePresentationsFrom((s) => s.from) === 'viewer'
+  const inspectorOver = useMemo(() => showPresentations
+    ? { open: true, close: closePresentations }
+    : { open: showInspector, close: () => toggleInspector(false) }, [showInspector, showPresentations])
   // Another model's view (a federation), of any view type: its bar says
   // whose it is, in a row of its own above the view.
   const otherModelBar = useDiagramStore((s) => !!otherModelViewShown(s)) && !isPresenting && !showInspector && (isDesigner || isViewer)
@@ -195,7 +203,7 @@ function AppInner(): React.ReactElement {
       {!isPresenting && <ActivityRail sections={isDesigner || isViewer || isPresenter} collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} over={inspectorOver} />}
       {!isPresenting && isDesigner && <LeftPanel mode="designer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} place={showInspector ? <InspectorSection /> : undefined} />}
       {!isPresenting && isViewer && <LeftPanel mode="viewer" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} place={showInspector ? <InspectorSection /> : undefined} />}
-      {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} place={showInspector ? <InspectorSection /> : undefined} />}
+      {!isPresenting && isPresenter && <LeftPanel mode="presenter" collapsed={leftCollapsed} onToggleCollapsed={toggleLeft} place={showInspector ? <InspectorSection /> : <PresenterDock readOnly={presentationsReadOnly} />} />}
       {/* The Inspector covers the view, which stays mounted under it: its
           camera and its places stay as they were, and going back is at once. */}
       {showInspector && <InspectorMain />}
@@ -211,7 +219,6 @@ function AppInner(): React.ReactElement {
       {otherModelBar && <OtherModelViewBar style={{ gridArea: 'otherbar' }} />}
       {!isPresenting && !showInspector && isDesigner && <RightPanel />}
       {!isPresenting && !showInspector && isViewer && <RightPanel readOnly />}
-      {!isPresenting && isPresenter && <PresenterDock />}
       <PresentationBar />
       <CheckSettingsDialog />
       {!isPresenting && !showInspector && isCanvasView && <SelectionActionBar />}

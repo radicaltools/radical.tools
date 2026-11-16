@@ -202,8 +202,9 @@ export function revealViewFolder(path: string): void {
   window.dispatchEvent(new CustomEvent('radical:show-left-panel'))
 }
 /** Where the app puts its own actions on the activity rail: at its top
- *  (Studio's models, as VS Code's explorer) and at its foot (settings). */
-export const useRailSlot = create<{ el: HTMLElement | null; top: HTMLElement | null }>()(() => ({ el: null, top: null }))
+ *  (Studio's models, as VS Code's explorer), under the sections after a
+ *  line (its places: presentations) and at its foot (settings). */
+export const useRailSlot = create<{ el: HTMLElement | null; top: HTMLElement | null; places: HTMLElement | null }>()(() => ({ el: null, top: null, places: null }))
 
 /** The activity rail along the window's left edge, top to bottom, as in
  *  VS Code: the app's models first, then the left panel's sections as tabs,
@@ -230,9 +231,10 @@ export function ActivityRail({ sections, collapsed = false, onToggleCollapsed, o
   const sequenceNames = useDiagramStore(useCallback((s: { sequences: Record<string, { name: string }> }) =>
     Object.values(s.sequences).map((q) => q.name).join(', '), []))
   const tabs: Array<{ id: PanelSectionId; title: string; count: number; preview: string }> = [
+    // Views and the sequences flow views play, then under a line the milestones.
     { id: 'views', title: 'Views', count: railViews, preview: `Open: ${activeViewName ?? 'All elements'}` },
-    { id: 'milestones', title: 'Milestones', count: railMilestones, preview: latestMilestone ? `Latest: ${latestMilestone}` : 'None saved yet' },
     { id: 'sequences', title: 'Sequences', count: railSequences, preview: sequenceNames || 'None yet' },
+    { id: 'milestones', title: 'Milestones', count: railMilestones, preview: latestMilestone ? `Latest: ${latestMilestone}` : 'None saved yet' },
   ]
   const covered = !!over?.open
   const pick = (id: PanelSectionId) => {
@@ -257,6 +259,7 @@ export function ActivityRail({ sections, collapsed = false, onToggleCollapsed, o
   }
   const slot = useCallback((el: HTMLDivElement | null) => { useRailSlot.setState({ el }) }, [])
   const topSlot = useCallback((top: HTMLDivElement | null) => { useRailSlot.setState({ top }) }, [])
+  const placesSlot = useCallback((places: HTMLDivElement | null) => { useRailSlot.setState({ places }) }, [])
   return (
     <nav className="activity-rail" aria-label="Activity bar">
       <div className="activity-rail-top" ref={topSlot} />
@@ -265,7 +268,8 @@ export function ActivityRail({ sections, collapsed = false, onToggleCollapsed, o
           {tabs.map((x) => {
             const shown = x.id === open && !collapsed && !covered
             return (
-              <button key={x.id} id={`lp-tab-${x.id}`} type="button" role="tab"
+              <React.Fragment key={x.id}>
+              <button id={`lp-tab-${x.id}`} type="button" role="tab"
                 className={`lp-rail-tab${shown ? ' active' : ''}`}
                 style={{ ['--sec-color' as string]: SECTION_COLORS[x.id] }}
                 aria-selected={shown} aria-controls={`lp-sec-${x.id}`} aria-label={x.title}
@@ -275,10 +279,15 @@ export function ActivityRail({ sections, collapsed = false, onToggleCollapsed, o
                 <SectionIcon id={x.id} />
                 <span className="lp-rail-count">{x.count}</span>
               </button>
+              {/* Views and Sequences stand apart from Milestones, under a line. */}
+              {x.id === 'sequences' && <hr className="activity-rail-divider" aria-hidden />}
+              </React.Fragment>
             )
           })}
         </div>
       )}
+      {/* The app's places under the sections, after a line (Studio's Presentations). */}
+      {sections && <div className="activity-rail-places" ref={placesSlot} />}
       <div className="activity-rail-actions" ref={slot} />
     </nav>
   )
@@ -840,6 +849,7 @@ function ViewPropertiesContent({ viewId, readOnly: panelReadOnly = false, onClos
   const [editingFolder, setEditingFolder] = useState(false)
   const setViewEdgeStyle = useDiagramStore((s) => s.setViewEdgeStyle)
   const setViewContinuousLayout = useDiagramStore((s) => s.setViewContinuousLayout)
+  const keepSmartDefault = useDiagramStore((s) => s.keepSmartDefault)
   const defaultEdgeStyle = useDiagramStore((s) => s.defaultEdgeStyle)
   const [editingName, setEditingName] = useState(false)
   const [nameVal, setNameVal] = useState('')
@@ -1075,17 +1085,19 @@ function ViewPropertiesContent({ viewId, readOnly: panelReadOnly = false, onClos
             <option value="ensemble">Ensemble (eleven algorithms, ranked)</option>
             <option value="tree">Hierarchical nested tree</option>
           </select>
-          <label
-            style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, cursor: 'pointer' }}
-            title="After each change to what the view shows (yours or an agent's), Smart Layout tidies the whole view and the elements glide into place; what you drop stays pinned"
+          <div className="props-label" style={{ marginTop: 6 }}>Keep smart (lay out after each change)</div>
+          <select
+            className="props-input"
+            aria-label="Keep smart"
+            style={{ cursor: 'pointer', width: '100%' }}
+            value={view.continuousLayout === undefined ? 'default' : view.continuousLayout ? 'on' : 'off'}
+            onChange={(e) => setViewContinuousLayout(view.id, e.target.value === 'default' ? null : e.target.value === 'on')}
+            title="On: after each change to what the view shows (yours or an agent's), Smart Layout tidies the whole view and the elements glide into place; what you drop stays pinned. Off: the view stays as it is. Both are saved with the view. Default follows Keep smart in Settings, each person's own"
           >
-            <input
-              type="checkbox"
-              checked={!!view.continuousLayout}
-              onChange={(e) => setViewContinuousLayout(view.id, e.target.checked)}
-            />
-            Keep smart (lay out after each change)
-          </label>
+            <option value="default">Default ({keepSmartDefault ? 'on' : 'off'}, from Settings)</option>
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
         </div>
       )}
       {(isStatic || isDynamic) && (view.layoutConstraints?.length ?? 0) > 0 && (

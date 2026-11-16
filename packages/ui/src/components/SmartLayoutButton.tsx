@@ -8,7 +8,7 @@
  * maintained copies that can drift.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { otherModelViewShown, useDiagramStore, type SmartLayoutReport } from '../store/diagramStore'
+import { keepsSmart, otherModelViewShown, useDiagramStore, type SmartLayoutReport } from '../store/diagramStore'
 import type { SmartLayoutProgress } from '../layout/smartLayoutRunner'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { keysOnTop } from './keysHere'
@@ -183,13 +183,26 @@ export function SmartLayoutButton({ readOnlyNote }: { readOnlyNote?: string } = 
     s.activeViewId ? s.views[s.activeViewId]?.layoutMode ?? 'auto' : 'auto'
   )
 
-  // Continuous layout is the view's (saved with it): a static view in Designer.
+  // Keep smart, on a static view: in Designer the view's (saved with it),
+  // in Viewer for as long as Viewer is open (saved nowhere).
   const continuousView = useDiagramStore((s) => {
     const v = s.activeViewId ? s.views[s.activeViewId] : undefined
-    return s.appMode === 'designer' && v && (v.kind ?? 'static') === 'static' && !otherModelViewShown(s) ? v : undefined
+    return (s.appMode === 'designer' || s.appMode === 'viewer') && v && (v.kind ?? 'static') === 'static' && !otherModelViewShown(s) ? v : undefined
   })
   const setViewContinuousLayout = useDiagramStore((s) => s.setViewContinuousLayout)
-  const continuous = !!continuousView?.continuousLayout
+  const setViewerKeepSmart = useDiagramStore((s) => s.setViewerKeepSmart)
+  const continuous = useDiagramStore((s) => !!continuousView && keepsSmart(s, continuousView))
+  const inViewer = appMode === 'viewer'
+  // Whether the view follows the default (no setting of its own, nor one made in Viewer).
+  const followsDefault = useDiagramStore((s) => !!continuousView && continuousView.continuousLayout === undefined
+    && !(inViewer && continuousView.id in s.viewerKeepSmart))
+  const continuousTitle = inViewer
+    ? (continuous
+      ? 'Keep smart is on while you view: after each change (an agent\'s too) Smart Layout tidies the view and the elements glide into place. Nothing is saved. Click to turn it off'
+      : 'Keep smart is off: the view stays as it is. Click to tidy it after each change while you view; nothing is saved')
+    : (continuous
+      ? `Keep smart is on for this view${followsDefault ? ' (the default in Settings)' : ''}: after each change Smart Layout tidies it and the elements glide into place; what you drop stays pinned. Click to turn it off, saved with the view`
+      : `Keep smart is off${followsDefault ? ' (the default in Settings)' : ' for this view'}: the view stays as it is until you run Smart Layout. Click to tidy it after each change, saved with the view`)
 
   // A running Tidy can be stopped from the button; the ensemble runs on.
   const tidying = isLayoutRunning && smartLayoutProgress?.phase === 'tidy'
@@ -223,11 +236,9 @@ export function SmartLayoutButton({ readOnlyNote }: { readOnlyNote?: string } = 
       {continuousView && !readOnlyNote && (
         <button
           className={`toolbar-btn canvas-continuous-toggle${continuous ? ' active' : ''}`}
-          onClick={() => setViewContinuousLayout(continuousView.id, !continuous)}
+          onClick={() => inViewer ? setViewerKeepSmart(continuousView.id, !continuous) : setViewContinuousLayout(continuousView.id, !continuous)}
           aria-pressed={continuous}
-          title={continuous
-            ? 'Keep smart is on for this view: after each change Smart Layout tidies it and the elements glide into place; what you drop stays pinned. Click to turn it off'
-            : 'Keep smart is off: the view stays as it is until you run Smart Layout. Click to tidy it after each change, saved with the view'}
+          title={continuousTitle}
         >
           <IconContinuous /> Keep smart
         </button>
