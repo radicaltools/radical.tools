@@ -3649,10 +3649,6 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .pres-icon-btn.danger:hover { background: rgba(239,68,68,0.12); color: #ef4444; }
 .pres-icon-btn.linked { color: var(--accent); }
 
-/* Snapshot picker */
-.pres-snap-item.active { color: var(--accent); font-weight: 600; }
-.pres-snap-item.disabled { opacity: 0.5; pointer-events: none; }
-
 /* Presenter HUD (bottom bar during presentation) */
 .pres-hud-btn.exit {
   border-color: rgba(239,68,68,0.4);

@@ -492,6 +492,8 @@ test('removing one of two steps of the same relation leaves the list as the sequ
   await studio.open('v-containers')
   await page.getByRole('tab', { name: 'Sequences' }).click()
   await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
+  // Its steps are in its properties, in the left panel.
+  await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().getByTitle('Sequence properties').click()
   const edge = page.locator('[data-testid="rf__edge-r2"] path.react-flow__edge-interaction').first()
   const mid = await edge.evaluate((el) => {
     const path = el as SVGPathElement
@@ -541,7 +543,9 @@ test('a step note shows the note after Undo, and leaving it unchanged writes not
   await studio.open('v-containers')
   await page.getByRole('tab', { name: 'Sequences' }).click()
   await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
-  const note = page.locator('.right-panel .seq-step input').first()
+  // Its steps are in its properties, in the left panel.
+  await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().getByTitle('Sequence properties').click()
+  const note = page.locator('.left-panel .seq-step input').first()
   await expect(note).toHaveValue('submits the order')
   await note.fill('EDITED NOTE')
   await note.press('Enter')
@@ -567,6 +571,8 @@ test('a step turned to run the other way is drawn back as a response, kept, and 
   await expect(page.locator('.seq-diagram-step')).toHaveCount(4)
   await page.getByRole('tab', { name: 'Sequences' }).click()
   await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
+  // Its steps are in its properties, in the left panel.
+  await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().getByTitle('Sequence properties').click()
   const step = page.locator('.seq-step').nth(3)
   await expect(step).toContainText('API → Payment Provider')
   await step.hover()
@@ -592,6 +598,30 @@ test('a step turned to run the other way is drawn back as a response, kept, and 
   await expect(page.locator('.seq-diagram-step[data-backward="true"]')).toHaveCount(1)
 })
 
+// A sequence picked showed its steps under its card and again on a card at
+// the right (the author, 2026-11-16): its properties are in the left panel,
+// from its ⚙, as a view's are.
+test('a sequence\'s properties open in the left panel from its ⚙, as a view\'s, and no card at the right', async ({ page, studio }) => {
+  await studio.open('v-containers')
+  await page.getByRole('tab', { name: 'Sequences' }).click()
+  const card = page.locator('.lp-view-card', { hasText: 'Place Order' }).last()
+  await card.click()
+  await expect(page.getByText(/Editing: Place Order/)).toBeVisible()
+  await expect(page.locator('.right-panel.open')).toHaveCount(0)
+  await expect(page.locator('.seq-step')).toHaveCount(0)
+  await card.getByTitle('Sequence properties').click()
+  const props = page.locator('.left-panel .props-sequence')
+  await expect(props).toContainText('SEQUENCE')
+  await expect(props).toContainText('Place Order')
+  await expect(props.locator('.seq-step')).toHaveCount(4)
+  await page.locator('.left-panel .rp-back-btn').click()
+  await expect(card).toBeVisible()
+  // A new sequence opens its properties, as a new view does.
+  await page.getByRole('button', { name: 'New sequence' }).click()
+  await expect(props).toContainText('Sequence 2')
+  await expect(page.locator('.right-panel.open')).toHaveCount(0)
+})
+
 // The Sequences section is not shown beside the Presentations place: a
 // sequence is picked in Designer or Viewer.
 for (const mode of ['viewer'] as const) {
@@ -604,7 +634,9 @@ for (const mode of ['viewer'] as const) {
     await expect(page.getByText(/Sequence: Place Order/)).toBeVisible()
     await expect(page.getByText(/Editing: Place Order/)).toHaveCount(0)
     await expect(page.locator('.lp-view-card', { hasText: 'Place Order' }).last()).not.toContainText(/editing/i)
-    if (mode === 'viewer') await expect(page.locator('.right-panel .seq-step')).toHaveCount(4)
+    // No card at the right, nor properties to open, as a view has none in Viewer.
+    await expect(page.locator('.right-panel .seq-step')).toHaveCount(0)
+    await expect(page.locator('.lp-view-card', { hasText: 'Place Order' }).last().getByTitle('Sequence properties')).toHaveCount(0)
     const edge = page.locator('[data-testid="rf__edge-r3"] path.react-flow__edge-interaction').first()
     const mid = await edge.evaluate((el) => {
       const path = el as SVGPathElement

@@ -661,30 +661,17 @@ function StepWayButton({ back, style, onClick }: { back: boolean; style: React.C
   )
 }
 
-function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolean; compact?: boolean }) {
+/** The sequences, as cards like the views': a click shows one on the
+ *  canvas (and, in Designer, makes it the one steps are added to), ⚙ opens
+ *  its properties in the panel (its steps among them), as a view's. Its
+ *  steps were a list under the card and again on a card at the right. */
+function SequenceList({ readOnly = false, onOpenProps }: { readOnly?: boolean; onOpenProps?: (sequenceId: string) => void }) {
   const sequences = useDiagramStore((s) => s.sequences)
   const activeSequenceId = useDiagramStore((s) => s.activeSequenceId)
   const setActiveSequence = useDiagramStore((s) => s.setActiveSequence)
   const addSequence = useDiagramStore((s) => s.addSequence)
-  const removeFromSequence = useDiagramStore((s) => s.removeFromSequence)
-  const reorderSequence = useDiagramStore((s) => s.reorderSequence)
-  const clearSequence = useDiagramStore((s) => s.clearSequence)
-  const updateStepDescription = useDiagramStore((s) => s.updateStepDescription)
-  const setStepBackward = useDiagramStore((s) => s.setStepBackward)
-  const c4Nodes = useDiagramStore((s) => s.c4Nodes)
-  const c4Relations = useDiagramStore((s) => s.c4Relations)
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-
-  const toggleExpand = (id: string) =>
-    setExpandedIds((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
 
   const seqList = Object.values(sequences)
-
-  const btnStyle: React.CSSProperties = {
-    background: 'none', border: 'none', cursor: 'pointer',
-    color: 'var(--text-muted)', padding: '2px 3px', borderRadius: 3,
-    display: 'flex', alignItems: 'center', lineHeight: 1,
-  }
 
   return (
     <div className="lp-view-list">
@@ -695,119 +682,31 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
       )}
       {seqList.map((seq) => {
         const isActive = activeSequenceId === seq.id
-        const isExpanded = compact ? expandedIds.has(seq.id) : (isActive)
         return (
-          <div key={seq.id}>
-            <div
-              className={`lp-card lp-view-card${isActive ? ' active' : ''}`}
-              style={{ ['--kind-color' as string]: SECTION_COLORS.sequences }}
-              onClick={() => setActiveSequence(isActive ? null : seq.id)}
-              {...cardKeys(() => setActiveSequence(isActive ? null : seq.id))}
-            >
-              <div className="lp-view-icon">
-                <Icon.Bolt />
-              </div>
-              <div className="lp-card-body">
-                <div className="lp-card-title">{seq.name}</div>
-                <div className="lp-card-meta">
-                  <span>{seq.relationIds.length} {seq.relationIds.length === 1 ? 'step' : 'steps'}</span>
-                  {isActive && !readOnly && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>editing</span>}
-                </div>
+          <div
+            key={seq.id}
+            className={`lp-card lp-view-card${isActive ? ' active' : ''}`}
+            style={{ ['--kind-color' as string]: SECTION_COLORS.sequences }}
+            onClick={() => setActiveSequence(isActive ? null : seq.id)}
+            {...cardKeys(() => setActiveSequence(isActive ? null : seq.id))}
+          >
+            <div className="lp-view-icon">
+              <Icon.Bolt />
+            </div>
+            <div className="lp-card-body">
+              <div className="lp-card-title">{seq.name}</div>
+              <div className="lp-card-meta">
+                <span>{seq.relationIds.length} {seq.relationIds.length === 1 ? 'step' : 'steps'}</span>
+                {isActive && !readOnly && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>editing</span>}
               </div>
             </div>
-            {/* Inline step detail */}
-            {((!compact && isActive) || (compact && isExpanded)) && seq.relationIds.length > 0 && (
-              <div style={{ padding: '2px 8px 8px', borderLeft: '2px solid var(--accent)', marginLeft: 10 }}>
-                <div style={{ display: 'grid', gap: 3, marginBottom: 4, minWidth: 0 }}>
-                  {/* Keyed by place too: a relation may be a step more than once,
-                      and rows keyed by its id alone kept a removed copy listed
-                      (with its index), so a second Remove took another step. */}
-                  {seq.relationIds.map((relId, idx) => {
-                    const rel = c4Relations[relId]
-                    const src = rel ? c4Nodes[rel.sourceId] : null
-                    const tgt = rel ? c4Nodes[rel.targetId] : null
-                    const stepDesc = seq.stepDescriptions?.[idx]
-                    const back = isBackwardStep(seq, idx)
-                    return (
-                      <div key={`${relId}-${idx}`} className="seq-step" style={{ display: 'flex', alignItems: 'flex-start', gap: 5, background: 'var(--surface-2,rgba(255,255,255,0.04))', borderRadius: 5, padding: '4px 6px' }}>
-                        <span style={{
-                          width: 18, height: 18, borderRadius: '50%',
-                          background: 'var(--accent)', color: '#fff',
-                          fontSize: 10, fontWeight: 700,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          flexShrink: 0, marginTop: 1,
-                        }}>{idx + 1}</span>
-                        <div style={{ flex: 1, minWidth: 0, fontSize: 11, lineHeight: 1.35 }}>
-                          <div style={{ color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            <StepWay src={src?.label} tgt={tgt?.label} back={back} />
-                          </div>
-                          {rel?.label && (
-                            <div style={{ color: 'var(--text-muted)', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {rel.label}
-                            </div>
-                          )}
-                          {!readOnly && (
-                            <StepNoteInput
-                              value={stepDesc}
-                              placeholder={rel?.label || 'Add step note…'}
-                              onCommit={(text) => updateStepDescription(seq.id, idx, text)}
-                              style={{ marginTop: 3, fontSize: 10, padding: '2px 4px', width: '100%', boxSizing: 'border-box' }}
-                            />
-                          )}
-                          {readOnly && stepDesc && (
-                            <div style={{ color: 'var(--text-secondary)', fontSize: 10, marginTop: 1, fontStyle: 'italic' }}>
-                              {stepDesc}
-                            </div>
-                          )}
-                        </div>
-                        {!readOnly && (
-                          <div className="seq-step-actions">
-                            <button
-                              style={{ ...btnStyle, opacity: idx === 0 ? 0.3 : 1 }}
-                              disabled={idx === 0}
-                              onClick={() => reorderSequence(seq.id, idx, idx - 1)}
-                              title="Move up"
-                            ><Icon.ArrowUp /></button>
-                            <button
-                              style={{ ...btnStyle, opacity: idx === seq.relationIds.length - 1 ? 0.3 : 1 }}
-                              disabled={idx === seq.relationIds.length - 1}
-                              onClick={() => reorderSequence(seq.id, idx, idx + 1)}
-                              title="Move down"
-                            ><Icon.ArrowDown /></button>
-                            <StepWayButton back={back} style={btnStyle} onClick={() => setStepBackward(seq.id, idx, !back)} />
-                            <button
-                              style={{ ...btnStyle, color: 'var(--danger, #ef4444)' }}
-                              onClick={() => removeFromSequence(seq.id, idx)}
-                              title="Remove step"
-                            ><Icon.Close /></button>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-                {!readOnly && (
-                  <button
-                    onClick={() => clearSequence(seq.id)}
-                    style={{
-                      width: '100%',
-                      fontSize: 11,
-                      padding: '4px 0',
-                      background: 'none',
-                      border: '1px solid var(--border)',
-                      borderRadius: 4,
-                      color: 'var(--text-muted)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Clear all steps
-                  </button>
-                )}
-              </div>
-            )}
-            {(!compact && isActive && seq.relationIds.length === 0) && (
-              <div style={{ padding: '4px 10px 8px', fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', opacity: 0.6 }}>
-                Click relations on canvas to add steps
+            {!readOnly && onOpenProps && (
+              <div className="lp-card-actions">
+                <button
+                  className="lp-icon-btn"
+                  title="Sequence properties"
+                  onClick={(e) => { e.stopPropagation(); onOpenProps(seq.id) }}
+                ><Icon.Settings /></button>
               </div>
             )}
           </div>
@@ -817,6 +716,7 @@ function SequenceList({ readOnly = false, compact = false }: { readOnly?: boolea
         <button className="lp-add-btn" onClick={() => {
           const id = addSequence(`Sequence ${seqList.length + 1}`)
           setActiveSequence(id)
+          onOpenProps?.(id)
         }}>
           <Icon.Plus /> New sequence
         </button>
@@ -1915,7 +1815,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
   // One section open at a time, picked on the activity rail.
   const openSection = useLeftPanelSection((s) => s.open)
   const setOpenSection = (open: PanelSectionId) => useLeftPanelSection.setState({ open })
-  type PaneContent = { kind: 'view'; id: string } | { kind: 'milestone'; id: string } | { kind: 'folder'; id: string }
+  type PaneContent = { kind: 'view'; id: string } | { kind: 'milestone'; id: string } | { kind: 'folder'; id: string } | { kind: 'sequence'; id: string }
   const [paneContent, setPaneContent] = useState<PaneContent | null>(null)
   // A view's properties asked for from elsewhere (a canvas too large to draw).
   useEffect(() => {
@@ -1942,6 +1842,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
     if (!paneContent) return false
     if (paneContent.kind === 'view') return !s.views[paneContent.id]
     if (paneContent.kind === 'milestone') return !s.snapshots.some((m) => m.id === paneContent.id)
+    if (paneContent.kind === 'sequence') return !s.sequences[paneContent.id]
     const folder = paneContent.id
     return !Object.values(s.views).some((v) => v.folder === folder || v.folder?.startsWith(`${folder}/`))
   })
@@ -1973,11 +1874,11 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
               <SnapshotList readOnly={isReadOnly} onOpenProps={!isReadOnly ? (id) => { setPaneContent({ kind: 'milestone', id }); setOpenSection('milestones') } : undefined} />
             </PanelSection>
             <PanelSection id="sequences" title="Sequences" count={sequencesCount} open={openSection === 'sequences'}>
-              <SequenceList readOnly={isReadOnly} compact={true} />
+              <SequenceList readOnly={isReadOnly} onOpenProps={!isReadOnly ? (id) => { setPaneContent({ kind: 'sequence', id }); setOpenSection('sequences') } : undefined} />
             </PanelSection>
           </div>
 
-          {/* Pane 2 — view / milestone properties */}
+          {/* Pane 2 — view / folder / sequence / milestone properties */}
           <div className="rp-pane" ref={propsPane}>
             <button className="rp-back-btn" onClick={() => setPaneContent(null)}>◀ Back</button>
             {paneContent?.kind === 'view' && (
@@ -1992,6 +1893,13 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
                 path={paneContent.id}
                 readOnly={isReadOnly}
                 onRenamed={(path) => setPaneContent({ kind: 'folder', id: path })}
+              />
+            )}
+            {paneContent?.kind === 'sequence' && (
+              <SequencePropertiesContent
+                sequenceId={paneContent.id}
+                readOnly={isReadOnly}
+                onClose={() => setPaneContent(null)}
               />
             )}
             {paneContent?.kind === 'milestone' && (
@@ -2013,7 +1921,7 @@ export function LeftPanel({ mode = 'designer', readOnly = false, collapsed = fal
 
 // ── RightPanel (tree + properties accordion) ──────────────────────────────────
 
-function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceId: string; readOnly?: boolean }) {
+function SequencePropertiesContent({ sequenceId, readOnly = false, onClose }: { sequenceId: string; readOnly?: boolean; onClose: () => void }) {
   const seq = useDiagramStore((s) => s.sequences[sequenceId])
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
   const c4Relations = useDiagramStore((s) => s.c4Relations)
@@ -2044,8 +1952,11 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
   }
 
   return (
-    // In the card, whose head already says Sequence.
+    // In the left panel, in place of the list, as a view's properties are.
     <div className="props-content props-sequence">
+      <div className="props-type-badge" style={{ background: SECTION_COLORS.sequences, color: '#fff' }}>
+        <Icon.Bolt /> &nbsp;SEQUENCE
+      </div>
       <div>
         <div className="props-section-title">Name</div>
         <div className="props-field">
@@ -2186,7 +2097,7 @@ function SequencePropertiesContent({ sequenceId, readOnly = false }: { sequenceI
               </button>
             )
           })()}
-          <DeleteButton className="props-delete" label="Delete sequence" onDelete={() => { removeSequence(seq.id); setActiveSequence(null) }} />
+          <DeleteButton className="props-delete" label="Delete sequence" onDelete={() => { removeSequence(seq.id); setActiveSequence(null); onClose() }} />
         </>
       )}
     </div>
@@ -3153,8 +3064,6 @@ function clampPanelWidth(w: number): number {
 export function RightPanel({ readOnly = false }: { readOnly?: boolean }) {
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId)
   const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId)
-  const activeSequenceId = useDiagramStore((s) => s.activeSequenceId)
-  const setActiveSequence = useDiagramStore((s) => s.setActiveSequence)
   // Several elements selected: the selection bar acts on them, and the card,
   // which would show one of them, stays out of the way of the next pick.
   const several = useDiagramStore((s) => s.selectedNodeIds.length > 1)
@@ -3162,14 +3071,13 @@ export function RightPanel({ readOnly = false }: { readOnly?: boolean }) {
   // What the card is about. A click only selects: the card opens when it
   // is asked for (openCard: a double-click, Quick Search, …) and then
   // follows the selection until ✕, or until nothing is selected. A
-  // sequence picked in its list shows at once.
+  // sequence's properties are in the left panel, as a view's.
   const subject = several ? null
     : selectedNodeId ? `node:${selectedNodeId}`
     : selectedEdgeId ? `edge:${selectedEdgeId}`
-    : activeSequenceId ? `sequence:${activeSequenceId}`
     : null
   const requested = useCardOpen((s) => s.requested)
-  const open = !!subject && (requested || subject.startsWith('sequence:'))
+  const open = !!subject && requested
   const close = useCallback(() => useCardOpen.setState({ requested: false }), [])
   useEffect(() => {
     useCardOpen.setState({ open })
@@ -3181,7 +3089,7 @@ export function RightPanel({ readOnly = false }: { readOnly?: boolean }) {
     if (subject) return
     const timer = setTimeout(() => {
       const s = useDiagramStore.getState()
-      if (!s.selectedNodeId && !s.selectedEdgeId && !s.activeSequenceId) useCardOpen.setState({ requested: false })
+      if (!s.selectedNodeId && !s.selectedEdgeId) useCardOpen.setState({ requested: false })
     }, 0)
     return () => clearTimeout(timer)
   }, [subject])
@@ -3228,15 +3136,7 @@ export function RightPanel({ readOnly = false }: { readOnly?: boolean }) {
 
   const content = selectedNodeId || selectedEdgeId
     ? <PropertiesContent readOnly={readOnly} onClose={close} />
-    : activeSequenceId
-      ? (
-        <div className="props-content">
-          <PanelHeader typeLabel="Sequence" color="var(--accent)" title="" titlePlaceholder="" readOnly
-            actions={[]} onClose={() => { close(); setActiveSequence(null) }} />
-          <SequencePropertiesContent sequenceId={activeSequenceId} readOnly={readOnly} />
-        </div>
-      )
-      : null
+    : null
 
   return (
     <aside className={`right-panel${open ? ' open' : ''}${resizing ? ' resizing' : ''}`}

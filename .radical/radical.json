@@ -735,10 +735,10 @@
     ] },
     { "element": "8bbc2b60-5cca-4055-b1ed-52e14c6475d9", "name": "Slides show what they hold", "tests": [
       "apps/e2e/tests/studio/presentation.spec.ts › a slide made with focus zooms onto its elements after a table slide, from a deep link and after a reload",
-      "apps/e2e/tests/studio/presentation.spec.ts › a slide card's Link view and Link milestone pickers show all their items above the dock",
       "apps/e2e/tests/studio/presentation.spec.ts › a slide added on a wiki page shows that page, on its card and played after a reload",
       "packages/ui/tests/firstCanvasPositions.test.ts › a slide of a view with no positions of its own",
-      "packages/ui/tests/treemapFocus.test.ts › a slide added on a wiki page"
+      "packages/ui/tests/treemapFocus.test.ts › a slide added on a wiki page",
+      "apps/e2e/tests/studio/presentation.spec.ts › a slide's properties link it to another view or to none, and to the live model"
     ] },
     { "element": "9e5b0f8d-ccc4-4545-ad1c-c44612e0e473", "name": "Step back to v2 with diff", "tests": [
       "packages/ui/tests/milestones.test.ts › v2 produces a diff against v1 (auto base = previous milestone)"
@@ -3848,6 +3848,16 @@
     ] },
     { "element": "347fa4fb-5b48-4630-a281-cc5f2b3b2bb3", "name": "Slide camera across views", "tests": [
       "apps/e2e/tests/studio/presentation.spec.ts › a slide on another view opens at its own camera in one step; on the same view it flies"
+    ] },
+    { "element": "e40f2e9c-2999-4bb3-a591-24ef22ee9f4b", "name": "Slides reordered and set in their properties", "tests": [
+      "apps/e2e/tests/studio/presentation.spec.ts › a slide is moved by drag, by Alt+arrow keys and in its properties, and Add slide puts one after the slide shown",
+      "packages/ui/tests/presentation.test.ts › the order of the slides (Reorder slides) › puts a new slide after the slide shown, and shows it",
+      "packages/ui/tests/presentation.test.ts › the order of the slides (Reorder slides) › moves a slide to another place, the slide shown staying the one shown",
+      "packages/ui/tests/presentation.test.ts › the order of the slides (Reorder slides) › duplicates a slide right after it, with an id of its own, and shows the copy",
+      "packages/ui/tests/presentation.test.ts › the order of the slides (Reorder slides) › duplicates a presentation with copies of its slides and makes it the active one"
+    ] },
+    { "element": "4ef25e89-7b87-4102-8685-da4c931089ca", "name": "Sequence properties shown in the panel", "tests": [
+      "apps/e2e/tests/studio/editing.spec.ts › a sequence's properties open in the left panel from its ⚙, as a view's, and no card at the right"
     ] }
   ]
 }

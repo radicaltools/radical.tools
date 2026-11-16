@@ -3595,6 +3595,13 @@ interface DiagramStore {
   setActivePresentation: (id: string) => void
   addPresentationSlide: (name?: string) => void
   removePresentationSlide: (id: string) => void
+  /** Moves a slide of the active presentation to `to` (its index once
+   *  moved); the slide shown stays the one shown. */
+  movePresentationSlide: (id: string, to: number) => void
+  /** A copy of a slide right after it, shown. */
+  duplicatePresentationSlide: (id: string) => void
+  /** A copy of a presentation with copies of its slides, made the active one. */
+  duplicatePresentation: (id: string) => void
   renamePresentationSlide: (id: string, name: string) => void
   updatePresentationSlideViewport: (id: string, vp: { x: number; y: number; zoom: number }) => void
   startPresentation: () => void
@@ -9209,8 +9216,54 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => {
           const pres = state.presentations.find(p => p.id === state.activePresentationId)
           if (!pres) return
-          pres.slides.push({ id, name: slideName, snapshotId: activeSnapshotId, viewId: activeViewId, viewport, canvasState, ...(modelSnapshot ? { modelSnapshot } : {}), ...slideViewFields(state, activeViewId) } as any)
+          // After the slide shown, and shown itself: a deck is built in an
+          // order, and every new slide went to the end.
+          const at = pres.slides.length ? Math.min(state.presentationSlideIndex + 1, pres.slides.length) : 0
+          pres.slides.splice(at, 0, { id, name: slideName, snapshotId: activeSnapshotId, viewId: activeViewId, viewport, canvasState, ...(modelSnapshot ? { modelSnapshot } : {}), ...slideViewFields(state, activeViewId) } as any)
           state.presentationSlides = pres.slides
+          state.presentationSlideIndex = at
+        })
+      },
+
+      movePresentationSlide(id, to) {
+        set((state) => {
+          const pres = state.presentations.find(p => p.id === state.activePresentationId)
+          if (!pres) return
+          const from = pres.slides.findIndex((s) => s.id === id)
+          const at = Math.max(0, Math.min(to, pres.slides.length - 1))
+          if (from < 0 || from === at) return
+          const shownId = pres.slides[state.presentationSlideIndex]?.id
+          const [slide] = pres.slides.splice(from, 1)
+          pres.slides.splice(at, 0, slide)
+          state.presentationSlides = pres.slides
+          const shown = pres.slides.findIndex((s) => s.id === shownId)
+          if (shown >= 0) state.presentationSlideIndex = shown
+        })
+      },
+
+      duplicatePresentationSlide(id) {
+        set((state) => {
+          const pres = state.presentations.find(p => p.id === state.activePresentationId)
+          if (!pres) return
+          const from = pres.slides.findIndex((s) => s.id === id)
+          if (from < 0) return
+          const copy = { ...JSON.parse(JSON.stringify(pres.slides[from])), id: uid(), name: `${pres.slides[from].name} (copy)` }
+          pres.slides.splice(from + 1, 0, copy)
+          state.presentationSlides = pres.slides
+          state.presentationSlideIndex = from + 1
+        })
+      },
+
+      duplicatePresentation(id) {
+        set((state) => {
+          const pres = state.presentations.find(p => p.id === id)
+          if (!pres) return
+          const copy = { ...JSON.parse(JSON.stringify(pres)), id: uid(), name: `${pres.name} (copy)` }
+          copy.slides = copy.slides.map((slide: PresentationSlide) => ({ ...slide, id: uid() }))
+          state.presentations.splice(state.presentations.indexOf(pres) + 1, 0, copy)
+          state.activePresentationId = copy.id
+          state.presentationSlides = state.presentations.find(p => p.id === copy.id)!.slides
+          state.presentationSlideIndex = 0
         })
       },
 
