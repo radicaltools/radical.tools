@@ -5252,3 +5252,7 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
   color: var(--text-primary);
 }
 .lp-explore-card .lp-card-title { font-style: italic; }
+
+/* A slide on another view: hidden for the frame or two React Flow takes to
+   measure its elements, then shown at its own camera (Canvas hideUntilPlaced). */
+.camera-pending .react-flow__viewport { visibility: hidden; }

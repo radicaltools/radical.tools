@@ -205,11 +205,14 @@ describe('goToSlide', () => {
   it('replays the captured viewport via setViewportFn (during active presentation)', () => {
     const setVP = vi.fn()
     useDiagramStore.getState().setViewportFns(() => ({ x: 0, y: 0, zoom: 1 }), setVP)
+    // The canvas has placed its first camera (it registers its focus then).
+    ;(window as any).__rfFocusNodes = vi.fn()
     useDiagramStore.getState().addPresentationSlide('a')
     ;(window as any).__rfCurrentViewport = { x: 0, y: 0, zoom: 1 }
     useDiagramStore.getState().startPresentation()
     return new Promise<void>((resolve) => {
       setTimeout(() => {
+        delete (window as any).__rfFocusNodes
         expect(setVP).toHaveBeenCalled()
         const [vpArg] = setVP.mock.calls[setVP.mock.calls.length - 1]
         expect(vpArg).toEqual({ x: 100, y: 200, zoom: 1.5 })
@@ -331,7 +334,8 @@ describe('previewSlide', () => {
       // A captured camera wins over the focus.
       { id: 'c', name: 'c', viewId: null, snapshotId: null, viewport: { x: 5, y: 6, zoom: 1.2 }, focusNodeIds: ['ctn1'] },
     ]
-    useDiagramStore.setState({ presentations: [{ id: 'p-test', name: 'P', slides }], presentationSlides: slides } as any)
+    // On the view shown: a slide on another view is placed in one step.
+    useDiagramStore.setState({ presentations: [{ id: 'p-test', name: 'P', slides }], presentationSlides: slides, activeViewId: null } as any)
     useDiagramStore.getState().previewSlide(0)
     await new Promise((resolve) => requestAnimationFrame(resolve))
     expect(focusNodes).toHaveBeenCalledWith(['ctn1'], { duration: 400 })

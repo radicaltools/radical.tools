@@ -6535,6 +6535,12 @@
     "targetId": "cdefa455-5e6f-4395-8261-f61398610d02"
   },
   {
+    "id": "470bd0d2-415a-4e40-a31a-dd98af42c42a",
+    "relationType": "verifies",
+    "sourceId": "347fa4fb-5b48-4630-a281-cc5f2b3b2bb3",
+    "targetId": "67ff0f59-c354-4ba2-ba8d-d0cd3982b700"
+  },
+  {
     "id": "47254435-1d77-4126-8f89-4e452b0ff1b7",
     "relationType": "verifies",
     "sourceId": "3150bb6d-fee6-408d-9b42-643f08cdc692",
@@ -9801,6 +9807,12 @@
     "relationType": "satisfies",
     "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
     "targetId": "740eea55-ef93-4964-822e-e69de9c3320b"
+  },
+  {
+    "id": "6abec3d8-c9ed-42c7-8750-231dd873b6e2",
+    "relationType": "satisfies",
+    "sourceId": "6d563737-4cfb-4ccd-993e-2f1c5deaf753",
+    "targetId": "67ff0f59-c354-4ba2-ba8d-d0cd3982b700"
   },
   {
     "id": "6ad6042f-6edb-4e54-b4d2-5191d7976d6c",
@@ -15574,6 +15586,13 @@
     "targetId": "cc714896-0081-4844-b0ee-763bf5a21e1f"
   },
   {
+    "id": "a7e90cb6-5962-47e1-b4b3-1ccf636281f7",
+    "quote": "gdy otwierany jest nowy widok, jest zoom i pozniej szybka zmiana kamera ... gdy juz jest w widoku to koeljne slajdy przechodza plynnie\nkamera przesuwala sie najpierw i pozniej dopiero dojezdzala\nprzy zmiane slajdow na tym samym widoku\nnie startuje dokladnie z pozycji (kamery) poprzedniego slajdu",
+    "relationType": "derives",
+    "sourceId": "67ff0f59-c354-4ba2-ba8d-d0cd3982b700",
+    "targetId": "be3ea289-8e78-4426-bb35-97da4dd8862a"
+  },
+  {
     "id": "a7e97529-bffd-41ce-b582-ff555a40b0f4",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -16790,6 +16809,12 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "b6bbd06e-4323-4131-9a3c-2018253fb841"
+  },
+  {
+    "id": "b486b7ac-5f93-41ac-a717-7bad865b60bf",
+    "relationType": "derives",
+    "sourceId": "be3ea289-8e78-4426-bb35-97da4dd8862a",
+    "targetId": "0547a0d4-ee5c-4a35-a763-c3be86838039"
   },
   {
     "id": "b49b09c0-fa93-4c8b-9546-d72bc02c2cc4",
@@ -20085,6 +20110,12 @@
     "relationType": "traces-to",
     "sourceId": "c9d4efcf-85b2-4d8d-b7b9-52c2aae14dc1",
     "targetId": "76ec53ca-f143-45c4-bf8e-f5b0abf5d631"
+  },
+  {
+    "id": "d71272e4-4cd6-4da1-87ee-e0a440462d49",
+    "relationType": "satisfies",
+    "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
+    "targetId": "67ff0f59-c354-4ba2-ba8d-d0cd3982b700"
   },
   {
     "id": "d714557f-0a53-4289-9877-b602cb62fbc1",

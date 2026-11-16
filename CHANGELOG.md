@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - radical.tools shows Radical Assay: a card on the home page's map (finds the model in code), a section below the hero (what it reads, how it is measured, what to ask your agent), a seventh use case, A system found in its code, and the manual's list of the stacks and tests it reads brought up to date.
 
 ### Fixed
+- A slide on another view opens straight at its own camera. The camera flew there from the camera of the slide before, so the new view showed zoomed in, swept across and then jumped; a canvas slide after a flow, table or matrix slide opened at 0,0 ×1 and was fitted for a moment first (with Smart fit on, every canvas that opened ran an animated fit). Between slides of one view the camera now glides from where it is with the pan and the zoom together, both arriving at once: React Flow's flight zoomed out and panned first, past the slide's framing, and zoomed in after.
+- After a reload with the Inspector open, its button on the rail works at once: it was greyed out until the test results beside the model were read.
 - A frame a view shows part of is laid out round that part. A view of a group of views per element (Entities of a domain, say) opens on All elements' places, where the elements it shows can stand at the far end of a frame as wide as everything the element holds; when Smart Layout found no move to make, it kept that canvas, and the view kept a 2840 px frame with its two entities in the right corner. Smart Layout now hands the frames back fitted round what the view shows, as the first step of its report.
 
 ## [0.4.0] - 2026-11-10

@@ -3845,6 +3845,9 @@
       "apps/e2e/tests/studio/presentation.spec.ts",
       "packages/ui/tests/presenterMode.test.ts",
       "packages/ui/tests/presenterSlides.test.ts"
+    ] },
+    { "element": "347fa4fb-5b48-4630-a281-cc5f2b3b2bb3", "name": "Slide camera across views", "tests": [
+      "apps/e2e/tests/studio/presentation.spec.ts › a slide on another view opens at its own camera in one step; on the same view it flies"
     ] }
   ]
 }

@@ -294,6 +294,102 @@ test('F5 stops a presentation F5 started, and Esc ends a Warnier slide with an e
   await expect(page.getByText('3 / 3')).toHaveCount(0)
 })
 
+// A slide on another view showed that view at the camera of the slide
+// before, zoomed in, and then swept across it to its own; a slide that fits
+// its view also jumped half-way. Each view has coordinates of its own: the
+// camera is placed in one step, as a view switch places it. On the same
+// view the camera still flies from slide to slide.
+test('a slide on another view opens at its own camera in one step; on the same view it flies', async ({ page, studio }) => {
+  await reseed(page, studio, (doc) => {
+    const slides = doc.presentations[0].slides
+    slides[0].viewport = { x: 300, y: 120, zoom: 1.6 }
+    slides[1].viewport = { x: 0, y: 0, zoom: 0 }
+    slides.push({ id: 'slide-3', name: 'Containers again', snapshotId: null, viewId: 'v-containers', viewport: { x: 200, y: 200, zoom: 1.2 } })
+    slides.push({ id: 'slide-4', name: 'Table', snapshotId: null, viewId: 'v-table', viewport: { x: 0, y: 0, zoom: 0 } })
+    slides.push({ id: 'slide-5', name: 'Containers after the table', snapshotId: null, viewId: 'v-containers', viewport: { x: -100, y: 40, zoom: 0.7 } })
+  })
+  await page.clock.resume()
+  // Each frame: the camera, and whether the Containers view is drawn (only it has "web").
+  const frames = async (act: () => Promise<void>): Promise<{ containers: boolean; camera: string }[]> => {
+    await page.evaluate(() => {
+      const out: { containers: boolean; camera: string }[] = []
+      ;(window as any).__frames = out
+      const until = performance.now() + 1200
+      const frame = (): void => {
+        const camera = (document.querySelector('.react-flow__viewport') as HTMLElement | null)?.style.transform ?? ''
+        // Drawn: shown, not hidden while its camera waits for its elements.
+        const shown = (document.querySelector('.react-flow__viewport') as HTMLElement | null)?.checkVisibility({ visibilityProperty: true }) ?? false
+        const rect = document.querySelector('.react-flow')?.getBoundingClientRect()
+        if (shown) out.push({ containers: !!document.querySelector('.react-flow__node[data-id="web"]'), camera, width: rect?.width ?? 0, height: rect?.height ?? 0 } as any)
+        if (performance.now() < until) requestAnimationFrame(frame)
+      }
+      requestAnimationFrame(frame)
+    })
+    await act()
+    await page.waitForTimeout(1400)
+    return page.evaluate(() => (window as any).__frames)
+  }
+  const cameras = (list: { camera: string }[]) => new Set(list.map((f) => f.camera))
+  const CONTEXT = 'translate(300px, 120px) scale(1.6)'
+  // The Containers view, fitted, is drawn only at its own camera.
+  const fittedInOneStep = (list: { containers: boolean; camera: string }[]) => {
+    expect(cameras(list.filter((f) => f.containers)).size).toBe(1)
+    expect(cameras(list.filter((f) => f.containers)).has(CONTEXT)).toBe(false)
+  }
+
+  await page.getByRole('button', { name: 'Present', exact: true }).click()
+  await expect(page.getByText('1 / 5')).toBeVisible()
+  await page.waitForTimeout(1000)
+  // To the Containers view, fitted: drawn only at its own camera.
+  let shown = await frames(() => page.keyboard.press('ArrowRight'))
+  await expect(page.getByText('2 / 5')).toBeVisible()
+  fittedInOneStep(shown)
+  // On the same view the camera flies: the zoom and the point in the middle
+  // of the canvas move together, each one way only, and arrive together
+  // (React Flow's flight panned past the target and zoomed in after).
+  shown = await frames(() => page.keyboard.press('ArrowRight'))
+  await expect(page.getByText('3 / 5')).toBeVisible()
+  expect(cameras(shown).size).toBeGreaterThan(5)
+  const path = shown.map((f: any) => {
+    const [x, y, zoom] = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\)/.exec(f.camera)!.slice(1).map(Number)
+    return { zoom, cx: (f.width / 2 - x) / zoom, cy: (f.height / 2 - y) / zoom }
+  })
+  // How far each has come, 0 to 1, in every frame: the zoom on a log scale.
+  const [first, last] = [path[0], path[path.length - 1]]
+  const lag = Math.max(...path.map((p) => {
+    const zoom = Math.log(p.zoom / first.zoom) / Math.log(last.zoom / first.zoom)
+    const pan = Math.hypot(p.cx - first.cx, p.cy - first.cy) / Math.hypot(last.cx - first.cx, last.cy - first.cy)
+    return Math.abs(zoom - pan)
+  }))
+  expect(lag).toBeLessThan(0.05)
+  // After a slide with no canvas the canvas opens at the slide's camera: it
+  // opened at 0,0 ×1, was fitted for a moment and then jumped.
+  await page.keyboard.press('ArrowRight')
+  await expect(page.getByText('4 / 5')).toBeVisible()
+  await page.waitForTimeout(800)
+  shown = await frames(() => page.keyboard.press('ArrowRight'))
+  await expect(page.getByText('5 / 5')).toBeVisible()
+  expect(cameras(shown)).toEqual(new Set(['translate(-100px, 40px) scale(0.7)']))
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowLeft')
+  await expect(page.getByText('2 / 5')).toBeVisible()
+  await page.waitForTimeout(800)
+  // Back to the Context view, at its captured camera at once.
+  shown = await frames(() => page.keyboard.press('ArrowLeft'))
+  await expect(page.getByText('1 / 5')).toBeVisible()
+  expect(cameras(shown.filter((f) => !f.containers))).toEqual(new Set([CONTEXT]))
+  await page.keyboard.press('Escape')
+
+  // A card picked in the place does the same (Esc went back to the
+  // Containers view).
+  const card = (name: string) => page.locator('.pres-slide-card .pres-slide-name', { hasText: new RegExp(`^${name}$`) })
+  await expect(studio.nodes).toHaveCount(6)
+  await page.waitForTimeout(500)
+  shown = await frames(() => card('Context').click())
+  expect(cameras(shown.filter((f) => !f.containers))).toEqual(new Set([CONTEXT]))
+  shown = await frames(() => card('Containers').click())
+  fittedInOneStep(shown)
+})
+
 // F-0096: a slide clicked in Presenter moved the camera, and the canvas kept
 // that as the view's camera: after a reload in Presenter, Designer opened the
 // view at the slide's camera. Only Designer's camera is kept as the view's.

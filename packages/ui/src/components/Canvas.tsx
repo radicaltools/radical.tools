@@ -386,6 +386,16 @@ function useDeleteKey(on: boolean): void {
 
 function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps): React.ReactElement {
   const rfInstanceRef = useRef<ReactFlowInstance | null>(null)
+  // The camera the canvas opens with: a slide's, asked for while it mounted
+  // (after a slide with no canvas), else the view's saved one. React Flow
+  // opened at 0,0 ×1 and the camera came 100 ms later: a slide's view
+  // showed zoomed, swept and then jumped to its camera.
+  const [openingCamera] = useState(() => {
+    const pending = (window as any).__rfPendingCamera?.vp as { x: number; y: number; zoom: number } | undefined
+    if (pending) return pending
+    const s = useDiagramStore.getState()
+    return (s.activeViewId ? viewById(s, s.activeViewId)?.viewport : s.defaultViewport) ?? undefined
+  })
   const [discussionMenu, setDiscussionMenu] = useState<{ nodeId: string; x: number; y: number; trigger: HTMLElement | null } | null>(null)
   const discussionMenuRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -572,6 +582,12 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
     if (d3Zoom && d3Selection) d3Zoom.transform(d3Selection, zoomIdentity.translate(vp.x, vp.y).scale(vp.zoom))
     else rfInstanceRef.current?.setViewport(vp)
   }, [rfStore])
+  /** A camera placed in one step once React Flow has measured the elements
+   *  (a slide on another view): the canvas is hidden until then, or the view
+   *  showed for a frame or two at the camera of the view before. */
+  const hideUntilPlaced = useCallback((on: boolean) => {
+    containerRef.current?.classList.toggle('camera-pending', on)
+  }, [])
 
   // ── Auto-fit animation state ─────────────────────────────────────────
   // We run a single persistent rAF loop that *exponentially* eases the
@@ -901,6 +917,38 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
   }, [])
 
   /**
+   * Flies the camera to `target` (or, null, the view fitted) in `duration`
+   * ms: the point in the middle of the canvas and the zoom (on a log scale)
+   * move together, eased in and out, and arrive together. React Flow's d3
+   * flight (van Wijk's) panned first, past the target, and zoomed in after:
+   * from slide to slide on one view the camera slid on and came back.
+   */
+  const flyCamera = useCallback((target: { x: number; y: number; zoom: number } | null, duration: number) => {
+    const inst = rfInstanceRef.current
+    const rect = containerRef.current?.getBoundingClientRect()
+    const to = target ?? computeFitTarget()
+    if (!inst || !to) return
+    stopFit()
+    if (!rect || duration <= 0) { setCameraNow(to); return }
+    const from = inst.getViewport()
+    const mid = { x: rect.width / 2, y: rect.height / 2 }
+    const c0 = { x: (mid.x - from.x) / from.zoom, y: (mid.y - from.y) / from.zoom }
+    const c1 = { x: (mid.x - to.x) / to.zoom, y: (mid.y - to.y) / to.zoom }
+    const z0 = Math.log(from.zoom)
+    const z1 = Math.log(to.zoom)
+    const start = performance.now()
+    const step = () => {
+      const t = Math.min(1, (performance.now() - start) / duration)
+      const e = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
+      const zoom = Math.exp(z0 + (z1 - z0) * e)
+      const c = { x: c0.x + (c1.x - c0.x) * e, y: c0.y + (c1.y - c0.y) * e }
+      setCameraNow(t >= 1 ? to : { x: mid.x - c.x * zoom, y: mid.y - c.y * zoom, zoom })
+      fitAnimRef.current = t < 1 ? requestAnimationFrame(step) : null
+    }
+    fitAnimRef.current = requestAnimationFrame(step)
+  }, [computeFitTarget, setCameraNow, stopFit])
+
+  /**
    * Suppress the auto-fit interval for `durationMs` and cancel any in-flight
    * fit animation immediately. Used by callers that just set an explicit
    * camera position of their own (quick-search focus, presentation slide
@@ -949,12 +997,13 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
    * Smart fit off, the saved camera stays. Either way the shown nodes become
    * Smart fit's baseline: it reacts again to the next expand or collapse.
    * `keep` holds `vp` even with Smart fit on: a reload of the same model
-   * (an outside edit) leaves the camera where the user had it.
+   * (an outside edit) leaves the camera where the user had it. `fit` fits
+   * the view when drawn even with Smart fit off (a slide on another view).
    */
   const placeCamera = useCallback((
     vp: { x: number; y: number; zoom: number } | null,
     ids?: string[],
-    opts?: { keep?: boolean },
+    opts?: { keep?: boolean; fit?: boolean },
   ) => {
     const inst = rfInstanceRef.current
     if (!inst) return
@@ -963,11 +1012,12 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
     const shown = new Set(ids ?? inst.getNodes().filter((n) => !n.hidden).map((n) => n.id))
     prevVisibleIdsRef.current = shown
     if (vp) setCameraNow(vp)
-    if (opts?.keep || !useDiagramStore.getState().autoFitActive) return
+    if (opts?.keep || (!opts?.fit && !useDiagramStore.getState().autoFitActive)) return
     snapIdsRef.current = shown
+    if (opts?.fit) hideUntilPlaced(true)
     let frames = 0
     const snap = () => {
-      if (snapIdsRef.current !== shown) return // stopped, or a newer view
+      if (snapIdsRef.current !== shown) { hideUntilPlaced(false); return } // stopped, or a newer view
       const visible = inst.getNodes().filter((n) => !n.hidden)
       const drawn = visible.length > 0 && visible.every((n) => n.width && n.height)
         && (shown.size === 0 || (visible.length === shown.size && visible.every((n) => shown.has(n.id))))
@@ -979,6 +1029,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       snapIdsRef.current = null
       prevVisibleIdsRef.current = new Set(visible.map((n) => n.id))
       const target = computeFitTarget()
+      hideUntilPlaced(false)
       if (!target) return
       // Then follow the view while it settles (the live layout, group sizes).
       const now = performance.now()
@@ -987,7 +1038,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       trackFit(target)
     }
     fitAnimRef.current = requestAnimationFrame(snap)
-  }, [stopFit, setCameraNow, computeFitTarget, trackFit])
+  }, [stopFit, setCameraNow, computeFitTarget, trackFit, hideUntilPlaced])
   // d3-zoom folds wheel events within ~150 ms into one gesture and reports its
   // start only once, so a wheel that lands while a fit animates would not
   // reach onMoveStart: every wheel takes the camera.
@@ -1032,11 +1083,14 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
   const frameNodes = useCallback((
     ids: string[], duration: number, maxZoom: number,
     onTarget?: (vp: { x: number; y: number; zoom: number }) => void,
+    fly = false,
   ) => {
     const instance = rfInstanceRef.current
     if (!instance) return
     const wanted = new Set(ids)
     suppressAutoFit(duration + 1800)
+    // In one step (duration 0): hidden till the elements are measured.
+    if (duration === 0) hideUntilPlaced(true)
     let frames = 0
     const frame = () => {
       const focus = instance.getNodes().filter((n) => wanted.has(n.id) && !n.hidden)
@@ -1045,6 +1099,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
         requestAnimationFrame(frame)
         return
       }
+      hideUntilPlaced(false)
       const rect = containerRef.current?.getBoundingClientRect()
       if (!drawn || !rect || rect.width === 0 || rect.height === 0) {
         smoothFitView(duration, true)
@@ -1057,11 +1112,13 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
         rect, 0.05, maxZoom, 0.08, true,
       )
       suppressAutoFit(duration + 1800)
-      instance.setViewport(target, { duration })
+      if (duration === 0) setCameraNow(target)
+      else if (fly) flyCamera(target, duration)
+      else instance.setViewport(target, { duration })
       onTarget?.(target)
     }
     requestAnimationFrame(frame)
-  }, [suppressAutoFit, smoothFitView])
+  }, [suppressAutoFit, smoothFitView, hideUntilPlaced, setCameraNow, flyCamera])
 
   // A click that selects on the canvas frames the selection with what it is
   // connected to, as the metamodel diagram does, unless all of it is in view
@@ -1190,13 +1247,15 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
     // once this canvas has placed its first camera (below): a slide that
     // asks before then leaves its focus pending (`__rfPendingFocus`).
     const focusNodes = (ids: string[], opts?: { duration?: number }) => {
-      frameNodes(ids, opts?.duration ?? 600, 1.5)
+      frameNodes(ids, opts?.duration ?? 600, 1.5, undefined, true)
     }
     // Presentation slide navigation (diagramStore's goToSlide/previewSlide)
     // uses this to stop the auto-fit interval from fighting the slide's own
     // captured camera right after a slide switch swaps the visible node set.
     ;(window as any).__rfSuppressAutoFit = suppressAutoFit
     ;(window as any).__rfPlaceCamera = placeCamera
+    // A slide's camera on the view shown (diagramStore setSlideCamera).
+    ;(window as any).__rfFlyCamera = flyCamera
     // Explore from here: what a + (or + 1 level, or the opening) just added,
     // `ids`, with what it was added from, `from`, at a readable zoom (no
     // less than EXPLORE_MIN_ZOOM): as many of them, nearest to `from` first,
@@ -1259,7 +1318,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       if (pending) {
         W.__rfPendingCamera = undefined
         suppressAutoFit(1800)
-        instance.setViewport(pending.vp)
+        placeCamera(pending.vp, undefined, { keep: true })
         return
       }
       // A slide asked to zoom onto its focus elements while this canvas was
@@ -1293,7 +1352,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
       delete (window as any).__radicalZoomIn
       delete (window as any).__radicalZoomOut
     }
-  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit, takeCamera, markUserCamera, placeCamera, frameNodes, computeFitTarget])
+  }, [setFitViewFn, setViewportFns, smoothFitView, suppressAutoFit, takeCamera, markUserCamera, placeCamera, frameNodes, computeFitTarget, flyCamera])
 
   // Double-click on the canvas background → add a new System at that position
   const onCanvasDoubleClick = useCallback(
@@ -2055,6 +2114,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
         onEdgeDoubleClick={onEdgeDoubleClick as any}
         onPaneClick={onPaneClick}
         onInit={onInit}
+        defaultViewport={openingCamera}
         onMoveStart={onUserMoveStart}
         onMove={onUserMove}
         nodeTypes={nodeTypes}
