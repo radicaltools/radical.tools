@@ -205,11 +205,14 @@ describe('goToSlide', () => {
   it('replays the captured viewport via setViewportFn (during active presentation)', () => {
     const setVP = vi.fn()
     useDiagramStore.getState().setViewportFns(() => ({ x: 0, y: 0, zoom: 1 }), setVP)
+    // The canvas has placed its first camera (it registers its focus then).
+    ;(window as any).__rfFocusNodes = vi.fn()
     useDiagramStore.getState().addPresentationSlide('a')
     ;(window as any).__rfCurrentViewport = { x: 0, y: 0, zoom: 1 }
     useDiagramStore.getState().startPresentation()
     return new Promise<void>((resolve) => {
       setTimeout(() => {
+        delete (window as any).__rfFocusNodes
         expect(setVP).toHaveBeenCalled()
         const [vpArg] = setVP.mock.calls[setVP.mock.calls.length - 1]
         expect(vpArg).toEqual({ x: 100, y: 200, zoom: 1.5 })
@@ -331,7 +334,8 @@ describe('previewSlide', () => {
       // A captured camera wins over the focus.
       { id: 'c', name: 'c', viewId: null, snapshotId: null, viewport: { x: 5, y: 6, zoom: 1.2 }, focusNodeIds: ['ctn1'] },
     ]
-    useDiagramStore.setState({ presentations: [{ id: 'p-test', name: 'P', slides }], presentationSlides: slides } as any)
+    // On the view shown: a slide on another view is placed in one step.
+    useDiagramStore.setState({ presentations: [{ id: 'p-test', name: 'P', slides }], presentationSlides: slides, activeViewId: null } as any)
     useDiagramStore.getState().previewSlide(0)
     await new Promise((resolve) => requestAnimationFrame(resolve))
     expect(focusNodes).toHaveBeenCalledWith(['ctn1'], { duration: 400 })
@@ -381,5 +385,59 @@ describe('the document read again after an outside change (item 136)', () => {
     s().loadDiagram(structuredClone(s().saveDiagram()))
     expect(s().activePresentationId).toBe('p-test')
     expect(s().presentationSlideIndex).toBe(0)
+  })
+})
+
+describe('the order of the slides (Reorder slides)', () => {
+  const names = () => useDiagramStore.getState().presentationSlides.map((s) => s.name)
+  const s = () => useDiagramStore.getState()
+
+  it('puts a new slide after the slide shown, and shows it', () => {
+    s().addPresentationSlide('a')
+    s().addPresentationSlide('b')
+    s().addPresentationSlide('c')
+    expect(names()).toEqual(['a', 'b', 'c'])
+    useDiagramStore.setState({ presentationSlideIndex: 0 })
+    s().addPresentationSlide('after a')
+    expect(names()).toEqual(['a', 'after a', 'b', 'c'])
+    expect(s().presentationSlideIndex).toBe(1)
+  })
+
+  it('moves a slide to another place, the slide shown staying the one shown', () => {
+    for (const name of ['a', 'b', 'c', 'd']) s().addPresentationSlide(name)
+    useDiagramStore.setState({ presentationSlideIndex: 1 }) // b
+    const d = s().presentationSlides[3].id
+    s().movePresentationSlide(d, 0)
+    expect(names()).toEqual(['d', 'a', 'b', 'c'])
+    expect(s().presentationSlides[s().presentationSlideIndex].name).toBe('b')
+    // Beyond the ends it stops at them; to its own place it does nothing.
+    s().movePresentationSlide(d, 99)
+    expect(names()).toEqual(['a', 'b', 'c', 'd'])
+    s().movePresentationSlide(d, 3)
+    expect(names()).toEqual(['a', 'b', 'c', 'd'])
+    // What is saved is the presentation's own list.
+    expect(s().presentations[0].slides.map((x) => x.name)).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('duplicates a slide right after it, with an id of its own, and shows the copy', () => {
+    s().addPresentationSlide('a')
+    s().addPresentationSlide('b')
+    const a = s().presentationSlides[0]
+    s().duplicatePresentationSlide(a.id)
+    expect(names()).toEqual(['a', 'a (copy)', 'b'])
+    const copy = s().presentationSlides[1]
+    expect(copy.id).not.toBe(a.id)
+    expect(copy.viewport).toEqual(a.viewport)
+    expect(s().presentationSlideIndex).toBe(1)
+  })
+
+  it('duplicates a presentation with copies of its slides and makes it the active one', () => {
+    s().addPresentationSlide('a')
+    s().duplicatePresentation('p-test')
+    expect(s().presentations.map((p) => p.name)).toEqual(['P', 'P (copy)'])
+    const copy = s().presentations[1]
+    expect(s().activePresentationId).toBe(copy.id)
+    expect(copy.slides.map((x) => x.name)).toEqual(['a'])
+    expect(copy.slides[0].id).not.toBe(s().presentations[0].slides[0].id)
   })
 })

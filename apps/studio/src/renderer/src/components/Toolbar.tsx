@@ -7,7 +7,7 @@ import { useDocumentsStore, type DocumentSource } from '../store/documentStore'
 import { OtherModelsButton } from './OtherModels'
 import { useOtherModelsStore } from '../persistence/otherModels'
 import { NavHistory } from './NavHistory'
-import { inspectorAvailable, useInspectorAvailable, useInspectorStore, useSettingsUnsaved } from '../persistence/inspector'
+import { inspectorAvailable, useInspectorAvailable, useInspectorMayShow, useInspectorStore, useSettingsUnsaved } from '../persistence/inspector'
 import { toggleInspector, useInspectorNav } from '../navigation'
 import { setLeftCollapsed, toggleLeftPanel } from '../leftPanelFold'
 import { closePresentations, openPresentations, switchPerspective, usePresentationsFrom, usePresentationsOpen } from '../presentationsPlace'
@@ -327,8 +327,13 @@ const RailIconInspector = () => (
  *  shows no panel. */
 function InspectorRailButton(): React.ReactElement | null {
   const check = useInspectorStore((s) => s.check)
-  const enabled = useInspectorAvailable()
-  const open = useInspectorNav((s) => s.open) && enabled
+  // Enabled with something to show, and while it is open (to fold or close
+  // it before the folder's evidence is read).
+  const isOpen = useInspectorNav((s) => s.open)
+  const mayShow = useInspectorMayShow()
+  const available = useInspectorAvailable()
+  const enabled = available || (isOpen && mayShow)
+  const open = isOpen && enabled
   const metamodel = useDiagramStore((s) => s.appMode === 'metamodel')
   if (metamodel) return null
   const title = !enabled

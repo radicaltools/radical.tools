@@ -971,6 +971,12 @@
     "targetId": "7c6f76e9-a041-48b9-8b14-573db32bbff1"
   },
   {
+    "id": "0b588038-7174-4ca7-803d-283e06244c3f",
+    "relationType": "satisfies",
+    "sourceId": "08c445dd-e14d-47dd-b4b1-1776a539dcbc",
+    "targetId": "443633b2-4f61-4bde-82ae-e8138e0eea31"
+  },
+  {
     "id": "0b58ba04-b608-45b1-9900-c4248f5f5faa",
     "label": "is published to",
     "relationType": "interacts",
@@ -1091,6 +1097,12 @@
     "relationType": "verifies",
     "sourceId": "c889c91f-38d1-4861-b48f-956ebb932608",
     "targetId": "e6abb346-57c0-48d2-a8a8-99a1c44c23e1"
+  },
+  {
+    "id": "0cb11616-4fb0-45fc-9078-d805b1dfb510",
+    "relationType": "verifies",
+    "sourceId": "e40f2e9c-2999-4bb3-a591-24ef22ee9f4b",
+    "targetId": "24ee8e23-687c-4355-a58f-debeb76fb07d"
   },
   {
     "id": "0cb48ca5-dcf1-4374-ad61-839d38d571a3",
@@ -2153,6 +2165,12 @@
     "targetId": "a2734db2-06ac-481e-ad00-9b5338a4420d"
   },
   {
+    "id": "180980ff-aaa9-4d53-83b9-57509c65265a",
+    "relationType": "verifies",
+    "sourceId": "e40f2e9c-2999-4bb3-a591-24ef22ee9f4b",
+    "targetId": "4fad78e7-46f0-431f-9477-4b6d09e95f55"
+  },
+  {
     "id": "18099465-aa73-451a-84fd-d2e537fc9105",
     "relationType": "constrains",
     "sourceId": "d05f4015-e4b1-4a70-95fa-d98fa429a200",
@@ -3151,6 +3169,12 @@
     "relationType": "derives",
     "sourceId": "b1bb1a5f-2c81-4e51-862a-e904a51aff57",
     "targetId": "ed9cf496-4559-4eed-bbac-8ba6d7d76300"
+  },
+  {
+    "id": "2388cf95-8562-4295-b55b-bc9545f6d3b9",
+    "relationType": "satisfies",
+    "sourceId": "6d563737-4cfb-4ccd-993e-2f1c5deaf753",
+    "targetId": "24ee8e23-687c-4355-a58f-debeb76fb07d"
   },
   {
     "id": "23a01dbf-5a52-4dbb-9500-a6693451182e",
@@ -4419,6 +4443,13 @@
     "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
+    "id": "311d266c-c77a-468f-bf3f-1882f881f30b",
+    "quote": "Lista prezentacji na całą szerokość; obok jedno ⋯: New presentation, Rename, Duplicate, Delete. Pod spodem Present i Add slide jak dziś.\nLista + menu ⋯ (Recommended)\nchce aby to menu pokazywalo sie tak samo jak inne tego typu elementy .. np. widok",
+    "relationType": "derives",
+    "sourceId": "12062180-d1f2-467e-b43c-0b85f36468b2",
+    "targetId": "f9154c36-a8c7-4440-9d59-9f8807f1939a"
+  },
+  {
     "id": "3133d830-80fa-4b38-9c9e-34e93678fb64",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -4920,6 +4951,12 @@
     "relationType": "derives",
     "sourceId": "cff8468e-6cfe-4fc3-9bd2-28a39b053745",
     "targetId": "a2734db2-06ac-481e-ad00-9b5338a4420d"
+  },
+  {
+    "id": "363a74e6-ed0f-4fa1-a62e-4229ae42a303",
+    "relationType": "verifies",
+    "sourceId": "e40f2e9c-2999-4bb3-a591-24ef22ee9f4b",
+    "targetId": "12062180-d1f2-467e-b43c-0b85f36468b2"
   },
   {
     "id": "363afa6e-5973-4a96-94aa-d34817d0b45c",
@@ -6535,6 +6572,12 @@
     "targetId": "cdefa455-5e6f-4395-8261-f61398610d02"
   },
   {
+    "id": "470bd0d2-415a-4e40-a31a-dd98af42c42a",
+    "relationType": "verifies",
+    "sourceId": "347fa4fb-5b48-4630-a281-cc5f2b3b2bb3",
+    "targetId": "67ff0f59-c354-4ba2-ba8d-d0cd3982b700"
+  },
+  {
     "id": "47254435-1d77-4126-8f89-4e452b0ff1b7",
     "relationType": "verifies",
     "sourceId": "3150bb6d-fee6-408d-9b42-643f08cdc692",
@@ -6770,6 +6813,12 @@
     "relationType": "interacts",
     "sourceId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3",
     "targetId": "cdefa455-5e6f-4395-8261-f61398610d02"
+  },
+  {
+    "id": "49b0eda5-7167-4d47-8da7-338be9fd09dc",
+    "relationType": "verifies",
+    "sourceId": "e40f2e9c-2999-4bb3-a591-24ef22ee9f4b",
+    "targetId": "b56aaaeb-cbe4-428c-92ba-0a348fa1d078"
   },
   {
     "id": "49be9b99-464d-45cf-8c29-4f6c305985dd",
@@ -7133,6 +7182,12 @@
     "relationType": "interacts",
     "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
     "targetId": "38ef3bc6-f81d-4d7e-b942-bdb21e743db5"
+  },
+  {
+    "id": "4d45db60-edab-460b-b745-61ffef984284",
+    "relationType": "derives",
+    "sourceId": "f9154c36-a8c7-4440-9d59-9f8807f1939a",
+    "targetId": "0547a0d4-ee5c-4a35-a763-c3be86838039"
   },
   {
     "id": "4d56027d-d9c5-4e84-9a8c-b5459b2c8d2d",
@@ -8185,6 +8240,12 @@
     "targetId": "9d82c358-fb01-4cc3-a632-72500811e9f0"
   },
   {
+    "id": "5906bfce-bba0-4401-b6de-0a0425abc83f",
+    "relationType": "satisfies",
+    "sourceId": "6d563737-4cfb-4ccd-993e-2f1c5deaf753",
+    "targetId": "4fad78e7-46f0-431f-9477-4b6d09e95f55"
+  },
+  {
     "id": "59205e26-2c75-43b8-b429-dedc499a29c1",
     "relationType": "satisfies",
     "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
@@ -9069,6 +9130,13 @@
     "targetId": "0f45402b-f686-4fe7-82e3-951587e20eba"
   },
   {
+    "id": "6201f24e-4ed6-40e2-8bcc-eedca5a9d30f",
+    "quote": "Nowy slajd z Add slide trafia za zaznaczony, nie na koniec.\nPrzeciąganie + klawisze (Recommended)",
+    "relationType": "derives",
+    "sourceId": "280d506b-cf21-48a3-8652-9e5dab6b752f",
+    "targetId": "f9154c36-a8c7-4440-9d59-9f8807f1939a"
+  },
+  {
     "id": "62188fa3-33cf-464b-9dab-1910a30ac03c",
     "relationType": "verifies",
     "sourceId": "785cc9bd-7281-4baf-a53c-537a8514103d",
@@ -9801,6 +9869,12 @@
     "relationType": "satisfies",
     "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
     "targetId": "740eea55-ef93-4964-822e-e69de9c3320b"
+  },
+  {
+    "id": "6abec3d8-c9ed-42c7-8750-231dd873b6e2",
+    "relationType": "satisfies",
+    "sourceId": "6d563737-4cfb-4ccd-993e-2f1c5deaf753",
+    "targetId": "67ff0f59-c354-4ba2-ba8d-d0cd3982b700"
   },
   {
     "id": "6ad6042f-6edb-4e54-b4d2-5191d7976d6c",
@@ -11851,6 +11925,13 @@
     "targetId": "48604bc7-944d-4bea-bf39-ec39a7b329b0"
   },
   {
+    "id": "7ee832f2-93cb-46fc-812b-9e066959d116",
+    "quote": "nie moge przesunac slajdow\nPrzeciągasz kartę za uchwyt ⠿ (linia pokazuje, gdzie wyląduje); z klawiatury ⌥/Alt+↑/↓ przesuwa zaznaczony slajd; w menu ⋯ także Move up / Move down. Nowy slajd z Add slide trafia za zaznaczony, nie na koniec.\nPrzeciąganie + klawisze (Recommended)",
+    "relationType": "derives",
+    "sourceId": "24ee8e23-687c-4355-a58f-debeb76fb07d",
+    "targetId": "f9154c36-a8c7-4440-9d59-9f8807f1939a"
+  },
+  {
     "description": "keeps copies of the model and shows its views",
     "id": "7ef3e770-91a0-4ed9-a8a2-ca7624a700d0",
     "relationType": "depends-on",
@@ -12501,6 +12582,13 @@
     "relationType": "derives",
     "sourceId": "b680e082-f271-4cab-a882-db7970ca5514",
     "targetId": "a9394a73-6e11-43a8-a8af-1fa1e42ba31f"
+  },
+  {
+    "id": "872ec47c-17d9-4ac1-9cfb-0789677f5b92",
+    "quote": "przy okazji popraw seqwuences ... chce aby wszystko pojawialo sie tak samo ... tzn properties sewquences ... w tym momencie pojawia sie panel po prawej stronie",
+    "relationType": "derives",
+    "sourceId": "443633b2-4f61-4bde-82ae-e8138e0eea31",
+    "targetId": "f9154c36-a8c7-4440-9d59-9f8807f1939a"
   },
   {
     "id": "8731b7a0-8c6b-42a2-9aed-18243c8deeeb",
@@ -15574,6 +15662,13 @@
     "targetId": "cc714896-0081-4844-b0ee-763bf5a21e1f"
   },
   {
+    "id": "a7e90cb6-5962-47e1-b4b3-1ccf636281f7",
+    "quote": "gdy otwierany jest nowy widok, jest zoom i pozniej szybka zmiana kamera ... gdy juz jest w widoku to koeljne slajdy przechodza plynnie\nkamera przesuwala sie najpierw i pozniej dopiero dojezdzala\nprzy zmiane slajdow na tym samym widoku\nnie startuje dokladnie z pozycji (kamery) poprzedniego slajdu",
+    "relationType": "derives",
+    "sourceId": "67ff0f59-c354-4ba2-ba8d-d0cd3982b700",
+    "targetId": "be3ea289-8e78-4426-bb35-97da4dd8862a"
+  },
+  {
     "id": "a7e97529-bffd-41ce-b582-ff555a40b0f4",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -16185,6 +16280,12 @@
     "targetId": "320cca7d-ae05-48b4-9cdf-c7bc1d5a0d55"
   },
   {
+    "id": "ae391581-60d1-4ba4-b3df-1eebe70be175",
+    "relationType": "verifies",
+    "sourceId": "4ef25e89-7b87-4102-8685-da4c931089ca",
+    "targetId": "443633b2-4f61-4bde-82ae-e8138e0eea31"
+  },
+  {
     "id": "ae44d537-264e-4aff-b7eb-f01b4fbdc247",
     "relationType": "satisfies",
     "sourceId": "524d63c4-9a7b-4a79-b14f-11c2c2475a1e",
@@ -16489,6 +16590,13 @@
     "targetId": "6ab7f200-95d0-45c6-b482-113389c1a739"
   },
   {
+    "id": "b15368e1-065f-437f-b777-5549fffbe908",
+    "quote": "zbyt duzo ikon jest\nJedno menu ⋯ (Recommended)\nchce aby to menu pokazywalo sie tak samo jak inne tego typu elementy .. np. widok\npresent from here - ikona ma za duzy rozmiar",
+    "relationType": "derives",
+    "sourceId": "b56aaaeb-cbe4-428c-92ba-0a348fa1d078",
+    "targetId": "f9154c36-a8c7-4440-9d59-9f8807f1939a"
+  },
+  {
     "id": "b173f4af-d229-4bd0-8469-df04f0f57e3a",
     "relationType": "satisfies",
     "sourceId": "a8f54fd7-75fb-4914-a888-6499f4175f0e",
@@ -16790,6 +16898,12 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "b6bbd06e-4323-4131-9a3c-2018253fb841"
+  },
+  {
+    "id": "b486b7ac-5f93-41ac-a717-7bad865b60bf",
+    "relationType": "derives",
+    "sourceId": "be3ea289-8e78-4426-bb35-97da4dd8862a",
+    "targetId": "0547a0d4-ee5c-4a35-a763-c3be86838039"
   },
   {
     "id": "b49b09c0-fa93-4c8b-9546-d72bc02c2cc4",
@@ -17382,6 +17496,13 @@
     "relationType": "verifies",
     "sourceId": "e40052a3-2bde-4650-b046-4c86941bc7cc",
     "targetId": "8b80323b-bc76-47f1-a6ba-90e82e06a6b0"
+  },
+  {
+    "id": "bbebf04a-f57c-4498-9abc-23edbf827b61",
+    "quote": "Jedna szara linia pod nazwą: widok, a przy kamieniu milowym „· v1 – Core & Accounts” z małą flagą. Niższe karty, więcej mieści się na ekranie.\nSzary podpis (Recommended)",
+    "relationType": "derives",
+    "sourceId": "4fad78e7-46f0-431f-9477-4b6d09e95f55",
+    "targetId": "f9154c36-a8c7-4440-9d59-9f8807f1939a"
   },
   {
     "id": "bc1c9161-e1b3-4c14-be57-c27022881571",
@@ -18023,6 +18144,12 @@
     "relationType": "verifies",
     "sourceId": "c89b3768-b14b-4baa-82d4-db52e9724720",
     "targetId": "48ad1f37-3336-4f91-9ef6-c610ed459636"
+  },
+  {
+    "id": "c34de99a-3a4e-474b-86ec-b98d25683a01",
+    "relationType": "satisfies",
+    "sourceId": "6d563737-4cfb-4ccd-993e-2f1c5deaf753",
+    "targetId": "12062180-d1f2-467e-b43c-0b85f36468b2"
   },
   {
     "event": "7efce68f-bd69-410e-94e8-8dca70d59159",
@@ -20085,6 +20212,12 @@
     "relationType": "traces-to",
     "sourceId": "c9d4efcf-85b2-4d8d-b7b9-52c2aae14dc1",
     "targetId": "76ec53ca-f143-45c4-bf8e-f5b0abf5d631"
+  },
+  {
+    "id": "d71272e4-4cd6-4da1-87ee-e0a440462d49",
+    "relationType": "satisfies",
+    "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
+    "targetId": "67ff0f59-c354-4ba2-ba8d-d0cd3982b700"
   },
   {
     "id": "d714557f-0a53-4289-9877-b602cb62fbc1",
@@ -23116,6 +23249,12 @@
     "relationType": "verifies",
     "sourceId": "258ed3df-d62e-41be-b3b1-b01b536dc8b4",
     "targetId": "68aa50a2-b7e2-4be0-b886-c139d2ec3e83"
+  },
+  {
+    "id": "f9f43688-519d-4aee-b852-e7fc2285007d",
+    "relationType": "satisfies",
+    "sourceId": "6d563737-4cfb-4ccd-993e-2f1c5deaf753",
+    "targetId": "b56aaaeb-cbe4-428c-92ba-0a348fa1d078"
   },
   {
     "id": "f9f94ee1-5226-4b8a-a3d6-701f37b31aa6",

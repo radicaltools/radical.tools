@@ -3595,6 +3595,13 @@ interface DiagramStore {
   setActivePresentation: (id: string) => void
   addPresentationSlide: (name?: string) => void
   removePresentationSlide: (id: string) => void
+  /** Moves a slide of the active presentation to `to` (its index once
+   *  moved); the slide shown stays the one shown. */
+  movePresentationSlide: (id: string, to: number) => void
+  /** A copy of a slide right after it, shown. */
+  duplicatePresentationSlide: (id: string) => void
+  /** A copy of a presentation with copies of its slides, made the active one. */
+  duplicatePresentation: (id: string) => void
   renamePresentationSlide: (id: string, name: string) => void
   updatePresentationSlideViewport: (id: string, vp: { x: number; y: number; zoom: number }) => void
   startPresentation: () => void
@@ -4079,9 +4086,16 @@ function setSlideCamera(vp: { x: number; y: number; zoom: number }, duration: nu
   requestAnimationFrame(() => {
     const pending = W.__rfPendingCamera as { vp: typeof vp; duration: number } | undefined
     const setViewport = _setViewportFn()
-    if (!pending || !setViewport) return
+    // A canvas still mounting (no __rfFocusNodes till it placed its first
+    // camera) takes the camera itself: taken here, the canvas then placed
+    // the view's own camera over it, fitted with Smart fit on.
+    if (!pending || !setViewport || !W.__rfFocusNodes) return
     W.__rfPendingCamera = undefined
-    setViewport(pending.vp, { duration: pending.duration })
+    // In one step in this frame: React Flow's setViewport takes a frame more.
+    if (pending.duration === 0 && W.__rfPlaceCamera) W.__rfPlaceCamera(pending.vp, undefined, { keep: true })
+    // Pan and zoom together (Canvas flyCamera), not React Flow's flight.
+    else if (W.__rfFlyCamera) W.__rfFlyCamera(pending.vp, pending.duration)
+    else setViewport(pending.vp, { duration: pending.duration })
   })
 }
 
@@ -4112,6 +4126,52 @@ function clearSlideCamera(): void {
   const W = window as any
   W.__rfPendingCamera = undefined
   W.__rfPendingFocus = undefined
+}
+
+/**
+ * A slide's camera. Within one view it flies from the slide before. On
+ * another view it is placed in one step, as a view switch places its camera
+ * (Canvas placeCamera): each view has coordinates of its own, and the flight
+ * first showed the new view at the old one's camera, zoomed in, and then
+ * swept across it (a slide that fits its view also jumped half-way).
+ */
+function placeSlideCamera(slide: PresentationSlide, duration: number, otherView: boolean, shown: () => string[]): void {
+  const W = window as any
+  // A canvas is shown now and has placed its first camera (both taken away
+  // when it goes): the camera of another view is placed in this frame,
+  // before the view is drawn. Else the canvas mounting takes it
+  // (setSlideCamera, setSlideFocus).
+  const now = otherView && !!W.__rfSetViewport && !!W.__rfFocusNodes
+  const vp = slide.viewport
+  if (vp && (vp.zoom || vp.x || vp.y)) {
+    // Slide switch just changed the visible node/view set: block the auto-fit
+    // interval from reacting to that as "new content" and dragging the camera
+    // to a fit-all framing right after the slide's own captured viewport.
+    W.__rfSuppressAutoFit?.(duration + 1200)
+    if (now && W.__rfPlaceCamera) {
+      clearSlideCamera()
+      W.__rfPlaceCamera({ x: vp.x, y: vp.y, zoom: vp.zoom }, shown(), { keep: true })
+    } else setSlideCamera({ x: vp.x, y: vp.y, zoom: vp.zoom }, otherView ? 0 : duration)
+  } else if (slide.focusNodeIds?.length) {
+    // No captured camera: zoom onto the slide's focus elements.
+    if (now && W.__rfFocusNodes) {
+      clearSlideCamera()
+      W.__rfFocusNodes(slide.focusNodeIds, { duration: 0 })
+    } else setSlideFocus(slide.focusNodeIds, otherView ? 0 : duration)
+  } else {
+    clearSlideCamera()
+    if (now && W.__rfPlaceCamera) {
+      // Fitted in the first frame React Flow draws the view's nodes.
+      W.__rfPlaceCamera(null, shown(), { fit: true })
+    } else {
+      // Once the slide's places are drawn: the view fitted, flown to as a
+      // captured camera is (Canvas flyCamera).
+      W.__rfSuppressAutoFit?.(duration + 1200)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => (W.__rfFlyCamera && W.__rfFocusNodes ? W.__rfFlyCamera(null, duration) : _getFitViewFn()?.()))
+      })
+    }
+  }
 }
 
 // ─── Store implementation ────────────────────────────────────────────────────
@@ -9156,8 +9216,54 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => {
           const pres = state.presentations.find(p => p.id === state.activePresentationId)
           if (!pres) return
-          pres.slides.push({ id, name: slideName, snapshotId: activeSnapshotId, viewId: activeViewId, viewport, canvasState, ...(modelSnapshot ? { modelSnapshot } : {}), ...slideViewFields(state, activeViewId) } as any)
+          // After the slide shown, and shown itself: a deck is built in an
+          // order, and every new slide went to the end.
+          const at = pres.slides.length ? Math.min(state.presentationSlideIndex + 1, pres.slides.length) : 0
+          pres.slides.splice(at, 0, { id, name: slideName, snapshotId: activeSnapshotId, viewId: activeViewId, viewport, canvasState, ...(modelSnapshot ? { modelSnapshot } : {}), ...slideViewFields(state, activeViewId) } as any)
           state.presentationSlides = pres.slides
+          state.presentationSlideIndex = at
+        })
+      },
+
+      movePresentationSlide(id, to) {
+        set((state) => {
+          const pres = state.presentations.find(p => p.id === state.activePresentationId)
+          if (!pres) return
+          const from = pres.slides.findIndex((s) => s.id === id)
+          const at = Math.max(0, Math.min(to, pres.slides.length - 1))
+          if (from < 0 || from === at) return
+          const shownId = pres.slides[state.presentationSlideIndex]?.id
+          const [slide] = pres.slides.splice(from, 1)
+          pres.slides.splice(at, 0, slide)
+          state.presentationSlides = pres.slides
+          const shown = pres.slides.findIndex((s) => s.id === shownId)
+          if (shown >= 0) state.presentationSlideIndex = shown
+        })
+      },
+
+      duplicatePresentationSlide(id) {
+        set((state) => {
+          const pres = state.presentations.find(p => p.id === state.activePresentationId)
+          if (!pres) return
+          const from = pres.slides.findIndex((s) => s.id === id)
+          if (from < 0) return
+          const copy = { ...JSON.parse(JSON.stringify(pres.slides[from])), id: uid(), name: `${pres.slides[from].name} (copy)` }
+          pres.slides.splice(from + 1, 0, copy)
+          state.presentationSlides = pres.slides
+          state.presentationSlideIndex = from + 1
+        })
+      },
+
+      duplicatePresentation(id) {
+        set((state) => {
+          const pres = state.presentations.find(p => p.id === id)
+          if (!pres) return
+          const copy = { ...JSON.parse(JSON.stringify(pres)), id: uid(), name: `${pres.name} (copy)` }
+          copy.slides = copy.slides.map((slide: PresentationSlide) => ({ ...slide, id: uid() }))
+          state.presentations.splice(state.presentations.indexOf(pres) + 1, 0, copy)
+          state.activePresentationId = copy.id
+          state.presentationSlides = state.presentations.find(p => p.id === copy.id)!.slides
+          state.presentationSlideIndex = 0
         })
       },
 
@@ -9354,23 +9460,7 @@ export const useDiagramStore = create<DiagramStore>()(
         // user has full control over framing (capture viewport on the slide
         // sets it; "Capture viewport" button updates it). If a slide has no
         // captured viewport at all (legacy data), fall back to fitView.
-        const vp = slide.viewport
-        if (vp && (vp.zoom || vp.x || vp.y)) {
-          // Slide switch just changed the visible node/view set — block the
-          // 300ms auto-fit interval from reacting to that as "new content"
-          // and dragging the camera to a fit-all framing right after we set
-          // the slide's own captured viewport below.
-          ;(window as any).__rfSuppressAutoFit?.(600 + 1200)
-          setSlideCamera({ x: vp.x, y: vp.y, zoom: vp.zoom }, 600)
-        } else if (slide.focusNodeIds?.length) {
-          // No captured camera: zoom onto the slide's focus elements.
-          setSlideFocus(slide.focusNodeIds, 600)
-        } else {
-          clearSlideCamera()
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => _getFitViewFn()?.())
-          })
-        }
+        placeSlideCamera(slide, 600, targetViewId !== currentViewId, () => get().rfNodes.filter((n) => !n.hidden).map((n) => n.id))
       },
 
       previewSlide(index) {
@@ -9422,7 +9512,8 @@ export const useDiagramStore = create<DiagramStore>()(
         }
 
         // Navigate to the view linked to this slide (or reset to "all" if none).
-        if (targetViewId !== get().activeViewId) {
+        const otherView = targetViewId !== get().activeViewId
+        if (otherView) {
           set((state) => { state.activeViewId = targetViewId })
         }
 
@@ -9436,20 +9527,7 @@ export const useDiagramStore = create<DiagramStore>()(
         get()._sync()
 
         // Restore saved viewport, or fit view if none captured.
-        const vp = slide.viewport
-        if (vp && (vp.zoom || vp.x || vp.y)) {
-          // See goToSlide — same auto-fit race, same fix.
-          ;(window as any).__rfSuppressAutoFit?.(400 + 1200)
-          setSlideCamera({ x: vp.x, y: vp.y, zoom: vp.zoom }, 400)
-        } else if (slide.focusNodeIds?.length) {
-          // No captured camera: zoom onto the slide's focus elements.
-          setSlideFocus(slide.focusNodeIds, 400)
-        } else {
-          clearSlideCamera()
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => _getFitViewFn()?.())
-          })
-        }
+        placeSlideCamera(slide, 400, otherView, () => get().rfNodes.filter((n) => !n.hidden).map((n) => n.id))
       },
 
       setViewportFns(getVP, setVP) {
@@ -10001,8 +10079,10 @@ export const useDiagramStore = create<DiagramStore>()(
             _setAutoFitTimer(null)
           }
           if (fn) {
-            // Animated re-fit so the user sees that autofit is still alive.
-            fn()
+            // No fit here: the canvas that registers places its own camera
+            // (Canvas onInit: a slide's, the view's, a fit with Smart fit
+            // on). An animated fit from here pulled a slide's camera away
+            // for a moment after a slide with no canvas.
             const t = setInterval(() => {
               if (!get().autoFitActive) { clearInterval(t); _setAutoFitTimer(null); return }
               if (get().presentationActive) return

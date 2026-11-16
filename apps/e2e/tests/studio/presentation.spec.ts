@@ -104,13 +104,14 @@ test('over Viewer presentations are only looked through and played; they are mad
   await expect(cards).toHaveCount(2)
   await expect(place.getByRole('button', { name: 'Present', exact: true })).toBeVisible()
   await expect(place.getByRole('button', { name: 'Add slide' })).toHaveCount(0)
-  for (const title of ['Rename presentation', 'New presentation', 'Delete presentation', /^Capture canvas state/, 'Link milestone', 'Link view', 'Delete slide']) {
+  // No properties of a slide or of the presentation, nothing to drag.
+  for (const title of ['Presentation properties', 'Slide properties']) {
     await expect(place.getByTitle(title)).toHaveCount(0)
   }
+  await expect(place.locator('.pres-slide-grip')).toHaveCount(0)
+  await expect(cards.nth(1)).toHaveAttribute('draggable', 'false')
   await cards.nth(1).click()
   await expect(cards.nth(1)).toHaveClass(/active/)
-  await cards.nth(1).locator('.pres-slide-name').dblclick()
-  await expect(place.locator('.pres-slide-name-input')).toHaveCount(0)
   await place.getByRole('button', { name: 'Present', exact: true }).click()
   await studio.settle()
   await expect(page.getByText('2 / 2')).toBeVisible()
@@ -122,8 +123,8 @@ test('over Viewer presentations are only looked through and played; they are mad
   await expect(page).toHaveURL(/\/m\/presenter\//)
   await expect(rail).toHaveAttribute('aria-pressed', 'true')
   await expect(place.getByRole('button', { name: 'Add slide' })).toBeVisible()
-  await expect(place.getByTitle('New presentation')).toBeVisible()
-  await expect(cards.nth(1).getByTitle(/^Capture canvas state/)).toBeVisible()
+  await expect(place.getByTitle('Presentation properties')).toBeVisible()
+  await expect(cards.nth(1).getByTitle('Slide properties')).toBeVisible()
 })
 
 test('a slide deep link opens the running presentation', async ({ page, studio }) => {
@@ -181,27 +182,82 @@ test('a slide made with focus zooms onto its elements after a table slide, from 
   expect(await zoom(page)).toBeGreaterThan(1.2)
 })
 
-test('a slide card\'s Link view and Link milestone pickers show all their items above the dock', async ({ page }) => {
+test('a slide\'s properties link it to another view or to none, and to the live model', async ({ page }) => {
   const card = page.locator('.pres-slide-card', { hasText: 'Containers' })
-  // The buttons are the current slide's.
-  await card.locator('.pres-slide-name').click()
-  await card.hover()
-  await card.getByTitle('Link view').click()
-  // The item farthest from the button: clipped by the dock, a click on it
-  // reached the canvas.
-  await page.locator('.pres-snap-item', { hasText: 'show all' }).click()
-  await expect(card.locator('.pres-slide-view-tag')).toHaveCount(0)
-  await card.hover()
-  await card.getByTitle('Link view').click()
-  await page.locator('.pres-snap-item', { hasText: 'Element Table' }).click()
-  await expect(card.locator('.pres-slide-view-tag')).toHaveText('Element Table')
-  await expect(page.locator('.pres-snap-picker')).toHaveCount(0)
+  await card.click()
+  await card.getByTitle('Slide properties').click()
+  const props = page.locator('.pres-place .props-content')
+  await expect(props).toContainText('SLIDE 2 OF 2')
+  await props.getByLabel('View of the slide').selectOption({ label: 'All elements' })
+  await expect(card.locator('.pres-slide-caption')).toHaveText('All elements')
+  await props.getByLabel('View of the slide').selectOption({ label: 'Element Table' })
+  await expect(card.locator('.pres-slide-caption')).toHaveText('Element Table')
+  await props.getByLabel('Milestone of the slide').selectOption({ label: 'Live model' })
+  await expect(card.locator('.pres-slide-caption-milestone')).toHaveCount(0)
+  await page.locator('.pres-place .rp-back-btn').click()
+  await expect(card).toBeVisible()
+})
 
-  await card.hover()
-  await card.getByTitle('Link milestone').click()
-  await expect(page.locator('.pres-snap-picker-title')).toHaveText('Link milestone')
-  await page.locator('.pres-snap-item', { hasText: 'current state' }).click()
-  await expect(page.locator('.pres-snap-picker')).toHaveCount(0)
+// The place was reviewed (the author, 2026-11-16): the slides could not be
+// moved, a new one went to the end, and a card had four unlabelled icons.
+// A card is now a view's card, ⚙ shows its properties in the panel.
+test('a slide is moved by drag, by Alt+arrow keys and in its properties, and Add slide puts one after the slide shown', async ({ page, studio }) => {
+  const place = page.locator('.pres-place')
+  const names = () => place.locator('.pres-slide-card .pres-slide-name').allTextContents()
+  const card = (name: string) => place.locator('.pres-slide-card').filter({ has: page.locator('.pres-slide-name', { hasText: new RegExp(`^${name.replace(/[()]/g, '\\$&')}$`) }) })
+  const saved = async () => (JSON.parse(await studio.storedJson()) as { presentations: Array<{ name: string; slides: Array<{ name: string }> }> }).presentations
+  expect(await names()).toEqual(['Context', 'Containers'])
+  // Each card: its number, its name and the view it shows, in grey.
+  await expect(card('Containers').locator('.pres-slide-num')).toHaveText('2')
+  await expect(card('Containers').locator('.pres-slide-caption')).toHaveText('Containers')
+
+  // After the slide shown, and shown itself.
+  await card('Context').click()
+  await studio.settle()
+  await place.getByRole('button', { name: 'Add slide' }).click()
+  await expect.poll(names).toEqual(['Context', 'Slide 3', 'Containers'])
+  await expect(card('Slide 3')).toHaveClass(/active/)
+
+  // Dragged above the first card; the slide shown stays the one shown.
+  await card('Containers').dragTo(card('Context'), { targetPosition: { x: 60, y: 4 } })
+  await expect.poll(names).toEqual(['Containers', 'Context', 'Slide 3'])
+  await expect(card('Slide 3')).toHaveClass(/active/)
+
+  // Alt+Down moves the card with the focus, which keeps it.
+  await card('Containers').focus()
+  await page.keyboard.press('Alt+ArrowDown')
+  await expect.poll(names).toEqual(['Context', 'Containers', 'Slide 3'])
+  await expect(card('Containers')).toBeFocused()
+  await studio.settle()
+  await expect.poll(async () => (await saved())[0].slides.map((x) => x.name)).toEqual(['Context', 'Containers', 'Slide 3'])
+
+  // ⚙ shows the slide's properties in the panel, in place of the list.
+  await card('Slide 3').getByTitle('Slide properties').click()
+  const props = place.locator('.props-content')
+  await expect(props).toContainText('SLIDE 3 OF 3')
+  // The list slid away takes no focus.
+  await expect(place.locator('.rp-pane').first()).toHaveAttribute('inert', '')
+  await props.getByTitle(/^Move up/).click()
+  await expect(props).toContainText('SLIDE 2 OF 3')
+  await props.getByTitle('Rename slide').click()
+  await page.getByLabel('Slide', { exact: true }).fill('Overview')
+  await page.getByLabel('Slide', { exact: true }).press('Enter')
+  await props.getByRole('button', { name: 'Duplicate' }).click()
+  await expect.poll(names).toEqual(['Context', 'Overview', 'Overview (copy)', 'Containers'])
+  await props.getByRole('button', { name: 'Delete slide' }).click()
+  await expect.poll(names).toEqual(['Context', 'Overview (copy)', 'Containers'])
+  await expect(place.locator('.rp-pane').first()).not.toHaveAttribute('inert', '')
+
+  // The presentation's properties: beside its list, ⚙.
+  await place.getByTitle('Presentation properties').click()
+  await expect(props).toContainText('PRESENTATION')
+  await expect(props).toContainText('Main')
+  await props.getByRole('button', { name: 'Duplicate' }).click()
+  await studio.settle()
+  await expect.poll(async () => (await saved()).map((p) => `${p.name}: ${p.slides.length}`)).toEqual(['Main: 3', 'Main (copy): 3'])
+  // The copy is the presentation open: the panel shows its slides.
+  await expect(place.locator('.rp-pane').first()).not.toHaveAttribute('inert', '')
+  await expect(place.getByLabel('Presentation', { exact: true }).locator('option:checked')).toHaveText('Main (copy) (3)')
 })
 
 test('a slide added on a wiki page shows that page, on its card and played after a reload', async ({ page, studio }) => {
@@ -210,23 +266,24 @@ test('a slide added on a wiki page shows that page, on its card and played after
   }, 'v-wiki/f/api')
   const title = page.locator('.wiki-page .wiki-title').first()
   await expect(title).toHaveText('API')
-  await page.getByTitle('Add slide from current canvas state').click()
+  await page.getByRole('button', { name: 'Add slide' }).click()
   const cards = page.locator('.pres-slide-card')
   await expect(cards).toHaveCount(3)
   await studio.settle()
   await expect.poll(async () => ((await studio.storedDoc()) as unknown as { presentations: Array<{ slides: unknown[] }> }).presentations[0].slides.length).toBe(3)
-  // Another page read, another slide shown: the new slide's card shows its page.
+  // Another page read, another slide shown: the new slide's card (after
+  // the slide shown, the first) shows its page.
   await page.getByRole('button', { name: 'Overview', exact: true }).click()
   await expect(title).toHaveText('Overview')
   await cards.first().locator('.pres-slide-name').click()
-  await cards.last().locator('.pres-slide-name').click()
+  await cards.nth(1).locator('.pres-slide-name').click()
   await expect(title).toHaveText('API')
   await expect(page).toHaveURL(/\/v\/v-wiki\/f\/api$/)
   // Played from a fresh page, where the view is on its Overview.
-  await page.goto(`/#/d/${encodeURIComponent(`ls:${DOC_ID}`)}/m/presenter/v/v-wiki/p/pres-main/play/1/sl/2`)
+  await page.goto(`/#/d/${encodeURIComponent(`ls:${DOC_ID}`)}/m/presenter/v/v-wiki/p/pres-main/play/1/sl/1`)
   await page.reload()
   await studio.ready()
-  await expect(page.getByText('3 / 3')).toBeVisible()
+  await expect(page.getByText('2 / 3')).toBeVisible()
   await expect(title).toHaveText('API')
 })
 
@@ -234,9 +291,10 @@ test('a click in the middle of another slide\'s card shows that slide, it does n
   const card = page.locator('.pres-slide-card', { hasText: 'Containers' })
   await expect(card).not.toHaveClass(/active/)
   const box = (await card.boundingBox())!
-  // The hidden Capture button sat where the card's middle is; in the left
-  // panel another card has no buttons at all (display none).
-  await expect(card.getByTitle(/^Capture canvas state/)).toBeHidden()
+  // The hidden Capture button sat where the card's middle is; now another
+  // card shows no button at all, its ⚙ only once it is the slide shown.
+  await page.mouse.move(0, 0)
+  await expect(card.locator('.lp-card-actions')).toHaveCSS('max-width', '0px')
   await page.mouse.click(box.x + box.width - 60, box.y + box.height / 2)
   await expect(card).toHaveClass(/active/)
   await studio.settle()
@@ -294,6 +352,102 @@ test('F5 stops a presentation F5 started, and Esc ends a Warnier slide with an e
   await expect(page.getByText('3 / 3')).toHaveCount(0)
 })
 
+// A slide on another view showed that view at the camera of the slide
+// before, zoomed in, and then swept across it to its own; a slide that fits
+// its view also jumped half-way. Each view has coordinates of its own: the
+// camera is placed in one step, as a view switch places it. On the same
+// view the camera still flies from slide to slide.
+test('a slide on another view opens at its own camera in one step; on the same view it flies', async ({ page, studio }) => {
+  await reseed(page, studio, (doc) => {
+    const slides = doc.presentations[0].slides
+    slides[0].viewport = { x: 300, y: 120, zoom: 1.6 }
+    slides[1].viewport = { x: 0, y: 0, zoom: 0 }
+    slides.push({ id: 'slide-3', name: 'Containers again', snapshotId: null, viewId: 'v-containers', viewport: { x: 200, y: 200, zoom: 1.2 } })
+    slides.push({ id: 'slide-4', name: 'Table', snapshotId: null, viewId: 'v-table', viewport: { x: 0, y: 0, zoom: 0 } })
+    slides.push({ id: 'slide-5', name: 'Containers after the table', snapshotId: null, viewId: 'v-containers', viewport: { x: -100, y: 40, zoom: 0.7 } })
+  })
+  await page.clock.resume()
+  // Each frame: the camera, and whether the Containers view is drawn (only it has "web").
+  const frames = async (act: () => Promise<void>): Promise<{ containers: boolean; camera: string }[]> => {
+    await page.evaluate(() => {
+      const out: { containers: boolean; camera: string }[] = []
+      ;(window as any).__frames = out
+      const until = performance.now() + 1200
+      const frame = (): void => {
+        const camera = (document.querySelector('.react-flow__viewport') as HTMLElement | null)?.style.transform ?? ''
+        // Drawn: shown, not hidden while its camera waits for its elements.
+        const shown = (document.querySelector('.react-flow__viewport') as HTMLElement | null)?.checkVisibility({ visibilityProperty: true }) ?? false
+        const rect = document.querySelector('.react-flow')?.getBoundingClientRect()
+        if (shown) out.push({ containers: !!document.querySelector('.react-flow__node[data-id="web"]'), camera, width: rect?.width ?? 0, height: rect?.height ?? 0 } as any)
+        if (performance.now() < until) requestAnimationFrame(frame)
+      }
+      requestAnimationFrame(frame)
+    })
+    await act()
+    await page.waitForTimeout(1400)
+    return page.evaluate(() => (window as any).__frames)
+  }
+  const cameras = (list: { camera: string }[]) => new Set(list.map((f) => f.camera))
+  const CONTEXT = 'translate(300px, 120px) scale(1.6)'
+  // The Containers view, fitted, is drawn only at its own camera.
+  const fittedInOneStep = (list: { containers: boolean; camera: string }[]) => {
+    expect(cameras(list.filter((f) => f.containers)).size).toBe(1)
+    expect(cameras(list.filter((f) => f.containers)).has(CONTEXT)).toBe(false)
+  }
+
+  await page.getByRole('button', { name: 'Present', exact: true }).click()
+  await expect(page.getByText('1 / 5')).toBeVisible()
+  await page.waitForTimeout(1000)
+  // To the Containers view, fitted: drawn only at its own camera.
+  let shown = await frames(() => page.keyboard.press('ArrowRight'))
+  await expect(page.getByText('2 / 5')).toBeVisible()
+  fittedInOneStep(shown)
+  // On the same view the camera flies: the zoom and the point in the middle
+  // of the canvas move together, each one way only, and arrive together
+  // (React Flow's flight panned past the target and zoomed in after).
+  shown = await frames(() => page.keyboard.press('ArrowRight'))
+  await expect(page.getByText('3 / 5')).toBeVisible()
+  expect(cameras(shown).size).toBeGreaterThan(5)
+  const path = shown.map((f: any) => {
+    const [x, y, zoom] = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\)/.exec(f.camera)!.slice(1).map(Number)
+    return { zoom, cx: (f.width / 2 - x) / zoom, cy: (f.height / 2 - y) / zoom }
+  })
+  // How far each has come, 0 to 1, in every frame: the zoom on a log scale.
+  const [first, last] = [path[0], path[path.length - 1]]
+  const lag = Math.max(...path.map((p) => {
+    const zoom = Math.log(p.zoom / first.zoom) / Math.log(last.zoom / first.zoom)
+    const pan = Math.hypot(p.cx - first.cx, p.cy - first.cy) / Math.hypot(last.cx - first.cx, last.cy - first.cy)
+    return Math.abs(zoom - pan)
+  }))
+  expect(lag).toBeLessThan(0.05)
+  // After a slide with no canvas the canvas opens at the slide's camera: it
+  // opened at 0,0 ×1, was fitted for a moment and then jumped.
+  await page.keyboard.press('ArrowRight')
+  await expect(page.getByText('4 / 5')).toBeVisible()
+  await page.waitForTimeout(800)
+  shown = await frames(() => page.keyboard.press('ArrowRight'))
+  await expect(page.getByText('5 / 5')).toBeVisible()
+  expect(cameras(shown)).toEqual(new Set(['translate(-100px, 40px) scale(0.7)']))
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowLeft')
+  await expect(page.getByText('2 / 5')).toBeVisible()
+  await page.waitForTimeout(800)
+  // Back to the Context view, at its captured camera at once.
+  shown = await frames(() => page.keyboard.press('ArrowLeft'))
+  await expect(page.getByText('1 / 5')).toBeVisible()
+  expect(cameras(shown.filter((f) => !f.containers))).toEqual(new Set([CONTEXT]))
+  await page.keyboard.press('Escape')
+
+  // A card picked in the place does the same (Esc went back to the
+  // Containers view).
+  const card = (name: string) => page.locator('.pres-slide-card .pres-slide-name', { hasText: new RegExp(`^${name}$`) })
+  await expect(studio.nodes).toHaveCount(6)
+  await page.waitForTimeout(500)
+  shown = await frames(() => card('Context').click())
+  expect(cameras(shown.filter((f) => !f.containers))).toEqual(new Set([CONTEXT]))
+  shown = await frames(() => card('Containers').click())
+  fittedInOneStep(shown)
+})
+
 // F-0096: a slide clicked in Presenter moved the camera, and the canvas kept
 // that as the view's camera: after a reload in Presenter, Designer opened the
 // view at the slide's camera. Only Designer's camera is kept as the view's.
@@ -334,14 +488,20 @@ test('F5 and Cmd/Ctrl+P in a slide\'s name field are Studio\'s: F5 saves the nam
     }, true)
   })
   const keys = (): Promise<string[]> => page.evaluate(() => (window as unknown as { __keys: string[] }).__keys)
-  const input = page.locator('.pres-slide-name-input')
-  await page.locator('.pres-slide-card .pres-slide-name', { hasText: 'Context' }).dblclick()
+  // The name is edited in the slide's properties.
+  const input = page.getByLabel('Slide', { exact: true })
+  const card = page.locator('.pres-slide-card').first()
+  await card.click()
+  await card.getByTitle('Slide properties').click()
+  const rename = page.locator('.pres-place .props-content').getByTitle('Rename slide')
+  await rename.click()
   await input.fill('Opening slide')
   await page.keyboard.press('ControlOrMeta+p')
   await studio.settle()
   await expect.poll(keys).toEqual(['p prevented: true'])
-  await page.keyboard.press('Escape')
-  await page.locator('.pres-slide-card .pres-slide-name', { hasText: 'Opening slide' }).dblclick()
+  // Left by the shortcut, the field keeps what was typed.
+  await expect(card.locator('.pres-slide-name')).toHaveText('Opening slide')
+  await rename.click()
   await input.fill('First slide')
   await page.keyboard.press('F5')
   await studio.settle()

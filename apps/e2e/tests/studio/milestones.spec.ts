@@ -246,8 +246,11 @@ test('in the Presentations place, a slide card names the milestone its slide sho
     await presentations.click()
   }
   await presentations.click()
-  await cards.nth(0).getByTitle('Link milestone').click()
-  await page.locator('.pres-snap-item', { hasText: 'v2' }).click()
+  await cards.nth(0).click()
+  await cards.nth(0).getByTitle('Slide properties').click()
+  const milestone = page.locator('.pres-place .props-content').getByLabel('Milestone of the slide')
+  await milestone.selectOption((await milestone.locator('option', { hasText: 'v2' }).first().getAttribute('value'))!)
+  await page.locator('.pres-place .rp-back-btn').click()
 
   await pickV1()
   await expect(chip, 'opened over v1, it is still shown').toContainText('Milestone: v1')

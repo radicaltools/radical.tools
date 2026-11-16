@@ -256,12 +256,14 @@ test('an agent\'s write leaves the sequence card open', async ({ page, studio })
   await saveAsFolder(page)
   await expect.poll(() => folder.paths()).toContain('nodes/customer.md')
   await page.getByRole('tab', { name: 'Sequences' }).click()
-  await page.locator('.lp-view-card', { hasText: 'Place Order' }).last().click()
-  await expect(page.locator('.right-panel .seq-step')).toHaveCount(4)
+  const card = page.locator('.lp-view-card', { hasText: 'Place Order' }).last()
+  await card.click()
+  await card.getByTitle('Sequence properties').click()
+  await expect(page.locator('.left-panel .seq-step')).toHaveCount(4)
   const file = (await folder.files())['nodes/customer.md']
   await folder.write('nodes/customer.md', file.replace('label: "Customer"', 'label: "Book Lover"'))
   await expect(studio.node('customer')).toContainText('Book Lover', { timeout: 10_000 })
-  await expect(page.locator('.right-panel .seq-step')).toHaveCount(4)
+  await expect(page.locator('.left-panel .seq-step')).toHaveCount(4)
 })
 
 test('Move to a folder keeps the model\'s name, and a rename reaches radical.md at once', async ({ page }) => {

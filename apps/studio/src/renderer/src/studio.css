@@ -91,11 +91,34 @@
   flex-direction: column;
   gap: 6px;
 }
-.pres-dock-card-wrap .pres-slide-card { width: 100%; flex-wrap: wrap; }
-/* In the panel's width a card's name takes the whole line: the slide picked
-   has its buttons on a line of their own under it, the others none. */
-.pres-place .pres-slide-card:not(.active) .pres-slide-actions { display: none; }
-.pres-place .pres-slide-card.active .pres-slide-actions { opacity: 1; width: 100%; padding-left: 30px; }
+.pres-dock-card-wrap .pres-slide-card { width: 100%; }
+.pres-dock-track { gap: 2px; }
+/* A slide's card is a view's card (lp-card lp-view-card): its number where
+   a view has its icon, ⚙ for its properties; and a handle to drag it. */
+.pres-place .pres-slide-card { position: relative; padding-left: 14px; }
+.pres-place .pres-slide-card:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pres-slide-num { font-size: 12px; font-weight: 700; color: var(--kind-color); }
+.pres-slide-card.active .pres-slide-num { color: #fff; }
+.pres-slide-grip { position: absolute; left: 2px; top: 50%; transform: translateY(-50%); display: flex; width: 10px; height: 16px; color: var(--text-muted); opacity: 0; cursor: grab; }
+.pres-slide-grip svg { width: 10px; height: 16px; }
+.pres-slide-card:hover .pres-slide-grip, .pres-slide-card:focus-visible .pres-slide-grip { opacity: 0.7; }
+.pres-slide-card.dragging { opacity: 0.45; }
+/* Where a dragged card lands: a line above or below the card under it. */
+.pres-slide-card.drop-before { box-shadow: 0 -3px 0 -1px var(--accent); }
+.pres-slide-card.drop-after { box-shadow: 0 3px 0 -1px var(--accent); }
+.pres-slide-caption { min-width: 0; white-space: nowrap; overflow: hidden; }
+/* The view gives way first: the milestone says more about the slide. */
+.pres-slide-caption-view { flex: 0 100 auto; min-width: 2.5em; overflow: hidden; text-overflow: ellipsis; }
+.pres-slide-caption-milestone { display: inline-flex; flex: 0 1 auto; align-items: center; gap: 3px; min-width: 0; }
+.pres-slide-caption-milestone svg { width: 11px; height: 11px; flex-shrink: 0; }
+.pres-slide-caption-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pres-picker-props { flex-shrink: 0; }
+/* The properties pane slides in over the list, as a view's does. */
+.pres-place > .rp-slider { flex: 1; min-height: 0; }
+.pres-props-name { flex: 1; font-size: 13px; font-weight: 600; padding: 3px 0; overflow-wrap: anywhere; }
+.pres-props-actions { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.pres-props-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+.pres-props-btn { justify-content: flex-start; width: 100%; padding: 6px 8px; font-size: 12px; gap: 8px; border-radius: 6px; display: flex; align-items: center; }
 .pres-dock-empty {
   padding: 12px 4px;
 }
@@ -326,93 +349,6 @@ label.app-menu-row { cursor: pointer; }
   text-align: center;
   line-height: 1.6;
 }
-.pres-slide-card {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 7px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
-  background: transparent;
-}
-.pres-slide-card:hover { background: var(--hover-bg); border-color: var(--border-color); }
-.pres-slide-num {
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  background: var(--border-color);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.pres-slide-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.pres-slide-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.pres-slide-name-input {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-  background: var(--bg-canvas);
-  border: 1px solid var(--accent);
-  border-radius: 3px;
-  padding: 1px 6px;
-  outline: none;
-  width: 100%;
-}
-.pres-slide-snap-tag {
-  font-size: 10px;
-  color: var(--accent);
-  background: rgba(var(--accent-rgb, 99,102,241), 0.15);
-  border-radius: 3px;
-  padding: 1px 5px;
-  align-self: flex-start;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-.pres-slide-view-tag {
-  font-size: 10px;
-  color: var(--success, #22c55e);
-  background: rgba(34, 197, 94, 0.15);
-  border-radius: 3px;
-  padding: 1px 5px;
-  align-self: flex-start;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-.pres-slide-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.12s;
-}
-.pres-slide-card:hover .pres-slide-actions { opacity: 1; }
-/* Only the current slide's card has its buttons: hidden but there, a click
-   in the middle of another card hit Capture and overwrote that slide. */
-.pres-slide-card:not(.active) .pres-slide-actions { visibility: hidden; }
 .pres-icon-btn {
   width: 26px;
   height: 26px;
@@ -428,40 +364,6 @@ label.app-menu-row { cursor: pointer; }
 }
 .pres-icon-btn svg { width: 14px; height: 14px; }
 .pres-icon-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
-/* A slide card's Link milestone / Link view picker: on the page, placed
-   above its button (PresentationBar's DockPicker), not clipped by the dock */
-.pres-snap-picker {
-  position: fixed;
-  z-index: 500;
-  background: var(--bg-toolbar);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
-  min-width: 160px;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-.pres-snap-picker-title {
-  padding: 6px 10px 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.pres-snap-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 6px 10px;
-  font-size: 12px;
-  border: none;
-  background: none;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: background 0.1s;
-}
-.pres-snap-item:hover { background: var(--hover-bg); }
 /* Presenter HUD (bottom bar during presentation) */
 .pres-hud {
   position: fixed;
