@@ -1,7 +1,7 @@
-# Radical.Tools — C4 Architecture Diagrams
+# Radical Studio — Architecture Model
 
-**Visual C4 architecture diagram editor built directly into VS Code.**  
-Model your software architecture with nodes, relations, and multiple synchronized views — no external tools required.
+**Radical Studio, the architecture studio of the open-source [radical.tools](https://radical.tools) family, inside VS Code.**  
+One living model of your system, for your team and your coding agents: C4, decisions, requirements and fitness functions together. Free and MIT licensed.
 
 ---
 
