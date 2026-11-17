@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The VS Code extension is published to the Marketplace through Trusted Publishing: the release workflow's GitHub OIDC token takes the place of a personal access token kept as a secret (`vsce publish --oidc`, vsce 4).
+
 ## [0.5.0] - 2026-11-16
 
 ### Added

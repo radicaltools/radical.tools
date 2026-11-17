@@ -120,7 +120,7 @@
     "@radical/host-bridge": "*",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
-    "@vscode/vsce": "^2.24.0",
+    "@vscode/vsce": "^4.1.1",
     "esbuild": "^0.20.0",
     "radical-model": "*"
   }
