@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - The VS Code extension is published to the Marketplace through Trusted Publishing: the release workflow's GitHub OIDC token takes the place of a personal access token kept as a secret (`vsce publish --oidc`, vsce 4).
+- The VS Code extension is listed as *Radical Studio — Architecture Model*, with the product's own description in place of the old diagram-editor one.
 
 ## [0.5.0] - 2026-11-16
 
