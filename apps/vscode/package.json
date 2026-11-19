@@ -1,7 +1,7 @@
 {
   "name": "vscode-radical",
-  "displayName": "Radical.Tools — C4 Architecture Diagrams",
-  "description": "Visual C4 architecture diagram editor with multi-metamodel support (C4, DDD, Governance), multiple views, AI assistant, and live VS Code theme sync.",
+  "displayName": "Radical Studio — Architecture Model",
+  "description": "Radical Studio from radical.tools: one living architecture model (C4, decisions, requirements, fitness functions) for your team and your coding agents. Free, MIT licensed.",
   "version": "0.5.0",
   "publisher": "radical-tools-oss",
   "license": "MIT",
@@ -120,7 +120,7 @@
     "@radical/host-bridge": "*",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
-    "@vscode/vsce": "^2.24.0",
+    "@vscode/vsce": "^4.1.1",
     "esbuild": "^0.20.0",
     "radical-model": "*"
   }

@@ -18,6 +18,11 @@ on:
 
 permissions:
   contents: read
+  # Trusted Publishing: the Marketplace takes the job's GitHub OIDC token in
+  # place of a personal access token. The policy on the Marketplace
+  # (publisher radical-tools-oss → Trusted Publishing) names this repository
+  # and this workflow file; renaming the file breaks publishing.
+  id-token: write
 
 jobs:
   publish:
@@ -73,7 +78,7 @@ jobs:
       # ── Package (always) ─────────────────────────────────────────────────────
       - name: Package VSIX
         working-directory: apps/vscode
-        run: npx @vscode/vsce package --no-dependencies
+        run: npx vsce package --no-dependencies
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
@@ -86,6 +91,4 @@ jobs:
       - name: Publish to VS Code Marketplace
         if: ${{ !inputs.dry_run }}
         working-directory: apps/vscode
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx @vscode/vsce publish --no-dependencies --packagePath *.vsix
+        run: npx vsce publish --oidc --no-dependencies --packagePath *.vsix
