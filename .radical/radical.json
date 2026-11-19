@@ -3858,6 +3858,12 @@
     ] },
     { "element": "4ef25e89-7b87-4102-8685-da4c931089ca", "name": "Sequence properties shown in the panel", "tests": [
       "apps/e2e/tests/studio/editing.spec.ts › a sequence's properties open in the left panel from its ⚙, as a view's, and no card at the right"
+    ] },
+    { "element": "a22e6b24-aa46-4a60-ab4a-8a5cda3ce822", "name": "Measurements listed by metric", "tests": [
+      "apps/e2e/tests/studio/measurements.spec.ts › the Measurements tab lists what the sensors measured, by metric, with what reads each value"
+    ] },
+    { "element": "29754f04-3b56-492e-97e9-8c96284d1319", "name": "Path from a measurement", "tests": [
+      "apps/e2e/tests/studio/measurements.spec.ts › Path on a reader opens its verification path, and Back returns to the tab"
     ] }
   ]
 }

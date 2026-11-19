@@ -459,7 +459,7 @@ test('inspector', async ({ page, shot }) => {
     }
   }
   walk(ARCHITECTURE)
-  test.skip(!files['.state/test-results.json'], 'run npm run check:architecture first')
+  test.skip(!files['.state/test-results.json'] || !files['.state/measurements.json'], 'run npm run check:architecture and radical sense run first')
   delete files['.state/selection.json']
   // As in the repository: the model in .radical/model, beside it the
   // .radical/radical.json that binds the tests to its scenarios.
@@ -498,9 +498,16 @@ test('inspector', async ({ page, shot }) => {
   await settle(page)
   await shot('inspector-implementation')
 
+  // What the sensors measured, by metric, with the fitness functions that
+  // read each value.
+  await page.getByRole('tab', { name: /^Measurements/ }).click()
+  await expect(page.getByTestId('insp-metric').first()).toBeVisible()
+  await settle(page)
+  await shot('inspector-measurements')
+
   // The verification path of the need it was built for: need, requirements,
   // scenarios and the tests with their results, in columns.
-  await expect(page).toHaveURL(/\/i\/implementation/)
+  await expect(page).toHaveURL(/\/i\/measurements/)
   await page.evaluate(() => { location.hash = `${location.hash}/tr/b77fe22f-9dc0-4e07-b355-65cb4647a412` })
   await expect(page.getByTestId('trace-panel')).toBeVisible()
   await expect(page.locator('.trace-line').first()).toBeAttached()
