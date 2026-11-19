@@ -16,8 +16,8 @@ export { showOnPage }
 
 /** The Inspector's tabs. Its Settings are Inspector settings… in the Settings
  *  menu now (CheckSettingsDialog). */
-export type InspectorTab = 'overview' | 'model' | 'implementation' | 'branch'
-export const INSPECTOR_TABS: readonly InspectorTab[] = ['overview', 'model', 'implementation', 'branch']
+export type InspectorTab = 'overview' | 'model' | 'implementation' | 'measurements' | 'branch'
+export const INSPECTOR_TABS: readonly InspectorTab[] = ['overview', 'model', 'implementation', 'measurements', 'branch']
 
 /** The tab a link names: its own name, or the name it had before (Changes
  *  is This branch now); undefined for none. */

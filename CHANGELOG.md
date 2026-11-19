@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The Inspector's Measurements tab: what the sensors measured, by metric, each value with its labels, its source and its age, and under it the scenarios and fitness functions whose conditions read it, with the condition and its outcome; *Path* on one of them opens the whole evaluation flow, from the need or ADR down to that value, and Back returns to the tab. A filter narrows the list by metric, label, source or element; *Not measured*, after the metrics, lists the conditions that still wait for a sensor. The tab's card counts the measurements and the values off their condition, and the tab is part of the address (`i/measurements`).
+
+### Fixed
+- A step of Studio's history is added whenever one of the changes of place within it is a person's move: a route Studio wrote in place in the same moment (the Inspector's panel following its evidence, a document that loaded) no longer swallows the move, which took a *Path* step away from Back.
+
 ## [0.5.0] - 2026-11-16
 
 ### Added

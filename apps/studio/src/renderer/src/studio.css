@@ -4380,3 +4380,26 @@ div.milestone-option { cursor: default; }
 .toolbar-edit .toolbar-icon-btn { min-width: 34px; height: 30px; color: var(--text-primary); }
 .toolbar-edit .toolbar-icon-btn svg { width: 18px; height: 18px; }
 .toolbar-edit .toolbar-icon-btn:disabled { color: var(--text-muted); opacity: 0.45; }
+
+/* Inspector: Measurements — what the sensors measured, by metric, with the
+   conditions that read each value. */
+.insp-meas-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 0 12px; }
+.insp-meas-filter { flex: 1 1 18em; max-width: 28em; padding: 5px 9px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-panel); color: var(--text-primary); font: inherit; font-size: 12.5px; }
+.insp-meas-filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.insp-metric { margin-bottom: 12px; }
+.insp-metric-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border-color); font-size: 12.5px; }
+.insp-metric-name { font-size: 12.5px; font-weight: 600; color: var(--text-primary); }
+.insp-meas-row { display: grid; gap: 4px; padding: 8px 14px; border-bottom: 1px solid var(--border-color); font-size: 12.5px; }
+.insp-meas-row:last-child { border-bottom: 0; }
+.insp-meas-row.alert { background: color-mix(in srgb, var(--danger) 5%, transparent); }
+.insp-meas-main { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.insp-meas-labels { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.insp-meas-labels code, .insp-meas-reader code { font-size: 11.5px; }
+.insp-meas-value { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.insp-meas-value b { font-size: 14px; color: var(--text-primary); }
+.insp-meas-readers { list-style: none; margin: 0; padding: 0 0 0 18px; display: grid; gap: 3px; }
+.insp-meas-waiting { padding: 8px 14px; }
+.insp-meas-reader { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.insp-meas-path { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; min-height: 24px; padding: 2px 9px; font-size: 12px; color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border-color)); }
+.insp-meas-path:hover { background: color-mix(in srgb, var(--accent) 10%, var(--bg-panel)); border-color: var(--accent); }
+.insp-metric-waiting { margin-top: 16px; }

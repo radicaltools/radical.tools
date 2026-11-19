@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
-import { currentRoute, describeRoute, parseHash, formatRoute, placeGone, type Route } from '../src/renderer/src/route'
+import { currentRoute, describeRoute, parseHash, formatRoute, placeGone, stepAddsEntry, type Route } from '../src/renderer/src/route'
 import { stepIndex, type NavState } from '../src/renderer/src/navHistory'
 
 describe('route parse/format', () => {
@@ -149,5 +149,16 @@ describe('an exploration in the history', () => {
     expect(stepIndex(nav, -1, placeGone)).toBe(0)
     expect(stepIndex({ ...nav, index: 0 }, 1, placeGone)).toBe(2)
     expect(stepIndex({ ...nav, index: 0 }, -1, placeGone)).toBeUndefined()
+  })
+})
+
+describe('one step of the history', () => {
+  it('adds an entry when any change in it is a move, whatever Studio wrote in place with it', () => {
+    // Routes applied alone are written in place.
+    expect(stepAddsEntry(false, true)).toBe(false)
+    // A move alone, or with a route Studio applied before or after it, adds an entry.
+    expect(stepAddsEntry(false, false)).toBe(true)
+    expect(stepAddsEntry(stepAddsEntry(false, true), false)).toBe(true)
+    expect(stepAddsEntry(stepAddsEntry(false, false), true)).toBe(true)
   })
 })

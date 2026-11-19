@@ -1,49 +1,92 @@
 {
   "rules": {
     "metamodel": "error",
-    "stale-reference": "error",
     "requirement-incomplete": "error",
+    "requirement-without-scenario": {
+      "severity": "error",
+      "max": 54
+    },
     "requirement-unsatisfied": "error",
     "requirement-without-origin": "error",
     "need-without-requirement": "error",
-    "scenario-verifies-nothing": "error",
-    "adr-incomplete": "error",
-    "adr-superseded-unlinked": "error",
-    "fitness-fn-unlinked": "error",
-    "metric-invalid": "error",
-    "concern-unbound": "error",
-    "requirement-without-scenario": {
+    "derives-quote-missing": {
       "severity": "error",
-      "max": 61
+      "max": 783
     },
+    "derives-quote-not-in-need": "error",
+    "quote-value-missing": "error",
+    "quote-value-differs": "error",
+    "requirement-value-unquoted": {
+      "severity": "error",
+      "max": 1
+    },
+    "scenario-value-missing": "error",
+    "example-not-in-scenario": "error",
+    "scenario-value-untested": {
+      "severity": "error",
+      "max": 16
+    },
+    "need-answer-unquoted": {
+      "severity": "error",
+      "max": 1
+    },
+    "need-answer-changed": "error",
+    "scenario-verifies-nothing": "error",
     "adr-without-fitness-fn": {
       "severity": "error",
       "max": 2
     },
-    "scenario-without-metrics": {
+    "inherited-adr-unapplied": "error",
+    "inherited-adr-unchecked": "error",
+    "adr-incomplete": "error",
+    "adr-superseded-unlinked": "error",
+    "fitness-fn-unlinked": "error",
+    "concern-unaddressed": {
+      "severity": "error",
+      "max": 53
+    },
+    "concern-unbound": "error",
+    "scenario-without-metrics": "error",
+    "scenario-not-verified-here": {
       "severity": "error",
       "max": 7
     },
+    "model-names-tests": "error",
     "fitness-fn-without-metrics": {
       "severity": "error",
-      "max": 2
+      "max": 1
     },
-    "test-unbound": {
-      "severity": "warning"
-    }
+    "fitness-fn-unclassified": "error",
+    "fitness-fn-measure-invalid": "error",
+    "repository-mapping": "error",
+    "repository-settings-in-model": "error",
+    "description-path-missing": "error",
+    "measure-with-arguments": "error",
+    "metric-invalid": "error",
+    "test-failed": "error",
+    "test-not-found": "error",
+    "test-skipped": "warning",
+    "test-not-run": "warning",
+    "metric-failed": "error",
+    "metric-stale": "warning",
+    "metric-not-measured": "warning",
+    "test-unbound": "error"
   },
   "goals": {
     "requirements-with-scenario": {
-      "min": 85
+      "min": 92
     },
     "requirements-verified": {
-      "min": 80
+      "min": 91
     },
     "adrs-verified": {
-      "min": 75
+      "min": 88
     },
     "tests-bound": {
       "min": 100
+    },
+    "requirements-quoting-need": {
+      "min": 2
     }
   }
 }

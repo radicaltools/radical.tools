@@ -397,6 +397,12 @@ export function describeRoute(route: Route, hash = formatRoute(route), at = Date
 /** Whether the place of a History entry is gone: an exploration closed
  *  since (it is never saved, and one Back led to opened All elements, a
  *  place never visited). Back and Forward pass over it. */
+/** Whether the step the changes within one window make adds an entry to
+ *  the history: as soon as one of them is no route applied (a person's
+ *  move, not Back, Forward, a link or a document that loaded), the step
+ *  does, whatever Studio wrote in place in the same moment. */
+export const stepAddsEntry = (soFar: boolean, replace: boolean): boolean => soFar || !replace
+
 export function placeGone(entry: NavEntry): boolean {
   const route = parseHash(entry.hash)
   return !!route && isExplorationId(route.view) && !viewById(useDiagramStore.getState(), route.view)
@@ -460,19 +466,23 @@ export function startRouteSync(): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null
   // Changes that apply a route (Back, Forward, a link, a document that has
   // loaded) write it in place; any other change of place adds an entry.
-  // Changes within 150 ms are one step.
-  let replaceNext = false
+  // Changes within 150 ms are one step, which adds an entry when any of
+  // them does (stepAddsEntry): a person's move is never written in place
+  // because Studio wrote a route of its own in the same moment (the
+  // Inspector's panel following its evidence took a Path step away from
+  // Back).
+  let pushNext = false
   const schedule = (replace = false): void => {
     if (applying || pending) return
-    if (replace) replaceNext = true
+    pushNext = stepAddsEntry(pushNext, replace)
     if (timer) clearTimeout(timer)
     timer = null
     // A move held (usePlaceHold) is written once it is let go.
     if (usePlaceHold.getState().held > 0) return
     timer = setTimeout(() => {
       timer = null
-      const push = !replaceNext
-      replaceNext = false
+      const push = pushNext
+      pushNext = false
       writeUrl(push)
     }, 150)
   }
@@ -572,8 +582,8 @@ export function startRouteSync(): () => void {
     if (h.held > 0 && p.held === 0 && timer) {
       clearTimeout(timer)
       timer = null
-      const push = !replaceNext
-      replaceNext = false
+      const push = pushNext
+      pushNext = false
       writeUrl(push)
     }
     if (h.held === 0 && p.held > 0) schedule()

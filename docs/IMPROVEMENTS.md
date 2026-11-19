@@ -368,6 +368,23 @@ runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main. ~~Fixed on fix/round-211-220 (2026-11-15), where it failed in
 both full runs: the poll now asks again when a box is missing instead of failing.~~
 
+### Dogfooding (2026-11-19): the Measurements tab
+
+One need, four requirements and two scenarios, written through the worktree's own MCP server before the code.
+
+- **The ad hoc stdio client a third time.** Written again from scratch (raw JSON-RPC this time, the SDK is bundled
+  into the server's dist and not resolvable from a script): `radical mcp call <folder> <calls.json>` is overdue.
+- **No list of measurements for agents.** The Measurements tab has no counterpart in the CLI or MCP: `radical check`
+  prints the verdicts and `get_trace` one element's path, but nothing lists what the sensors measured with who reads
+  each value. A `radical check --measurements` (or `list_measurements`) would give agents the same look.
+- **Tightening check.json by hand.** To see what every rule would find, a temporary config with all 44 rules as
+  errors had to be generated from rules.ts and passed with `--config`; then the counts were copied into `max`
+  baselines. `radical check --ratchet --all-rules` (every rule on, each baseline set to its count) would do it in
+  one command, and the Inspector settings could offer the same as one button.
+- **`radical check --metrics` without `--report` forgot the tests.** Run after `--from-ci` on the same folder, it
+  reported 0 of 758 requirements verified: the kept test results count for the goals only when the same run reads
+  reports. One command for "read the measurements, keep the tests you have" would spare the surprise.
+
 ### Dogfooding (2026-11-16): Keep smart by default, Presentations as a place of the rail
 
 Fifteen rounds of the product owner's corrections (the rail's order alone changed five times), written into the model

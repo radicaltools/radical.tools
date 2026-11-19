@@ -34,6 +34,7 @@ import { Errors, TabBadge, dimensionOfFinding, dimensionsOf, type Ctx } from './
 import { OverviewTab } from './inspector/OverviewTab'
 import { ModelTab } from './inspector/ModelTab'
 import { ImplementationTab } from './inspector/ImplementationTab'
+import { MeasurementsTab, measurementsBadge } from './inspector/MeasurementsTab'
 import { FreshnessChips } from './inspector/Freshness'
 import { modelChangedAt, waitingForMeasurement } from './inspector/attention'
 import { TracePanel } from './inspector/TracePanel'
@@ -164,6 +165,7 @@ export function InspectorMain(): React.ReactElement {
             {tab === 'model' && <><Errors errors={model.errors} ctx={ctx} /><ModelTab check={check} ctx={ctx} relations={relations} onSettings={openCheckSettings} /></>}
             {tab === 'implementation' && <><Errors errors={impl.errors} ctx={ctx} />
               <ImplementationTab check={check} ctx={ctx} relations={relations} onSettings={openCheckSettings} /></>}
+            {tab === 'measurements' && <MeasurementsTab measurements={measurements} ctx={ctx} folder={folder} onTrace={setTrace} />}
             {tab === 'branch' && !branch.base && <NoBase />}
             {tab === 'branch' && branch.changes && branch.base && branch.baseModel && <ThisBranch work={work} changes={branch.changes} base={branch.base} baseModel={branch.baseModel} ctx={ctx} />}
           </div>
@@ -182,6 +184,7 @@ const TAB_INFO: Record<Tab, { label: string; about: string; icon: React.ReactNod
   overview: { label: 'Overview', about: 'Scores and what needs attention', icon: <path d="M2.5 13.5h11M4 11V7m4 4V4m4 7V8.5" /> },
   model: { label: 'Model', about: 'The model on its own', icon: <><rect x="2" y="2.5" width="5" height="4" rx="1" /><rect x="9" y="9.5" width="5" height="4" rx="1" /><path d="M4.5 6.5v3.5a1.5 1.5 0 0 0 1.5 1.5h3" /></> },
   implementation: { label: 'Implementation', about: 'What the tests say', icon: <><path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5" /></> },
+  measurements: { label: 'Measurements', about: 'What the sensors measured', icon: <><path d="M2.5 12.5h11" /><path d="M3.5 10.5 6 7l2.5 2 4-5" /><circle cx="12.5" cy="4" r="1" /></> },
   branch: { label: 'This branch', about: 'Changed since the base', icon: <><circle cx="4.5" cy="3.5" r="1.5" /><circle cx="4.5" cy="12.5" r="1.5" /><circle cx="11.5" cy="5.5" r="1.5" /><path d="M4.5 5v6M11.5 7c0 2.5-2 3-7 4" /></> },
 }
 
@@ -196,6 +199,8 @@ function SideNav({ tab, onTab, check, branch, work }: {
   work: ReturnType<typeof changeWork> | null
 }): React.ReactElement {
   const hasBranch = !!(branch.changes && branch.base)
+  const measurements = useInspectorStore((s) => s.measurements)
+  const measured = check ? measurementsBadge(measurements, check.evidence?.nodes) : null
   const dims = (perspective: 'model' | 'implementation') => {
     if (!check) return null
     const ids = new Set(dimensionsOf(perspective).map((d) => d.id))
@@ -207,6 +212,11 @@ function SideNav({ tab, onTab, check, branch, work }: {
     ['overview', check?.errors ? <span key="b" className="insp-pill bad">✗ {check.errors}</span> : null],
     ['model', model ? <TabBadge key="b" metrics={model.metrics} errors={model.errors} /> : null],
     ['implementation', !check ? null : check.evidence && impl ? <TabBadge key="b" metrics={impl.metrics} errors={impl.errors} /> : <span key="b" className="insp-pill none">no results</span>],
+    ['measurements', !measured ? null : measured.count ? <React.Fragment key="b">
+      <span className="insp-pill none" title="Measurements beside the model">{measured.count}</span>
+      {measured.failed > 0 && <span className="insp-pill bad" title="Values off their condition">✗ {measured.failed}</span>}
+      {measured.stale > 0 && <span className="insp-pill warn" title="Measurements too old for their condition">◷ {measured.stale}</span>}
+    </React.Fragment> : <span key="b" className="insp-pill none">none</span>],
     // Changes on branch is here only: without a base, how to save one.
     ['branch', hasBranch ? <React.Fragment key="b">
       <span className="insp-pill none" title="Elements and relations changed since the base">{changeTotal(branch.changes!.counts)}</span>

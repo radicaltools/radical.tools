@@ -15,7 +15,8 @@ import { HUB_PORT } from '../../playwright.config'
 // `radical sense` keeps there. It is a place of the activity rail, as the
 // Views section is: its button (above Settings) lists its tabs in the left
 // panel (Overview: the scores and what needs attention; Model;
-// Implementation: what the tests say; This branch) and shows the tab picked
+// Implementation: what the tests say; Measurements: what the sensors
+// measured; This branch) and shows the tab picked
 // in place of the view, under a bar that says how old the evidence is and
 // gives the verdict. Settings → Inspector settings… edits the folder's
 // check.json.
@@ -172,7 +173,7 @@ test('the Inspector opens on Overview with what needs attention, and each findin
 
   // Overview first: the scores of the model and of what the tests verify.
   await expect(tab(page, /^Overview/)).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab')).toHaveText([/^Overview/, /^Model/, /^Implementation/, /^This branch/])
+  await expect(page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab')).toHaveText([/^Overview/, /^Model/, /^Implementation/, /^Measurements/, /^This branch/])
   const scores = page.getByRole('region', { name: 'Model scores' }).locator('.insp-score')
   await expect(scores).toHaveCount(4)
   await expect(scores.first()).toContainText('Consistency')
