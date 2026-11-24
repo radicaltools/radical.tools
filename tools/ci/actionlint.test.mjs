@@ -2,7 +2,7 @@
 // nothing in this repository's workflows and refuses a broken one. It runs
 // actionlint's Docker image where Docker runs (CI), else its release binary.
 import { describe, expect, it } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import yaml from 'js-yaml'
@@ -18,7 +18,10 @@ describe('Workflows pass actionlint', () => {
 
   it('Broken workflow refused: a job whose needs names a job that does not exist fails, naming the file and line', async () => {
     const root = mkdtempSync(join(tmpdir(), 'radical-actionlint-'))
-    mkdirSync(join(root, '.github/workflows'), { recursive: true })
+    // mkdtemp makes it 0700: actionlint's image, not run as this user, could
+    // not read it (a fatal error, exit code 3, not findings).
+    chmodSync(root, 0o755)
+    mkdirSync(join(root, '.github/workflows'), { recursive: true, mode: 0o755 })
     writeFileSync(join(root, '.github/workflows/ci.yml'), `name: CI
 on: pull_request
 jobs:
