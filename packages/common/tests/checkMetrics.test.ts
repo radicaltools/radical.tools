@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkModel, computeEvidence, convertUnit, mergeMeasurements, metricsFileProblems, parseCombine, parseCondition, parseMaxAge, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile, type Measurement } from '../src/check'
+import { checkModel, computeEvidence, convertUnit, evaluateMetric, mergeMeasurements, metricsFileProblems, parseCombine, parseCondition, parseMaxAge, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile, type Measurement } from '../src/check'
 import { checkedStatus } from '../src/check/evidence'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
 import type { C4Node, C4Relation, DiagramData } from '../src/c4'
@@ -122,7 +122,7 @@ describe('invalid conditions', () => {
     const data = model('p95 is fine\nload.share{env=prod} <= 300 ms', { combine: 'most', max_age: 'soon' })
     const result = run(data, [measured('load.share', 40, '%', { env: 'prod' })])
     expect(messages(result, 'metric-invalid')).toEqual([
-      'Fitness function "Checkout latency": "p95 is fine" cannot be read: it is neither `test(<file> › <title>) passed`, `review(<name>) passed`, `<metric>{<labels>} <op> <number> [unit]` nor `<metric>{<labels>} <op> baseline [+|- <number> %|unit]`.',
+      'Fitness function "Checkout latency": "p95 is fine" cannot be read: it is neither `test(<file> › <title>) passed`, `review(<name>) passed`, `<metric>{<labels>} <op> <number> [unit] [scaled]` nor `<metric>{<labels>} <op> baseline [+|- <number> %|unit]`.',
       'Fitness function "Checkout latency": "load.share{env=prod} <= 300 ms" cannot be evaluated: the measurement is in %, which does not convert to ms.',
       'Fitness function "Checkout latency": combine "most" is none of all, any, at least N.',
       'Fitness function "Checkout latency": max_age "soon" is no age such as 7d, 12h or 30min.',
@@ -168,5 +168,55 @@ describe('conditions against a baseline', () => {
     expect(result.evidence!.nodes.ff.status).toBe('not-run')
     expect(messages(result, 'metric-failed')).toEqual([])
     expect(messages(result, 'metric-not-measured')).toEqual(['Fitness function "Checkout latency": studio.open_ms{model=x14} <= baseline + 20% was not evaluated: no baseline to compare with (9000 ms from json, 2 h ago).'])
+  })
+})
+
+describe('limits scaled to the machine', () => {
+  const evaluate = (line: string, measurements: Measurement[]) => {
+    const c = parseCondition(line)
+    if (c.kind !== 'metric') throw new Error(`no metric condition: ${line}`)
+    return evaluateMetric(c, measurements, undefined, NOW)
+  }
+  const unit = (ms: number, msAgo = 3600e3) => measured('test.duration.max', ms, 'ms', { kind: 'unit' }, msAgo)
+  const speed = (value: number, msAgo = 3600e3) => ({ ...measured('machine.speed', value, undefined, {}, msAgo), source: 'machine' })
+
+  it('reads scaled at the end of a fixed limit, and refuses it on == and on a baseline', () => {
+    expect(parseCondition('test.duration.max{kind=unit} <= 100 ms scaled')).toMatchObject({ kind: 'metric', metric: 'test.duration.max', labels: { kind: 'unit' }, op: '<=', value: 100, unit: 'ms', scaled: true })
+    expect(parseCondition('throughput >= 1000 scaled')).toMatchObject({ kind: 'metric', op: '>=', value: 1000, scaled: true })
+    expect(parseCondition('test.duration.max <= 100 ms')).not.toHaveProperty('scaled')
+    expect(parseCondition('x == 1 scaled').kind).toBe('invalid')
+    expect(parseCondition('x <= baseline + 20% scaled').kind).toBe('invalid')
+  })
+
+  it('multiplies an upper limit by the machine.speed measured with the value and shows the arithmetic', () => {
+    const e = evaluate('test.duration.max{kind=unit} <= 100 ms scaled', [unit(180), speed(2.4)])
+    expect(e.outcome).toBe('passed')
+    expect(e.detail).toBe('limit 100 ms × 2.4 = 240 ms')
+    expect(evaluate('test.duration.max{kind=unit} <= 100 ms scaled', [unit(250), speed(2.4)]).outcome).toBe('failed')
+  })
+
+  it('never scales below ×1, so a faster machine tightens nothing', () => {
+    const e = evaluate('test.duration.max{kind=unit} <= 100 ms scaled', [unit(100), speed(0.5)])
+    expect(e.outcome).toBe('passed')
+    expect(e.detail).toBe('limit 100 ms × 1 = 100 ms (machine.speed 0.5, never below ×1)')
+  })
+
+  it('divides a lower limit, and takes the machine.speed nearest in time to the value', () => {
+    const ops = (value: number) => measured('api.throughput', value, undefined, {}, 3600e3)
+    // Measured an hour ago with the value, and a faster run a day ago.
+    const e = evaluate('api.throughput >= 1000 scaled', [ops(600), speed(2, 3600e3 + 60e3), speed(1, DAY)])
+    expect(e.outcome).toBe('passed')
+    expect(e.detail).toBe('limit 1000 ÷ 2 = 500')
+  })
+
+  it('does not measure a scaled condition when no machine.speed was measured, and names the sensor', () => {
+    const e = evaluate('test.duration.max{kind=unit} <= 100 ms scaled', [unit(50)])
+    expect(e.outcome).toBe('not-run')
+    expect(e.detail).toContain('radical sense machine')
+  })
+
+  it('keeps the measurement raw in the evidence', () => {
+    const data = model('test.duration.max{kind=unit} <= 100 ms scaled')
+    expect(run(data, [unit(180), speed(2.4)]).evidence!.nodes.ff.conditions![0]).toMatchObject({ outcome: 'passed', detail: 'limit 100 ms × 2.4 = 240 ms', measurement: { value: 180, unit: 'ms' } })
   })
 })

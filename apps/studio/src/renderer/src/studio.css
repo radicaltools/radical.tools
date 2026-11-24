@@ -278,6 +278,37 @@ label.app-menu-row { cursor: pointer; }
 }
 .app-menu-select:hover,
 .app-menu-select:focus { border-color: var(--accent); }
+/* A setting of a few values (MenuChoice): its values side by side, as one
+   segmented control; a long one wraps under its name. */
+.app-menu-choice { flex-wrap: wrap; row-gap: 4px; }
+.app-menu-seg {
+  display: inline-flex; margin-left: auto;
+  border: 1px solid var(--border-color); border-radius: 6px;
+  background: var(--input-bg); padding: 1px; gap: 1px;
+}
+.app-menu-seg-btn {
+  min-height: 24px; padding: 0 8px;
+  background: none; border: none; border-radius: 5px;
+  color: var(--text-secondary); font-size: 11.5px; cursor: pointer;
+  white-space: nowrap;
+}
+.app-menu-seg-btn:hover:not(:disabled) { background: var(--hover-bg); color: var(--text-primary); }
+.app-menu-seg-btn.on { background: var(--accent-soft); color: var(--text-primary); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.45); }
+.app-menu-seg-btn:disabled { cursor: default; opacity: 0.6; }
+.app-menu-seg-btn:focus-visible, .app-menu-check:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; box-shadow: none; }
+/* A setting on or off (MenuCheck): the row is the item, its box at the right. */
+.app-menu-check {
+  width: 100%; min-height: 30px;
+  background: none; border: none; border-radius: 6px;
+  cursor: pointer; text-align: left;
+}
+.app-menu-check:hover { background: var(--hover-bg); }
+.app-menu-box {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 16px; height: 16px; border-radius: 4px;
+  border: 1px solid var(--border-color-strong); background: var(--input-bg);
+}
+.app-menu-box.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 /* Presentation picker */
 .pres-picker {
   padding: 6px 8px;
@@ -819,9 +850,9 @@ div.milestone-option { cursor: default; }
 .forge-btn:disabled { cursor: default; opacity: 0.45; }
 .forge-btn-sm { padding: 4px 10px; font-size: 11px; border-radius: 6px; }
 .forge-btn-primary {
-  background: var(--accent);
+  background: var(--accent-solid);
   color: #fff;
-  border-color: var(--accent);
+  border-color: var(--accent-solid);
   box-shadow: 0 1px 2px rgba(0,0,0,.18);
 }
 .forge-btn-primary:hover:not(:disabled) {
@@ -1909,6 +1940,7 @@ div.milestone-option { cursor: default; }
 }
 .quick-search-bar .quick-search-inputrow input {
   font-size: 12px;
+  min-height: 24px;
 }
 .quick-search-inputrow {
   display: flex;
@@ -2038,9 +2070,9 @@ div.milestone-option { cursor: default; }
   transition: background-color 0.12s, color 0.12s, border-color 0.12s;
 }
 .quick-search-view-chip:hover {
-  background: var(--accent);
+  background: var(--accent-solid);
   color: white;
-  border-color: var(--accent);
+  border-color: var(--accent-solid);
 }
 /* ─── Quick search · sections, marks, suggestions ─────────────────── */
 /* A hit's views: how many, and → (or a click) to choose where it opens. */
@@ -2522,9 +2554,9 @@ div.milestone-option { cursor: default; }
   font-weight: 600;
 }
 .ai-set-default-btn {
-  background: var(--accent);
+  background: var(--accent-solid);
   color: white;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--accent-solid);
   padding: 4px 10px;
   border-radius: 4px;
   font-size: 11px;
@@ -2566,8 +2598,10 @@ div.milestone-option { cursor: default; }
   --text-primary: #111827;
   --text-secondary: #374151;
   --text-muted: #6b7280;
-  --accent: #3b6fe6;
-  --accent-rgb: 59, 111, 230;
+  /* A shade deeper than the light theme's accent: its links stand on the
+     right column's #f8f9fc at 5:1 (WCAG 1.4.3). */
+  --accent: #2f64dc;
+  --accent-rgb: 47, 100, 220;
   --accent-soft: rgba(59, 111, 230, 0.08);
   --hover-bg: rgba(59, 111, 230, 0.07);
   display: grid;
@@ -2683,7 +2717,7 @@ div.milestone-option { cursor: default; }
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  color: #3b6fe6;
+  color: var(--accent);
   cursor: pointer;
 }
 .welcome-sample-link svg {
@@ -2697,6 +2731,7 @@ div.milestone-option { cursor: default; }
   outline-offset: 2px;
 }
 .welcome-choice {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -2730,10 +2765,19 @@ div.milestone-option { cursor: default; }
   background: #2d5fd4;
   border-color: #2d5fd4;
 }
-.welcome-choice:focus-visible {
+.welcome-choice:has(.welcome-choice-btn:focus-visible) {
   outline: 2px solid rgba(59, 111, 230, 0.4);
   outline-offset: 2px;
 }
+/* The card's one button, its title: its box covers the whole card. */
+.welcome-choice-btn {
+  align-self: flex-start;
+  padding: 0; border: none; background: none;
+  font: inherit; color: inherit; text-align: left; line-height: 24px;
+  cursor: pointer;
+}
+.welcome-choice-btn::after { content: "";  position: absolute; inset: 0; border-radius: 14px; }
+.welcome-choice-btn:focus-visible { outline: none; box-shadow: none; }
 .welcome-choice-text {
   display: flex;
   flex-direction: column;
@@ -2751,7 +2795,7 @@ div.milestone-option { cursor: default; }
   color: #6b7280;
 }
 .welcome-choice-primary .welcome-choice-desc {
-  color: rgba(255, 255, 255, 0.8);
+  color: #fff;
 }
 
 /* ─── New model / Open steps (welcome screen, Models dialog) ─────────────── */
@@ -2767,6 +2811,7 @@ div.milestone-option { cursor: default; }
   gap: 6px;
   background: none;
   border: none;
+  min-height: 24px;
   padding: 4px 6px;
   margin: -4px 0 8px -6px;
   font: inherit;
@@ -2858,6 +2903,7 @@ div.milestone-option { cursor: default; }
   padding: 0 12px 4px 35px;
 }
 .msteps-link {
+  display: inline-flex; align-items: center; min-height: 24px;
   padding: 0;
   font: inherit;
   font-size: 11.5px;
@@ -2921,8 +2967,8 @@ div.milestone-option { cursor: default; }
   width: 100%;
 }
 .msteps-btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-solid);
+  border-color: var(--accent-solid);
   color: #ffffff;
 }
 .msteps-btn-primary:hover {
@@ -3061,9 +3107,9 @@ div.milestone-option { cursor: default; }
   transition: background 0.12s;
 }
 .tm-bc-back:hover {
-  background: var(--accent);
+  background: var(--accent-solid);
   color: #fff;
-  border-color: var(--accent);
+  border-color: var(--accent-solid);
 }
 .tm-bc-spacer { flex: 1 1 auto; }
 .tm-bc-sizeby {
@@ -3188,8 +3234,8 @@ div.milestone-option { cursor: default; }
 }
 .lcn-btn:hover { border-color: var(--accent); }
 .lcn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-solid);
+  border-color: var(--accent-solid);
   color: #fff;
 }
 .mx-empty {
@@ -3772,7 +3818,7 @@ div.milestone-option { cursor: default; }
 .insp-sec-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .insp-sec-head .insp-lede { margin: 0; }
 .insp-btn { border: 1px solid var(--border-color-strong); background: var(--input-bg); color: var(--text-primary); border-radius: var(--radius-sm); padding: 5px 12px; min-height: 30px; cursor: pointer; font: inherit; font-size: 12.5px; }
-.insp-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.insp-btn.primary { background: var(--accent-solid); border-color: var(--accent-solid); color: #fff; font-weight: 600; }
 .insp-btn.ghost { background: transparent; color: inherit; border-color: color-mix(in srgb, currentColor 35%, transparent); }
 .insp-btn:disabled { opacity: 0.5; cursor: default; }
 .insp-ratchet { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 12px; max-width: 60ch; }
@@ -4169,16 +4215,21 @@ div.milestone-option { cursor: default; }
   padding: 18px 22px 0;
 }
 .setup-kicker { font-size: 12px; color: var(--text-muted); letter-spacing: 0.02em; }
-.setup-dots { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.setup-dots { display: flex; gap: 0; list-style: none; margin: 0 -8px; padding: 0; }
+/* A 24 px button (WCAG 2.5.8) that draws its small dot in the middle. */
 .setup-dot {
-  width: 8px; height: 8px; padding: 0;
-  border-radius: 50%;
-  border: 0;
-  background: var(--border-color-strong);
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; height: 24px; padding: 0 8px;
+  border: 0; border-radius: 6px;
+  background: none;
   cursor: pointer;
 }
-.setup-dot.passed { background: rgba(var(--accent-rgb), 0.45); }
-.setup-dot.current { background: var(--accent); width: 20px; border-radius: 4px; }
+.setup-dot::before {
+  content: ''; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border-color-strong);
+}
+.setup-dot.passed::before { background: rgba(var(--accent-rgb), 0.45); }
+.setup-dot.current::before { background: var(--accent); width: 20px; border-radius: 4px; }
 .setup-body { flex: 1; padding: 14px 22px 8px; }
 .setup-title { margin: 0 0 14px; font-size: 18px; font-weight: 600; }
 .setup-text { margin: 0 0 10px; font-size: 13px; color: var(--text-secondary); line-height: 1.45; }
@@ -4208,6 +4259,7 @@ div.milestone-option { cursor: default; }
 .setup-choice.row { flex-direction: row; justify-content: flex-start; padding: 10px 12px; }
 .setup-choice-label { font-size: 13px; font-weight: 600; }
 .setup-choice-hint { font-size: 11px; color: var(--text-muted); line-height: 1.35; }
+.setup-choice.chosen .setup-choice-hint { color: var(--text-secondary); }
 .setup-swatch {
   width: 100%;
   height: 54px;
@@ -4248,7 +4300,7 @@ div.milestone-option { cursor: default; }
   padding: 12px 22px 18px;
 }
 .setup-foot .milestone-btn { padding: 6px 14px; font-size: 12px; }
-.setup-foot .milestone-btn.primary:hover { background: var(--accent); filter: brightness(1.1); }
+.setup-foot .milestone-btn.primary:hover { background: var(--accent-solid); filter: brightness(1.1); }
 .setup-foot-hint { flex: 1; font-size: 11px; color: var(--text-muted); text-align: right; }
 @media (max-width: 560px) {
   .setup-choices.four { grid-template-columns: repeat(2, 1fr); }
@@ -4403,3 +4455,72 @@ div.milestone-option { cursor: default; }
 .insp-meas-path { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; min-height: 24px; padding: 2px 9px; font-size: 12px; color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border-color)); }
 .insp-meas-path:hover { background: color-mix(in srgb, var(--accent) 10%, var(--bg-panel)); border-color: var(--accent); }
 .insp-metric-waiting { margin-top: 16px; }
+
+/* ─── A narrow window: a phone, or 1280 px at 400 % zoom (WCAG 1.4.10) ───
+   Nothing of the chrome may be cut off at 320 px: the toolbar wraps, Quick
+   Search takes a row of its own under it, the left panel lies over the
+   canvas instead of taking its width, the welcome card is one column that
+   scrolls. The canvas itself is a map, two-dimensional by nature. */
+@media (max-width: 700px) {
+  .app-layout,
+  .app-layout.mode-presentation,
+  .app-layout.lp-collapsed,
+  .app-layout.mode-presentation.lp-collapsed {
+    grid-template-columns: var(--rail-w) 0 minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr auto;
+    grid-template-areas:
+      "rail toolbar    toolbar"
+      "rail qs         qs"
+      "rail leftpanel  canvas"
+      "rail timetravel timetravel";
+  }
+  .app-layout.other-model-shown,
+  .app-layout.mode-presentation.other-model-shown {
+    grid-template-rows: auto auto auto 1fr auto;
+    grid-template-areas:
+      "rail toolbar    toolbar"
+      "rail qs         qs"
+      "rail leftpanel  otherbar"
+      "rail leftpanel  canvas"
+      "rail timetravel timetravel";
+  }
+  .app-layout.mode-metamodel {
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      "rail toolbar"
+      "rail qs"
+      "rail canvas";
+  }
+  .app-layout:not(.lp-collapsed) > .left-panel:not(.collapsed) {
+    /* Room at its edge for its fold tab (.panel-toggle). */
+    width: min(300px, calc(100vw - var(--rail-w) - 24px));
+    z-index: 30;
+  }
+  /* The toolbar: its groups on as many lines as they need. */
+  .toolbar { flex-wrap: wrap; row-gap: 6px; min-height: 48px; padding: 8px; }
+  .toolbar-center { position: static; display: contents; }
+  .toolbar-center > * { position: static; transform: none; }
+  .toolbar .toolbar-mode-btn .toolbar-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  /* Quick Search in its row under the toolbar, the row's width. */
+  .app-layout > .quick-search-bar {
+    grid-area: qs;
+    position: relative;
+    top: auto; left: auto; transform: none;
+    width: auto;
+    margin: 6px 8px;
+  }
+  /* Fit, zoom and the rest at the canvas's foot: on two lines if need be. */
+  .canvas-controls { flex-wrap: wrap; justify-content: center; max-width: calc(100% - 16px); }
+  /* The welcome card: its two columns one under the other, scrolled. */
+  .welcome-overlay { padding: 8px; }
+  .welcome-card {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    height: auto;
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+  }
+  .welcome-left { padding: 24px 20px 20px; }
+  .welcome-right { padding: 20px; overflow-y: visible; border-left: none; border-top: 1px solid #e8eaf0; }
+}

@@ -55,7 +55,7 @@ test('the card says in every perspective what the check says of the element, and
   await folder.write('.state/measurements.json', serializeMeasurementStore([
     { metric: 'checkout.latency.p95', value: 420, unit: 'ms', labels: {}, source: 'k6', at: new Date(Date.now() - 2 * 3600_000).toISOString() },
   ]))
-  const inspector = page.locator('.activity-rail').getByRole('button', { name: 'Inspector', exact: true })
+  const inspector = page.locator('.activity-rail').getByRole('button', { name: /^Inspector(,|$)/ })
   await expect(inspector).toBeEnabled({ timeout: 10_000 })
 
   // In Viewer, where the model opens.

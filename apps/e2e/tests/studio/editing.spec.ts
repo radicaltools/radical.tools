@@ -277,7 +277,7 @@ test('Undo and Redo are Designer\'s: Viewer, Presenter and the metamodel editor 
   await expect(undo).toBeEnabled()
   for (const mode of ['Viewer', 'Presentations']) {
     // Presentations are a place of the activity rail, not a perspective.
-    await page.getByRole('button', { name: mode, exact: true }).click()
+    await page.getByRole('button', { name: mode === 'Presentations' ? /^Presentations(,|$)/ : mode, exact: true }).click()
     await expect(undo).toHaveCount(0)
     await expect(redo).toHaveCount(0)
     // Nor do the keys take Designer's step behind the user's back.
@@ -330,7 +330,7 @@ for (const perspective of ['Viewer', 'Presenter']) {
     await studio.addFromPalette('Software System', await studio.nearBottom())
     await expect(studio.nodes).toHaveCount(4)
     await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(7)
-    await page.getByRole('button', { name: perspective === 'Presenter' ? 'Presentations' : perspective, exact: true }).click()
+    await page.getByRole('button', { name: perspective === 'Presenter' ? /^Presentations(,|$)/ : perspective, exact: true }).click()
     await studio.settle()
     await studio.pane.click({ position: { x: 5, y: 5 } })
     await page.keyboard.press('ControlOrMeta+z')
@@ -853,16 +853,17 @@ test('⌘+ on a table leaves the browser its zoom, and the canvas after it draws
 })
 
 test('view, milestone and sequence cards open from the keyboard', async ({ page }) => {
-  // Item 215: only View properties' button was a Tab stop.
+  // Item 215: only View properties' button was a Tab stop. A card's title
+  // is its button (no button inside another, WCAG 4.1.2).
   const card = page.locator('.lp-view-card', { hasText: 'Containers' }).first()
-  await card.focus()
+  await card.locator('.lp-card-main').focus()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/\/v\/v-containers$/)
   const all = page.locator('.lp-view-card', { hasText: 'All elements' })
-  await all.focus()
+  await all.locator('.lp-card-main').focus()
   await page.keyboard.press(' ')
   await expect(page).toHaveURL(/\/v\/all$/)
-  await expect(page.locator('.lp-snap-current')).toHaveAttribute('tabindex', '0')
+  await expect(page.locator('.lp-snap-current button.lp-card-main')).toHaveCount(1)
 })
 
 test('Move to… with many parents stays in the window and scrolls', async ({ page, studio }) => {

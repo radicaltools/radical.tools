@@ -6,15 +6,15 @@
 
 import React, { useState } from 'react'
 import {
-  CHECK_DIMENSIONS, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, formatAge,
+  ADOPT_RULE, CHECK_DIMENSIONS, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, formatAge,
   type CheckDimension, type ConditionResult, type CheckFinding, type CheckMetricResult, type CheckPerspective, type CheckResult, type CheckRuleResult, type EvidenceEntry,
 } from '@radical/common/check'
 import type { C4Node } from '@radical/common/c4'
 import type { Metamodel } from '@radical/common/metamodel'
 import { openConcern } from '../../persistence/inspector'
 
-export const RULE_INFO = new Map<string, string>([...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE].map((r) => [r.id, r.description]))
-const RULE_DIMENSION = new Map<string, CheckDimension>([...FOLDER_RULES, ...CHECK_RULES].map((r) => [r.id, r.dimension]))
+export const RULE_INFO = new Map<string, string>([...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE, ADOPT_RULE].map((r) => [r.id, r.description]))
+const RULE_DIMENSION = new Map<string, CheckDimension>([...FOLDER_RULES, ...CHECK_RULES, ADOPT_RULE].map((r) => [r.id, r.dimension]))
 const METRIC_DIMENSION = new Map<string, CheckDimension>(CHECK_METRICS.map((m) => [m.id, m.dimension]))
 export const DIMENSIONS = new Map(CHECK_DIMENSIONS.map((d) => [d.id, d]))
 export const dimensionsOf = (perspective: CheckPerspective): typeof CHECK_DIMENSIONS => CHECK_DIMENSIONS.filter((d) => d.perspective === perspective)

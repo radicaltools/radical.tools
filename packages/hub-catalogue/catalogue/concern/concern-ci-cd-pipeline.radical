@@ -1,0 +1,975 @@
+{
+  "hub": {
+    "id": "concern-ci-cd-pipeline",
+    "category": "concern",
+    "name": "CI/CD pipeline",
+    "description": "How a change is built, checked and delivered by machine: the pipeline as code in the repository, the gate the main branch requires from it, one artifact built once and promoted by digest, how the pipeline signs in to the cloud without stored keys, and how fast and reliable the pipeline itself must be. The snippets assume a Node project on GitHub Actions deploying a container image to AWS; the time and reliability are measured with radical sense github-actions.",
+    "tags": [
+      "sdlc",
+      "ci",
+      "cd",
+      "pipeline",
+      "github actions",
+      "oidc",
+      "build once",
+      "branch protection"
+    ],
+    "requiredMetamodel": "c4-ddd-governance-builtin",
+    "concern": {
+      "id": "ci-cd-pipeline",
+      "trigger": "LIST NODES WHERE (type = \"container\" OR type = \"webapp\") AND external != true",
+      "why": "these elements are built, checked and deployed by a pipeline, so how that pipeline is defined, what it gates, what it deploys and how fast and reliable it is has to be decided.",
+      "group": "sdlc"
+    },
+    "sources": [
+      {
+        "title": "Jez Humble, David Farley: Continuous Delivery (the deployment pipeline; only build your binaries once)",
+        "url": "https://www.oreilly.com/library/view/continuous-delivery-reliable/9780321670250/"
+      },
+      {
+        "title": "Martin Fowler: Continuous Integration",
+        "url": "https://martinfowler.com/articles/continuousIntegration.html"
+      },
+      {
+        "title": "Martin Fowler: Eradicating Non-Determinism in Tests",
+        "url": "https://martinfowler.com/articles/nonDeterminism.html"
+      },
+      {
+        "title": "DORA capabilities: Continuous integration",
+        "url": "https://dora.dev/capabilities/continuous-integration/"
+      },
+      {
+        "title": "GitHub Docs: Workflow syntax for GitHub Actions",
+        "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax"
+      },
+      {
+        "title": "GitHub Docs: Reusing workflows",
+        "url": "https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows"
+      },
+      {
+        "title": "GitHub Docs: Using conditions to control job execution (a skipped job reports success)",
+        "url": "https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions"
+      },
+      {
+        "title": "GitHub Docs: Available rules for rulesets (required status checks)",
+        "url": "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets"
+      },
+      {
+        "title": "GitHub Docs: Control the concurrency of workflows and jobs",
+        "url": "https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency"
+      },
+      {
+        "title": "GitHub Docs: Dependency caching",
+        "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching"
+      },
+      {
+        "title": "GitHub Docs: OpenID Connect",
+        "url": "https://docs.github.com/en/actions/concepts/security/openid-connect"
+      },
+      {
+        "title": "GitHub Docs: Configuring OpenID Connect in Amazon Web Services",
+        "url": "https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws"
+      },
+      {
+        "title": "GitHub Docs: Deployments and environments",
+        "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments"
+      },
+      {
+        "title": "OWASP Secrets Management Cheat Sheet",
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html"
+      },
+      {
+        "title": "Reproducible Builds: definitions",
+        "url": "https://reproducible-builds.org/docs/definition/"
+      },
+      {
+        "title": "Docker Docs: Reproducible builds with GitHub Actions",
+        "url": "https://docs.docker.com/build/ci/github-actions/reproducible-builds/"
+      },
+      {
+        "title": "actionlint",
+        "url": "https://github.com/rhysd/actionlint"
+      },
+      {
+        "title": "GitLab Docs: Pipelines API and Jobs API",
+        "url": "https://docs.gitlab.com/api/pipelines/"
+      }
+    ],
+    "templateParams": [
+      {
+        "key": "PLATFORM",
+        "title": "CI platform",
+        "label": "Which CI platform runs the pipeline?",
+        "hint": "The decisions hold on any platform, and the snippets are written for GitHub Actions. The platform decides what measures the pipeline's time and reliability: radical sense has a built-in sensor for GitHub Actions only.",
+        "defaultValue": "github",
+        "options": [
+          {
+            "value": "github",
+            "label": "GitHub Actions",
+            "description": "Workflows under .github/workflows; every night radical sense github-actions reads the runs of the last 30 days and the rules of main through the GitHub API, and the model judges the figures. Pick it when the code and the pipeline are on GitHub."
+          },
+          {
+            "value": "other",
+            "label": "another CI platform, measured by a job of our own",
+            "description": "The snippets are translated to the platform's own configuration, and a scheduled job of the team's reads the platform's API and writes the same figures as JSON for radical sense json (an example for GitLab CI is given). Pick it when the pipeline runs on GitLab CI, Azure Pipelines, Jenkins or another platform; once an adapter for it is added to radical sense by pull request, the job is no longer needed."
+          }
+        ]
+      },
+      {
+        "key": "ARTIFACT",
+        "title": "Artifacts",
+        "label": "How does a build reach each environment?",
+        "hint": "What runs in production should be what was tested; a build made again for each environment may not be, because dependencies, base images and tools move between builds. Which environments exist is decided in the Infrastructure pack.",
+        "defaultValue": "promote",
+        "options": [
+          {
+            "value": "promote",
+            "label": "one build, promoted by digest",
+            "description": "The image is built once for each commit merged to main, and every environment deploys that image by its sha256 digest; only configuration differs between environments. Pick it whenever the environments can pull from one registry; it is the default of continuous delivery."
+          },
+          {
+            "value": "reproducible",
+            "label": "a build per environment, made reproducible",
+            "description": "Each environment builds the image again from the same commit, and the build is made reproducible so that the rebuilds come out identical, which a nightly double build proves. Pick it only when environments cannot share an artifact: separate registries or accounts with no pull between them, an air-gapped production that must build from source, or a regulator that asks for builds inside each environment."
+          }
+        ]
+      },
+      {
+        "key": "CLOUD",
+        "title": "Cloud credentials",
+        "label": "How does the pipeline sign in to the cloud it deploys to?",
+        "hint": "A long-lived key in CI secrets can be used by every workflow that may read it, and from anywhere once it leaks. The running element's own credentials are decided in the Secrets pack.",
+        "defaultValue": "oidc",
+        "options": [
+          {
+            "value": "oidc",
+            "label": "OIDC federation, no stored keys",
+            "description": "Each deploy job exchanges GitHub's OpenID Connect token for short-lived credentials of a role that trusts only this repository and that job's environment. Pick it whenever the target supports it: AWS, Azure, Google Cloud and HashiCorp Vault all do."
+          },
+          {
+            "value": "static",
+            "label": "static keys in environment secrets, rotated",
+            "description": "A key for each environment, stored as a secret of the GitHub environment it deploys to and replaced on a schedule. Pick it only for a target without OIDC federation (some on-premises platforms and SaaS APIs), and plan the move to federation."
+          }
+        ]
+      },
+      {
+        "key": "LOCAL",
+        "title": "First run",
+        "label": "Where does the pipeline first run?",
+        "hint": "Either way the gate on the CI platform decides the merge; this is about whether a developer can run the same checks before pushing.",
+        "defaultValue": "mirrored",
+        "options": [
+          {
+            "value": "mirrored",
+            "label": "one command, run locally and mirrored in CI",
+            "description": "Every step of the pull-request workflows is a package.json script, and npm run verify runs all of them, so a developer runs exactly what CI will run before pushing. Pick it when the checks can run on a laptop (no cloud-only services) and feedback before the push is worth keeping the two in step."
+          },
+          {
+            "value": "ci-only",
+            "label": "in CI only",
+            "description": "The checks are written for the CI runners, and developers push to learn the result. Pick it when the checks need what laptops lack (a GPU, cloud services, large data sets), or when the pipeline answers fast enough that a local run adds little."
+          }
+        ]
+      },
+      {
+        "key": "PR_MINUTES",
+        "label": "Within how many minutes must all the checks of a pull-request commit finish, at the 90th percentile? (the whole pipeline; the time limit of the test run alone is decided in the Test strategy pack)",
+        "defaultValue": "15",
+        "type": "number"
+      },
+      {
+        "key": "MAIN_SUCCESS_PCT",
+        "label": "For at least what share of the commits pushed to main must every run succeed (%)?",
+        "defaultValue": "90",
+        "type": "number"
+      },
+      {
+        "key": "RERUN_PCT",
+        "label": "At most what share of the pipeline's runs may need a second attempt (%)?",
+        "defaultValue": "5",
+        "type": "number"
+      },
+      {
+        "key": "KEY_ROTATE_DAYS",
+        "label": "Within how many days is each of the pipeline's cloud keys replaced? (static keys only)",
+        "defaultValue": "90",
+        "type": "number"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "need",
+      "type": "need",
+      "label": "The pipeline is a gate people trust",
+      "x": 0,
+      "y": 0,
+      "kind": "brief",
+      "source": "Hub concern pack: CI/CD pipeline",
+      "description": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/."
+    },
+    {
+      "id": "req-pipeline-as-code",
+      "type": "requirement",
+      "label": "Pipeline defined as code",
+      "x": 260,
+      "y": 0,
+      "ears_type": "ubiquitous",
+      "action": "define its whole pipeline (builds, checks and deploys) in workflow files under .github/workflows in its own repository, changed only through pull requests, with steps that several workflows need kept in reusable workflows, and with every workflow passing actionlint",
+      "rationale": "A pipeline that is code is reviewed, versioned and rebuilt like the element it builds; one configured by hand drifts where nobody sees it (Humble, Farley: Continuous Delivery, the deployment pipeline; GitHub Docs: Reusing workflows)."
+    },
+    {
+      "id": "req-server-gate",
+      "type": "requirement",
+      "label": "Gate runs on the server",
+      "x": 260,
+      "y": 130,
+      "ears_type": "ubiquitous",
+      "action": "run its pull-request checks on the CI platform's runners for every pull request, and refuse the merge until the gate job ci, which needs every other job of the pull-request workflow, has succeeded, counting a skipped or cancelled job as a failure",
+      "rationale": "A green run on a developer's machine is evidence nobody else can see; a required check on the server is the gate nobody can skip, and GitHub reports a skipped job as a success unless a gate counts it (Fowler, Continuous Integration; GitHub Docs: Using conditions to control job execution)."
+    },
+    {
+      "id": "req-pr-time",
+      "type": "requirement",
+      "label": "Pull-request pipeline in time",
+      "x": 260,
+      "y": 260,
+      "ears_type": "ubiquitous",
+      "action": "finish all the pipeline runs of a pull-request commit, from the start of the first to the end of the last, within {{PR_MINUTES}} minutes for at least 90 % of the commits of the last 30 days",
+      "rationale": "Feedback that people wait for keeps changes small and integrated; a slow pipeline is worked around by batching changes and merging without waiting (Fowler, Continuous Integration: keep the build fast; DORA: continuous integration)."
+    },
+    {
+      "id": "req-main-green",
+      "type": "requirement",
+      "label": "Main stays green",
+      "x": 260,
+      "y": 390,
+      "ears_type": "ubiquitous",
+      "action": "complete every run of at least {{MAIN_SUCCESS_PCT}} % of the commits pushed to main successfully, over the last 30 days, with cancelled and skipped runs left out",
+      "rationale": "A main branch that is often red cannot be released from, and a red build everyone is used to hides the next real failure (Fowler, Continuous Integration: fix broken builds immediately)."
+    },
+    {
+      "id": "req-reruns",
+      "type": "requirement",
+      "label": "Few runs need a rerun",
+      "x": 260,
+      "y": 520,
+      "ears_type": "ubiquitous",
+      "action": "need a second attempt for at most {{RERUN_PCT}} % of its completed runs over the last 30 days",
+      "rationale": "A run that passes on a second attempt teaches everyone to press Re-run, and then real failures are rerun too; the rerun rate shows the pipeline's own flakiness, while flaky tests are handled as the Test strategy pack decides (Fowler, Eradicating Non-Determinism in Tests)."
+    },
+    {
+      "id": "req-concurrency",
+      "type": "requirement",
+      "label": "Superseded runs cancelled, deploys queued",
+      "x": 260,
+      "y": 650,
+      "ears_type": "ubiquitous",
+      "action": "cancel the running pipeline of a pull request when a newer commit is pushed to it, and run the deploys to one environment one at a time, never cancelling one that has started",
+      "rationale": "Runs of a superseded commit only take runners from the current one, while a deploy cut off halfway leaves an environment in neither version (GitHub Docs: Control the concurrency of workflows and jobs)."
+    },
+    {
+      "id": "req-build-once",
+      "type": "requirement",
+      "label": "Built once, promoted by digest",
+      "x": 260,
+      "y": 780,
+      "ears_type": "event-driven",
+      "trigger": "a commit is merged to main",
+      "action": "build its image once, in the build job, and deploy that image by its sha256 digest to every environment, building nothing in a deploy job",
+      "rationale": "Only build your binaries once: a rebuild for each environment may differ from what was tested, through a moved dependency, base image or tool (Humble, Farley: Continuous Delivery).",
+      "hubWhen": {
+        "ARTIFACT": [
+          "promote"
+        ]
+      }
+    },
+    {
+      "id": "req-reproducible",
+      "type": "requirement",
+      "label": "Rebuilds come out identical",
+      "x": 260,
+      "y": 910,
+      "ears_type": "ubiquitous",
+      "action": "build every environment's image from the same commit with SOURCE_DATE_EPOCH set to the commit's time and every input pinned, so that two builds of one commit from scratch produce the same image digest",
+      "rationale": "A build is reproducible when the same source, environment and instructions give bit-for-bit identical output; only then does a rebuild ship what was tested (Reproducible Builds: definitions; Docker Docs: Reproducible builds).",
+      "hubWhen": {
+        "ARTIFACT": [
+          "reproducible"
+        ]
+      }
+    },
+    {
+      "id": "req-oidc",
+      "type": "requirement",
+      "label": "Cloud reached without stored keys",
+      "x": 260,
+      "y": 1040,
+      "ears_type": "ubiquitous",
+      "action": "sign every deploy job in to the cloud with GitHub's OIDC token, exchanged for a role that trusts only this repository and that job's environment and for credentials that expire within 1 hour, and keep no cloud key in the repository's or environments' secrets or in any workflow file",
+      "rationale": "Credentials issued for one job leave nothing to steal or rotate, and a trust condition on the repository and environment keeps every other workflow out (GitHub Docs: OpenID Connect; Configuring OpenID Connect in Amazon Web Services).",
+      "hubWhen": {
+        "CLOUD": [
+          "oidc"
+        ]
+      }
+    },
+    {
+      "id": "req-key-rotation",
+      "type": "requirement",
+      "label": "Pipeline keys scoped and rotated",
+      "x": 260,
+      "y": 1170,
+      "ears_type": "ubiquitous",
+      "action": "keep the pipeline's cloud keys only as secrets of the GitHub environment each one deploys to, one key for each environment, and replace every key within {{KEY_ROTATE_DAYS}} days of its creation",
+      "rationale": "A long-lived key is exposed to every run that can read it; scoping it to one environment and rotating it bounds what a leak gives away and for how long (OWASP Secrets Management Cheat Sheet: rotation; GitHub Docs: Deployments and environments).",
+      "hubWhen": {
+        "CLOUD": [
+          "static"
+        ]
+      }
+    },
+    {
+      "id": "req-local-run",
+      "type": "requirement",
+      "label": "One command runs the checks locally",
+      "x": 260,
+      "y": 1300,
+      "ears_type": "ubiquitous",
+      "action": "let a developer run every check of the pull-request workflows on their own machine with one command, npm run verify, by making every pull-request step a package.json script that verify runs",
+      "rationale": "Checks run before the push fail in seconds and in private, and the same commands in CI keep the two from drifting apart (Fowler, Continuous Integration: automate the build, one command to build and test).",
+      "hubWhen": {
+        "LOCAL": [
+          "mirrored"
+        ]
+      }
+    },
+    {
+      "id": "sc-pipeline-as-code",
+      "type": "scenario",
+      "label": "Broken workflow refused",
+      "x": 520,
+      "y": 0,
+      "given": "a pull request that adds a job whose needs names a job that does not exist",
+      "when": "the pull-request checks run",
+      "then": "actionlint fails naming the file and line, and the gate job ci fails with it"
+    },
+    {
+      "id": "sc-server-gate",
+      "type": "scenario",
+      "label": "Skipped job does not pass",
+      "x": 520,
+      "y": 130,
+      "given": "a pull request whose test job fails, so that the job after it is skipped",
+      "when": "the pipeline finishes",
+      "then": "the gate job ci fails and the pull request cannot be merged, although the skipped job shows as passed"
+    },
+    {
+      "id": "sc-pr-time",
+      "type": "scenario",
+      "label": "Slow pipeline found",
+      "x": 520,
+      "y": 260,
+      "given": "the pull-request commits of the last 30 days",
+      "when": "the nightly measurement runs",
+      "then": "the 90th percentile of their pipeline time is at most {{PR_MINUTES}} minutes, and the check fails on the night it is not"
+    },
+    {
+      "id": "sc-main-green",
+      "type": "scenario",
+      "label": "Red main counted",
+      "x": 520,
+      "y": 390,
+      "given": "the commits pushed to main in the last 30 days, some with a failed run",
+      "when": "the nightly measurement runs",
+      "then": "the share of commits whose runs all succeeded is at least {{MAIN_SUCCESS_PCT}} %, and the check fails below it"
+    },
+    {
+      "id": "sc-reruns",
+      "type": "scenario",
+      "label": "Reruns counted",
+      "x": 520,
+      "y": 520,
+      "given": "the completed runs of the last 30 days",
+      "when": "the nightly measurement runs",
+      "then": "at most {{RERUN_PCT}} % of them have a run attempt above 1, and the check fails above it"
+    },
+    {
+      "id": "sc-concurrency",
+      "type": "scenario",
+      "label": "Superseded run cancelled",
+      "x": 520,
+      "y": 650,
+      "given": "a pull request whose pipeline is running, and a deploy to staging in progress",
+      "when": "a new commit is pushed to the pull request and a second merge starts another deploy to staging",
+      "then": "the old pull-request run is cancelled, and the second deploy waits until the first has finished"
+    },
+    {
+      "id": "sc-build-once",
+      "type": "scenario",
+      "label": "Deploy job cannot rebuild",
+      "x": 520,
+      "y": 780,
+      "given": "a pull request that adds a docker build step to the production deploy job",
+      "when": "the promotion check runs",
+      "then": "it fails naming the job, and passes once the job deploys the digest the build job made",
+      "hubWhen": {
+        "ARTIFACT": [
+          "promote"
+        ]
+      }
+    },
+    {
+      "id": "sc-reproducible",
+      "type": "scenario",
+      "label": "Rebuild comes out identical",
+      "x": 520,
+      "y": 910,
+      "given": "the head of main",
+      "when": "the nightly job builds it twice without a cache",
+      "then": "both images have the same digest, and a Dockerfile step that writes the build time into the image makes the check fail",
+      "hubWhen": {
+        "ARTIFACT": [
+          "reproducible"
+        ]
+      }
+    },
+    {
+      "id": "sc-oidc",
+      "type": "scenario",
+      "label": "Stored key found",
+      "x": 520,
+      "y": 1040,
+      "given": "a repository secret AWS_SECRET_ACCESS_KEY added for a quick fix",
+      "when": "the nightly credentials check runs",
+      "then": "it fails naming the secret, and it fails too when a role's trust policy accepts every repository of the organisation",
+      "hubWhen": {
+        "CLOUD": [
+          "oidc"
+        ]
+      }
+    },
+    {
+      "id": "sc-key-rotation",
+      "type": "scenario",
+      "label": "Old key found",
+      "x": 520,
+      "y": 1170,
+      "given": "the production key created {{KEY_ROTATE_DAYS}} days ago and a day more",
+      "when": "the nightly key check runs",
+      "then": "it fails naming the key, and it fails too when a key sits in the repository's secrets instead of its environment's",
+      "hubWhen": {
+        "CLOUD": [
+          "static"
+        ]
+      }
+    },
+    {
+      "id": "sc-local-run",
+      "type": "scenario",
+      "label": "Step outside verify found",
+      "x": 520,
+      "y": 1300,
+      "given": "a pull request that adds a step running npx eslint . to a pull-request workflow",
+      "when": "the mirror check runs",
+      "then": "it fails until the step runs a package.json script that npm run verify runs as well",
+      "hubWhen": {
+        "LOCAL": [
+          "mirrored"
+        ]
+      }
+    },
+    {
+      "id": "adr-build-once",
+      "type": "adr",
+      "label": "Pipeline as code, one build promoted by digest",
+      "x": 780,
+      "y": 0,
+      "concern": "ci-cd-pipeline",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is built, checked and deployed by machine many times a day, and the pipeline that does it is code with failures of its own. The forces: a pipeline clicked together in a web UI cannot be reviewed, versioned or rebuilt; a check that runs only on a developer's machine is skipped the day it matters, while one that runs only in CI is slow to learn from; a rebuild for each environment ships something other than what was tested, as dependencies, base images and tools move between builds; long-lived cloud keys in CI secrets are among the credentials most often stolen from pipelines, readable by every workflow that may use them and valid from anywhere once leaked; a slow pipeline is worked around (changes batched, merges made without waiting), and one that fails at random teaches everyone to press Re-run; caches and parallel jobs buy time but go stale or race; and two deploys to one environment at once leave it in neither version. Neighbouring packs own the rest: the main branch's ruleset (no direct pushes, no force pushes, the approvals) in the Code review and branching pack; the test run and its own time limit in the Test strategy pack, the static checks and theirs in the Code quality gate pack; rollout, rollback and how often the element is released in the Deployment and rollback pack; which environments exist, and the gate that production gets the digest staging tested, in the Infrastructure pack; version numbers and who approves a release in the Release and versioning pack; pinning actions by commit SHA, provenance and SBOMs in the Software supply chain pack; the running element's own credentials in the Secrets pack; and the DORA delivery metrics in the Delivery metrics pack.",
+      "decision": "A change merged to main is built once: the job build of deliver.yml builds the image with docker/build-push-action, pushes it to ghcr.io/our-org/shop/order-api tagged with the commit SHA, and passes its sha256 digest on as a job output. Every deploy job, for staging and for production, calls the reusable workflow deploy.yml with that digest and deploys image@digest; no deploy job builds anything, and what differs between environments is configuration read at start, never the image. That production gets the digest staging tested is checked by the Infrastructure pack's promotion gate; signing, provenance and SBOMs of the image are the Software supply chain pack's. The pipeline is code: every workflow lives under .github/workflows in the element's repository and changes through pull requests like any other code, nothing is configured by hand in the web UI, and steps that more than one workflow or repository needs live in reusable workflows (on: workflow_call) instead of being copied; actionlint checks every workflow on every pull request. The pull-request workflow ci.yml ends in a gate job named ci that needs every other job of the workflow and fails unless all of them succeeded, because GitHub reports a skipped job as a success. The main branch's ruleset, which the Code review and branching pack keeps, requires ci beside the checks the Code quality gate and Test strategy packs name, so the gate always runs on the CI platform's runners, whatever ran before on a developer's machine. Where the pipeline first runs: {{LOCAL}}. A pull request's runs are cancelled when a newer commit is pushed to it (concurrency with cancel-in-progress), while deploys to one environment queue in a concurrency group of that environment and are never cancelled halfway. Dependencies are cached by their lockfile (setup-node's npm cache, BuildKit's GitHub Actions cache for image layers), and jobs that do not depend on each other run in parallel. The pipeline is held to targets over the last 30 days: all the checks of a pull-request commit finish within {{PR_MINUTES}} minutes at the 90th percentile, the runs of at least {{MAIN_SUCCESS_PCT}} % of the commits on main succeed, and at most {{RERUN_PCT}} % of runs need a second attempt. CI platform: {{PLATFORM}}. On GitHub Actions radical sense github-actions measures those figures every night; on another platform a job of the team's own writes the same figures for radical sense json, until an adapter for the platform is contributed to radical sense by pull request. Cloud credentials: {{CLOUD}}.",
+      "consequences": "• What production runs is, byte for byte, what staging tested.\n• Configuration has to live outside the image (environment variables, mounted files), so that one image fits every environment; a setting baked in at build time per environment is no longer possible.\n• Images stay in the registry as long as they may be promoted or rolled back to.\n• Workflows are tied together by job outputs and a reusable deploy workflow; a deploy started by hand names a digest.\n• The pipeline's own time, success rate and reruns are measured and judged like any other quality of the element, so a slow or flaky pipeline becomes a finding rather than a complaint.",
+      "alternatives": "1. A build per environment, made reproducible: needed where environments cannot share an artifact, at the price of keeping every build reproducible.\n2. A build per environment without that: what staging tested is not what production runs (Humble, Farley: Continuous Delivery).\n3. Promotion by a mutable tag (latest, staging): the tag can move between the test and the deploy.",
+      "hubWhen": {
+        "ARTIFACT": [
+          "promote"
+        ]
+      }
+    },
+    {
+      "id": "adr-rebuild-reproducible",
+      "type": "adr",
+      "label": "Pipeline as code, reproducible builds per environment",
+      "x": 780,
+      "y": 130,
+      "concern": "ci-cd-pipeline",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is built, checked and deployed by machine many times a day, and the pipeline that does it is code with failures of its own. The forces: a pipeline clicked together in a web UI cannot be reviewed, versioned or rebuilt; a check that runs only on a developer's machine is skipped the day it matters, while one that runs only in CI is slow to learn from; a rebuild for each environment ships something other than what was tested, as dependencies, base images and tools move between builds; long-lived cloud keys in CI secrets are among the credentials most often stolen from pipelines, readable by every workflow that may use them and valid from anywhere once leaked; a slow pipeline is worked around (changes batched, merges made without waiting), and one that fails at random teaches everyone to press Re-run; caches and parallel jobs buy time but go stale or race; and two deploys to one environment at once leave it in neither version. Neighbouring packs own the rest: the main branch's ruleset (no direct pushes, no force pushes, the approvals) in the Code review and branching pack; the test run and its own time limit in the Test strategy pack, the static checks and theirs in the Code quality gate pack; rollout, rollback and how often the element is released in the Deployment and rollback pack; which environments exist, and the gate that production gets the digest staging tested, in the Infrastructure pack; version numbers and who approves a release in the Release and versioning pack; pinning actions by commit SHA, provenance and SBOMs in the Software supply chain pack; the running element's own credentials in the Secrets pack; and the DORA delivery metrics in the Delivery metrics pack.",
+      "decision": "Each environment's image is built by its own deploy run from the same commit, and the build is reproducible: SOURCE_DATE_EPOCH is the commit's time and file timestamps are rewritten to it (rewrite-timestamp=true), the base image and every downloaded tool are pinned by digest or checksum, dependencies are installed from the lockfile, nothing reads the network or the clock beyond that, and provenance and SBOM attestations are kept outside the image (attached as the Software supply chain pack decides) so that they do not change its digest. A nightly job builds the head of main twice from scratch and fails when the two digests differ, and the Infrastructure pack's promotion gate holds production to the digest staging tested, which a reproducible rebuild meets. The pipeline is code: every workflow lives under .github/workflows in the element's repository and changes through pull requests like any other code, nothing is configured by hand in the web UI, and steps that more than one workflow or repository needs live in reusable workflows (on: workflow_call) instead of being copied; actionlint checks every workflow on every pull request. The pull-request workflow ci.yml ends in a gate job named ci that needs every other job of the workflow and fails unless all of them succeeded, because GitHub reports a skipped job as a success. The main branch's ruleset, which the Code review and branching pack keeps, requires ci beside the checks the Code quality gate and Test strategy packs name, so the gate always runs on the CI platform's runners, whatever ran before on a developer's machine. Where the pipeline first runs: {{LOCAL}}. A pull request's runs are cancelled when a newer commit is pushed to it (concurrency with cancel-in-progress), while deploys to one environment queue in a concurrency group of that environment and are never cancelled halfway. Dependencies are cached by their lockfile (setup-node's npm cache, BuildKit's GitHub Actions cache for image layers), and jobs that do not depend on each other run in parallel. The pipeline is held to targets over the last 30 days: all the checks of a pull-request commit finish within {{PR_MINUTES}} minutes at the 90th percentile, the runs of at least {{MAIN_SUCCESS_PCT}} % of the commits on main succeed, and at most {{RERUN_PCT}} % of runs need a second attempt. CI platform: {{PLATFORM}}. On GitHub Actions radical sense github-actions measures those figures every night; on another platform a job of the team's own writes the same figures for radical sense json, until an adapter for the platform is contributed to radical sense by pull request. Cloud credentials: {{CLOUD}}.",
+      "consequences": "• Each environment builds inside its own boundary, and still runs what was tested, as long as the builds stay reproducible.\n• Reproducibility is work: package installs without pinned versions, timestamps, random identifiers and build-time downloads each break it, and the nightly double build finds them only after they are merged.\n• Every environment pays for its own build, so a deploy takes longer than a promotion.\n• The pipeline's own time, success rate and reruns are measured and judged like any other quality of the element.",
+      "alternatives": "1. One build promoted by digest: simpler, and what runs is what was tested by construction; needs one registry every environment can pull from.\n2. Rebuilds without reproducibility: what staging tested is not what production runs.\n3. Copying the image between registries by digest (crane copy, skopeo copy): keeps one build across separate registries when only a copy step, not a pull, can cross the boundary.",
+      "hubWhen": {
+        "ARTIFACT": [
+          "reproducible"
+        ]
+      }
+    },
+    {
+      "id": "adr-oidc",
+      "type": "adr",
+      "label": "Cloud reached through OIDC federation",
+      "x": 780,
+      "y": 260,
+      "concern": "ci-cd-pipeline",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is built, checked and deployed by machine many times a day, and the pipeline that does it is code with failures of its own. The forces: a pipeline clicked together in a web UI cannot be reviewed, versioned or rebuilt; a check that runs only on a developer's machine is skipped the day it matters, while one that runs only in CI is slow to learn from; a rebuild for each environment ships something other than what was tested, as dependencies, base images and tools move between builds; long-lived cloud keys in CI secrets are among the credentials most often stolen from pipelines, readable by every workflow that may use them and valid from anywhere once leaked; a slow pipeline is worked around (changes batched, merges made without waiting), and one that fails at random teaches everyone to press Re-run; caches and parallel jobs buy time but go stale or race; and two deploys to one environment at once leave it in neither version. Neighbouring packs own the rest: the main branch's ruleset (no direct pushes, no force pushes, the approvals) in the Code review and branching pack; the test run and its own time limit in the Test strategy pack, the static checks and theirs in the Code quality gate pack; rollout, rollback and how often the element is released in the Deployment and rollback pack; which environments exist, and the gate that production gets the digest staging tested, in the Infrastructure pack; version numbers and who approves a release in the Release and versioning pack; pinning actions by commit SHA, provenance and SBOMs in the Software supply chain pack; the running element's own credentials in the Secrets pack; and the DORA delivery metrics in the Delivery metrics pack.",
+      "decision": "Pipeline jobs reach the cloud through OpenID Connect: a deploy job asks GitHub for an OIDC token (permissions: id-token: write) and exchanges it for short-lived credentials of a role for its environment. On AWS, aws-actions/configure-aws-credentials with role-to-assume, and a trust policy on each role whose aud condition is sts.amazonaws.com and whose sub condition is exactly repo:our-org/shop:environment:<environment>, never a wildcard; on Azure, azure/login with a federated credential of an app registration; on Google Cloud, google-github-actions/auth with Workload Identity Federation. The credentials expire within an hour, each environment's role holds only the rights its deploy needs, and no cloud key is stored in the repository's, the environments' or the organisation's secrets. The running element's own credentials are decided in the Secrets pack.",
+      "consequences": "• Nothing long-lived to leak, rotate or revoke for the pipeline's cloud access.\n• A trust policy is now security-critical configuration: a sub condition with a wildcard lets other repositories, branches or forks deploy, so it is checked every night.\n• Each cloud account needs the GitHub OIDC provider and a role per environment, set up once in infrastructure code.\n• A job that cannot ask for an id-token (a workflow from a fork) cannot deploy, which is the point.",
+      "alternatives": "1. Static keys in environment secrets, rotated: works with any target, but a leaked key works from anywhere until it is rotated.\n2. Self-hosted runners with an instance role: no keys either, but every job on those runners gets the role, and the runners need hardening.\n3. Keys fetched from a secrets manager at run time: the manager still needs a credential, which OIDC is the way to avoid.",
+      "hubWhen": {
+        "CLOUD": [
+          "oidc"
+        ]
+      }
+    },
+    {
+      "id": "adr-static-keys",
+      "type": "adr",
+      "label": "Static cloud keys in environment secrets, rotated",
+      "x": 780,
+      "y": 390,
+      "concern": "ci-cd-pipeline",
+      "status": "accepted",
+      "date": "",
+      "context": "This element is built, checked and deployed by machine many times a day, and the pipeline that does it is code with failures of its own. The forces: a pipeline clicked together in a web UI cannot be reviewed, versioned or rebuilt; a check that runs only on a developer's machine is skipped the day it matters, while one that runs only in CI is slow to learn from; a rebuild for each environment ships something other than what was tested, as dependencies, base images and tools move between builds; long-lived cloud keys in CI secrets are among the credentials most often stolen from pipelines, readable by every workflow that may use them and valid from anywhere once leaked; a slow pipeline is worked around (changes batched, merges made without waiting), and one that fails at random teaches everyone to press Re-run; caches and parallel jobs buy time but go stale or race; and two deploys to one environment at once leave it in neither version. Neighbouring packs own the rest: the main branch's ruleset (no direct pushes, no force pushes, the approvals) in the Code review and branching pack; the test run and its own time limit in the Test strategy pack, the static checks and theirs in the Code quality gate pack; rollout, rollback and how often the element is released in the Deployment and rollback pack; which environments exist, and the gate that production gets the digest staging tested, in the Infrastructure pack; version numbers and who approves a release in the Release and versioning pack; pinning actions by commit SHA, provenance and SBOMs in the Software supply chain pack; the running element's own credentials in the Secrets pack; and the DORA delivery metrics in the Delivery metrics pack.",
+      "decision": "The target offers no OIDC federation, so the pipeline signs in with keys: one CI user per environment (ci-deploy-staging, ci-deploy-production) with only the rights its deploy needs, whose key is stored as a secret of that GitHub environment and nowhere else, so only jobs that run in the environment, after its protection rules, can read it. Every key is replaced within {{KEY_ROTATE_DAYS}} days by creating the new key, updating the environment secret and then deleting the old key, and a nightly check finds keys older than that. When the target gains federation, this decision is superseded by OIDC.",
+      "consequences": "• Works with any target that accepts a key.\n• A leaked key works from anywhere until it is replaced; the rotation bounds that to {{KEY_ROTATE_DAYS}} days, the environment scope to one environment.\n• Rotation is work on a calendar, which the nightly check makes visible when it is missed.\n• The keys are secrets in the sense of the Secrets pack, scanned for like any other.",
+      "alternatives": "1. OIDC federation: nothing stored, nothing to rotate, where the target supports it.\n2. One key for all environments in repository secrets: simpler, but a leak from any workflow reaches production.",
+      "hubWhen": {
+        "CLOUD": [
+          "static"
+        ]
+      }
+    },
+    {
+      "id": "ff-actionlint",
+      "type": "fitness-fn",
+      "label": "Workflows pass actionlint",
+      "x": 1040,
+      "y": 0,
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
+      "description": "A job of the pull-request workflow runs actionlint over every workflow file: syntax, expressions and their types, needs between jobs, inputs of reusable workflows, and the shell scripts in run steps through shellcheck. As a job of ci.yml it is covered by the gate, so it runs on every pull request and blocks the merge without a ruleset entry of its own. On another platform the platform's own linter takes its place (GitLab: glab ci lint).\n\nThreshold: 0 actionlint findings in .github/workflows on every pull request; the job is one the gate job ci needs\n\nTool: actionlint (its Docker image, which bundles shellcheck)\n\n```yaml\n# package.json: \"lint:workflows\": \"docker run --rm -v \\\"$PWD:/repo\\\" --workdir /repo rhysd/actionlint:1.7.12 -color\"\n# a job of .github/workflows/ci.yml, which the gate job ci needs\n  actionlint:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - uses: actions/checkout@v7.0.1        # pin by commit SHA in your repository\n      - run: npm run lint:workflows\n```"
+    },
+    {
+      "id": "ff-required-gate",
+      "type": "fitness-fn",
+      "label": "The gate is required on main",
+      "x": 1040,
+      "y": 130,
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
+      "measure": "github-actions",
+      "metrics": "ci.required-checks >= 1",
+      "description": "Every night radical sense github-actions counts the status checks the rules of main require (classic branch protection and the rulesets that apply, together), and the model fails below one. The gate job below is the check to require: it runs whatever happened before it (if: always()) and fails unless every job it needs succeeded, so a failed job and the skipped jobs after it cannot pass as green. The ruleset itself (no direct pushes, no force pushes, the approvals) is checked by the Code review and branching pack.\n\nThreshold: At least 1 required status check on main (the gate job ci among them); the gate fails when any job it needs did not succeed\n\nTool: radical sense github-actions; GitHub Actions (the gate job)\n\n```yaml\n# .github/workflows/ci.yml: the pull-request pipeline; its last job, ci, is the check the ruleset of main requires\nname: ci\non:\n  pull_request:\nconcurrency:\n  group: ci-${{ github.event.pull_request.number }}\n  cancel-in-progress: true\npermissions:\n  contents: read\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7.0.1          # pin by commit SHA in your repository\n      - uses: docker/setup-buildx-action@v4.4.1\n      - uses: docker/build-push-action@v7.4.0\n        with:\n          push: false\n          cache-from: type=gha\n          cache-to: type=gha,mode=max\n  # … actionlint and every other job of this workflow, each named in needs below\n  ci:\n    if: always()\n    needs: [build]                               # every other job of this workflow\n    runs-on: ubuntu-latest\n    timeout-minutes: 2\n    steps:\n      - name: Every job succeeded (a skipped or cancelled job is no pass)\n        env:\n          RESULTS: ${{ toJSON(needs.*.result) }}\n        run: echo \"$RESULTS\" | jq -e 'all(. == \"success\")'\n```",
+      "hubWhen": {
+        "PLATFORM": [
+          "github"
+        ]
+      }
+    },
+    {
+      "id": "ff-pipeline-health",
+      "type": "fitness-fn",
+      "label": "Pipeline fast and reliable",
+      "x": 1040,
+      "y": 260,
+      "characteristic": "performance-efficiency",
+      "scope": "holistic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
+      "measure": "github-actions",
+      "metrics": "ci.pr.duration.p90 <= {{PR_MINUTES}} min\nci.main.success.rate >= {{MAIN_SUCCESS_PCT}} %\nci.rerun.rate <= {{RERUN_PCT}} %",
+      "description": "Every night radical sense github-actions reads the completed runs of the last 30 days through the GitHub CLI: for each pull-request commit the time from the start of its first run to the end of its last, the share of commits on main whose runs all succeeded (cancelled and skipped runs left out), and the share of runs with a run attempt above 1; radical check judges them against the model. When the time goes over, look first at caching (a cache key that misses on every run), at jobs that could run in parallel, and at the slowest job of the slowest runs; when reruns go up, find the jobs that are rerun most and treat their tests as the Test strategy pack decides for flaky tests.\n\nThreshold: Over the last 30 days: the 90th percentile of a pull-request commit's pipeline time at most {{PR_MINUTES}} minutes, at least {{MAIN_SUCCESS_PCT}} % of the commits on main with every run successful, at most {{RERUN_PCT}} % of runs with a second attempt\n\nTool: radical sense github-actions and radical check, in a scheduled GitHub Actions workflow\n\n```yaml\n# .github/workflows/pipeline-health.yml: measures the pipeline every night and judges it against the model\n# the sensor's own options go in .radical/sensors/sensors.json:\n#   { \"sensors\": { \"github-actions\": { \"adapter\": \"github-actions\", \"args\": [\"--days\", \"30\", \"--branch\", \"main\"] } } }\nname: pipeline-health\non:\n  schedule: [{ cron: '30 5 * * *' }]\n  workflow_dispatch:\npermissions:\n  contents: read\n  actions: read\nenv:\n  RADICAL: '@radicaltools/cli@0.6.0'          # a release with radical sense github-actions\njobs:\n  measure:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7.0.1          # pin by commit SHA in your repository\n      - name: Measure every fitness function triggered nightly\n        env:\n          GH_TOKEN: ${{ github.token }}          # reads runs and rulesets; classic branch protection needs a token with Administration: read\n        run: npx --yes \"$RADICAL\" sense run --trigger nightly --out reports/metrics\n      - name: Judge\n        run: npx --yes \"$RADICAL\" check .radical/model --metrics reports/metrics\n```",
+      "hubWhen": {
+        "PLATFORM": [
+          "github"
+        ]
+      }
+    },
+    {
+      "id": "ff-pipeline-figures",
+      "type": "fitness-fn",
+      "label": "Pipeline figures from our own job",
+      "x": 1040,
+      "y": 390,
+      "characteristic": "performance-efficiency",
+      "scope": "holistic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
+      "description": "A nightly job reads the platform's API and writes the figures radical sense github-actions would measure, under the same names, into a JSON file that radical sense json reads; the team adds these conditions to the fitness function's metrics once the job runs: ci.pr.duration.p90 <= {{PR_MINUTES}} min, ci.main.success.rate >= {{MAIN_SUCCESS_PCT}} %, ci.rerun.rate <= {{RERUN_PCT}} %, ci.required-checks >= 1. The example is for GitLab CI: a merge request pipeline stands for a pull request's runs, a pipeline with a retried job counts as rerun (the Jobs API lists more jobs with include_retried than without), and the project setting that merges only after a successful pipeline is the required check. An adapter for the platform, contributed to radical sense by pull request, replaces the job.\n\nThreshold: Over the last 30 days: the 90th percentile of a merge request commit's pipeline time at most {{PR_MINUTES}} minutes, at least {{MAIN_SUCCESS_PCT}} % of the commits on main with every pipeline successful, at most {{RERUN_PCT}} % of pipelines with a retried job, and merges allowed only after a successful pipeline (1 required check)\n\nTool: Node.js 20 over the GitLab REST API, read with radical sense json\n\n```js\n// scripts/ci-figures.mjs, nightly in a GitLab job (GITLAB_TOKEN with read_api):\n//   node scripts/ci-figures.mjs > ci-figures.json\n//   radical sense json ci-figures.json --metric ci.pr.duration.p90=pr_p90@min --metric ci.main.success.rate=main_success@% \\\n//     --metric ci.rerun.rate=rerun@% --metric ci.required-checks=required_checks\nconst base = `${process.env.CI_API_V4_URL}/projects/${encodeURIComponent(process.env.CI_PROJECT_ID)}`\nconst since = new Date(Date.now() - 30 * 86400e3).toISOString()\nconst get = async (path) => {\n  const res = await fetch(base + path, { headers: { 'PRIVATE-TOKEN': process.env.GITLAB_TOKEN } })\n  if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`)\n  return { body: await res.json(), next: res.headers.get('x-next-page') }\n}\nconst all = async (path) => {\n  const out = []\n  for (let page = '1'; page; ) {\n    const { body, next } = await get(`${path}${path.includes('?') ? '&' : '?'}per_page=100&page=${page}`)\n    out.push(...body)\n    page = next\n  }\n  return out\n}\nconst finished = (p) => p.status === 'success' || p.status === 'failed'   // canceled and skipped left out\n// merge requests: one commit's pipelines taken together, from the first start to the last finish\nconst mr = (await all(`/pipelines?source=merge_request_event&updated_after=${since}`)).filter(finished)\nconst spans = new Map()\nfor (const p of mr) {\n  const { started_at, finished_at } = (await get(`/pipelines/${p.id}`)).body\n  if (!started_at || !finished_at) continue\n  const [from, to] = spans.get(p.sha) ?? [Infinity, 0]\n  spans.set(p.sha, [Math.min(from, Date.parse(started_at)), Math.max(to, Date.parse(finished_at))])\n}\nconst minutes = [...spans.values()].map(([from, to]) => (to - from) / 60e3).sort((a, b) => a - b)\nconst pr_p90 = minutes.length ? minutes[Math.ceil(0.9 * minutes.length) - 1] : 0\n// main: the share of commits whose finished pipelines all succeeded\nconst main = (await all(`/pipelines?ref=main&source=push&updated_after=${since}`)).filter(finished)\nconst green = new Map()\nfor (const p of main) green.set(p.sha, (green.get(p.sha) ?? true) && p.status === 'success')\nconst main_success = green.size ? (100 * [...green.values()].filter(Boolean).length) / green.size : 100\n// reruns: pipelines in which a job was retried\nlet retried = 0\nfor (const p of [...mr, ...main]) {\n  const withRetried = await all(`/pipelines/${p.id}/jobs?include_retried=true`)\n  if (withRetried.length > (await all(`/pipelines/${p.id}/jobs`)).length) retried++\n}\nconst rerun = mr.length + main.length ? (100 * retried) / (mr.length + main.length) : 0\n// the gate: merge requests merge only after a successful pipeline\nconst required_checks = (await get('')).body.only_allow_merge_if_pipeline_succeeds ? 1 : 0\nconsole.log(JSON.stringify({ pr_p90, main_success, rerun, required_checks, pipelines: mr.length + main.length }))\n```",
+      "hubWhen": {
+        "PLATFORM": [
+          "other"
+        ]
+      }
+    },
+    {
+      "id": "ff-concurrency",
+      "type": "fitness-fn",
+      "label": "Superseded runs cancelled, deploys never",
+      "x": 1040,
+      "y": 520,
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
+      "description": "A check on every pull request reads each workflow file as JSON and fails when a workflow that runs on pull requests does not cancel its superseded runs, or when a job that deploys to an environment has no concurrency group (its own, or the workflow's) or has one that would cancel a deploy in progress.\n\nThreshold: 0 workflows triggered by pull requests without concurrency.cancel-in-progress: true; 0 jobs with an environment outside a concurrency group, or in one that cancels in progress\n\nTool: yq and jq (both on GitHub's Ubuntu runners), run as npm run check:concurrency in ci.yml\n\n```bash\n#!/usr/bin/env bash\n# scripts/check-concurrency.sh (package.json: \"check:concurrency\": \"bash scripts/check-concurrency.sh\")\nset -euo pipefail\nproblems=$(for wf in .github/workflows/*.yml; do\n  yq -o=json \"$wf\" | jq -r --arg wf \"$wf\" '\n    (.on | if type == \"object\" then keys elif type == \"array\" then . else [.] end) as $events\n    | .concurrency as $top\n    | ( select($events | index(\"pull_request\"))\n        | select(($top | type) != \"object\" or $top[\"cancel-in-progress\"] != true)\n        | \"\\($wf): runs on pull requests without concurrency.cancel-in-progress: true\" ),\n      ( .jobs | to_entries[] | select(.value.environment) | (.value.concurrency // $top) as $c\n        | if $c == null then \"\\($wf): job \\(.key) deploys outside a concurrency group, so two deploys can overlap\"\n          elif ($c | type) == \"object\" and $c[\"cancel-in-progress\"] == true then \"\\($wf): job \\(.key) deploys with cancel-in-progress, so a newer run cuts it off halfway\"\n          else empty end )'\ndone)\n[ -z \"$problems\" ] || { echo \"$problems\"; exit 1; }\n```"
+    },
+    {
+      "id": "ff-promote-digest",
+      "type": "fitness-fn",
+      "label": "Deploys take the build's digest",
+      "x": 1040,
+      "y": 650,
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
+      "description": "A check on every pull request reads each workflow file as JSON and fails when a job that deploys to an environment also builds an image (docker/build-push-action, docker, podman or buildah build), when a job calls the reusable deploy.yml without passing the build job's digest, or when a deploy job names neither inputs.digest nor the build job's output. With the image referenced as image@digest the Infrastructure pack's gate then compares production's digest with staging's.\n\nThreshold: 0 jobs with an environment that build an image; 0 calls of deploy.yml without digest from needs.build.outputs.digest; 0 jobs with an environment that name no digest\n\nTool: yq and jq (both on GitHub's Ubuntu runners), run as npm run check:promotion in ci.yml\n\n```bash\n#!/usr/bin/env bash\n# scripts/check-promotion.sh (package.json: \"check:promotion\": \"bash scripts/check-promotion.sh\")\n# deliver.yml: build (outputs.digest: ${{ steps.image.outputs.digest }}), then for staging and production:\n#   uses: ./.github/workflows/deploy.yml\n#   with: { environment: production, digest: ${{ needs.build.outputs.digest }} }\nset -euo pipefail\nproblems=$(for wf in .github/workflows/*.yml; do\n  yq -o=json \"$wf\" | jq -r --arg wf \"$wf\" '\n    .jobs | to_entries[] | .key as $job | .value as $j\n    | ( select($j.environment)\n        | select([$j.steps[]? | ((.uses // \"\") | test(\"docker/build-push-action\")) or ((.run // \"\") | test(\"(docker|podman) (buildx )?build|buildah (bud|build)\"))] | any)\n        | \"\\($wf): job \\($job) deploys and builds; it must deploy the image the build job made\" ),\n      ( select(($j.uses // \"\") | test(\"deploy\\\\.ya?ml\"))\n        | select(($j.with.digest // \"\") | test(\"needs\\\\.build\\\\.outputs\\\\.digest\") | not)\n        | \"\\($wf): job \\($job) calls deploy.yml without the build job digest\" ),\n      ( select($j.environment)\n        | select($j | tojson | test(\"inputs\\\\.digest|needs\\\\.build\\\\.outputs\\\\.digest\") | not)\n        | \"\\($wf): job \\($job) deploys without naming the digest it deploys\" )'\ndone)\n[ -z \"$problems\" ] || { echo \"$problems\"; exit 1; }\n```",
+      "hubWhen": {
+        "ARTIFACT": [
+          "promote"
+        ]
+      }
+    },
+    {
+      "id": "ff-reproducible",
+      "type": "fitness-fn",
+      "label": "Two builds, one digest",
+      "x": 1040,
+      "y": 780,
+      "characteristic": "reliability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
+      "description": "Every night a job builds the head of main twice, each time from scratch, as OCI layouts with SOURCE_DATE_EPOCH set to the commit's time and timestamps rewritten to it, and without provenance or SBOM attestations in the image (they carry the build's time and are attached outside it), then compares the manifest digests in the two layouts' index.json. A difference means some step of the build reads the clock, the network or something unpinned.\n\nThreshold: Two builds of the head of main without a cache produce the same image manifest digest, every night\n\nTool: docker buildx (docker-container builder, OCI exporter) and jq in a scheduled GitHub Actions job\n\n```yaml\n# .github/workflows/reproducible.yml\nname: reproducible\non:\n  schedule: [{ cron: '0 4 * * *' }]\npermissions:\n  contents: read\njobs:\n  twice:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7.0.1              # pin by commit SHA in your repository\n      - uses: docker/setup-buildx-action@v4.4.1    # a docker-container builder, which exports OCI layouts\n      - name: Build twice from scratch and compare the digests\n        run: |\n          export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)\n          for n in 1 2; do\n            docker buildx build --no-cache --provenance=false --sbom=false \\\n              --output \"type=oci,dest=build-$n.tar,rewrite-timestamp=true\" .\n            tar -xOf \"build-$n.tar\" index.json | jq -r '.manifests[0].digest' > \"digest-$n\"\n          done\n          cmp -s digest-1 digest-2 || { echo \"two builds of $GITHUB_SHA differ: $(cat digest-1) and $(cat digest-2)\"; exit 1; }\n```",
+      "hubWhen": {
+        "ARTIFACT": [
+          "reproducible"
+        ]
+      }
+    },
+    {
+      "id": "ff-no-cloud-keys",
+      "type": "fitness-fn",
+      "label": "No stored cloud keys, tight trust",
+      "x": 1040,
+      "y": 910,
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
+      "description": "A nightly job lists the names of the repository's and every environment's secrets and fails on the names cloud keys go by, greps the workflows for login inputs that take a stored key (aws-access-key-id, aws-secret-access-key, credentials_json, creds), and reads the trust policy of each CI role: every statement must name GitHub's OIDC provider, require the audience sts.amazonaws.com and pin the subject to this repository and the role's environment, with no wildcard. The job signs in to AWS itself through OIDC, with a role that may only read IAM roles. Names are a heuristic: the Secrets pack's scanning finds keys stored under other names.\n\nThreshold: 0 secrets named as cloud keys in the repository or its environments; 0 workflow steps that pass a stored key to a cloud login; every CI role trusted only by GitHub's OIDC provider for sts.amazonaws.com and exactly repo:<repository>:environment:<environment>\n\nTool: the GitHub CLI (gh secret list, gh api), grep, the AWS CLI (aws iam get-role) and jq\n\n```bash\n#!/usr/bin/env bash\n# nightly; GH_TOKEN may read the repository's secrets and environments, AWS credentials (through OIDC) may call iam:GetRole\nset -euo pipefail\nREPO=${GITHUB_REPOSITORY:-our-org/shop}\nKEYS='AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|AZURE_CLIENT_SECRET|AZURE_CREDENTIALS|GCP_SA_KEY|GOOGLE_CREDENTIALS|GOOGLE_APPLICATION_CREDENTIALS'\nstored=$( { gh secret list --repo \"$REPO\" --json name --jq '.[].name'\n            for env in $(gh api \"repos/$REPO/environments\" --jq '.environments[].name'); do\n              gh secret list --repo \"$REPO\" --env \"$env\" --json name --jq '.[].name'\n            done; } | grep -E \"^($KEYS)$\" || true)\n[ -z \"$stored\" ] || { echo \"cloud keys stored as secrets: $stored\"; exit 1; }\n! grep -nE '^\\s*(aws-access-key-id|aws-secret-access-key|credentials_json|creds):' .github/workflows/*.yml \\\n  || { echo \"a workflow signs in to the cloud with a stored key\"; exit 1; }\nfor env in staging production; do\n  aws iam get-role --role-name \"ci-deploy-$env\" --query 'Role.AssumeRolePolicyDocument' --output json \\\n    | jq -e --arg sub \"repo:$REPO:environment:$env\" '\n        [.Statement[] | select(.Effect == \"Allow\")] | length > 0 and all(\n          (.Principal.Federated // \"\" | endswith(\":oidc-provider/token.actions.githubusercontent.com\"))\n          and .Condition.StringEquals[\"token.actions.githubusercontent.com:aud\"] == \"sts.amazonaws.com\"\n          and .Condition.StringEquals[\"token.actions.githubusercontent.com:sub\"] == $sub)' >/dev/null \\\n    || { echo \"ci-deploy-$env must trust only GitHub's OIDC tokens for repo:$REPO:environment:$env\"; exit 1; }\ndone\n```",
+      "hubWhen": {
+        "CLOUD": [
+          "oidc"
+        ]
+      }
+    },
+    {
+      "id": "ff-key-age",
+      "type": "fitness-fn",
+      "label": "Pipeline keys young and scoped",
+      "x": 1040,
+      "y": 1040,
+      "characteristic": "security",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "nightly",
+      "invocation": "automated",
+      "description": "A nightly job lists the active access keys of each environment's CI user and fails on any created more than {{KEY_ROTATE_DAYS}} days ago, and fails when a cloud key is stored among the repository's secrets, where every workflow can read it, instead of the environment's. On a target other than AWS, its own key listing takes the place of aws iam list-access-keys.\n\nThreshold: 0 active keys of the CI users older than {{KEY_ROTATE_DAYS}} days; 0 cloud keys among the repository's own secrets\n\nTool: the AWS CLI (aws iam list-access-keys), GNU date and the GitHub CLI (gh secret list)\n\n```bash\n#!/usr/bin/env bash\n# nightly; AWS credentials may call iam:ListAccessKeys on the CI users, GH_TOKEN may list the repository's secrets\nset -euo pipefail\nREPO=${GITHUB_REPOSITORY:-our-org/shop}\noldest=$(( $(date +%s) - {{KEY_ROTATE_DAYS}} * 86400 ))\nfor env in staging production; do\n  aws iam list-access-keys --user-name \"ci-deploy-$env\" \\\n      --query 'AccessKeyMetadata[?Status==`Active`].[AccessKeyId,CreateDate]' --output text |\n  while read -r id created; do\n    [ \"$(date -d \"$created\" +%s)\" -ge \"$oldest\" ] || { echo \"ci-deploy-$env: key $id is older than {{KEY_ROTATE_DAYS}} days\"; exit 1; }\n  done\ndone\nin_repo=$(gh secret list --repo \"$REPO\" --json name --jq '.[].name' | grep -E '^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)$' || true)\n[ -z \"$in_repo\" ] || { echo \"cloud keys in the repository's secrets ($in_repo): keep each in its environment's secrets\"; exit 1; }\n```",
+      "hubWhen": {
+        "CLOUD": [
+          "static"
+        ]
+      }
+    },
+    {
+      "id": "ff-local-mirror",
+      "type": "fitness-fn",
+      "label": "CI runs what verify runs",
+      "x": 1040,
+      "y": 1170,
+      "characteristic": "maintainability",
+      "scope": "atomic",
+      "cadence": "triggered",
+      "trigger": "pull-request",
+      "invocation": "automated",
+      "description": "A check on every pull request collects the run steps of every workflow triggered by pull requests, leaving out the gate job, and fails on any that is not npm ci or npm run <script>, and on any script that the verify script of package.json does not run, so that npm run verify on a developer's machine runs exactly what CI runs. The checks of the other packs' snippets become package.json scripts too.\n\nThreshold: 0 run steps of the pull-request workflows (the gate job ci aside) other than npm ci and npm run <script>; 0 such scripts that npm run verify does not run\n\nTool: yq and jq (both on GitHub's Ubuntu runners), run as npm run check:mirror in ci.yml\n\n```bash\n#!/usr/bin/env bash\n# scripts/check-mirror.sh (package.json: \"check:mirror\": \"bash scripts/check-mirror.sh\",\n#   \"verify\": \"npm run lint:workflows && npm run check:mirror && npm run check:concurrency && npm run lint && npm run test\")\nset -euo pipefail\nsteps=$(for wf in .github/workflows/*.yml; do\n  yq -o=json \"$wf\" | jq -r '\n    select(.on | if type == \"object\" then has(\"pull_request\") elif type == \"array\" then index(\"pull_request\") != null else . == \"pull_request\" end)\n    | .jobs | to_entries[] | select(.key != \"ci\") | .value.steps[]? | .run // empty'\ndone | sed '/^[[:space:]]*$/d' | sort -u)\nother=$(grep -vxE 'npm ci|npm run [A-Za-z0-9:_-]+' <<<\"$steps\" || true)\n[ -z \"$other\" ] || { echo \"pull-request steps that are not a package.json script run as npm run <name>:\"; echo \"$other\"; exit 1; }\nverify=$(jq -r '.scripts.verify // empty' package.json)\n[ -n \"$verify\" ] || { echo \"package.json has no verify script\"; exit 1; }\nfor name in $(sed -n 's/^npm run //p' <<<\"$steps\"); do\n  [ \"$name\" = verify ] || grep -qE \"npm run $name( |&|;|$)\" <<<\"$verify\" || { echo \"CI runs $name, which npm run verify does not\"; exit 1; }\ndone\n```",
+      "hubWhen": {
+        "LOCAL": [
+          "mirrored"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "req-pipeline-as-code--derives--need",
+      "sourceId": "req-pipeline-as-code",
+      "targetId": "need",
+      "relationType": "derives",
+      "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/."
+    },
+    {
+      "id": "req-server-gate--derives--need",
+      "sourceId": "req-server-gate",
+      "targetId": "need",
+      "relationType": "derives",
+      "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/."
+    },
+    {
+      "id": "req-pr-time--derives--need",
+      "sourceId": "req-pr-time",
+      "targetId": "need",
+      "relationType": "derives",
+      "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/."
+    },
+    {
+      "id": "req-main-green--derives--need",
+      "sourceId": "req-main-green",
+      "targetId": "need",
+      "relationType": "derives",
+      "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/."
+    },
+    {
+      "id": "req-reruns--derives--need",
+      "sourceId": "req-reruns",
+      "targetId": "need",
+      "relationType": "derives",
+      "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/."
+    },
+    {
+      "id": "req-concurrency--derives--need",
+      "sourceId": "req-concurrency",
+      "targetId": "need",
+      "relationType": "derives",
+      "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/."
+    },
+    {
+      "id": "req-build-once--derives--need",
+      "sourceId": "req-build-once",
+      "targetId": "need",
+      "relationType": "derives",
+      "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/."
+    },
+    {
+      "id": "req-reproducible--derives--need",
+      "sourceId": "req-reproducible",
+      "targetId": "need",
+      "relationType": "derives",
+      "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/."
+    },
+    {
+      "id": "req-oidc--derives--need",
+      "sourceId": "req-oidc",
+      "targetId": "need",
+      "relationType": "derives",
+      "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/."
+    },
+    {
+      "id": "req-key-rotation--derives--need",
+      "sourceId": "req-key-rotation",
+      "targetId": "need",
+      "relationType": "derives",
+      "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/."
+    },
+    {
+      "id": "req-local-run--derives--need",
+      "sourceId": "req-local-run",
+      "targetId": "need",
+      "relationType": "derives",
+      "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/."
+    },
+    {
+      "id": "sc-pipeline-as-code--verifies--req-pipeline-as-code",
+      "sourceId": "sc-pipeline-as-code",
+      "targetId": "req-pipeline-as-code",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-server-gate--verifies--req-server-gate",
+      "sourceId": "sc-server-gate",
+      "targetId": "req-server-gate",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-pr-time--verifies--req-pr-time",
+      "sourceId": "sc-pr-time",
+      "targetId": "req-pr-time",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-main-green--verifies--req-main-green",
+      "sourceId": "sc-main-green",
+      "targetId": "req-main-green",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-reruns--verifies--req-reruns",
+      "sourceId": "sc-reruns",
+      "targetId": "req-reruns",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-concurrency--verifies--req-concurrency",
+      "sourceId": "sc-concurrency",
+      "targetId": "req-concurrency",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-build-once--verifies--req-build-once",
+      "sourceId": "sc-build-once",
+      "targetId": "req-build-once",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-reproducible--verifies--req-reproducible",
+      "sourceId": "sc-reproducible",
+      "targetId": "req-reproducible",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-oidc--verifies--req-oidc",
+      "sourceId": "sc-oidc",
+      "targetId": "req-oidc",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-key-rotation--verifies--req-key-rotation",
+      "sourceId": "sc-key-rotation",
+      "targetId": "req-key-rotation",
+      "relationType": "verifies"
+    },
+    {
+      "id": "sc-local-run--verifies--req-local-run",
+      "sourceId": "sc-local-run",
+      "targetId": "req-local-run",
+      "relationType": "verifies"
+    },
+    {
+      "id": "ff-actionlint--implements--adr-build-once",
+      "sourceId": "ff-actionlint",
+      "targetId": "adr-build-once",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-actionlint--implements--adr-rebuild-reproducible",
+      "sourceId": "ff-actionlint",
+      "targetId": "adr-rebuild-reproducible",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-required-gate--implements--adr-build-once",
+      "sourceId": "ff-required-gate",
+      "targetId": "adr-build-once",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-required-gate--implements--adr-rebuild-reproducible",
+      "sourceId": "ff-required-gate",
+      "targetId": "adr-rebuild-reproducible",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pipeline-health--implements--adr-build-once",
+      "sourceId": "ff-pipeline-health",
+      "targetId": "adr-build-once",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pipeline-health--implements--adr-rebuild-reproducible",
+      "sourceId": "ff-pipeline-health",
+      "targetId": "adr-rebuild-reproducible",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pipeline-figures--implements--adr-build-once",
+      "sourceId": "ff-pipeline-figures",
+      "targetId": "adr-build-once",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-pipeline-figures--implements--adr-rebuild-reproducible",
+      "sourceId": "ff-pipeline-figures",
+      "targetId": "adr-rebuild-reproducible",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-concurrency--implements--adr-build-once",
+      "sourceId": "ff-concurrency",
+      "targetId": "adr-build-once",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-concurrency--implements--adr-rebuild-reproducible",
+      "sourceId": "ff-concurrency",
+      "targetId": "adr-rebuild-reproducible",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-promote-digest--implements--adr-build-once",
+      "sourceId": "ff-promote-digest",
+      "targetId": "adr-build-once",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-reproducible--implements--adr-rebuild-reproducible",
+      "sourceId": "ff-reproducible",
+      "targetId": "adr-rebuild-reproducible",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-no-cloud-keys--implements--adr-oidc",
+      "sourceId": "ff-no-cloud-keys",
+      "targetId": "adr-oidc",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-key-age--implements--adr-static-keys",
+      "sourceId": "ff-key-age",
+      "targetId": "adr-static-keys",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-local-mirror--implements--adr-build-once",
+      "sourceId": "ff-local-mirror",
+      "targetId": "adr-build-once",
+      "relationType": "implements"
+    },
+    {
+      "id": "ff-local-mirror--implements--adr-rebuild-reproducible",
+      "sourceId": "ff-local-mirror",
+      "targetId": "adr-rebuild-reproducible",
+      "relationType": "implements"
+    }
+  ]
+}

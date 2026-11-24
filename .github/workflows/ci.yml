@@ -17,6 +17,12 @@ name: CI
 # runs). Labels are read when a run starts, so add it before pushing, or push
 # again; adding a label does not start a run. The E2E suite still runs before
 # every deploy from main (deploy.yml).
+#
+# Every run step of the checking jobs is `npm ci` or `npm run <script>`, and
+# `npm run verify` runs each of those scripts, so a developer runs what CI
+# runs (tools/ci/workflows.mjs mirror, fitness function CI runs what verify
+# runs). The last job, ci, fails unless every other job succeeded: GitHub
+# reports a skipped job as passed.
 
 on:
   pull_request:
@@ -29,6 +35,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # actionlint over every workflow, and what the CI/CD pipeline pack asks of
+  # them (tools/ci/workflows.mjs: concurrency, one build per deploy, no stored
+  # cloud keys, CI steps mirrored by npm run verify).
+  workflows:
+    name: Workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run lint:workflows
+      - run: npm run check:workflows
+
   test:
     name: Type-check & Test
     runs-on: ubuntu-latest
@@ -42,7 +65,7 @@ jobs:
       - run: npm run check:workspaces
       - run: npm run typecheck
       # Radical Assay's Explore tests drive a browser: Playwright's Chromium.
-      - run: npx playwright install --with-deps chromium
+      - run: npm run browsers
       # npm test, keeping a JSON report per workspace for radical check.
       - run: npm run test:reports
       # What the model measures on a pull request: the measure of every
@@ -51,8 +74,7 @@ jobs:
       # sensor of .radical/sensors/sensors.json, run once for each
       # element their ADR constrains (Workspace boundaries, One product
       # version, One mark everywhere, Installable npm packages).
-      - run: npm run build -w @radicaltools/cli
-      - run: node apps/cli/dist/index.js sense run --trigger pull-request --out reports/metrics --context commit=${{ github.sha }}
+      - run: npm run sense:pull-request
       - name: Upload test reports
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -116,7 +138,7 @@ jobs:
             {
               echo "### Screenshots still change after the bot's own baseline commit"
               echo "Not committed again: a screenshot that differs from run to run is flaky."
-              ls -R new-baselines | sed 's/^/    /'
+              find new-baselines -type f | sed 's/^/    /'
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -152,21 +174,20 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run build -w @radicaltools/cli
       - uses: actions/download-artifact@v4
         with:
           name: test-reports
           path: reports
+      # The artifact holds reports/e2e.json (and apps/e2e/playwright-report/),
+      # unpacked in place.
       - name: Download the e2e report
         if: ${{ needs.e2e.result == 'success' || needs.e2e.result == 'failure' }}
         uses: actions/download-artifact@v4
         with:
           name: e2e-report
-          path: e2e-report
+          path: .
       - name: radical check
-        run: |
-          if [ -f e2e-report/reports/e2e.json ]; then cp e2e-report/reports/e2e.json reports/; fi
-          node apps/cli/dist/index.js check --report reports --metrics reports/metrics --trigger pull-request --format github
+        run: npm run check:architecture -- --metrics reports/metrics --format github
 
   mcp-package:
     name: MCP package (${{ matrix.os }}, Node ${{ matrix.node }})
@@ -182,7 +203,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - run: npm ci --ignore-scripts
-      - run: npm run test:package -w ./apps/mcp
+      - run: npm run test:mcp-package
 
   launcher:
     name: Launcher (${{ matrix.os }})
@@ -195,27 +216,31 @@ jobs:
     # download Node.js on each platform, not this commit's CLI.
     steps:
       - uses: actions/checkout@v4
-      - name: radical.sh with no Node.js on the PATH downloads it
-        if: runner.os != 'Windows'
-        run: |
-          out=$(env -i HOME="$RUNNER_TEMP/home" PATH=/usr/bin:/bin RADICAL_YES=1 sh apps/cli/launcher/radical.sh --version)
-          echo "$out"
-          echo "$out" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+'
-          [ -x /usr/bin/node ] || ls "$RUNNER_TEMP/home/.radical/node"
+      # Linux runs npm with the runner's own Node.js; the launcher itself runs
+      # with none on the PATH (tools/ci/launcher.mjs).
       - uses: actions/setup-node@v4
         if: runner.os == 'Windows'
         with:
           node-version: 24
-      - name: radical.cmd with Node.js on the PATH
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: call apps\cli\launcher\radical.cmd --version
-      - name: radical.cmd with no Node.js on the PATH downloads it
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: |
-          set "PATH=C:\Windows\System32;C:\Windows"
-          set "RADICAL_HOME=%RUNNER_TEMP%\radical"
-          set "RADICAL_YES=1"
-          call apps\cli\launcher\radical.cmd --version || exit /b 1
-          dir "%RADICAL_HOME%\node"
+      - name: The launcher finds or downloads Node.js
+        run: npm run test:launcher
+
+  # The gate: the check to require on main. It runs whatever happened before
+  # it and fails unless every job it needs succeeded (tools/ci/gate.mjs); E2E
+  # may be skipped only by the skip-e2e label. Name every other checking job
+  # of this workflow in its needs.
+  ci:
+    name: CI gate
+    if: ${{ always() }}
+    needs: [workflows, test, e2e, architecture, mcp-package, launcher]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/ci
+      - name: Every job succeeded (a skipped or cancelled job is no pass)
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          MAY_SKIP: ${{ contains(github.event.pull_request.labels.*.name, 'skip-e2e') && 'e2e' || '' }}
+        run: node tools/ci/gate.mjs

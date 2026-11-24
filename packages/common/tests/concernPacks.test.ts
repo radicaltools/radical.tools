@@ -39,7 +39,7 @@ function good(): HubRadicalDoc {
 describe('concernPackProblems', () => {
   it('passes a pack that meets the standard', () => {
     expect(concernPackProblems(good())).toEqual([])
-    expect(CONCERN_GROUPS.map((g) => g.id)).toEqual(['security', 'api', 'architecture', 'coding', 'sdlc', 'technology', 'compliance', 'operability'])
+    expect(CONCERN_GROUPS.map((g) => g.id)).toEqual(['security', 'api', 'architecture', 'coding', 'sdlc', 'technology', 'compliance', 'operability', 'ux'])
   })
 
   it('names each way a pack falls below the standard', () => {

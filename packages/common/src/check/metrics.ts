@@ -133,8 +133,10 @@ export interface BaselineMargin {
 export type Condition =
   | { kind: 'test'; raw: string; id: TestId }
   /** `value` (and `unit`) is the limit; with `baseline`, the limit is the
-   *  baseline's median with that margin, and `value` is NaN. */
-  | { kind: 'metric'; raw: string; metric: string; labels: Record<string, string>; op: Comparison; value: number; unit?: string; baseline?: BaselineMargin }
+   *  baseline's median with that margin, and `value` is NaN. With `scaled`,
+   *  the limit follows the speed of the machine that measured the value
+   *  (scaledLimit). */
+  | { kind: 'metric'; raw: string; metric: string; labels: Record<string, string>; op: Comparison; value: number; unit?: string; baseline?: BaselineMargin; scaled?: true }
   | { kind: 'invalid'; raw: string; problem: string }
 
 const TEST_LINE = /^test\((.+)\)(?:\s+passed)?$/
@@ -145,6 +147,8 @@ const REVIEW_LINE = /^review\((.+)\)\s+passed$/i
 /** The metric a recorded review is read as (reviews.ts): 1 passed, 0 failed,
  *  labelled with the review's name. */
 export const REVIEW_METRIC = 'review'
+// A fixed limit that follows the speed of the machine: `<= 100 ms scaled`.
+const SCALED = /\s+scaled$/i
 const METRIC_LINE = /^([A-Za-z_][\w.:/-]*)\s*(?:\{([^}]*)\})?\s*(<=|>=|==|!=|=|<|>)\s*(-?\d+(?:\.\d+)?(?:e-?\d+)?)\s*(\S+)?$/i
 const BASELINE_LINE = /^([A-Za-z_][\w.:/-]*)\s*(?:\{([^}]*)\})?\s*(<=|>=|==|!=|=|<|>)\s*baseline(?:\s*([+-])\s*(\d+(?:\.\d+)?(?:e-?\d+)?)\s*(%|[^\s%]+)?)?$/i
 
@@ -178,11 +182,14 @@ export function parseCondition(line: string): Condition {
       : { sign: 1, by: 0, percent: true }
     return { kind: 'metric', raw, metric: b[1], labels, op: (b[3] === '=' ? '==' : b[3]) as Comparison, value: Number.NaN, baseline }
   }
-  const m = METRIC_LINE.exec(raw)
-  if (!m) return { kind: 'invalid', raw, problem: 'it is neither `test(<file> › <title>) passed`, `review(<name>) passed`, `<metric>{<labels>} <op> <number> [unit]` nor `<metric>{<labels>} <op> baseline [+|- <number> %|unit]`' }
+  const scaled = SCALED.test(raw)
+  const m = METRIC_LINE.exec(scaled ? raw.replace(SCALED, '') : raw)
+  if (!m) return { kind: 'invalid', raw, problem: 'it is neither `test(<file> › <title>) passed`, `review(<name>) passed`, `<metric>{<labels>} <op> <number> [unit] [scaled]` nor `<metric>{<labels>} <op> baseline [+|- <number> %|unit]`' }
   const labels = m[2] === undefined ? {} : parseLabels(m[2])
   if (typeof labels === 'string') return { kind: 'invalid', raw, problem: labels }
-  return { kind: 'metric', raw, metric: m[1], labels, op: (m[3] === '=' ? '==' : m[3]) as Comparison, value: Number(m[4]), ...(m[5] ? { unit: m[5] } : {}) }
+  const op = (m[3] === '=' ? '==' : m[3]) as Comparison
+  if (scaled && (op === '==' || op === '!=')) return { kind: 'invalid', raw, problem: 'scaled stretches a limit: it takes <, <=, > or >=, not == or !=' }
+  return { kind: 'metric', raw, metric: m[1], labels, op, value: Number(m[4]), ...(m[5] ? { unit: m[5] } : {}), ...(scaled ? { scaled: true as const } : {}) }
 }
 
 /** The conditions in a `metrics` property, one per line; blank lines and
@@ -296,6 +303,35 @@ export function baselineOf(condition: Extract<Condition, { kind: 'metric' }>, ba
 
 const round = (n: number): number => Math.round(n * 100) / 100
 
+/** The metrics `radical sense machine` measures: the time of its fixed work,
+ *  and that time's ratio to the repository's reference time. */
+export const MACHINE_WORK_METRIC = 'machine.work'
+export const MACHINE_SPEED_METRIC = 'machine.speed'
+
+/** The machine.speed measured nearest in time to `at`; undefined when none. */
+export function machineSpeedAt(measurements: Measurement[], at: string): Measurement | undefined {
+  const t = Date.parse(at)
+  let best: Measurement | undefined
+  for (const m of measurements) {
+    if (m.metric !== MACHINE_SPEED_METRIC || !Number.isFinite(m.value) || m.value <= 0) continue
+    if (!best || Math.abs(Date.parse(m.at) - t) < Math.abs(Date.parse(best.at) - t)) best = m
+  }
+  return best
+}
+
+/** A scaled condition's limit on a machine of `speed` (its ratio to the
+ *  reference machine): an upper limit multiplied, a lower one divided, by
+ *  the factor, which is never below 1, so a faster machine tightens
+ *  nothing. `text` shows the arithmetic: "100 ms × 2.4 = 240 ms". */
+export function scaledLimit(condition: Pick<Extract<Condition, { kind: 'metric' }>, 'op' | 'value' | 'unit'>, speed: number): { limit: number; factor: number; text: string } {
+  const factor = Math.max(1, round(speed))
+  const upper = condition.op === '<' || condition.op === '<='
+  const limit = upper ? condition.value * factor : condition.value / factor
+  const unit = condition.unit ? ` ${condition.unit}` : ''
+  const text = `${condition.value}${unit} ${upper ? '×' : '÷'} ${factor} = ${round(limit)}${unit}${speed < 1 ? ` (machine.speed ${round(speed)}, never below ×1)` : ''}`
+  return { limit, factor, text }
+}
+
 /** A metric condition against the measurements: not run when none matches,
  *  stale when the latest is older than `maxAge` (whatever it says),
  *  invalid when the units do not convert, else passed or failed. A
@@ -329,5 +365,11 @@ export function evaluateMetric(condition: Extract<Condition, { kind: 'metric' }>
     value = converted
   }
   if (maxAge !== undefined && age > maxAge) return { outcome: 'stale', measurement, detail: `measured ${formatAge(age)} ago` }
+  if (condition.scaled) {
+    const machine = machineSpeedAt(measurements, measurement.at)
+    if (!machine) return { outcome: 'not-run', measurement, detail: `scaled to the machine, and no ${MACHINE_SPEED_METRIC} was measured: run radical sense machine where the value is measured` }
+    const scaled = scaledLimit(condition, machine.value)
+    return { outcome: COMPARE[condition.op](value, scaled.limit) ? 'passed' : 'failed', measurement, detail: `limit ${scaled.text}` }
+  }
   return { outcome: COMPARE[condition.op](value, condition.value) ? 'passed' : 'failed', measurement }
 }

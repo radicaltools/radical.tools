@@ -68,6 +68,19 @@ async function scriptAnthropic(page: Page, stages: ScriptedStage[], pickConcern?
   return stagePrompts
 }
 
+/** Unchecks the Hub packs Forge proposes in a stage's questions (the
+ *  baseline packs every system is offered) and confirms the answers, for a
+ *  test about something else. Nothing to do when the stage asks nothing. */
+async function dropProposedPacks(scope: Page | Locator): Promise<void> {
+  // Forge asks once it has the questions; with none, Generate is enabled.
+  const question = scope.locator('.forge-clarify-q', { hasText: /Hub concern packs to bring in|Concerns the model raises/ })
+  const ready = scope.locator('button.forge-btn-primary:not([disabled])', { hasText: /^Generate / })
+  await expect(question.or(ready).first()).toBeVisible()
+  if (!(await question.count())) return
+  for (const box of await question.getByRole('checkbox').all()) await box.uncheck()
+  await scope.getByRole('button', { name: 'Confirm answers' }).click()
+}
+
 const requirement = (i: number): ToolUse => ({
   name: 'add_node',
   input: { tempId: `r${i}`, type: 'requirement', label: `Requirement ${i}`, properties: { ears_type: 'ubiquitous', action: `do thing ${i}` } },
@@ -106,6 +119,7 @@ test('Forge files each stage into its view and offers to arrange it', async ({ p
   await expect(page).toHaveURL(new RegExp(`/v/${conceptual.id}$`))
 
   // Requirements: into Conceptual, then the arrange questions.
+  await dropProposedPacks(page)
   await page.getByRole('button', { name: 'Generate requirements' }).click()
   const arrange = page.locator('.forge-arrange')
   await expect(arrange).toContainText('Keep the 5 new elements on Conceptual in a')
@@ -187,6 +201,7 @@ test('Forge builds the domain model after the requirements and the state machine
   expect(await page.locator('.forge-steps').evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0)
 
   for (const stage of ['requirements', 'domain model', 'fitness functions', 'Gherkin scenarios']) {
+    if (stage === 'requirements') await dropProposedPacks(page)
     await page.getByRole('button', { name: `Generate ${stage}` }).click()
     await page.getByRole('button', { name: 'Continue →' }).click()
   }
@@ -246,6 +261,7 @@ test('Forge asks for the view structure and files the run into the Radical one',
   const traceability = ((await studio.storedDoc()) as unknown as { views: View[] }).views.find((v) => v.viewpoint === 'traceability')!
   await expect(page).toHaveURL(new RegExp(`/v/${traceability.id}$`))
 
+  await dropProposedPacks(page)
   await page.getByRole('button', { name: 'Generate requirements' }).click()
   await expect(page.getByRole('button', { name: 'Continue →' })).toBeVisible()
   // The views of requirements in Governance; nothing for Specification, which
@@ -311,6 +327,7 @@ test('Forge asks before it refines an earlier stage and applies only what the us
   await page.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
   await page.getByRole('group', { name: 'Views' }).getByLabel(/Layer canvases/).check()
   await page.getByRole('button', { name: 'Start →' }).click()
+  await dropProposedPacks(page)
   await page.getByRole('button', { name: 'Generate requirements' }).click()
   await expect(page.getByTestId('forge-refinements')).toHaveCount(0)
   await page.getByRole('button', { name: 'Continue →' }).click()
@@ -571,6 +588,7 @@ folderTest('Radical Forge put aside for the agent\'s Assay panel between two sta
   await forge.locator('.forge-textarea').fill('# Click & collect\n\nReaders reserve a book online and pick it up in the shop.')
   await forge.getByRole('group', { name: 'Views' }).getByLabel(/Layer canvases/).check()
   await forge.getByRole('button', { name: 'Start →' }).click()
+  await dropProposedPacks(forge)
   await forge.getByRole('button', { name: 'Generate requirements' }).click()
   await expect(forge.getByRole('button', { name: 'Continue →' })).toBeVisible()
   await expect(forge.locator('.forge-step.active')).toHaveText('Requirements')

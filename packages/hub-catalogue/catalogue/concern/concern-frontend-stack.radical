@@ -3,29 +3,25 @@
     "id": "concern-frontend-stack",
     "category": "concern",
     "name": "Frontend stack",
-    "description": "The UI framework and rendering model of a web front end, its design system, the browsers it supports, its performance budget (Core Web Vitals, JavaScript size) and its accessibility level.",
+    "description": "The UI framework and rendering model of a web front end, its design system, the browsers it supports, its JavaScript budget and how long its framework stays supported. The Core Web Vitals and accessibility are decided in the UX & Accessibility packs.",
     "tags": [
       "technology",
       "frontend",
       "web",
       "framework",
-      "core web vitals",
-      "accessibility",
+      "rendering",
       "design system",
-      "browser support"
+      "browser support",
+      "javascript budget"
     ],
     "requiredMetamodel": "c4-ddd-governance-builtin",
     "concern": {
       "id": "frontend-stack",
       "trigger": "LIST NODES WHERE type = \"webapp\" AND external != true",
-      "why": "these are web front ends, so what they are built with, how they render, how fast and accessible they must be, and which browsers they support has to be decided.",
+      "why": "these are web front ends, so what they are built with, how they render, how much JavaScript they may ship, and which browsers they support has to be decided.",
       "group": "technology"
     },
     "sources": [
-      {
-        "title": "web.dev: Web Vitals (LCP, INP, CLS and their thresholds)",
-        "url": "https://web.dev/articles/vitals"
-      },
       {
         "title": "web.dev: Performance budgets 101",
         "url": "https://web.dev/articles/performance-budgets-101"
@@ -41,14 +37,6 @@
       {
         "title": "web.dev: Prevent unnecessary network requests with the HTTP Cache",
         "url": "https://web.dev/articles/http-cache"
-      },
-      {
-        "title": "W3C: Web Content Accessibility Guidelines (WCAG) 2.2",
-        "url": "https://www.w3.org/TR/WCAG22/"
-      },
-      {
-        "title": "ETSI EN 301 549: Accessibility requirements for ICT products and services",
-        "url": "https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf"
       },
       {
         "title": "W3C Design Tokens Community Group: Design Tokens Format Module",
@@ -69,10 +57,6 @@
       {
         "title": "Lighthouse CI",
         "url": "https://github.com/GoogleChrome/lighthouse-ci"
-      },
-      {
-        "title": "axe-core",
-        "url": "https://github.com/dequelabs/axe-core"
       },
       {
         "title": "Thoughtworks Technology Radar",
@@ -187,24 +171,6 @@
         ]
       },
       {
-        "key": "LCP_MS",
-        "label": "Largest Contentful Paint at the 75th percentile (ms)?",
-        "defaultValue": "2500",
-        "type": "number"
-      },
-      {
-        "key": "INP_MS",
-        "label": "Interaction to Next Paint at the 75th percentile (ms)?",
-        "defaultValue": "200",
-        "type": "number"
-      },
-      {
-        "key": "CLS",
-        "label": "Cumulative Layout Shift at the 75th percentile?",
-        "defaultValue": "0.1",
-        "type": "number"
-      },
-      {
         "key": "JS_KB",
         "label": "At most how much JavaScript may a route load before it is interactive (KB, compressed)?",
         "defaultValue": "200",
@@ -222,12 +188,12 @@
     {
       "id": "need",
       "type": "need",
-      "label": "A fast, accessible front end",
+      "label": "A front end built to last",
       "x": 0,
       "y": 0,
       "kind": "brief",
       "source": "Hub concern pack: Frontend stack",
-      "description": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
+      "description": "People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview)."
     },
     {
       "id": "req-one-framework",
@@ -240,41 +206,21 @@
       "rationale": "Two UI frameworks in one front end double the JavaScript users download and the skills the team needs (Thoughtworks Technology Radar)."
     },
     {
-      "id": "req-vitals",
-      "type": "requirement",
-      "label": "Core Web Vitals met",
-      "x": 260,
-      "y": 130,
-      "ears_type": "ubiquitous",
-      "action": "meet, at the 75th percentile of real page loads over 28 days per page group, a Largest Contentful Paint within {{LCP_MS}} ms, an Interaction to Next Paint within {{INP_MS}} ms and a Cumulative Layout Shift of at most {{CLS}}",
-      "rationale": "These are the thresholds for a \"good\" experience, measured at the 75th percentile of field data over 28 days (web.dev, Web Vitals: LCP 2.5 s, INP 200 ms, CLS 0.1); they also feed search ranking."
-    },
-    {
       "id": "req-bundle",
       "type": "requirement",
       "label": "JavaScript within budget",
       "x": 260,
-      "y": 260,
+      "y": 130,
       "ears_type": "ubiquitous",
-      "action": "keep the JavaScript a route loads before it is interactive within {{JS_KB}} KB compressed, loading the rest on demand",
+      "action": "keep the JavaScript a route loads on its first view within {{JS_KB}} KB compressed, loading the rest on demand",
       "rationale": "JavaScript is the costliest byte on a phone: it is downloaded, parsed and run on the main thread, which is what INP measures (web.dev, Performance budgets 101)."
-    },
-    {
-      "id": "req-a11y",
-      "type": "requirement",
-      "label": "Accessible to WCAG 2.2 AA",
-      "x": 260,
-      "y": 390,
-      "ears_type": "ubiquitous",
-      "action": "conform to WCAG 2.2 level AA on every page, with 0 serious or critical automated accessibility violations, every function operable by keyboard alone, and a manual audit with a screen reader before each major release",
-      "rationale": "WCAG 2.2 AA is the level EN 301 549, the European Accessibility Act and most public-sector rules require; automated checks find only part of the failures, hence the keyboard journey and the manual audit (W3C WCAG 2.2; EN 301 549)."
     },
     {
       "id": "req-supported",
       "type": "requirement",
       "label": "Supported framework versions",
       "x": 260,
-      "y": 520,
+      "y": 260,
       "ears_type": "ubiquitous",
       "action": "run only framework and build-tool majors under support, moving off each at least {{EOL_DAYS}} days before its end of support",
       "rationale": "Front-end frameworks support a major for a limited time (Angular 18 months, Node.js-based tooling with its runtime); after that, security fixes stop (endoflife.date).",
@@ -292,7 +238,7 @@
       "type": "requirement",
       "label": "App shell cached right",
       "x": 260,
-      "y": 650,
+      "y": 390,
       "ears_type": "event-driven",
       "trigger": "a new version of the single-page app is deployed",
       "action": "serve its content-hashed assets with a one-year immutable cache and its HTML with no-cache, so that every user gets the new version on their next navigation and 0 users load a mix of versions",
@@ -314,11 +260,11 @@
       "type": "requirement",
       "label": "Content in the first response",
       "x": 260,
-      "y": 780,
+      "y": 520,
       "ears_type": "event-driven",
       "trigger": "a page is requested",
       "action": "answer with HTML that already holds the page's main content, with a Time to First Byte within 800 ms at the 75th percentile at the peak load decided in the Capacity and scaling pack",
-      "rationale": "Server rendering pays off only if the server answers quickly; 800 ms is web.dev's \"good\" Time to First Byte, which leaves room for LCP within budget (web.dev, TTFB).",
+      "rationale": "Server rendering pays off only if the server answers quickly; 800 ms is web.dev's \"good\" Time to First Byte, which leaves room for the LCP budget of the Mobile and perceived performance pack (web.dev, TTFB).",
       "hubWhen": {
         "RENDERING": [
           "ssr"
@@ -330,7 +276,7 @@
       "type": "requirement",
       "label": "Pages built in advance",
       "x": 260,
-      "y": 910,
+      "y": 650,
       "ears_type": "event-driven",
       "trigger": "content is published or changed",
       "action": "rebuild the affected pages and serve them from the CDN within 15 minutes, with 100% of pages served as pre-built files from the CDN cache",
@@ -352,7 +298,7 @@
       "type": "requirement",
       "label": "Screens use our design system",
       "x": 260,
-      "y": 1040,
+      "y": 780,
       "ears_type": "ubiquitous",
       "action": "build every screen from the design system's components and tokens, document each component with its states in Storybook, and use 0 hard-coded colours, font sizes or spacing outside the tokens",
       "rationale": "A design system pays off only when used everywhere; tokens make a brand or contrast change one edit instead of a search (W3C Design Tokens Format Module).",
@@ -367,7 +313,7 @@
       "type": "requirement",
       "label": "Library used through its theme",
       "x": 260,
-      "y": 1170,
+      "y": 910,
       "ears_type": "ubiquitous",
       "action": "style the component library only through its theme and public props, with 0 overrides of its internal class names, so that it can be upgraded to each new major within 6 months",
       "rationale": "Overrides of a library's internals break on its next major and pin the front end to an old version (the library's own theming guides).",
@@ -382,7 +328,7 @@
       "type": "requirement",
       "label": "Utilities use the tokens",
       "x": 260,
-      "y": 1300,
+      "y": 1040,
       "ears_type": "ubiquitous",
       "action": "take colours, spacing and type sizes only from the tokens in the Tailwind theme, with 0 arbitrary values in class names",
       "rationale": "Arbitrary values bypass the theme and turn the design system back into one-off styles (Tailwind CSS documentation, theme variables).",
@@ -397,7 +343,7 @@
       "type": "requirement",
       "label": "Supported browsers work",
       "x": 260,
-      "y": 1430,
+      "y": 1170,
       "ears_type": "ubiquitous",
       "action": "work in every browser of {{BROWSERS}}, with the main journeys tested in Chromium, Firefox and WebKit on every pull request and 0 unsupported language or web features shipped without a polyfill",
       "rationale": "An explicit browser list lets the build ship only the transpilation and polyfills needed, and the lint catch a feature the list does not have (Browserslist)."
@@ -407,7 +353,7 @@
       "type": "requirement",
       "label": "Old browsers told",
       "x": 260,
-      "y": 1560,
+      "y": 1300,
       "ears_type": "unwanted-behaviour",
       "unwanted_condition": "the front end is opened in a browser outside the supported list",
       "action": "show a notice naming the supported browsers instead of a broken page",
@@ -423,12 +369,12 @@
       "type": "requirement",
       "label": "Tested on older phones",
       "x": 260,
-      "y": 1690,
+      "y": 1430,
       "ears_type": "event-driven",
       "trigger": "a release candidate is built",
-      "action": "run the main journeys on real devices with the oldest supported iOS Safari and a low-end Android phone, and meet the Core Web Vitals budget on the Android phone",
-      "rationale": "Emulated browsers miss the CPU and memory limits of old phones, where an extended audience feels the budget most (web.dev, Web Vitals).",
-      "unchecked": "It runs on real phones, which no pipeline tool here drives: the release engineer runs the main journeys on the device bench (the oldest supported iPhone and a low-end Android phone) before each release candidate is promoted, and records LCP from the phone's DevTools in the release notes.",
+      "action": "run the main journeys on real devices with the oldest supported iOS Safari and a low-end Android phone",
+      "rationale": "Emulated browsers miss the CPU, memory and engine limits of old phones, where an extended audience meets the front end (Browserslist).",
+      "unchecked": "It runs on real phones, which no pipeline tool here drives: the release engineer runs the main journeys on the device bench (the oldest supported iPhone and a low-end Android phone) before each release candidate is promoted, and records the result, with LCP read from the phone's DevTools against the budget of the Mobile and perceived performance pack, in the release notes.",
       "hubWhen": {
         "BROWSERS": [
           "extended"
@@ -446,41 +392,21 @@
       "then": "the framework check fails until a decision record allows it"
     },
     {
-      "id": "sc-vitals",
-      "type": "scenario",
-      "label": "Field vitals within budget",
-      "x": 520,
-      "y": 130,
-      "given": "28 days of real-user measurements per page group",
-      "when": "the 75th percentiles are computed",
-      "then": "LCP is within {{LCP_MS}} ms, INP within {{INP_MS}} ms and CLS at most {{CLS}} for every page group"
-    },
-    {
       "id": "sc-bundle",
       "type": "scenario",
       "label": "Bundle over budget refused",
       "x": 520,
-      "y": 260,
+      "y": 130,
       "given": "a pull request that adds a large library to a route",
-      "when": "Lighthouse CI runs against the preview",
-      "then": "it fails when the route's script transfer size passes {{JS_KB}} KB"
-    },
-    {
-      "id": "sc-a11y",
-      "type": "scenario",
-      "label": "Page passes accessibility checks",
-      "x": 520,
-      "y": 390,
-      "given": "each page of the main journeys",
-      "when": "the automated checks run and the main journey is completed with the keyboard only",
-      "then": "0 serious or critical violations are reported and the journey completes"
+      "when": "Lighthouse CI collects from the preview and radical check judges the measurements",
+      "then": "the script size condition fails when the route's script transfer size passes {{JS_KB}} KB"
     },
     {
       "id": "sc-supported",
       "type": "scenario",
       "label": "End of support ahead",
       "x": 520,
-      "y": 520,
+      "y": 260,
       "given": "a framework major whose end of support is less than {{EOL_DAYS}} days away",
       "when": "the version check runs",
       "then": "it fails naming the version and its end-of-support date",
@@ -498,7 +424,7 @@
       "type": "scenario",
       "label": "New version reaches users",
       "x": 520,
-      "y": 650,
+      "y": 390,
       "given": "a user with the previous version cached",
       "when": "a new version is deployed and the user navigates",
       "then": "the new HTML loads, its hashed assets are fetched once, and the unchanged ones come from the cache",
@@ -519,7 +445,7 @@
       "type": "scenario",
       "label": "Content without JavaScript",
       "x": 520,
-      "y": 780,
+      "y": 520,
       "given": "a public page",
       "when": "it is requested at the peak rate with JavaScript disabled",
       "then": "its main content is in the HTML, and the 75th-percentile TTFB is within 800 ms",
@@ -534,7 +460,7 @@
       "type": "scenario",
       "label": "Change live within 15 minutes",
       "x": 520,
-      "y": 910,
+      "y": 650,
       "given": "a published page",
       "when": "its content is changed",
       "then": "the publish run completes within 15 minutes and the CDN serves the rebuilt page from its cache",
@@ -555,7 +481,7 @@
       "type": "scenario",
       "label": "Hard-coded colour refused",
       "x": 520,
-      "y": 1040,
+      "y": 780,
       "given": "a stylesheet change",
       "when": "it sets a colour as a hex value instead of a token",
       "then": "the style lint fails",
@@ -570,7 +496,7 @@
       "type": "scenario",
       "label": "Internal override refused",
       "x": 520,
-      "y": 1170,
+      "y": 910,
       "given": "a stylesheet change",
       "when": "it targets one of the library's internal class names",
       "then": "the style lint fails",
@@ -585,7 +511,7 @@
       "type": "scenario",
       "label": "Arbitrary value refused",
       "x": 520,
-      "y": 1300,
+      "y": 1040,
       "given": "a component or template change",
       "when": "it uses a class with an arbitrary value such as a hex colour in brackets",
       "then": "the lint fails",
@@ -600,7 +526,7 @@
       "type": "scenario",
       "label": "Unsupported feature caught",
       "x": 520,
-      "y": 1430,
+      "y": 1170,
       "given": "the browser list",
       "when": "a change uses a web feature a listed browser lacks",
       "then": "the compatibility lint fails unless a polyfill is configured"
@@ -610,7 +536,7 @@
       "type": "scenario",
       "label": "Notice in old browser",
       "x": 520,
-      "y": 1560,
+      "y": 1300,
       "given": "a browser lacking a feature every supported browser has",
       "when": "the front end is opened",
       "then": "the notice names the supported browsers",
@@ -625,10 +551,10 @@
       "type": "scenario",
       "label": "Journeys pass on old phones",
       "x": 520,
-      "y": 1690,
+      "y": 1430,
       "given": "a release candidate",
       "when": "the main journeys run on the oldest supported iPhone and a low-end Android phone",
-      "then": "all pass, and LCP on the Android phone is within {{LCP_MS}} ms",
+      "then": "all pass",
       "hubWhen": {
         "BROWSERS": [
           "extended"
@@ -644,8 +570,8 @@
       "concern": "frontend-stack",
       "status": "accepted",
       "date": "",
-      "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; the browsers to support decide which features and polyfills ship; and accessibility is a legal duty in many markets (European Accessibility Act, ADA, Section 508), cheap when built in and expensive when retrofitted.",
-      "decision": "The front end is built with React in TypeScript (strict). Rendering: {{RENDERING}}: Next.js (App Router, server components) for server rendering and static generation, Vite with React Router for a single-page app. Data fetching with TanStack Query; forms with React Hook Form. Design system: {{DESIGN}}. Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile of real page loads, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Dependency updates: as decided in the Dependency hygiene pack. Choosing Next.js or React Router (framework mode): Next.js for the widest ecosystem and hosting on Vercel or Node; React Router when you want web-standard loaders and fewer conventions. Versions tracked through endoflife.date (react, nextjs), each major replaced at least {{EOL_DAYS}} days before its end of support.",
+      "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; and the browsers to support decide which features and polyfills ship. How fast pages feel on phones and who can use them are decided in the packs of the UX & Accessibility group.",
+      "decision": "The front end is built with React in TypeScript (strict). Rendering: {{RENDERING}}: Next.js (App Router, server components) for server rendering and static generation, Vite with React Router for a single-page app. Data fetching with TanStack Query; forms with React Hook Form. Design system: {{DESIGN}}. Browsers: {{BROWSERS}}. JavaScript budget: {{JS_KB}} KB per route, compressed. The Core Web Vitals budget, Reflow and touch target size are decided in the Mobile and perceived performance pack, and conformance to WCAG 2.2 AA in the Accessibility pack, both of the UX & Accessibility group. Dependency updates: as decided in the Dependency hygiene pack. Choosing Next.js or React Router (framework mode): Next.js for the widest ecosystem and hosting on Vercel or Node; React Router when you want web-standard loaders and fewer conventions. Versions tracked through endoflife.date (react, nextjs), each major replaced at least {{EOL_DAYS}} days before its end of support.",
       "consequences": "• The largest ecosystem of components and libraries, and the largest hiring pool.\n• React itself is only the view: routing, data, forms and state are choices to make and keep current.\n• Server components cut the JavaScript sent, but add a server and a new mental model.\n• Next.js majors arrive roughly yearly and change conventions; upgrades are planned work.",
       "alternatives": "1. Angular: everything included and one way of doing it, heavier.\n2. Vue with Nuxt: similar capabilities, gentler learning curve, smaller ecosystem.\n3. Svelte with SvelteKit: smaller bundles, smaller ecosystem.",
       "hubWhen": {
@@ -663,8 +589,8 @@
       "concern": "frontend-stack",
       "status": "accepted",
       "date": "",
-      "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; the browsers to support decide which features and polyfills ship; and accessibility is a legal duty in many markets (European Accessibility Act, ADA, Section 508), cheap when built in and expensive when retrofitted.",
-      "decision": "The front end is built with Angular in TypeScript (strict), with standalone components, signals and the Angular CLI (esbuild). Rendering: {{RENDERING}}: Angular SSR with hydration for server rendering, prerendering for static pages, the default build for a single-page app. Design system: {{DESIGN}} (Angular Material and the CDK when adopting a library). Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile of real page loads, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Dependency updates: as decided in the Dependency hygiene pack. The JavaScript budget is also set in angular.json budgets. Each major is supported for 18 months (6 active, 12 LTS), so the front end moves one major at a time with ng update, at least {{EOL_DAYS}} days before the end of support tracked on endoflife.date (angular).",
+      "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; and the browsers to support decide which features and polyfills ship. How fast pages feel on phones and who can use them are decided in the packs of the UX & Accessibility group.",
+      "decision": "The front end is built with Angular in TypeScript (strict), with standalone components, signals and the Angular CLI (esbuild). Rendering: {{RENDERING}}: Angular SSR with hydration for server rendering, prerendering for static pages, the default build for a single-page app. Design system: {{DESIGN}} (Angular Material and the CDK when adopting a library). Browsers: {{BROWSERS}}. JavaScript budget: {{JS_KB}} KB per route, compressed. The Core Web Vitals budget, Reflow and touch target size are decided in the Mobile and perceived performance pack, and conformance to WCAG 2.2 AA in the Accessibility pack, both of the UX & Accessibility group. Dependency updates: as decided in the Dependency hygiene pack. The JavaScript budget is also set in angular.json budgets. Each major is supported for 18 months (6 active, 12 LTS), so the front end moves one major at a time with ng update, at least {{EOL_DAYS}} days before the end of support tracked on endoflife.date (angular).",
       "consequences": "• Routing, forms, HTTP, testing and i18n come with the framework: one way of doing things across teams.\n• Larger initial bundles than Svelte or Vue unless routes are lazy-loaded and deferrable views used.\n• A predictable release and support schedule makes the version policy easy to plan.\n• A steeper learning curve (dependency injection, RxJS) for people new to it.",
       "alternatives": "1. React with Next.js: larger ecosystem, more choices to make.\n2. Vue with Nuxt: lighter, less prescriptive.\n3. Server-rendered HTML with htmx: far less JavaScript for forms-and-tables applications.",
       "hubWhen": {
@@ -682,8 +608,8 @@
       "concern": "frontend-stack",
       "status": "accepted",
       "date": "",
-      "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; the browsers to support decide which features and polyfills ship; and accessibility is a legal duty in many markets (European Accessibility Act, ADA, Section 508), cheap when built in and expensive when retrofitted.",
-      "decision": "The front end is built with Vue 3 in TypeScript, using the Composition API and single-file components. Rendering: {{RENDERING}}: Nuxt for server rendering and static generation, Vite with Vue Router for a single-page app. State in Pinia. Design system: {{DESIGN}}. Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile of real page loads, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Dependency updates: as decided in the Dependency hygiene pack. Versions tracked through endoflife.date (vue, nuxt), each major replaced at least {{EOL_DAYS}} days before its end of support.",
+      "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; and the browsers to support decide which features and polyfills ship. How fast pages feel on phones and who can use them are decided in the packs of the UX & Accessibility group.",
+      "decision": "The front end is built with Vue 3 in TypeScript, using the Composition API and single-file components. Rendering: {{RENDERING}}: Nuxt for server rendering and static generation, Vite with Vue Router for a single-page app. State in Pinia. Design system: {{DESIGN}}. Browsers: {{BROWSERS}}. JavaScript budget: {{JS_KB}} KB per route, compressed. The Core Web Vitals budget, Reflow and touch target size are decided in the Mobile and perceived performance pack, and conformance to WCAG 2.2 AA in the Accessibility pack, both of the UX & Accessibility group. Dependency updates: as decided in the Dependency hygiene pack. Versions tracked through endoflife.date (vue, nuxt), each major replaced at least {{EOL_DAYS}} days before its end of support.",
       "consequences": "• Gentle learning curve and good performance out of the box.\n• Can be adopted gradually inside existing server-rendered pages.\n• A smaller ecosystem and hiring pool than React.\n• Nuxt majors bring migration work; plan them like framework upgrades.",
       "alternatives": "1. React with Next.js: the largest ecosystem.\n2. Svelte with SvelteKit: smaller bundles.\n3. Angular: more included, more prescriptive.",
       "hubWhen": {
@@ -701,8 +627,8 @@
       "concern": "frontend-stack",
       "status": "accepted",
       "date": "",
-      "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; the browsers to support decide which features and polyfills ship; and accessibility is a legal duty in many markets (European Accessibility Act, ADA, Section 508), cheap when built in and expensive when retrofitted.",
-      "decision": "The front end is built with Svelte 5 (runes) in TypeScript and SvelteKit, whose adapters cover every rendering mode. Rendering: {{RENDERING}}: adapter-node or a platform adapter for server rendering, adapter-static for static pages and single-page apps. Design system: {{DESIGN}}. Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile of real page loads, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Dependency updates: as decided in the Dependency hygiene pack. Versions tracked through endoflife.date (svelte), each major replaced at least {{EOL_DAYS}} days before its end of support.",
+      "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; and the browsers to support decide which features and polyfills ship. How fast pages feel on phones and who can use them are decided in the packs of the UX & Accessibility group.",
+      "decision": "The front end is built with Svelte 5 (runes) in TypeScript and SvelteKit, whose adapters cover every rendering mode. Rendering: {{RENDERING}}: adapter-node or a platform adapter for server rendering, adapter-static for static pages and single-page apps. Design system: {{DESIGN}}. Browsers: {{BROWSERS}}. JavaScript budget: {{JS_KB}} KB per route, compressed. The Core Web Vitals budget, Reflow and touch target size are decided in the Mobile and perceived performance pack, and conformance to WCAG 2.2 AA in the Accessibility pack, both of the UX & Accessibility group. Dependency updates: as decided in the Dependency hygiene pack. Versions tracked through endoflife.date (svelte), each major replaced at least {{EOL_DAYS}} days before its end of support.",
       "consequences": "• Compiled components ship little JavaScript, which makes the budget easy to keep.\n• Simple syntax, quick to learn.\n• A smaller ecosystem: fewer ready-made components and integrations, more built in-house.\n• A smaller hiring pool than React, Angular or Vue.",
       "alternatives": "1. React with Next.js: the largest ecosystem, more JavaScript.\n2. Vue with Nuxt: similar simplicity, larger ecosystem.\n3. Server-rendered HTML with htmx: even less JavaScript, less interactivity.",
       "hubWhen": {
@@ -720,8 +646,8 @@
       "concern": "frontend-stack",
       "status": "accepted",
       "date": "",
-      "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; the browsers to support decide which features and polyfills ship; and accessibility is a legal duty in many markets (European Accessibility Act, ADA, Section 508), cheap when built in and expensive when retrofitted.",
-      "decision": "The front end is HTML rendered by the back end from templates (Thymeleaf, Razor, Jinja, templ or the back end's own), with htmx swapping parts of the page and Alpine.js for small client-side state; no client-side framework or build step beyond CSS. Rendering: every page on the server, with partial updates over HTTP; the rendering question does not apply. Design system: {{DESIGN}}, delivered as template partials. Browsers: {{BROWSERS}}. Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile of real page loads, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Dependency updates: as decided in the Dependency hygiene pack. htmx and Alpine.js are pinned dependencies updated like any other; the runtime and framework that render the pages, and their support lifecycle, are decided in the Backend stack pack. Choose it while interactions are forms, tables, filters and dialogs; supersede it when screens need rich client state (offline, drag-and-drop editors, real-time collaboration).",
+      "context": "This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user's phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; and the browsers to support decide which features and polyfills ship. How fast pages feel on phones and who can use them are decided in the packs of the UX & Accessibility group.",
+      "decision": "The front end is HTML rendered by the back end from templates (Thymeleaf, Razor, Jinja, templ or the back end's own), with htmx swapping parts of the page and Alpine.js for small client-side state; no client-side framework or build step beyond CSS. Rendering: every page on the server, with partial updates over HTTP; the rendering question does not apply. Design system: {{DESIGN}}, delivered as template partials. Browsers: {{BROWSERS}}. JavaScript budget: {{JS_KB}} KB per route, compressed. The Core Web Vitals budget, Reflow and touch target size are decided in the Mobile and perceived performance pack, and conformance to WCAG 2.2 AA in the Accessibility pack, both of the UX & Accessibility group. Dependency updates: as decided in the Dependency hygiene pack. htmx and Alpine.js are pinned dependencies updated like any other; the runtime and framework that render the pages, and their support lifecycle, are decided in the Backend stack pack. Choose it while interactions are forms, tables, filters and dialogs; supersede it when screens need rich client state (offline, drag-and-drop editors, real-time collaboration).",
       "consequences": "• Very little JavaScript, no client-side state to keep in sync, one codebase and one team for front and back end.\n• Fast first loads; every interaction is a request, so latency to the server sets how responsive it feels.\n• Rich client-side interaction is awkward and grows into hand-written JavaScript.\n• Fewer ready-made components; the design system is built as template partials.",
       "alternatives": "1. A single-page app framework (React, Angular, Vue, Svelte): rich interaction, much more JavaScript and a second codebase.\n2. Hotwire (Turbo and Stimulus) or Phoenix LiveView: the same idea tied to Rails or Elixir.\n3. Plain server-rendered pages without htmx: simplest, full reloads.",
       "hubWhen": {
@@ -821,9 +747,9 @@
       }
     },
     {
-      "id": "ff-lighthouse",
+      "id": "ff-bundle",
       "type": "fitness-fn",
-      "label": "Lab budget holds",
+      "label": "JavaScript within budget",
       "x": 1040,
       "y": 650,
       "characteristic": "performance-efficiency",
@@ -831,53 +757,16 @@
       "cadence": "triggered",
       "trigger": "pull-request",
       "invocation": "automated",
-      "description": "Lighthouse CI starts the preview build, runs three times per main page on its mobile profile and asserts the budget; the median run counts. The script size is the transfer size of every script the page loads, whatever the framework's output paths. INP needs real interactions, so it is checked in the field (see Field vitals). Pages behind sign-in need a puppeteerScript that signs in before the runs.\n\nThreshold: On every pull request, for each main page: script transfer size at most {{JS_KB}} KB, LCP within {{LCP_MS}} ms, CLS at most {{CLS}}, Total Blocking Time within 200 ms (the lab stand-in for INP), accessibility score at least 0.95\n\nTool: Lighthouse CI\n\n```js\n// lighthouserc.cjs\nmodule.exports = {\n  ci: {\n    collect: {\n      startServerCommand: 'npm run preview',\n      url: ['http://localhost:4173/', 'http://localhost:4173/search'],\n      numberOfRuns: 3,\n      // puppeteerScript: './lighthouse-login.cjs',   // signs in first, for pages behind sign-in\n    },\n    assert: {\n      assertions: {\n        'resource-summary:script:size': ['error', { maxNumericValue: {{JS_KB}} * 1024, aggregationMethod: 'median' }],\n        'largest-contentful-paint': ['error', { maxNumericValue: {{LCP_MS}}, aggregationMethod: 'median' }],\n        'cumulative-layout-shift': ['error', { maxNumericValue: {{CLS}}, aggregationMethod: 'median' }],\n        'total-blocking-time': ['error', { maxNumericValue: 200, aggregationMethod: 'median' }],\n        'categories:accessibility': ['error', { minScore: 0.95 }],\n      },\n    },\n    upload: { target: 'temporary-public-storage' },\n  },\n}\n```"
-    },
-    {
-      "id": "ff-field-vitals",
-      "type": "fitness-fn",
-      "label": "Field vitals within budget",
-      "x": 1040,
-      "y": 780,
-      "characteristic": "performance-efficiency",
-      "scope": "holistic",
-      "cadence": "triggered",
-      "trigger": "nightly",
-      "invocation": "automated",
-      "description": "The page reports LCP, INP and CLS from real users with the web-vitals library (navigator.sendBeacon to /rum, which stores name, value and page group in rum_events). A daily job runs the query below, which computes the 75th percentile per metric and page group over the last 28 days and returns every row over budget; any row fails the job and alerts the team.\n\nThreshold: 75th percentile over 28 days per page group: LCP within {{LCP_MS}} ms, INP within {{INP_MS}} ms, CLS at most {{CLS}}; the daily query returns 0 rows\n\nTool: web-vitals (Google Chrome) in the page; a scheduled SQL query over the RUM table (PostgreSQL syntax)\n\n```sql\n-- rum_events(name text, value numeric, page_group text, received_at timestamptz); run daily, alert on any row\nWITH p75 AS (\n  SELECT name, page_group, percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75\n  FROM rum_events\n  WHERE received_at > now() - interval '28 days'\n  GROUP BY name, page_group\n)\nSELECT name, page_group, p75\nFROM p75\nWHERE (name = 'LCP' AND p75 > {{LCP_MS}})\n   OR (name = 'INP' AND p75 > {{INP_MS}})\n   OR (name = 'CLS' AND p75 > {{CLS}})\nORDER BY name, page_group;\n```"
-    },
-    {
-      "id": "ff-axe",
-      "type": "fitness-fn",
-      "label": "No accessibility violations",
-      "x": 1040,
-      "y": 910,
-      "characteristic": "interaction-capability",
-      "scope": "atomic",
-      "cadence": "triggered",
-      "trigger": "pull-request",
-      "invocation": "automated",
-      "description": "A Playwright test opens each page of the main journeys, including open dialogs and error states, and runs axe-core with the WCAG A and AA tags; any serious or critical violation fails it.\n\nThreshold: 0 serious or critical axe violations against the WCAG 2.0 and 2.1 A and AA rules and the 2.2 AA rules on every page of the main journeys\n\nTool: axe-core with Playwright (@axe-core/playwright)\n\n```ts\nimport AxeBuilder from '@axe-core/playwright'\nimport { expect, test } from '@playwright/test'\n\nfor (const path of ['/', '/search', '/checkout']) {\n  test(`${path} meets WCAG 2.2 AA`, async ({ page }) => {\n    await page.goto(path)\n    const { violations } = await new AxeBuilder({ page })\n      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])\n      .analyze()\n    expect(violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual([])\n  })\n}\n```"
-    },
-    {
-      "id": "ff-keyboard",
-      "type": "fitness-fn",
-      "label": "Main journey by keyboard",
-      "x": 1040,
-      "y": 1040,
-      "characteristic": "interaction-capability",
-      "scope": "atomic",
-      "cadence": "triggered",
-      "trigger": "pull-request",
-      "invocation": "automated",
-      "description": "A Playwright test walks the main journey without the mouse: it tabs to each control by its accessible name, activates it with Enter or Space, and asserts the focused element is visible after every move; a control that cannot be reached within 200 tabs fails the test.\n\nThreshold: The main journey completes with Tab, Shift+Tab, Enter, Space and the arrow keys only, and focus is visible at every step\n\nTool: Playwright\n\n```ts\nimport { expect, test, type Page } from '@playwright/test'\n\nasync function tabTo(page: Page, name: string): Promise<void> {\n  for (let i = 0; i < 200; i++) {\n    const focused = page.locator(':focus')\n    if ((await focused.count()) && (await focused.textContent())?.includes(name)) { await expect(focused).toBeVisible(); return }\n    await page.keyboard.press('Tab')\n  }\n  throw new Error(`${name} cannot be reached with Tab`)\n}\n\ntest('checkout completes with the keyboard alone', async ({ page }) => {\n  await page.goto('/')\n  for (const step of ['Search', 'Add to basket', 'Checkout', 'Place order']) {\n    await tabTo(page, step)\n    await page.keyboard.press('Enter')\n  }\n  await expect(page.getByRole('heading', { name: 'Order placed' })).toBeVisible()\n})\n```"
+      "measure": "lighthouse",
+      "metrics": "web.lab.script_bytes.max{device=mobile} <= {{JS_KB}} KB",
+      "description": "Lighthouse CI starts the preview build and runs three times on each main page; radical sense lighthouse reads the reports and takes, per page, the median transfer size of every script the page loads, whatever the framework's output paths, and the largest over the pages as web.lab.script_bytes.max. lighthouserc.cjs holds no assertions: the limit is this condition, judged by radical check. It is the same collect run the Mobile and perceived performance pack uses for the Core Web Vitals; with that pack imported, one lighthouserc serves both. A desktop-only tool that collects only the desktop preset reads device=desktop instead.\n\nThreshold: On every pull request, for the main page that loads the most JavaScript on Lighthouse's mobile default: script transfer size at most {{JS_KB}} KB (1 KB = 1000 bytes)\n\nTool: Lighthouse CI (@lhci/cli) with radical sense lighthouse\n\n```js\n// lighthouserc.cjs: Lighthouse CI only collects; the model's conditions judge the numbers\nmodule.exports = {\n  ci: {\n    collect: {\n      startServerCommand: 'npm run preview',\n      url: ['http://localhost:4173/', 'http://localhost:4173/search'],\n      numberOfRuns: 3,\n      // puppeteerScript: './lighthouse-login.cjs',   // signs in first, for pages behind sign-in\n    },\n  },\n}\n// The pull-request job (no assert, no upload: radical check fails the job):\n//   npx @lhci/cli@0.15.1 collect                                        # Lighthouse's mobile default\n//   npx radical sense run --trigger pull-request --out reports/metrics  # lighthouse reads .lighthouseci\n//   npx radical check --metrics reports/metrics\n```"
     },
     {
       "id": "ff-compat",
       "type": "fitness-fn",
       "label": "Features match browser list",
       "x": 1040,
-      "y": 1170,
+      "y": 780,
       "characteristic": "compatibility",
       "scope": "atomic",
       "cadence": "triggered",
@@ -890,7 +779,7 @@
       "type": "fitness-fn",
       "label": "Framework still supported",
       "x": 1040,
-      "y": 1300,
+      "y": 910,
       "characteristic": "maintainability",
       "scope": "atomic",
       "cadence": "triggered",
@@ -911,7 +800,7 @@
       "type": "fitness-fn",
       "label": "Cache headers right",
       "x": 1040,
-      "y": 1430,
+      "y": 1040,
       "characteristic": "performance-efficiency",
       "scope": "atomic",
       "cadence": "triggered",
@@ -935,7 +824,7 @@
       "type": "fitness-fn",
       "label": "Server answers quickly",
       "x": 1040,
-      "y": 1560,
+      "y": 1170,
       "characteristic": "performance-efficiency",
       "scope": "holistic",
       "cadence": "triggered",
@@ -953,7 +842,7 @@
       "type": "fitness-fn",
       "label": "Pages served from the edge",
       "x": 1040,
-      "y": 1690,
+      "y": 1300,
       "characteristic": "performance-efficiency",
       "scope": "atomic",
       "cadence": "triggered",
@@ -977,7 +866,7 @@
       "type": "fitness-fn",
       "label": "Only design tokens",
       "x": 1040,
-      "y": 1820,
+      "y": 1430,
       "characteristic": "maintainability",
       "scope": "atomic",
       "cadence": "triggered",
@@ -995,7 +884,7 @@
       "type": "fitness-fn",
       "label": "No library internals styled",
       "x": 1040,
-      "y": 1950,
+      "y": 1560,
       "characteristic": "maintainability",
       "scope": "atomic",
       "cadence": "triggered",
@@ -1013,7 +902,7 @@
       "type": "fitness-fn",
       "label": "No arbitrary utility values",
       "x": 1040,
-      "y": 2080,
+      "y": 1690,
       "characteristic": "maintainability",
       "scope": "atomic",
       "cadence": "triggered",
@@ -1037,7 +926,7 @@
       "type": "fitness-fn",
       "label": "No arbitrary utility values in templates",
       "x": 1040,
-      "y": 2210,
+      "y": 1820,
       "characteristic": "maintainability",
       "scope": "atomic",
       "cadence": "triggered",
@@ -1058,7 +947,7 @@
       "type": "fitness-fn",
       "label": "Old browsers get the notice",
       "x": 1040,
-      "y": 2340,
+      "y": 1950,
       "characteristic": "compatibility",
       "scope": "atomic",
       "cadence": "triggered",
@@ -1078,98 +967,84 @@
       "sourceId": "req-one-framework",
       "targetId": "need",
       "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
-    },
-    {
-      "id": "req-vitals--derives--need",
-      "sourceId": "req-vitals",
-      "targetId": "need",
-      "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
+      "quote": "People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview)."
     },
     {
       "id": "req-bundle--derives--need",
       "sourceId": "req-bundle",
       "targetId": "need",
       "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
-    },
-    {
-      "id": "req-a11y--derives--need",
-      "sourceId": "req-a11y",
-      "targetId": "need",
-      "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
+      "quote": "People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview)."
     },
     {
       "id": "req-supported--derives--need",
       "sourceId": "req-supported",
       "targetId": "need",
       "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
+      "quote": "People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview)."
     },
     {
       "id": "req-spa-cache--derives--need",
       "sourceId": "req-spa-cache",
       "targetId": "need",
       "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
+      "quote": "People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview)."
     },
     {
       "id": "req-ssr--derives--need",
       "sourceId": "req-ssr",
       "targetId": "need",
       "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
+      "quote": "People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview)."
     },
     {
       "id": "req-static--derives--need",
       "sourceId": "req-static",
       "targetId": "need",
       "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
+      "quote": "People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview)."
     },
     {
       "id": "req-design-own--derives--need",
       "sourceId": "req-design-own",
       "targetId": "need",
       "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
+      "quote": "People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview)."
     },
     {
       "id": "req-design-library--derives--need",
       "sourceId": "req-design-library",
       "targetId": "need",
       "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
+      "quote": "People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview)."
     },
     {
       "id": "req-design-utility--derives--need",
       "sourceId": "req-design-utility",
       "targetId": "need",
       "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
+      "quote": "People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview)."
     },
     {
       "id": "req-browsers--derives--need",
       "sourceId": "req-browsers",
       "targetId": "need",
       "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
+      "quote": "People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview)."
     },
     {
       "id": "req-unsupported--derives--need",
       "sourceId": "req-unsupported",
       "targetId": "need",
       "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
+      "quote": "People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview)."
     },
     {
       "id": "req-old-devices--derives--need",
       "sourceId": "req-old-devices",
       "targetId": "need",
       "relationType": "derives",
-      "quote": "People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page."
+      "quote": "People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview)."
     },
     {
       "id": "sc-one-framework--verifies--req-one-framework",
@@ -1178,21 +1053,9 @@
       "relationType": "verifies"
     },
     {
-      "id": "sc-vitals--verifies--req-vitals",
-      "sourceId": "sc-vitals",
-      "targetId": "req-vitals",
-      "relationType": "verifies"
-    },
-    {
       "id": "sc-bundle--verifies--req-bundle",
       "sourceId": "sc-bundle",
       "targetId": "req-bundle",
-      "relationType": "verifies"
-    },
-    {
-      "id": "sc-a11y--verifies--req-a11y",
-      "sourceId": "sc-a11y",
-      "targetId": "req-a11y",
       "relationType": "verifies"
     },
     {
@@ -1286,122 +1149,32 @@
       "relationType": "implements"
     },
     {
-      "id": "ff-lighthouse--implements--adr-react",
-      "sourceId": "ff-lighthouse",
+      "id": "ff-bundle--implements--adr-react",
+      "sourceId": "ff-bundle",
       "targetId": "adr-react",
       "relationType": "implements"
     },
     {
-      "id": "ff-lighthouse--implements--adr-angular",
-      "sourceId": "ff-lighthouse",
+      "id": "ff-bundle--implements--adr-angular",
+      "sourceId": "ff-bundle",
       "targetId": "adr-angular",
       "relationType": "implements"
     },
     {
-      "id": "ff-lighthouse--implements--adr-vue",
-      "sourceId": "ff-lighthouse",
+      "id": "ff-bundle--implements--adr-vue",
+      "sourceId": "ff-bundle",
       "targetId": "adr-vue",
       "relationType": "implements"
     },
     {
-      "id": "ff-lighthouse--implements--adr-svelte",
-      "sourceId": "ff-lighthouse",
+      "id": "ff-bundle--implements--adr-svelte",
+      "sourceId": "ff-bundle",
       "targetId": "adr-svelte",
       "relationType": "implements"
     },
     {
-      "id": "ff-lighthouse--implements--adr-htmx",
-      "sourceId": "ff-lighthouse",
-      "targetId": "adr-htmx",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-field-vitals--implements--adr-react",
-      "sourceId": "ff-field-vitals",
-      "targetId": "adr-react",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-field-vitals--implements--adr-angular",
-      "sourceId": "ff-field-vitals",
-      "targetId": "adr-angular",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-field-vitals--implements--adr-vue",
-      "sourceId": "ff-field-vitals",
-      "targetId": "adr-vue",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-field-vitals--implements--adr-svelte",
-      "sourceId": "ff-field-vitals",
-      "targetId": "adr-svelte",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-field-vitals--implements--adr-htmx",
-      "sourceId": "ff-field-vitals",
-      "targetId": "adr-htmx",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-axe--implements--adr-react",
-      "sourceId": "ff-axe",
-      "targetId": "adr-react",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-axe--implements--adr-angular",
-      "sourceId": "ff-axe",
-      "targetId": "adr-angular",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-axe--implements--adr-vue",
-      "sourceId": "ff-axe",
-      "targetId": "adr-vue",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-axe--implements--adr-svelte",
-      "sourceId": "ff-axe",
-      "targetId": "adr-svelte",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-axe--implements--adr-htmx",
-      "sourceId": "ff-axe",
-      "targetId": "adr-htmx",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-keyboard--implements--adr-react",
-      "sourceId": "ff-keyboard",
-      "targetId": "adr-react",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-keyboard--implements--adr-angular",
-      "sourceId": "ff-keyboard",
-      "targetId": "adr-angular",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-keyboard--implements--adr-vue",
-      "sourceId": "ff-keyboard",
-      "targetId": "adr-vue",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-keyboard--implements--adr-svelte",
-      "sourceId": "ff-keyboard",
-      "targetId": "adr-svelte",
-      "relationType": "implements"
-    },
-    {
-      "id": "ff-keyboard--implements--adr-htmx",
-      "sourceId": "ff-keyboard",
+      "id": "ff-bundle--implements--adr-htmx",
+      "sourceId": "ff-bundle",
       "targetId": "adr-htmx",
       "relationType": "implements"
     },

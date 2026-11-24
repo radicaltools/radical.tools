@@ -65,9 +65,9 @@ test('a Settings switch keeps Focus and Smart fit as the user left them', async 
   await page.getByRole('menuitemcheckbox', { name: /Smart fit/ }).click()
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('menuitemcheckbox', { name: /Smart fit/ })).toContainText('(off)')
-  const wizard = page.locator('label.app-menu-row', { hasText: 'Wizard on create' }).locator('input')
-  await wizard.uncheck()
-  await expect(wizard).not.toBeChecked()
+  const wizard = page.getByRole('menuitemcheckbox', { name: 'Wizard on create' })
+  await wizard.click()
+  await expect(wizard).toHaveAttribute('aria-checked', 'false')
   await page.keyboard.press('Escape')
 
   await page.reload()
@@ -75,7 +75,7 @@ test('a Settings switch keeps Focus and Smart fit as the user left them', async 
   await expect(focus).toHaveAttribute('aria-pressed', 'false')
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('menuitemcheckbox', { name: /Smart fit/ })).toContainText('(off)')
-  await expect(wizard).not.toBeChecked()
+  await expect(wizard).toHaveAttribute('aria-checked', 'false')
 })
 
 test('a selected relation brings forward itself and its two ends', async ({ page, studio }) => {

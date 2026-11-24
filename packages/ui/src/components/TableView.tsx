@@ -11,6 +11,10 @@ import { MarkdownText } from './MarkdownText'
 import { WikiMenu } from './WikiMenu'
 import { editingControl } from './editingControl'
 import { originModel, originOf } from '@radical/common/model'
+import { legibleFill } from './contrast'
+
+/** A type's chip: its colour, deepened or lightened as far as its text needs. */
+const chipColors = (fill: string, fg: string): React.CSSProperties => ({ background: legibleFill(fill, fg), color: fg })
 
 // ─── Table view ──────────────────────────────────────────────────────────────
 // Shows what the view's steps give (viewPipeline.ts, set in the Nodes panel)
@@ -240,6 +244,10 @@ export function TableView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
     ...Object.entries(c.properties ?? {}).filter(([, v]) => v).map(([k, v]) => `${metamodel.nodeTypes[c.type]?.properties?.find((p) => p.key === k)?.label ?? k}: ${v}`),
     c.hidden ? "the filter won't show it" : '',
   ].filter(Boolean).join(' · ')
+  // What an add row shows, in words (its name ends with it).
+  const addRowText = (choices: AddChoice[], under?: ChainRow): string => choices.length === 1
+    ? [typeName(choices[0].type), choices[0].group === 'Add' || choices[0].group === 'Inside' ? '' : choices[0].group.toLowerCase(), choiceHint(choices[0], under)].filter(Boolean).join(' · ')
+    : `${addLabel(choices.map((c) => typeName(c.type)))}…`
 
   // A new element, named `name`, or "New <type>" with its name open to be
   // written (a type with a wizard opens it instead), and the row it went
@@ -396,7 +404,7 @@ export function TableView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
             <svg viewBox="0 0 16 16" width="10" height="10" aria-hidden><path d="M5 3 L11 8 L5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
         ) : <span className="tv-group-toggle-space" />}
-        <span className="tv-chain-type" style={{ background: NODE_COLORS[node.type] ?? metamodel.nodeTypes[node.type]?.color ?? '#555', color: NODE_FG[node.type] ?? '#fff' }}>
+        <span className="tv-chain-type" style={chipColors(NODE_COLORS[node.type] ?? metamodel.nodeTypes[node.type]?.color ?? '#555', NODE_FG[node.type] ?? '#fff')}>
           {metamodel.nodeTypes[node.type]?.label ?? TYPE_LABELS[node.type] ?? node.type}
         </span>
         {rawVal || <span className="tv-cell-placeholder">{readOnly || origin ? '—' : 'F2 to name…'}</span>}
@@ -454,7 +462,8 @@ export function TableView({ onDiscuss }: { onDiscuss?: (nodeId: string) => void 
               <tr key={`${line.under?.path ?? ''}+`} {...editingControl} className="tv-add-row">
                 <td className="tv-td" colSpan={2}>
                   <button className="tv-add-btn"
-                    aria-label={line.under ? `Add under ${line.under.node.label}` : 'Add at the top'}
+                    // Where it adds, then what it shows (WCAG 2.5.3 Label in Name).
+                    aria-label={`${line.under ? `Add under ${line.under.node.label}` : 'Add at the top'}: ${addRowText(line.choices, line.under)}`}
                     onClick={(e) => onAdd(e, line.choices, line.under)}>
                     {Array.from({ length: line.depth }, (_, i) => <span key={i} className="tv-tree-guide" aria-hidden />)}
                     <span className="tv-group-toggle-space" />

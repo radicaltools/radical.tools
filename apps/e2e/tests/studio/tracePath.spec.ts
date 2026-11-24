@@ -13,7 +13,7 @@ import type { Locator, Page } from '@playwright/test'
 // the view, and a link in it shows the element on its view with its card.
 
 /** The Inspector's button on the activity rail. */
-const inspectorButton = (page: Page): Locator => page.locator('.activity-rail').getByRole('button', { name: 'Inspector', exact: true })
+const inspectorButton = (page: Page): Locator => page.locator('.activity-rail').getByRole('button', { name: /^Inspector(,|$)/ })
 /** A tab of the Inspector, a card in its list in the left panel. */
 const inspectorTab = (page: Page, name: RegExp): Locator => page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab', { name })
 

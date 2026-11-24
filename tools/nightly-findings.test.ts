@@ -65,4 +65,19 @@ describe('nightly findings', () => {
     expect(slow.map((f) => f.title)).toEqual(['Large model stays responsive: studio.open_ms measured 6500 ms, beyond the baseline + 20% (baseline 5000 ms, the median of 3; limit 6000 ms)'])
     expect(nightlyFindings([relative], [measured('studio.open_ms', 9000)], [], { trigger: 'nightly', now: NOW })).toEqual([])
   })
+
+  it('judges a condition measured for each element on that element\'s own nights (No lab regression on phones)', () => {
+    const phones = fitness('web.lab.lcp.max{device=mobile} <= baseline + 10%', NIGHTLY, 'lab', 'No lab regression on phones')
+    const hub = { id: 'hub', type: 'container', label: 'Architecture Hub' } as unknown as C4Node
+    const lcp = (element: string, value: number, daysAgo = 0): Measurement =>
+      ({ metric: 'web.lab.lcp.max', value, unit: 'ms', labels: { device: 'mobile', element }, source: 'lighthouse-lab-mobile', at: new Date(NOW - daysAgo * 86400e3).toISOString() })
+    // Studio is slow on every night, the Hub fast: each against its own.
+    const earlier = [1, 2, 3].flatMap((d) => [lcp('studio', 9000, d), lcp('hub', 3800, d)])
+    expect(nightlyFindings([phones, hub], [lcp('studio', 9300), lcp('hub', 3900)], [], { trigger: 'nightly', now: NOW }, earlier)).toEqual([])
+    const slower = nightlyFindings([phones, hub], [lcp('studio', 9300), lcp('hub', 4750)], [], { trigger: 'nightly', now: NOW }, earlier)
+    expect(slower.map((f) => [f.title, f.signature])).toEqual([[
+      'No lab regression on phones (Architecture Hub): web.lab.lcp.max measured 4750 ms, beyond the baseline + 10% (baseline 3800 ms, the median of 3; limit 4180 ms)',
+      'sense|lab|web.lab.lcp.max{device=mobile} <= baseline + 10%|hub|failed',
+    ]])
+  })
 })

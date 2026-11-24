@@ -305,9 +305,15 @@ export async function senseCommand(args: string[], io: Io, now: () => Date = () 
     return 2
   }
   const options = Object.fromEntries(Object.entries(values).filter(([k]) => !(k in COMMON)))
+  // What was measured before where this run goes: the --out file, or the
+  // model folder's store (radical sense machine --again reads it).
+  const previous = typeof values.out === 'string'
+    ? await readFile(resolve(io.cwd, values.out), 'utf8').then((text) => parseMetricsFile(text, values.out as string), () => [])
+    : await modelFolderArg(typeof values.folder === 'string' ? values.folder : undefined, io.cwd)
+      .then((named) => readEditorStateFile(resolve(io.cwd, named), MEASUREMENTS_FILE)).then((text) => parseMeasurementStore(text ?? ''), () => [])
   let measured
   try {
-    measured = await adapter.measure({ args: [...positionals, ...after], options, cwd: io.cwd })
+    measured = await adapter.measure({ args: [...positionals, ...after], options, cwd: io.cwd, previous })
   } catch (error) {
     io.err(`radical sense ${adapter.name}: ${(error as Error).message}\n\n${adapter.usage}`)
     return 2

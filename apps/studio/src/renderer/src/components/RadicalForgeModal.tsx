@@ -28,7 +28,13 @@ import {
   bindUnboundConcerns,
   buildConcernsBlock,
   concernAnswersOf,
+  concernBindTargets,
+  concernsStageOf,
   decidedConcern,
+  keptConcernPacks,
+  openConcernsForReview,
+  reviewConcernLine,
+  shownClarifyQuestions,
   type DecidedConcern,
   forgeStageView,
   formatClarificationAnswers,
@@ -67,6 +73,7 @@ import type { C4Node, C4Relation, DiagramView } from '@radical/common/c4'
 import { generateWireframe } from '../ai/mockupWireframe'
 import { addedSince, currentModelIds, removeAdded, type ModelIds } from '../ai/forgeStageOutput'
 import { saveForgeBase } from '../persistence/branchChanges'
+import { saveForgeGate } from '../persistence/inspector'
 
 type ClarifyStatus = 'asking' | 'form' | 'done'
 
@@ -245,11 +252,15 @@ export function RadicalForgeModal({ open, resume = false, onClose, onBusy }: Pro
   const answerRef = useRef<((answer: ProposalAnswer) => void) | null>(null)
   /** The gaps the model had right after each stage, by the rules of the stages done. */
   const [gapsByStage, setGapsByStage] = useState<Partial<Record<ForgeStageId, ForgeGap[]>>>({})
-  /** The concern packs the model picked in the Requirements stage's clarify. */
-  const [concernPicks, setConcernPicks] = useState<ConcernPack[]>([])
+  /** The concern packs proposed in a stage's clarify (Requirements: the
+   *  model's picks and the baseline packs; Review: the open concerns); the
+   *  user unchecks those that do not apply (keptConcernPacks). */
+  const [concernPicksByStage, setConcernPicksByStage] = useState<Partial<Record<ForgeStageId, ConcernPack[]>>>({})
   /** The packs the Requirements stage imported, unbound until C4 (a ref, as
    *  runStage reads it right after it is set). */
   const decidedRef = useRef<DecidedConcern[]>([])
+  /** The packs the Review stage imported, bound at once. */
+  const reviewDecidedRef = useRef<DecidedConcern[]>([])
   const [layingOut, setLayingOut] = useState(false)
   /** Furthest step reached by normal forward navigation — stepper tabs past
    *  it stay disabled. An early finish jumps to the last step without
@@ -315,8 +326,9 @@ export function RadicalForgeModal({ open, resume = false, onClose, onBusy }: Pro
     setRefinementsByStage({})
     setPendingProposal(null)
     setGapsByStage({})
-    setConcernPicks([])
+    setConcernPicksByStage({})
     decidedRef.current = []
+    reviewDecidedRef.current = []
     setReachedIndex(0)
     setFinishedAt(null)
     // The structure the model already has, or Radical.
@@ -410,9 +422,15 @@ export function RadicalForgeModal({ open, resume = false, onClose, onBusy }: Pro
       .map((s) => formatClarificationAnswers(clarifyQuestionsByStage[s.id], clarifyAnswersByStage[s.id]))
       .filter(Boolean)
       .join('\n\n')
-    askClarifyingQuestions(stage.title, description, currentStageId === 'requirements' ? packs : undefined, aiSettings, undefined, priorQA)
+    // Requirements offers the Hub's packs; Review the concerns the model
+    // raises by now that no decision settles.
+    const concernsStage = concernsStageOf(currentStageId)
+    const offered = concernsStage === 'review'
+      ? openConcernsForReview(packs, diagram.getNodes(), diagram.getRelations(), diagram.getMetamodel?.())
+      : { packs: concernsStage ? packs : [], appliesTo: {} }
+    askClarifyingQuestions(stage.title, description, offered.packs.length ? offered.packs : undefined, aiSettings, undefined, priorQA, { stage: concernsStage, appliesTo: offered.appliesTo })
       .then(({ questions, picked, usage }) => {
-        if (currentStageId === 'requirements') setConcernPicks(picked)
+        setConcernPicksByStage((c) => ({ ...c, [currentStageId]: picked }))
         setClarifyQuestionsByStage((q) => ({ ...q, [currentStageId]: questions }))
         // A concern pack's question starts at its default answer, and a
         // multiSelect question with everything selected.
@@ -513,17 +531,24 @@ export function RadicalForgeModal({ open, resume = false, onClose, onBusy }: Pro
     // The concern packs the user kept come in whole and unbound, as part of
     // the Requirements stage (a regenerate takes them out again); C4 binds
     // them. ADR Forge settles concerns, C4 binds them.
-    if (stageId === 'requirements') {
-      decidedRef.current = []
-      for (const pack of concernPicks) {
+    // In Review, the open concerns the user settled come in bound at once
+    // where each pack's trigger points, and the stage is told they are decided.
+    const settled: Array<{ name: string; boundTo: string[] }> = []
+    if (stageId === 'requirements' || stageId === 'review') {
+      const decided: DecidedConcern[] = []
+      for (const pack of keptConcernPacks(concernPicksByStage[stageId] ?? [], clarifyAnswersByStage[stageId])) {
         try {
           const concept = await loadHubConcept(pack.id)
-          const { insert } = importConcernPackIntoDiagram(concept, concernAnswersOf(pack, clarifyAnswersByStage[stageId]), [])
-          decidedRef.current.push(decidedConcern(pack, insert))
+          const bindTo = stageId === 'review' ? concernBindTargets(pack, diagram.getNodes(), diagram.getRelations(), diagram.getMetamodel?.()) : []
+          const { insert } = importConcernPackIntoDiagram(concept, concernAnswersOf(pack, clarifyAnswersByStage[stageId]), bindTo)
+          decided.push(decidedConcern(pack, insert))
+          settled.push({ name: pack.name, boundTo: bindTo })
         } catch (err) {
           setError(`${pack.name}: ${(err as Error).message || String(err)}`)
         }
       }
+      if (stageId === 'requirements') decidedRef.current = decided
+      else reviewDecidedRef.current = decided
     }
     const snapshot = snapshotOf(diagram)
     // What the accepted proposals wrote: only that is the stage's refinement,
@@ -554,7 +579,7 @@ export function RadicalForgeModal({ open, resume = false, onClose, onBusy }: Pro
       const needNode = needId ? useDiagramStore.getState().c4Nodes[needId] : undefined
       const needRef: ForgeNeedRef | undefined = needNode ? { id: needNode.id, label: needNode.label } : undefined
       const gaps = formatForgeGaps(forgeGaps(done, diagram.getNodes(), diagram.getRelations(), diagram.getMetamodel?.()))
-      const concerns = buildConcernsBlock(stageId, decidedRef.current, diagram.getNodes())
+      const concerns = buildConcernsBlock(stageId, [...decidedRef.current, ...(stageId === 'review' ? reviewDecidedRef.current : [])], diagram.getNodes())
       const prompt = buildForgeStagePrompt(stageId, description, concerns, clarifications, priorStageSummaries, needRef, gaps)
       const relevantTypeIds = new Set(PRIMARY_TYPE_IDS_FOR_STAGE[stageId])
       // The stage writes its own elements; what it would add to or change in
@@ -598,7 +623,8 @@ export function RadicalForgeModal({ open, resume = false, onClose, onBusy }: Pro
         bound = binding.lines
       }
       setStageReports((r) => ({ ...r, [stageId]: result.report }))
-      setStageSummaries((s) => ({ ...s, [stageId]: [result.summary || 'Done.', ...bound].join(' ') }))
+      if (stageId === 'review') bound.push(reviewConcernLine(settled, diagram.getNodes()))
+      setStageSummaries((s) => ({ ...s, [stageId]: [result.summary || 'Done.', ...bound].filter(Boolean).join(' ') }))
       if (result.usage) {
         setProgressByStage((p) => ({ ...p, [stageId]: { ...(p[stageId] ?? { round: 0, entries: [] }), usage: result.usage } }))
         setSessionUsage((u) => addTokenUsage(u, result.usage))
@@ -626,7 +652,7 @@ export function RadicalForgeModal({ open, resume = false, onClose, onBusy }: Pro
       abortRef.current = null
       setBusy(false)
     }
-  }, [busy, unavailableReason, description, needId, packs, concernPicks, loadHubConcept, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries, structure, refinementsByStage, stageReports, askUser])
+  }, [busy, unavailableReason, description, needId, packs, concernPicksByStage, loadHubConcept, clarifyAnswersByStage, clarifyQuestionsByStage, aiSettings, diagram, stageSummaries, structure, refinementsByStage, stageReports, askUser])
 
   /** The user's answer to the proposal the stage waits on. */
   const answerProposal = useCallback((accept: boolean) => {
@@ -785,6 +811,8 @@ export function RadicalForgeModal({ open, resume = false, onClose, onBusy }: Pro
     // A folder git saved no base for gets the model as it is now, so
     // Changes on branch shows what the run changes.
     await saveForgeBase().catch(() => false)
+    // A model kept in a folder without check.json starts with the strict gate.
+    await saveForgeGate().catch(() => false)
     ensureNeed()
     goNext()
   }, [ensureNeed, goNext])
@@ -878,7 +906,8 @@ export function RadicalForgeModal({ open, resume = false, onClose, onBusy }: Pro
       return <button type="button" className="forge-btn forge-btn-secondary" onClick={cancelStage}>Cancel</button>
     }
     if (clarifyStatus === 'form') {
-      const awaitingAcceptance = !!clarifyQuestionsByStage[currentStageId]?.some((q) => q.fromDescription !== undefined) && !proposalsAcceptedByStage[currentStageId]
+      const shown = shownClarifyQuestions(clarifyQuestionsByStage[currentStageId] ?? [], concernPicksByStage[currentStageId] ?? [], clarifyAnswersByStage[currentStageId])
+      const awaitingAcceptance = shown.some((q) => q.fromDescription !== undefined) && !proposalsAcceptedByStage[currentStageId]
       return (
         <>
           <button type="button" className="forge-btn forge-btn-ghost" onClick={() => skipClarify(currentStageId)}>Skip questions</button>
@@ -1098,7 +1127,8 @@ export function RadicalForgeModal({ open, resume = false, onClose, onBusy }: Pro
               )}
 
               {clarifyStatusByStage[currentStage.id] === 'form' && (() => {
-                const questions = clarifyQuestionsByStage[currentStage.id]!
+                // An unchecked concern pack's questions are not asked.
+                const questions = shownClarifyQuestions(clarifyQuestionsByStage[currentStage.id]!, concernPicksByStage[currentStage.id] ?? [], clarifyAnswersByStage[currentStage.id])
                 const open = questions.filter((q) => q.fromDescription === undefined)
                 const proposed = questions.filter((q) => q.fromDescription !== undefined)
                 const accepted = !!proposalsAcceptedByStage[currentStage.id]

@@ -107,6 +107,8 @@ export function parseCheckConfig(text: string): CheckConfig {
       if (typeof min !== 'number' || !(min >= 0 && min <= 100)) throw new Error(`goal "${id}" needs a "min" from 0 to 100 (percent)`)
     }
   }
+  const adopt = (data as CheckConfig).adopt
+  if (adopt !== undefined && typeof adopt !== 'boolean') throw new Error('"adopt" is true while check.json waits for the baselines of its first run (radical check --adopt), else left out')
   const ci = (data as CheckConfig).ci
   if (ci !== undefined) {
     const artifacts = (ci as { artifacts?: unknown } | null)?.artifacts

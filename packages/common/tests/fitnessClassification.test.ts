@@ -105,16 +105,16 @@ describe('fitness function classification', () => {
   it('reports a measure line that names no sensor', () => {
     const data = model(node('ff', 'fitness-fn', 'Page speed', {
       ...CLASSIFIED,
-      measure: 'lighthouse report.json --label page=home\nplaywright tests/load.spec.ts --cwd apps/e2e\n# a comment\n',
+      measure: 'k6 report.json --label page=home\nplaywright tests/load.spec.ts --cwd apps/e2e\n# a comment\n',
     }))
     expect(messages(data, 'fitness-fn-measure-invalid', { sensors: null })).toEqual([
-      'Fitness function "Page speed": measure "lighthouse report.json --label page=home" names no sensor; radical sense has command, json, playwright, and the repository has no .radical/sensors/sensors.json.',
+      'Fitness function "Page speed": measure "k6 report.json --label page=home" names no sensor; radical sense has command, github-actions, json, lighthouse, machine, playwright, and the repository has no .radical/sensors/sensors.json.',
     ])
     expect(messages(data, 'fitness-fn-measure-invalid', { sensors: { file: 'radical.sensors.json', names: ['openapi'] } })).toEqual([
-      'Fitness function "Page speed": measure "lighthouse report.json --label page=home" names no sensor; radical sense has command, json, playwright, radical.sensors.json openapi.',
+      'Fitness function "Page speed": measure "k6 report.json --label page=home" names no sensor; radical sense has command, github-actions, json, lighthouse, machine, playwright, radical.sensors.json openapi.',
     ])
     // A sensor of the repository's radical.sensors.json is one.
-    expect(messages(data, 'fitness-fn-measure-invalid', { sensors: { file: 'radical.sensors.json', names: ['lighthouse'] } })).toEqual([])
+    expect(messages(data, 'fitness-fn-measure-invalid', { sensors: { file: 'radical.sensors.json', names: ['k6'] } })).toEqual([])
     // Without the repository's sensors (Studio), any name may be one.
     expect(messages(data, 'fitness-fn-measure-invalid')).toEqual([])
   })

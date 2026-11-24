@@ -13,7 +13,7 @@ import type { Page } from '@playwright/test'
 // conditions nothing measured; Path on a reader opens its verification
 // path, the whole evaluation flow, and Back returns to the tab.
 
-const inspectorButton = (page: Page) => page.locator('.activity-rail').getByRole('button', { name: 'Inspector', exact: true })
+const inspectorButton = (page: Page) => page.locator('.activity-rail').getByRole('button', { name: /^Inspector(,|$)/ })
 const tab = (page: Page, name: RegExp) => page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab', { name })
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>

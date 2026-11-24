@@ -49,15 +49,15 @@ describe('radical sense', () => {
     const cwd = await modelWith([
       fitness('night', 'Night check', {
         cadence: 'triggered', trigger: 'nightly', invocation: 'automated',
-        measure: `command --name ok -- ${node} -e "process.exit(0)"\ncommand --name fails -- ${node} -e "process.exit(3)"\nlighthouse report.json`,
+        measure: `command --name ok -- ${node} -e "process.exit(0)"\ncommand --name fails -- ${node} -e "process.exit(3)"\nk6 report.json`,
       }),
       fitness('gate', 'Gate check', { cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', measure: 'command --name gate -- node -v' }),
       fitness('person', 'Person check', { cadence: 'triggered', trigger: 'nightly', invocation: 'manual', measure: 'command --name manual -- node -v' }),
     ])
     const result = await run(cwd, 'sense', 'run', '--trigger', 'nightly', '--folder', 'model', '--out', 'metrics', '--context', 'commit=abc')
-    // The lighthouse line names no sensor: the run says so and exits 2.
+    // The k6 line names no sensor: the run says so and exits 2.
     expect(result.code).toBe(2)
-    expect(result.err).toContain('Night check: cannot measure "lighthouse report.json": no sensor lighthouse,')
+    expect(result.err).toContain('Night check: cannot measure "k6 report.json": no sensor k6,')
     expect(result.out).toContain('Night check: measured "command --name ok')
     const ok = JSON.parse(await readFile(join(cwd, 'metrics/night-check-1.json'), 'utf8'))
     expect(ok).toMatchObject({ source: 'command', context: { commit: 'abc' } })
@@ -117,9 +117,9 @@ describe('radical sense', () => {
 
   it('exits 2 when it cannot measure', async () => {
     const cwd = await workspace()
-    const unknown = await run(cwd, 'sense', 'lighthouse', 'report.json', '--folder', 'model')
+    const unknown = await run(cwd, 'sense', 'k6', 'report.json', '--folder', 'model')
     expect(unknown.code).toBe(2)
-    expect(unknown.err).toContain('No sensor adapter lighthouse. The adapters: command, json, playwright.')
+    expect(unknown.err).toContain('No sensor adapter k6. The adapters: command, github-actions, json, lighthouse, machine, playwright.')
     const missing = await run(cwd, 'sense', 'json', 'gone.json', '--metric', 'a=b', '--folder', 'model')
     expect(missing.code).toBe(2)
     expect(missing.err).toContain('radical sense json: cannot read gone.json: no such file')

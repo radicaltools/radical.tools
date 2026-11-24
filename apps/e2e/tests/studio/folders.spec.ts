@@ -838,7 +838,7 @@ test('Add or link no longer offers an element an outside edit removed, and links
   await models.getByRole('button', { name: 'Close' }).click()
   await expect.poll(async () => Object.keys(await folder.files()).some((p) => p.startsWith('nodes/'))).toBe(true)
 
-  await page.getByRole('button', { name: 'Add under Retail payments brief', exact: true }).click()
+  await page.getByRole('button', { name: /^Add under Retail payments brief:/ }).click()
   const picker = page.getByRole('dialog', { name: 'Add under Retail payments brief' })
   await page.keyboard.type('Four-eyes')
   await expect(picker.getByRole('option', { name: 'Four-eyes approval' })).toBeVisible()

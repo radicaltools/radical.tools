@@ -57,7 +57,11 @@ import {
   forgeGaps,
   bindUnboundConcerns,
   buildConcernsBlock,
+  concernBindTargets,
+  concernsStageOf,
   decidedConcern,
+  openConcernsForReview,
+  reviewConcernLine,
   type DecidedConcern,
   formatClarificationAnswers,
   formatForgeGaps,
@@ -122,10 +126,13 @@ export const FORGE_PROCEDURE = [
   '   and write the model in the other.',
   '2. For each stage, in order:',
   '   a. forge_clarify: read it and ask the user the clarifying questions it calls for, if any. In the',
-  '      Requirements stage it also lists the Hub\'s concern packs: pick those the description calls for, have',
-  '      the user confirm them and ask their questions. Wait for the answers.',
-  '   b. forge_generate with those answers (in Requirements, the confirmed packs with their answers as',
-  '      concerns: they come into the model whole, unbound, before the stage). It returns the stage task:',
+  '      Requirements stage it also lists the Hub\'s concern packs: pick those the description calls for, the',
+  '      baseline packs every system needs always among them, present them to the user as proposed, let the user',
+  '      drop any and ask the questions of the packs kept. In the Review stage it lists the concerns the model',
+  '      raises that are still open, to settle the same way. Wait for the answers.',
+  '   b. forge_generate with those answers (in Requirements and Review, the packs the user kept with their',
+  '      answers as concerns: in Requirements they come into the model whole, unbound, before the stage; in',
+  '      Review bound at once where their concern applies). It returns the stage task:',
   '      carry it out with the model tools (add_node, add_relation, update_node, search_model, …).',
   '      A stage may also close gaps in earlier stages within the description (a requirement or scenario a',
   '      process shows is missing, a wrong name), but only by proposing it: forge_propose_refinement returns',
@@ -179,7 +186,7 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
   },
   {
     name: 'forge_clarify',
-    description: 'Before generating a Forge stage: returns what to clarify with the user first, and in the Requirements stage the Hub\'s concern packs to pick from with their questions. Ask the user, then call forge_generate with the answers.',
+    description: 'Before generating a Forge stage: returns what to clarify with the user first; in the Requirements stage the Hub\'s concern packs to pick from with their questions (the baseline packs every system needs always proposed), and in the Review stage the concerns the model raises that are still open. Ask the user, then call forge_generate with the answers.',
     inputSchema: {
       type: 'object',
       properties: { stage: { ...stageEnum, description: 'The next stage of the run, or one already generated (to regenerate it with new answers).' } },
@@ -206,7 +213,7 @@ export const FORGE_TOOL_DEFS: ToolDef[] = [
         },
         concerns: {
           type: 'array',
-          description: 'Requirements stage only: the concern packs (from forge_clarify) the user confirmed, each with the user\'s answers by question key (option values). They come into the model whole and unbound before the stage; the C4 stage binds them. Omit to keep the last run\'s; [] imports none.',
+          description: 'Requirements and Review stages only: the concern packs (from forge_clarify) the user kept, each with the user\'s answers by question key (option values); leave out those the user dropped. In Requirements they come into the model whole and unbound before the stage, and the C4 stage binds them; in Review each comes in bound at once where its concern applies. Omit to keep the last run\'s; [] imports none.',
           items: {
             type: 'object',
             properties: { id: { type: 'string' }, answers: { type: 'object', additionalProperties: { type: 'string' } } },
@@ -364,7 +371,8 @@ interface StageState {
   declined: number
   summary?: string
   clarifications?: string
-  /** Requirements stage: the concern packs it imported, with the answers. */
+  /** Requirements and Review stages: the concern packs it imported, with
+   *  the answers. */
   concernPicks?: Array<{ id: string; answers: Record<string, string> }>
 }
 
@@ -517,7 +525,7 @@ export class Forge {
     const args = (input ?? {}) as Record<string, unknown>
     switch (name) {
       case 'forge_start': return this.start(args, ctx, facade)
-      case 'forge_clarify': return this.clarify(args)
+      case 'forge_clarify': return this.clarify(args, facade)
       case 'forge_generate': return this.generate(args, facade)
       case 'forge_complete_stage': return this.complete(args, facade)
       case 'forge_propose_refinement': return this.propose(args, ctx, facade)
@@ -649,7 +657,7 @@ export class Forge {
     ].join('\n'), { readOnly: true, commit: () => { for (const id of ids) { run.skipped.set(id, reason); run.clarified.delete(id) } } })
   }
 
-  private clarify(args: Record<string, unknown>): ForgeResult {
+  private clarify(args: Record<string, unknown>, facade: ModelFacade): ForgeResult {
     const run = this.run
     if (!run) return fail('forge_clarify: no Forge run; call forge_start first')
     const stage = this.stageArg(args, 'forge_clarify')
@@ -657,12 +665,18 @@ export class Forge {
     const id = stage as ForgeStageId
     const blocked = this.blocked(run, id)
     if (blocked) return fail(`forge_clarify: ${blocked}`)
-    const packs = id === 'requirements' ? this.concernPacks() : []
+    // Requirements offers the Hub's packs; Review the concerns the model
+    // raises by now that no decision settles.
+    const concernsStage = concernsStageOf(id)
+    const offered = concernsStage === 'review'
+      ? openConcernsForReview(this.concernPacks(), facade.getNodes(), facade.getRelations(), facade.getMetamodel?.())
+      : { packs: concernsStage ? this.concernPacks() : [], appliesTo: {} }
+    const packs = offered.packs
     const priorQA = STAGE_IDS.slice(0, STAGE_IDS.indexOf(id))
       .map((prior) => run.stages[prior]?.clarifications ?? '')
       .filter(Boolean)
       .join('\n\n')
-    const lines = [buildClarifyPrompt(stageTitle(id), run.description, packs, priorQA, 'ask'), '', ...forgeLanguageRules(run.languages)]
+    const lines = [buildClarifyPrompt(stageTitle(id), run.description, packs, priorQA, 'ask', { stage: concernsStage, appliesTo: offered.appliesTo }), '', ...forgeLanguageRules(run.languages)]
     lines.push('', `Then call forge_generate with stage "${id}"${packs.length ? ', the answers and the concerns' : ' and the answers'}.`)
     return ok(lines.join('\n'), { readOnly: true, commit: () => { run.clarified.add(id); run.skipped.delete(id) } })
   }
@@ -695,10 +709,10 @@ export class Forge {
       })
       clarifications = formatClarificationAnswers(questions, answers)
     }
-    // The concern packs to import with the Requirements stage.
+    // The concern packs to import with the Requirements or Review stage.
     let concernPicks = previous?.concernPicks
     if (args.concerns !== undefined) {
-      if (id !== 'requirements') return fail('forge_generate: concerns are picked in the Requirements stage')
+      if (!concernsStageOf(id)) return fail('forge_generate: concerns are settled in the Requirements and Review stages')
       if (!Array.isArray(args.concerns)) return fail('forge_generate: concerns must be an array of { id, answers }')
       const picks: Array<{ id: string; answers: Record<string, string> }> = []
       for (const raw of args.concerns) {
@@ -734,26 +748,35 @@ export class Forge {
     const openedNames = opened.map((v) => views[v]?.name).filter(Boolean)
 
     // The picked concern packs come in whole, unbound, as part of the stage
-    // (so a regenerate takes them out too); C4 binds them.
+    // (so a regenerate takes them out too); C4 binds them. In Review, the
+    // open concerns the user settled come in bound at once
+    // where each pack's trigger points; the stage is told they are decided.
     let data: DiagramData | undefined
     let decided = run.concerns
-    if (id === 'requirements') {
-      decided = []
+    const stageDecided: DecidedConcern[] = []
+    const settled: Array<{ name: string; boundTo: string[] }> = []
+    if (concernsStageOf(id)) {
+      if (id === 'requirements') decided = []
       if (concernPicks?.length) {
         data = facade.toDiagramData()
         const roots = data.nodes.filter((n) => !n.parentId)
         let top = roots.length ? Math.max(...roots.map((n) => n.y + n.height)) + IMPORT_GAP : 0
+        const metamodel = facade.getMetamodel?.()
+        const modelNodes = facade.getNodes()
         for (const pick of concernPicks) {
+          const pack = this.concernPacks().find((p) => p.id === pick.id)!
           const concept = docToConcept(this.hub().docs.get(pick.id)!)
+          const bindTo = id === 'review' ? concernBindTargets(pack, modelNodes, facade.getRelations(), metamodel) : []
           const insert = buildConcernInsert(concept, {
-            answers: pick.answers, elements: [], metamodel: facade.getMetamodel?.(), today: new Date().toISOString().slice(0, 10),
+            answers: pick.answers, elements: bindTo.map((el) => modelNodes[el]), nodes: modelNodes, metamodel, today: new Date().toISOString().slice(0, 10),
             newId: () => crypto.randomUUID(), place: ({ height }) => { const at = { x: 0, y: top }; top += height + IMPORT_GAP; return at },
             takenNames: { views: (data.views ?? []).map((v) => v.name) },
           })
           data.nodes.push(...Object.values(insert.nodes))
           data.relations.push(...Object.values(insert.relations))
           data.views = [...(data.views ?? []), ...insert.views]
-          decided.push(decidedConcern(this.concernPacks().find((p) => p.id === pick.id)!, insert))
+          ;(id === 'requirements' ? decided : stageDecided).push(decidedConcern(pack, insert))
+          settled.push({ name: pack.name, boundTo: bindTo })
         }
         readOnly = false
       }
@@ -766,7 +789,7 @@ export class Forge {
     )
     const needNode = run.needId ? nodes[run.needId] : undefined
     const gaps = forgeGaps(STAGE_IDS.slice(0, stageIdx), nodes, relations, facade.getMetamodel?.())
-    const prompt = buildForgeStagePrompt(id, run.description, buildConcernsBlock(id, decided, nodes), clarifications, priorSummaries,
+    const prompt = buildForgeStagePrompt(id, run.description, buildConcernsBlock(id, [...decided, ...stageDecided], nodes), clarifications, priorSummaries,
       needNode ? { id: needNode.id, label: needNode.label } : undefined, formatForgeGaps(gaps), 'forge_propose_refinement')
     const metamodelMessage = buildMetamodelMessage(facade.getMetamodel?.(), new Set(PRIMARY_TYPE_IDS_FOR_STAGE[id]), nodes)
     let context = buildContextMessage(nodes, relations, null, facade.getViews?.())
@@ -778,6 +801,7 @@ export class Forge {
       FORGE_STAGES[stageIdx].blurb,
       ...(openedNames.length ? [`Made the stage's views before it begins: ${openedNames.join(', ')}. What you add shows up in them as you add it.`] : []),
       ...(id === 'requirements' && decided.length ? [`Imported the concern packs the user confirmed, whole and unbound: ${decided.map((d) => d.name).join(', ')}. The C4 stage links them.`] : []),
+      ...(id === 'review' && settled.length ? [reviewConcernLine(settled, nodes)] : []),
       '',
       'Carry out the task at the end with the model tools (add_node, add_relation, update_node, move_node, search_model, …).',
       'A Forge stage only builds the model: do not change the metamodel, presentations or milestones.',

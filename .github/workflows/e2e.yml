@@ -52,7 +52,7 @@ jobs:
         env:
           E2E_BLOB: '1'
           UPDATE: ${{ inputs.update-snapshots && '--update-snapshots=changed' || '' }}
-        run: npm run e2e -w @radical/e2e -- --shard=${{ matrix.shard }}/4 $UPDATE
+        run: npm run e2e -w @radical/e2e -- --shard=${{ matrix.shard }}/4 ${UPDATE:+"$UPDATE"}
       - name: Collect new screenshot baselines
         if: ${{ inputs.update-snapshots && !cancelled() }}
         run: |

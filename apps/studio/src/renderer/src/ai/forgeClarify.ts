@@ -8,15 +8,17 @@
 // provider-agnostic — same pattern AISettingsModal.tsx already uses for its
 // "Test connection" button: getAdapter(id).chat({...}, cfg) then textOf(res.content).
 
-import { buildClarifyPrompt, parseClarifyReply, withConcernQuestions, type ClarifyStageQuestion } from '@radical/common/ai/forge'
+import { buildClarifyPrompt, parseClarifyReply, withConcernQuestions, type ClarifyStageQuestion, type ConcernsClarifyOptions } from '@radical/common/ai/forge'
 import type { ConcernPack } from '@radical/common/concerns'
 import { getAdapter } from './registry'
 import { textOf, type AISettings, type TokenUsage } from './types'
 
 export interface ClarifyResult {
   questions: ClarifyStageQuestion[]
-  /** The concern packs the model picked (Requirements stage); their
-   *  questions are among `questions`. */
+  /** The concern packs proposed (Requirements stage: the model's picks and
+   *  the baseline packs; Review: the open concerns); the concerns question
+   *  in which the user unchecks them, and their questions, are among
+   *  `questions`. */
   picked: ConcernPack[]
   /** From this call alone — the caller sums it into whatever running total
    *  it's tracking (the clarify call is real token spend too, same as any
@@ -34,6 +36,7 @@ export async function askClarifyingQuestions(
   settings: AISettings,
   signal?: AbortSignal,
   priorQA?: string,
+  concerns: ConcernsClarifyOptions = {},
 ): Promise<ClarifyResult> {
   const adapter = getAdapter(settings.active)
   const cfg = settings.providers[settings.active]
@@ -44,13 +47,14 @@ export async function askClarifyingQuestions(
   // routes clarify there regardless of what generation is configured to use.
   const res = await adapter.chat({
     model: adapter.defaultModel,
-    messages: [{ role: 'user', content: buildClarifyPrompt(stageTitle, description, concernPacks, priorQA) }],
+    messages: [{ role: 'user', content: buildClarifyPrompt(stageTitle, description, concernPacks, priorQA, 'json', concerns) }],
     maxTokens: 900,
     temperature: 0.3,
     signal,
   }, cfg)
-  const reply = parseClarifyReply(textOf(res.content))
-  if (!reply) return { questions: [], picked: [], usage: res.usage }
-  const { questions, picked } = withConcernQuestions(reply, concernPacks ?? [])
+  // A reply that is no JSON array asks nothing, but the packs proposed
+  // whatever the model picks (the baseline packs) still are.
+  const reply = parseClarifyReply(textOf(res.content)) ?? []
+  const { questions, picked } = withConcernQuestions(reply, concernPacks ?? [], concerns.stage)
   return { questions, picked, usage: res.usage }
 }

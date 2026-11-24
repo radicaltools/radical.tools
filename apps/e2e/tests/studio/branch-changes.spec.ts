@@ -15,6 +15,19 @@ import type { C4Node, C4Relation, DiagramData } from '@radical/common/c4'
 // own). Studio has no git: the tests write the base file as radical diff
 // --save-base would.
 
+/** Unchecks the Hub packs Forge proposes in a stage's questions (the
+ *  baseline packs every system is offered) and confirms the answers, for a
+ *  test about something else. Nothing to do when the stage asks nothing. */
+async function dropProposedPacks(scope: Page | Locator): Promise<void> {
+  // Forge asks once it has the questions; with none, Generate is enabled.
+  const question = scope.locator('.forge-clarify-q', { hasText: /Hub concern packs to bring in|Concerns the model raises/ })
+  const ready = scope.locator('button.forge-btn-primary:not([disabled])', { hasText: /^Generate / })
+  await expect(question.or(ready).first()).toBeVisible()
+  if (!(await question.count())) return
+  for (const box of await question.getByRole('checkbox').all()) await box.uncheck()
+  await scope.getByRole('button', { name: 'Confirm answers' }).click()
+}
+
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
   ({ id, type, label, x: 0, y: 0, width: 200, height: 100, collapsed: false, ...props }) as C4Node
 const rel = (id: string, relationType: string, sourceId: string, targetId: string): C4Relation => ({ id, relationType, sourceId, targetId })
@@ -38,7 +51,7 @@ async function openFolder(page: Page, studio: { ready(): Promise<void>; designer
 }
 
 /** The Inspector's button on the activity rail. */
-const inspectorButton = (page: Page): Locator => page.locator('.activity-rail').getByRole('button', { name: 'Inspector', exact: true })
+const inspectorButton = (page: Page): Locator => page.locator('.activity-rail').getByRole('button', { name: /^Inspector(,|$)/ })
 /** A tab of the Inspector, a card in its list in the left panel. */
 const inspectorTab = (page: Page, name: RegExp): Locator => page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab', { name })
 /** Opens the Inspector on This branch; returns the tab's region. */
@@ -406,6 +419,7 @@ test('a Forge run in a folder without a base from git saves one, and Changes on 
   await page.getByRole('menuitem', { name: 'Radical Forge…' }).click()
   await page.locator('.forge-textarea').fill('# Card payments\n\nShoppers pay by card.')
   await page.getByRole('button', { name: 'Start →' }).click()
+  await dropProposedPacks(page)
   await page.getByRole('button', { name: 'Generate requirements' }).click()
   await expect(page.locator('.forge-stage-result')).toBeVisible()
 

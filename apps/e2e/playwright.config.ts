@@ -78,6 +78,12 @@ export default defineConfig({
   projects: [
     { name: 'studio', testDir: './tests/studio', use: { baseURL: `http://localhost:${STUDIO_PORT}` } },
     { name: 'hub', testDir: './tests/hub', use: { baseURL: `http://localhost:${HUB_PORT}` } },
+    // Accessibility, reflow and target size over Studio, the Hub and the
+    // site: tests/a11y/pages.ts says where each is served.
+    { name: 'a11y', testDir: './tests/a11y' },
+    // Usability (navigation, links, form errors, empty views) over Studio,
+    // the Hub and the site: tests/ux/journeys.ts says where each is served.
+    { name: 'ux', testDir: './tests/ux' },
   ],
 
   webServer: [

@@ -13,6 +13,7 @@
 import type { HubRadicalDoc, HubSource, TemplateParam } from '@radical/common/hubFormat'
 import type { ConcernGroupId } from '@radical/common/concerns'
 import { FITNESS_CHARACTERISTICS, FITNESS_TRIGGERS } from '@radical/common/metamodel'
+import { parseConditions, parseMeasure } from '@radical/common/check'
 
 /** Answers an element is imported for: every key listed must hold one of its values. */
 export type When = Record<string, string[]>
@@ -82,6 +83,10 @@ export type FitnessCadence = typeof FITNESS_CADENCES[number]
 export const FITNESS_INVOCATIONS = ['automated', 'manual'] as const
 export type FitnessInvocation = typeof FITNESS_INVOCATIONS[number]
 
+/** The sensors of radical sense a pack's fitness function may name: their
+ *  metric names are fixed by the CLI, with no file of the project to read. */
+export const PACK_SENSORS = ['github-actions', 'lighthouse', 'machine'] as const
+
 export interface FitnessSpec {
   id: string
   label: string
@@ -97,10 +102,17 @@ export interface FitnessSpec {
   trigger?: FitnessTrigger
   /** How often a temporal one falls due, as in "90d": only when temporal. */
   every?: string
-  /** Run by a sensor, or by a person. A pack states no `measure`: it cannot
-   *  know the project's sensors. */
+  /** Run by a sensor, or by a person. */
   invocation: FitnessInvocation
   threshold: string
+  /** The built-in sensors that measure it, one a line, by name only
+   *  (PACK_SENSORS): their metric names are fixed, so a pack can know them.
+   *  A project's own tests and sensors it cannot know. */
+  measure?: string
+  /** Conditions over what those sensors measure, one a line, filled by the
+   *  answers (`ci.pr.duration.p90 <= {{PIPELINE_MINUTES}} min`); never a
+   *  test() line, as a pack cannot know the project's tests. */
+  metrics?: string
   /** How it is checked, in prose. */
   description: string
   /** The tool that runs it: a name, as in "gitleaks" or "k6". */
@@ -177,6 +189,8 @@ export function buildPackDoc(spec: PackSpec): HubRadicalDoc {
       ...(f.cadence === 'triggered' ? { trigger: f.trigger } : {}),
       ...(f.cadence === 'temporal' ? { every: f.every } : {}),
       invocation: f.invocation,
+      ...(f.measure ? { measure: f.measure.trim() } : {}),
+      ...(f.metrics ? { metrics: f.metrics.trim() } : {}),
       // The pack cannot know the project's tests or metric names: the
       // criterion goes into the text, for the team to turn into conditions
       // in `metrics` once they have the sensor or the test that checks it.
@@ -250,7 +264,19 @@ function classificationProblems(f: FitnessSpec): string[] {
     } else if (f.every !== undefined) errors.push(`${at} has an every but is not temporal`)
   }
   if ('category' in f) errors.push(`${at} still has a category: state its characteristic, scope, cadence and invocation instead`)
-  if ('measure' in f) errors.push(`${at} states a measure: a pack cannot know the project's sensors`)
+  for (const line of parseMeasure(f.measure)) {
+    if (!(PACK_SENSORS as readonly string[]).includes(line.sensor)) errors.push(`${at} measures with ${line.sensor}: a pack names only the built-in sensors whose metrics it knows (${PACK_SENSORS.join(', ')})`)
+    else if (line.args.length) errors.push(`${at}: measure line "${line.raw}" has arguments, which belong to the project's .radical/sensors/sensors.json`)
+  }
+  if (f.metrics !== undefined) {
+    if (f.invocation !== 'automated') errors.push(`${at} states metrics but is not automated`)
+    if (!parseMeasure(f.measure).length) errors.push(`${at} states metrics but no measure: name the built-in sensor that measures them`)
+    // Filled with a number, as the answers will fill them.
+    for (const c of parseConditions(f.metrics.replace(/\{\{[A-Z0-9_]+\}\}/g, '1'))) {
+      if (c.kind === 'invalid') errors.push(`${at}: metrics line "${c.raw}": ${c.problem}`)
+      else if (c.kind === 'test') errors.push(`${at}: metrics line "${c.raw}" names a test, which a pack cannot know`)
+    }
+  }
   return errors
 }
 

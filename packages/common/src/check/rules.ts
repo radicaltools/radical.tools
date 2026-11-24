@@ -16,7 +16,7 @@ import { formatAge, parseCombine, parseConditions, parseMaxAge, type Measurement
 import { SENSOR_NAMES, isSensorName, parseMeasure } from './sensors'
 import { findTests, globMatch, type TestCase } from './reports'
 import type { CheckDimension } from './goals'
-import { concernStatuses, holdsConcerns, questionLine, unboundDecisions, type ConcernPack } from '../concerns'
+import { openConcerns, questionLine, unboundDecisions, type ConcernPack } from '../concerns'
 import { REFUSAL, SUPERSEDED, answerBlocks, answerKey, currentNeedText, exampleSentences, fragmentWords, needAnswers, needParts, oppositeOrder, plainWords, quoteFound, quoteFragments, readLimits, readOrders, readRoundings, readValues, saysValueOf, wordsAt, type Limit, type Op, type Quantity, type ValueReading } from './words'
 
 export { hardValues, needAnswers, needParts, quoteFragments, readValues } from './words'
@@ -833,19 +833,17 @@ export const CHECK_RULES: CheckRule[] = [
     description: 'Every concern a Hub concern pack finds in the model is settled by an accepted ADR marked with it (property `concern`) that constrains the elements it applies to, or what contains them.',
     severity: 'warning',
     dimension: 'decisions',
-    run: (model) => holdsConcerns(model.metamodel)
-      ? concernStatuses(model.concerns ?? [], model.nodes, model.relations).filter((s) => s.open.length).map(({ pack, open, pending }) => {
-        const names = open.map((id) => quote(model.nodes[id])).join(', ')
-        const being = pending.length ? ` ${pending.map(quote).join(', ')} ${pending.length === 1 ? 'is' : 'are'} proposed: the decision is being made.` : ''
-        return {
-          nodeId: open[0],
-          ...(open.length > 1 ? { relatedIds: open.slice(1) } : {}),
-          code: pack.id,
-          message: `${pack.name}: ${pack.concern.why} No accepted ADR marked "${pack.concern.id}" settles it for ${names}.${being}`,
-          details: (pack.templateParams ?? []).map(questionLine),
-        }
-      })
-      : [],
+    run: (model) => openConcerns(model.concerns ?? [], model.nodes, model.relations, model.metamodel).map(({ pack, open, pending }) => {
+      const names = open.map((id) => quote(model.nodes[id])).join(', ')
+      const being = pending.length ? ` ${pending.map(quote).join(', ')} ${pending.length === 1 ? 'is' : 'are'} proposed: the decision is being made.` : ''
+      return {
+        nodeId: open[0],
+        ...(open.length > 1 ? { relatedIds: open.slice(1) } : {}),
+        code: pack.id,
+        message: `${pack.name}: ${pack.concern.why} No accepted ADR marked "${pack.concern.id}" settles it for ${names}.${being}`,
+        details: (pack.templateParams ?? []).map(questionLine),
+      }
+    }),
   },
   {
     id: 'concern-unbound',

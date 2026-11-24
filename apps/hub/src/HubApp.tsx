@@ -122,6 +122,8 @@ function ConceptCard({
   const theme = categoryTheme(hubGroupOf(concept))
   const badges = metaBadges(concept)
   return (
+    // The whole card opens the concept for the mouse; the keyboard and
+    // assistive technology reach it by its title, a real link (one tab stop).
     <article
       className={`hub-card${active ? ' active' : ''}${selected ? ' selected' : ''}`}
       style={{ ['--cat-color' as string]: theme.color }}
@@ -129,7 +131,19 @@ function ConceptCard({
     >
       <div className="hub-card-head">
         <span className="hub-card-icon"><TypeIcon path={theme.iconPath} size={14} color={theme.fg} /></span>
-        <span className="hub-card-name">{concept.name}</span>
+        <a
+          className="hub-card-name"
+          href={formatHubHash({ browse: true, concept: concept.id })}
+          onClick={(e) => {
+            e.stopPropagation()
+            // A new tab or window gets the link itself; here the filters stay.
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+            e.preventDefault()
+            onOpen()
+          }}
+        >
+          {concept.name}
+        </a>
         <button
           type="button"
           className={`hub-card-select${selected ? ' on' : ''}`}
@@ -446,6 +460,24 @@ function HubAppInner(): React.ReactElement {
     setConceptId(undefined)
   }, [])
 
+  // The preview is modal: the catalogue under it is inert (out of the tab
+  // order and out of reach of assistive technology), focus moves into the
+  // preview when it opens and back to what opened it when it closes.
+  const catalogRef = useRef<HTMLElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const previewOpen = !!conceptId
+  useEffect(() => {
+    const catalog = catalogRef.current
+    if (!previewOpen || !catalog) return
+    const opener = document.activeElement instanceof HTMLElement && catalog.contains(document.activeElement) ? document.activeElement : null
+    catalog.setAttribute('inert', '')
+    panelRef.current?.focus({ preventScroll: true })
+    return () => {
+      catalog.removeAttribute('inert')
+      if (opener?.isConnected) opener.focus({ preventScroll: true })
+    }
+  }, [previewOpen, browsing])
+
   // Esc closes the concept preview popup.
   useEffect(() => {
     if (!conceptId) return
@@ -550,7 +582,7 @@ function HubAppInner(): React.ReactElement {
     <SiteNav studioUrl={STUDIO_URL} theme={theme} onToggleTheme={toggleTheme} onHub={goHome} />
     <div className="hub-layout">
       {/* ── Catalogue ────────────────────────────────────────────────────────────── */}
-      <aside className="hub-catalog">
+      <aside className="hub-catalog" ref={catalogRef}>
         <div className="hub-search">
           <input
             type="search"
@@ -682,7 +714,10 @@ function HubAppInner(): React.ReactElement {
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
+            aria-modal="true"
             aria-label={concept?.name ?? summary?.name ?? 'Concept preview'}
+            ref={panelRef}
+            tabIndex={-1}
           >
             {/* ── Viewer toolbar ────────────────────────────────────────────── */}
             <div className="toolbar hub-toolbar">

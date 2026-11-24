@@ -1,0 +1,13 @@
+[
+  {
+    "front": "apps/studio",
+    "state": "Studio: element selected",
+    "rule": "color-contrast",
+    "impact": "serious",
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "elements": 5,
+    "issue": "to be filed",
+    "found": "2026-11-24",
+    "due": "2026-12-24"
+  }
+]

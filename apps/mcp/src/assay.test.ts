@@ -266,7 +266,7 @@ describe('Radical Assay over MCP', () => {
   })
 
   it('writes a requirement only when the user accepts it, with its scenarios and their tests', async () => {
-    const { dir, call, nodes, json } = await central()
+    const { dir, root, call, nodes, json } = await central()
     await call('assay_start', { directories: ['../shop'] })
     await call('assay_apply', { plan: C4 })
     const proposed = await call('assay_apply', { plan: REQUIREMENTS })
@@ -292,6 +292,8 @@ describe('Radical Assay over MCP', () => {
     expect(json(join(dir, 'storefront/.radical/radical.json')).verifies).toEqual([{ element: scenario, name: 'Order shown', tests: ['apps/web/tests/orders.test.js › orders › shows an order'] }])
     expect((await call('get_issues')).text).toMatch(/^No issues/)
     expect((await call('assay_finish')).text).toContain('wrote 3 elements and 1 relations between them, 1 requirements, 1 scenarios, 0 needs from documents and the need Found in the code and 0 decisions into .radical/model; each requirement, scenario, need and decision with its own relations (satisfies, verifies, derives, constrains).\nProposals: 1 accepted, 1 left out, 0 waiting.')
+    // The central model describes code that was there: its gate waits for the first run's baselines.
+    expect(json(join(root, '.radical', 'model', 'check.json'))).toMatchObject({ adopt: true, rules: { 'requirement-without-scenario': 'error' } })
   })
 
   it('needs a run first', async () => {

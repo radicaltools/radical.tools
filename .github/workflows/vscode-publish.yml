@@ -91,4 +91,4 @@ jobs:
       - name: Publish to VS Code Marketplace
         if: ${{ !inputs.dry_run }}
         working-directory: apps/vscode
-        run: npx vsce publish --oidc --no-dependencies --packagePath *.vsix
+        run: npx vsce publish --oidc --no-dependencies --packagePath ./*.vsix

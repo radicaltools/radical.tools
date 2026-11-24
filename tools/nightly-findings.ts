@@ -6,7 +6,10 @@
 // folder (source sense), unless an open finding already says the same. The
 // conditions are evaluated as radical check evaluates them; one against a
 // baseline compares with the median of the earlier nights (--baseline), and
-// makes no finding while there are none.
+// makes no finding while there are none. A condition measured for each
+// element the fitness function's ADR constrains (the element label radical
+// sense run puts on a sensor's measurements) is judged for each element on
+// its own measurements and earlier nights, as radical check judges it.
 //
 //   tsx tools/nightly-findings.ts <model folder> <findings folder>
 //       --metrics <file|dir> [--metrics …] [--baseline <file|dir> …] --trigger <event>
@@ -20,7 +23,7 @@ import { parseArgs } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import { deserializeFromMdFolder } from '@radical/common/formats/mdFolder'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
-import { REVIEW_METRIC, evaluateMetric, parseConditions, parseMaxAge, parseMetricsFile, type Measurement } from '@radical/common/check'
+import { ELEMENT_LABEL, REVIEW_METRIC, evaluateMetric, parseConditions, parseMaxAge, parseMetricsFile, type Measurement } from '@radical/common/check'
 import type { C4Node } from '@radical/common/c4'
 import { diskFolderStorage } from '@radical/node-files/diskFolderStorage'
 import { nextFindingId, readFindings, writeFinding, type Finding } from '@radical/crucible/findings'
@@ -43,49 +46,59 @@ export function nightlyFindings(nodes: C4Node[], measurements: Measurement[], ex
   const known = new Set(existing.filter((f) => OPEN.has(f.status)).map((f) => f.signature))
   const day = new Date(options.now).toISOString().slice(0, 10)
   const out: Finding[] = []
+  const labelOf = new Map(nodes.map((n) => [n.id, n.label]))
   for (const node of nodes) {
     const props = node as unknown as Record<string, unknown>
     if (node.type !== 'fitness-fn' || props.cadence !== 'triggered' || props.trigger !== options.trigger || props.invocation !== 'automated') continue
     const maxAge = parseMaxAge(props.max_age) ?? undefined
-    for (const condition of parseConditions(props.metrics)) {
-      if (condition.kind !== 'metric' || condition.metric === REVIEW_METRIC) continue
-      const result = evaluateMetric(condition, measurements, maxAge, options.now, baseline)
-      if (result.outcome === 'passed') continue
-      // Measured, but no earlier night to compare with yet: nothing wrong.
-      if (result.outcome === 'not-run' && result.measurement) continue
-      const signature = `sense|${node.id}|${condition.raw}|${result.outcome === 'failed' ? 'failed' : 'not-measured'}`
-      if (known.has(signature)) continue
-      known.add(signature)
-      const m = result.measurement
-      const measured = m ? `${m.value}${m.unit ? ` ${m.unit}` : ''}` : null
-      const where = m ? ` (${Object.entries(m.labels).map(([k, v]) => `${k}=${v}`).join(', ')}; ${m.source}, ${m.at}${m.context ? `; ${Object.entries(m.context).map(([k, v]) => `${k}=${v}`).join(', ')}` : ''})` : ''
-      const id = nextFindingId(ids)
-      ids.push(id)
-      const b = condition.baseline
-      const limit = b
-        ? `the baseline${b.by ? ` ${b.sign < 0 ? '-' : '+'} ${b.by}${b.percent ? '%' : ` ${b.unit}`}` : ''} (${result.detail})`
-        : `${condition.op} ${condition.value}${condition.unit ? ` ${condition.unit}` : ''}`
-      out.push({
-        id,
-        title: result.outcome === 'failed'
-          ? `${node.label}: ${condition.metric} measured ${measured}, beyond ${limit}`
-          : `${node.label}: the night measured no ${condition.metric}`,
-        source: 'sense',
-        status: 'open',
-        rule: `${node.type === 'fitness-fn' ? 'Fitness function' : 'Scenario'} "${node.label}"`,
-        signature,
-        round: 'nightly',
-        ...(options.commit ? { commit: options.commit.slice(0, 8) } : {}),
-        found: day,
-        steps: [
-          `The nightly workflow (.github/workflows/nightly.yml) measures ${condition.metric}${options.commit ? ` on commit ${options.commit.slice(0, 8)}` : ''}${options.run ? ` (${options.run})` : ''}`,
-          `radical check reads the condition "${condition.raw}" of ${node.type === 'fitness-fn' ? 'fitness function' : 'scenario'} "${node.label}"`,
-        ],
-        detail: [
-          `Expected: ${condition.raw}`,
-          `Actual: ${result.outcome === 'failed' ? `${measured}${where}${result.detail ? `; ${result.detail}` : ''}` : result.outcome === 'stale' ? `only a stale measurement, ${result.detail}` : result.outcome === 'invalid' ? `cannot be evaluated: ${result.detail}` : 'nothing measured'}`,
-        ].join('\n'),
-      })
+    for (const stated of parseConditions(props.metrics)) {
+      if (stated.kind !== 'metric' || stated.metric === REVIEW_METRIC) continue
+      // Measured for each element its ADR constrains (radical sense run
+      // labels a sensor's measurements with the element): judged on each
+      // element's own measurements and earlier nights, as radical check does.
+      const elements = [...new Set(measurements.filter((m) => m.metric === stated.metric && ELEMENT_LABEL in m.labels
+        && Object.entries(stated.labels).every(([k, v]) => m.labels[k] === v)).map((m) => m.labels[ELEMENT_LABEL]))].sort()
+      for (const element of elements.length ? elements : [undefined]) {
+        const condition = element ? { ...stated, labels: { ...stated.labels, [ELEMENT_LABEL]: element } } : stated
+        const result = evaluateMetric(condition, measurements, maxAge, options.now, baseline)
+        if (result.outcome === 'passed') continue
+        // Measured, but no earlier night to compare with yet: nothing wrong.
+        if (result.outcome === 'not-run' && result.measurement) continue
+        const signature = `sense|${node.id}|${condition.raw}${element ? `|${element}` : ''}|${result.outcome === 'failed' ? 'failed' : 'not-measured'}`
+        if (known.has(signature)) continue
+        known.add(signature)
+        const m = result.measurement
+        const measured = m ? `${m.value}${m.unit ? ` ${m.unit}` : ''}` : null
+        const where = m ? ` (${Object.entries(m.labels).map(([k, v]) => `${k}=${v}`).join(', ')}; ${m.source}, ${m.at}${m.context ? `; ${Object.entries(m.context).map(([k, v]) => `${k}=${v}`).join(', ')}` : ''})` : ''
+        const on = element ? ` (${labelOf.get(element) ?? element})` : ''
+        const id = nextFindingId(ids)
+        ids.push(id)
+        const b = condition.baseline
+        const limit = b
+          ? `the baseline${b.by ? ` ${b.sign < 0 ? '-' : '+'} ${b.by}${b.percent ? '%' : ` ${b.unit}`}` : ''} (${result.detail})`
+          : `${condition.op} ${condition.value}${condition.unit ? ` ${condition.unit}` : ''}`
+        out.push({
+          id,
+          title: result.outcome === 'failed'
+            ? `${node.label}${on}: ${condition.metric} measured ${measured}, beyond ${limit}`
+            : `${node.label}${on}: the night measured no ${condition.metric}`,
+          source: 'sense',
+          status: 'open',
+          rule: `${node.type === 'fitness-fn' ? 'Fitness function' : 'Scenario'} "${node.label}"`,
+          signature,
+          round: 'nightly',
+          ...(options.commit ? { commit: options.commit.slice(0, 8) } : {}),
+          found: day,
+          steps: [
+            `The nightly workflow (.github/workflows/nightly.yml) measures ${condition.metric}${options.commit ? ` on commit ${options.commit.slice(0, 8)}` : ''}${options.run ? ` (${options.run})` : ''}`,
+            `radical check reads the condition "${condition.raw}" of ${node.type === 'fitness-fn' ? 'fitness function' : 'scenario'} "${node.label}"`,
+          ],
+          detail: [
+            `Expected: ${condition.raw}`,
+            `Actual: ${result.outcome === 'failed' ? `${measured}${where}${result.detail ? `; ${result.detail}` : ''}` : result.outcome === 'stale' ? `only a stale measurement, ${result.detail}` : result.outcome === 'invalid' ? `cannot be evaluated: ${result.detail}` : 'nothing measured'}`,
+          ].join('\n'),
+        })
+      }
     }
   }
   return out

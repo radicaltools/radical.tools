@@ -17,8 +17,24 @@ import { MODEL_FOLDER, RADICAL_DIR, findModelFolder, oldLayout, repositoryFileOf
 import { addDependencies, describeDeps, fetchFederation, latestRef, parseDependsOn, readDependencies } from './federation'
 import { DEPS_FILE, FEDERATION_FILE, type Dependency, type Deps } from '@radical/common/federation'
 import type { Io } from './check'
+import { CHECK_CONFIG_FILE, existingCodeCheckConfig, serializeCheckConfig, strictCheckConfig } from '@radical/common/check'
 
 const exec = promisify(execFile)
+
+/** Files a repository has before its code: documentation, licences, its
+ *  settings (dot-files and folders) and Radical's own. */
+const NOT_CODE = /^(\.|docs?\/|LICEN[CS]E|COPYING|NOTICE|AUTHORS|CODEOWNERS)|\.(md|markdown|txt|rst|adoc)$/i
+
+/** Whether the repository at `root` holds code beside the model `folder`:
+ *  any file git tracks or would track (untracked, not ignored) that is no
+ *  documentation, licence or setting. Outside git, the files at its top. */
+export async function hasCode(root: string, folder: string): Promise<boolean> {
+  const inModel = (path: string) => !relative(folder, resolve(root, path)).startsWith('..')
+  const listed = await exec('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: root, windowsHide: true, maxBuffer: 64 * 1024 * 1024 })
+    .then(({ stdout }) => stdout.split('\n').filter(Boolean), () => null)
+  const files = listed ?? (await readdir(root, { withFileTypes: true }).catch(() => [])).map((e) => e.name + (e.isDirectory() ? '/' : ''))
+  return files.some((path) => !NOT_CODE.test(path) && !inModel(path))
+}
 
 /** Metamodels a new folder can start with, as the MCP server's --metamodel. */
 const METAMODELS = { radical: builtInGovernanceMetamodel, c4: builtInC4Metamodel } as const
@@ -28,7 +44,11 @@ export const SETUP_USAGE = `Usage: radical setup [folder] [options]
 
 Connects your coding agents to a Radical model folder, step by step:
   1. Node      checks the version
-  2. Folder    a missing or empty folder becomes a new model
+  2. Folder    a missing or empty folder becomes a new model, with the
+               check.json its gate starts from: in a repository without
+               code every rule an error and every goal at 100%; in one with
+               code every rule an error, waiting for the baselines of its
+               first run (radical check --adopt)
   3. Other models
                the models this one depends on (a federation): their names,
                repositories, model folders and versions go into deps.json,
@@ -239,6 +259,18 @@ export async function setupCommand(args: string[], io: Io): Promise<number> {
       const written = await new MdFolderSession(diskFolderStorage(folder)).write(files)
       if (!written.ok) { io.err(`radical setup: ${folderArg} changed while the model was written; run it again.`); return 2 }
       io.out(`  + started a new model (${metamodel} metamodel) in ${folderArg}`)
+    }
+    // The gate the new model starts with (ADR Strict gate for new models).
+    if (!existsSync(resolve(folder, CHECK_CONFIG_FILE))) {
+      const code = await hasCode(await repositoryRoot(existsSync(folder) ? folder : io.cwd) ?? io.cwd, folder)
+      const what = code
+        ? 'every rule an error, waiting for the baselines of its first run: radical check --adopt takes them once the model describes the code'
+        : 'every rule an error and every goal at 100%'
+      if (dry) io.out(`  would write ${CHECK_CONFIG_FILE}: ${what}`)
+      else {
+        await writeFile(resolve(folder, CHECK_CONFIG_FILE), serializeCheckConfig(code ? existingCodeCheckConfig() : strictCheckConfig()))
+        io.out(`  + ${CHECK_CONFIG_FILE}: ${what}`)
+      }
     }
   } else if (!existsSync(resolve(folder, 'radical.md'))) {
     io.err(`radical setup: ${folderArg} holds other files and no radical.md, so it is not a Radical model folder. Name an empty or new folder, or one with a model.`)

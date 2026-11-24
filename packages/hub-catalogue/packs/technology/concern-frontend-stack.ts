@@ -3,8 +3,8 @@ import type { FitnessSpec, PackSpec } from '../../src/packSpec'
 const FRAMEWORKS = ['adr-react', 'adr-angular', 'adr-vue', 'adr-svelte', 'adr-htmx']
 /** The frameworks with a JavaScript build; htmx has none. */
 const BUILT = ['react', 'angular', 'vue', 'svelte']
-const FORCES = 'This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user\'s phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; the browsers to support decide which features and polyfills ship; and accessibility is a legal duty in many markets (European Accessibility Act, ADA, Section 508), cheap when built in and expensive when retrofitted.'
-const BUDGET = 'Budget: LCP {{LCP_MS}} ms, INP {{INP_MS}} ms, CLS {{CLS}} at the 75th percentile of real page loads, {{JS_KB}} KB of JavaScript per route; WCAG 2.2 AA. Dependency updates: as decided in the Dependency hygiene pack.'
+const FORCES = 'This element is a web front end that people use in their own browsers, on their own devices and networks. The forces: every kilobyte of JavaScript is downloaded, parsed and run on the user\'s phone, and mid-range phones on mobile networks are where most budgets break; search engines and first visits reward content in the first HTML response, while app-like screens favour rendering in the browser; a framework brings its ecosystem, hiring pool and release cadence, and its majors reach end of support on published dates; a shared design system keeps screens consistent and accessible, but costs effort to build and keep; and the browsers to support decide which features and polyfills ship. How fast pages feel on phones and who can use them are decided in the packs of the UX & Accessibility group.'
+const BUDGET = 'JavaScript budget: {{JS_KB}} KB per route, compressed. The Core Web Vitals budget, Reflow and touch target size are decided in the Mobile and perceived performance pack, and conformance to WCAG 2.2 AA in the Accessibility pack, both of the UX & Accessibility group. Dependency updates: as decided in the Dependency hygiene pack.'
 
 /** The npm packages that mean a UI framework is in the build. */
 const PACKAGES: Record<string, string[]> = {
@@ -36,27 +36,23 @@ const pack: PackSpec = {
   id: 'concern-frontend-stack',
   name: 'Frontend stack',
   group: 'technology',
-  description: 'The UI framework and rendering model of a web front end, its design system, the browsers it supports, its performance budget (Core Web Vitals, JavaScript size) and its accessibility level.',
-  tags: ['technology', 'frontend', 'web', 'framework', 'core web vitals', 'accessibility', 'design system', 'browser support'],
+  description: 'The UI framework and rendering model of a web front end, its design system, the browsers it supports, its JavaScript budget and how long its framework stays supported. The Core Web Vitals and accessibility are decided in the UX & Accessibility packs.',
+  tags: ['technology', 'frontend', 'web', 'framework', 'rendering', 'design system', 'browser support', 'javascript budget'],
   concern: {
     id: 'frontend-stack',
     trigger: 'LIST NODES WHERE type = "webapp" AND external != true',
-    why: 'these are web front ends, so what they are built with, how they render, how fast and accessible they must be, and which browsers they support has to be decided.',
+    why: 'these are web front ends, so what they are built with, how they render, how much JavaScript they may ship, and which browsers they support has to be decided.',
   },
   sources: [
-    { title: 'web.dev: Web Vitals (LCP, INP, CLS and their thresholds)', url: 'https://web.dev/articles/vitals' },
     { title: 'web.dev: Performance budgets 101', url: 'https://web.dev/articles/performance-budgets-101' },
     { title: 'web.dev: Rendering on the web', url: 'https://web.dev/articles/rendering-on-the-web' },
     { title: 'web.dev: Time to First Byte (TTFB)', url: 'https://web.dev/articles/ttfb' },
     { title: 'web.dev: Prevent unnecessary network requests with the HTTP Cache', url: 'https://web.dev/articles/http-cache' },
-    { title: 'W3C: Web Content Accessibility Guidelines (WCAG) 2.2', url: 'https://www.w3.org/TR/WCAG22/' },
-    { title: 'ETSI EN 301 549: Accessibility requirements for ICT products and services', url: 'https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf' },
     { title: 'W3C Design Tokens Community Group: Design Tokens Format Module', url: 'https://tr.designtokens.org/format/' },
     { title: 'Tailwind CSS documentation: theme variables', url: 'https://tailwindcss.com/docs/theme' },
     { title: 'Browserslist', url: 'https://github.com/browserslist/browserslist' },
     { title: 'endoflife.date: framework support lifecycles', url: 'https://endoflife.date/' },
     { title: 'Lighthouse CI', url: 'https://github.com/GoogleChrome/lighthouse-ci' },
-    { title: 'axe-core', url: 'https://github.com/dequelabs/axe-core' },
     { title: 'Thoughtworks Technology Radar', url: 'https://www.thoughtworks.com/radar' },
   ],
   questions: [
@@ -104,15 +100,12 @@ const pack: PackSpec = {
     },
   ],
   details: [
-    { key: 'LCP_MS', label: 'Largest Contentful Paint at the 75th percentile (ms)?', default: '2500', number: true },
-    { key: 'INP_MS', label: 'Interaction to Next Paint at the 75th percentile (ms)?', default: '200', number: true },
-    { key: 'CLS', label: 'Cumulative Layout Shift at the 75th percentile?', default: '0.1', number: true },
     { key: 'JS_KB', label: 'At most how much JavaScript may a route load before it is interactive (KB, compressed)?', default: '200', number: true },
     { key: 'EOL_DAYS', label: 'How many days before end of support must a framework major be replaced?', default: '180', number: true },
   ],
   need: {
-    label: 'A fast, accessible front end',
-    text: 'People use this front end on their own devices, browsers and networks, some with disabilities and assistive technology. It has to load and respond quickly on an ordinary phone, work in the browsers its users have, be usable by everyone, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a RUM table rum_events(name, value, page_group, received_at) fed by the page.',
+    label: 'A front end built to last',
+    text: 'People use this front end on their own devices, browsers and networks. It has to ship no more JavaScript than an ordinary phone can take, work in the browsers its users have, look and behave consistently, and be built on a framework the team knows and that keeps receiving fixes. The choices and the numbers it is held to must be written down and checked, not rediscovered after users complain. The checks assume one front end per repository with its package.json at the root, a versions.txt listing the endoflife.date products and cycles in use, server templates (htmx) under templates/ or src/, and a preview server on http://localhost:4173 (npm run preview).',
   },
   forces: FORCES,
   requirements: [
@@ -123,22 +116,10 @@ const pack: PackSpec = {
       scenario: { label: 'Second framework refused', given: 'the front end\'s package.json files', when: 'a change adds another UI framework\'s package', then: 'the framework check fails until a decision record allows it' },
     },
     {
-      id: 'req-vitals', label: 'Core Web Vitals met', ears_type: 'ubiquitous',
-      action: 'meet, at the 75th percentile of real page loads over 28 days per page group, a Largest Contentful Paint within {{LCP_MS}} ms, an Interaction to Next Paint within {{INP_MS}} ms and a Cumulative Layout Shift of at most {{CLS}}',
-      rationale: 'These are the thresholds for a "good" experience, measured at the 75th percentile of field data over 28 days (web.dev, Web Vitals: LCP 2.5 s, INP 200 ms, CLS 0.1); they also feed search ranking.',
-      scenario: { label: 'Field vitals within budget', given: '28 days of real-user measurements per page group', when: 'the 75th percentiles are computed', then: 'LCP is within {{LCP_MS}} ms, INP within {{INP_MS}} ms and CLS at most {{CLS}} for every page group' },
-    },
-    {
       id: 'req-bundle', label: 'JavaScript within budget', ears_type: 'ubiquitous',
-      action: 'keep the JavaScript a route loads before it is interactive within {{JS_KB}} KB compressed, loading the rest on demand',
+      action: 'keep the JavaScript a route loads on its first view within {{JS_KB}} KB compressed, loading the rest on demand',
       rationale: 'JavaScript is the costliest byte on a phone: it is downloaded, parsed and run on the main thread, which is what INP measures (web.dev, Performance budgets 101).',
-      scenario: { label: 'Bundle over budget refused', given: 'a pull request that adds a large library to a route', when: 'Lighthouse CI runs against the preview', then: 'it fails when the route\'s script transfer size passes {{JS_KB}} KB' },
-    },
-    {
-      id: 'req-a11y', label: 'Accessible to WCAG 2.2 AA', ears_type: 'ubiquitous',
-      action: 'conform to WCAG 2.2 level AA on every page, with 0 serious or critical automated accessibility violations, every function operable by keyboard alone, and a manual audit with a screen reader before each major release',
-      rationale: 'WCAG 2.2 AA is the level EN 301 549, the European Accessibility Act and most public-sector rules require; automated checks find only part of the failures, hence the keyboard journey and the manual audit (W3C WCAG 2.2; EN 301 549).',
-      scenario: { label: 'Page passes accessibility checks', given: 'each page of the main journeys', when: 'the automated checks run and the main journey is completed with the keyboard only', then: '0 serious or critical violations are reported and the journey completes' },
+      scenario: { label: 'Bundle over budget refused', given: 'a pull request that adds a large library to a route', when: 'Lighthouse CI collects from the preview and radical check judges the measurements', then: 'the script size condition fails when the route\'s script transfer size passes {{JS_KB}} KB' },
     },
     {
       id: 'req-supported', label: 'Supported framework versions', when: { FRAMEWORK: BUILT }, ears_type: 'ubiquitous',
@@ -157,7 +138,7 @@ const pack: PackSpec = {
       id: 'req-ssr', label: 'Content in the first response', when: { RENDERING: ['ssr'] }, ears_type: 'event-driven',
       trigger: 'a page is requested',
       action: 'answer with HTML that already holds the page\'s main content, with a Time to First Byte within 800 ms at the 75th percentile at the peak load decided in the Capacity and scaling pack',
-      rationale: 'Server rendering pays off only if the server answers quickly; 800 ms is web.dev\'s "good" Time to First Byte, which leaves room for LCP within budget (web.dev, TTFB).',
+      rationale: 'Server rendering pays off only if the server answers quickly; 800 ms is web.dev\'s "good" Time to First Byte, which leaves room for the LCP budget of the Mobile and perceived performance pack (web.dev, TTFB).',
       scenario: { label: 'Content without JavaScript', given: 'a public page', when: 'it is requested at the peak rate with JavaScript disabled', then: 'its main content is in the HTML, and the 75th-percentile TTFB is within 800 ms' },
     },
     {
@@ -201,10 +182,10 @@ const pack: PackSpec = {
     {
       id: 'req-old-devices', label: 'Tested on older phones', when: { BROWSERS: ['extended'] }, ears_type: 'event-driven',
       trigger: 'a release candidate is built',
-      action: 'run the main journeys on real devices with the oldest supported iOS Safari and a low-end Android phone, and meet the Core Web Vitals budget on the Android phone',
-      rationale: 'Emulated browsers miss the CPU and memory limits of old phones, where an extended audience feels the budget most (web.dev, Web Vitals).',
-      scenario: { label: 'Journeys pass on old phones', given: 'a release candidate', when: 'the main journeys run on the oldest supported iPhone and a low-end Android phone', then: 'all pass, and LCP on the Android phone is within {{LCP_MS}} ms' },
-      unchecked: 'It runs on real phones, which no pipeline tool here drives: the release engineer runs the main journeys on the device bench (the oldest supported iPhone and a low-end Android phone) before each release candidate is promoted, and records LCP from the phone\'s DevTools in the release notes.',
+      action: 'run the main journeys on real devices with the oldest supported iOS Safari and a low-end Android phone',
+      rationale: 'Emulated browsers miss the CPU, memory and engine limits of old phones, where an extended audience meets the front end (Browserslist).',
+      scenario: { label: 'Journeys pass on old phones', given: 'a release candidate', when: 'the main journeys run on the oldest supported iPhone and a low-end Android phone', then: 'all pass' },
+      unchecked: 'It runs on real phones, which no pipeline tool here drives: the release engineer runs the main journeys on the device bench (the oldest supported iPhone and a low-end Android phone) before each release candidate is promoted, and records the result, with LCP read from the phone\'s DevTools against the budget of the Mobile and perceived performance pack, in the release notes.',
     },
   ],
   adrs: [
@@ -246,12 +227,14 @@ const pack: PackSpec = {
     oneFramework('svelte', 'adr-svelte', 'Svelte'),
     oneFramework('htmx', 'adr-htmx', 'htmx'),
     {
-      id: 'ff-lighthouse', label: 'Lab budget holds', characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-bundle'],
-      threshold: 'On every pull request, for each main page: script transfer size at most {{JS_KB}} KB, LCP within {{LCP_MS}} ms, CLS at most {{CLS}}, Total Blocking Time within 200 ms (the lab stand-in for INP), accessibility score at least 0.95',
-      description: 'Lighthouse CI starts the preview build, runs three times per main page on its mobile profile and asserts the budget; the median run counts. The script size is the transfer size of every script the page loads, whatever the framework\'s output paths. INP needs real interactions, so it is checked in the field (see Field vitals). Pages behind sign-in need a puppeteerScript that signs in before the runs.',
-      tool: 'Lighthouse CI',
+      id: 'ff-bundle', label: 'JavaScript within budget', characteristic: 'performance-efficiency', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-bundle'],
+      threshold: 'On every pull request, for the main page that loads the most JavaScript on Lighthouse\'s mobile default: script transfer size at most {{JS_KB}} KB (1 KB = 1000 bytes)',
+      measure: 'lighthouse',
+      metrics: 'web.lab.script_bytes.max{device=mobile} <= {{JS_KB}} KB',
+      description: 'Lighthouse CI starts the preview build and runs three times on each main page; radical sense lighthouse reads the reports and takes, per page, the median transfer size of every script the page loads, whatever the framework\'s output paths, and the largest over the pages as web.lab.script_bytes.max. lighthouserc.cjs holds no assertions: the limit is this condition, judged by radical check. It is the same collect run the Mobile and perceived performance pack uses for the Core Web Vitals; with that pack imported, one lighthouserc serves both. A desktop-only tool that collects only the desktop preset reads device=desktop instead.',
+      tool: 'Lighthouse CI (@lhci/cli) with radical sense lighthouse',
       language: 'js',
-      snippet: `// lighthouserc.cjs
+      snippet: `// lighthouserc.cjs: Lighthouse CI only collects; the model's conditions judge the numbers
 module.exports = {
   ci: {
     collect: {
@@ -260,83 +243,12 @@ module.exports = {
       numberOfRuns: 3,
       // puppeteerScript: './lighthouse-login.cjs',   // signs in first, for pages behind sign-in
     },
-    assert: {
-      assertions: {
-        'resource-summary:script:size': ['error', { maxNumericValue: {{JS_KB}} * 1024, aggregationMethod: 'median' }],
-        'largest-contentful-paint': ['error', { maxNumericValue: {{LCP_MS}}, aggregationMethod: 'median' }],
-        'cumulative-layout-shift': ['error', { maxNumericValue: {{CLS}}, aggregationMethod: 'median' }],
-        'total-blocking-time': ['error', { maxNumericValue: 200, aggregationMethod: 'median' }],
-        'categories:accessibility': ['error', { minScore: 0.95 }],
-      },
-    },
-    upload: { target: 'temporary-public-storage' },
   },
-}`,
-    },
-    {
-      id: 'ff-field-vitals', label: 'Field vitals within budget', characteristic: 'performance-efficiency', scope: 'holistic', cadence: 'triggered', trigger: 'nightly', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-vitals'],
-      threshold: '75th percentile over 28 days per page group: LCP within {{LCP_MS}} ms, INP within {{INP_MS}} ms, CLS at most {{CLS}}; the daily query returns 0 rows',
-      description: 'The page reports LCP, INP and CLS from real users with the web-vitals library (navigator.sendBeacon to /rum, which stores name, value and page group in rum_events). A daily job runs the query below, which computes the 75th percentile per metric and page group over the last 28 days and returns every row over budget; any row fails the job and alerts the team.',
-      tool: 'web-vitals (Google Chrome) in the page; a scheduled SQL query over the RUM table (PostgreSQL syntax)',
-      language: 'sql',
-      snippet: `-- rum_events(name text, value numeric, page_group text, received_at timestamptz); run daily, alert on any row
-WITH p75 AS (
-  SELECT name, page_group, percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75
-  FROM rum_events
-  WHERE received_at > now() - interval '28 days'
-  GROUP BY name, page_group
-)
-SELECT name, page_group, p75
-FROM p75
-WHERE (name = 'LCP' AND p75 > {{LCP_MS}})
-   OR (name = 'INP' AND p75 > {{INP_MS}})
-   OR (name = 'CLS' AND p75 > {{CLS}})
-ORDER BY name, page_group;`,
-    },
-    {
-      id: 'ff-axe', label: 'No accessibility violations', characteristic: 'interaction-capability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-a11y'],
-      threshold: '0 serious or critical axe violations against the WCAG 2.0 and 2.1 A and AA rules and the 2.2 AA rules on every page of the main journeys',
-      description: 'A Playwright test opens each page of the main journeys, including open dialogs and error states, and runs axe-core with the WCAG A and AA tags; any serious or critical violation fails it.',
-      tool: 'axe-core with Playwright (@axe-core/playwright)',
-      language: 'ts',
-      snippet: `import AxeBuilder from '@axe-core/playwright'
-import { expect, test } from '@playwright/test'
-
-for (const path of ['/', '/search', '/checkout']) {
-  test(\`\${path} meets WCAG 2.2 AA\`, async ({ page }) => {
-    await page.goto(path)
-    const { violations } = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
-      .analyze()
-    expect(violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual([])
-  })
-}`,
-    },
-    {
-      id: 'ff-keyboard', label: 'Main journey by keyboard', characteristic: 'interaction-capability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-a11y'],
-      threshold: 'The main journey completes with Tab, Shift+Tab, Enter, Space and the arrow keys only, and focus is visible at every step',
-      description: 'A Playwright test walks the main journey without the mouse: it tabs to each control by its accessible name, activates it with Enter or Space, and asserts the focused element is visible after every move; a control that cannot be reached within 200 tabs fails the test.',
-      tool: 'Playwright',
-      language: 'ts',
-      snippet: `import { expect, test, type Page } from '@playwright/test'
-
-async function tabTo(page: Page, name: string): Promise<void> {
-  for (let i = 0; i < 200; i++) {
-    const focused = page.locator(':focus')
-    if ((await focused.count()) && (await focused.textContent())?.includes(name)) { await expect(focused).toBeVisible(); return }
-    await page.keyboard.press('Tab')
-  }
-  throw new Error(\`\${name} cannot be reached with Tab\`)
 }
-
-test('checkout completes with the keyboard alone', async ({ page }) => {
-  await page.goto('/')
-  for (const step of ['Search', 'Add to basket', 'Checkout', 'Place order']) {
-    await tabTo(page, step)
-    await page.keyboard.press('Enter')
-  }
-  await expect(page.getByRole('heading', { name: 'Order placed' })).toBeVisible()
-})`,
+// The pull-request job (no assert, no upload: radical check fails the job):
+//   npx @lhci/cli@0.15.1 collect                                        # Lighthouse's mobile default
+//   npx radical sense run --trigger pull-request --out reports/metrics  # lighthouse reads .lighthouseci
+//   npx radical check --metrics reports/metrics`,
     },
     {
       id: 'ff-compat', label: 'Features match browser list', characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: FRAMEWORKS, checks: ['req-browsers'],

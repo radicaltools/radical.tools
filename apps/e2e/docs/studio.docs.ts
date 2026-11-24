@@ -298,7 +298,7 @@ test('viewer', async ({ page, shot }) => {
 test('presenter', async ({ page, shot }) => {
   // Presentations opened over Designer, where they are made.
   await open(page, 'view-ctx')
-  await page.getByRole('button', { name: 'Presentations', exact: true }).click()
+  await page.getByRole('button', { name: /^Presentations(,|$)/ }).click()
   await settle(page)
   await shot('presenter')
 })
@@ -486,7 +486,7 @@ test('inspector', async ({ page, shot }) => {
   await page.getByRole('button', { name: 'Folder…' }).click()
   await expect(page.locator('.welcome-overlay')).toBeHidden()
   // The Inspector's button on the activity rail, above Settings.
-  const inspector = page.locator('.activity-rail').getByRole('button', { name: 'Inspector', exact: true })
+  const inspector = page.locator('.activity-rail').getByRole('button', { name: /^Inspector(,|$)/ })
   await expect(inspector).toBeEnabled({ timeout: 20_000 })
   await inspector.click()
   await expect(page.locator('.insp-verdict')).toBeVisible()
