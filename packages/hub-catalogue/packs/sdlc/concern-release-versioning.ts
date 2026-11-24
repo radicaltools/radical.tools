@@ -4,14 +4,15 @@ const NUMBERED: When = { SCHEME: ['semver', 'calver'] }
 const VERSIONED = ['adr-semver', 'adr-calver']
 const SCHEMES = ['adr-semver', 'adr-calver', 'adr-build-id']
 const APPROVAL_SENTENCE = 'Release approval: {{APPROVAL}}. With the release owner\'s approval, the job that publishes a release runs in the GitHub environment release, which waits for a review by a member of the team {{RELEASE_OWNER}} other than the person who started the run; with automatic releases, the release workflow runs on every push to main and publishes within {{RELEASE_HOURS}} hours of the merge, waiting for nobody. Either way only the release workflow publishes releases, never a person by hand.'
+const SHOWN_SENTENCE = 'Where the running version is shown: {{SHOWN}}. GET /version answers in every case. Where the interface shows it, the footer of every page (or the About page) holds an element marked data-testid="app-version" whose text gives the version and the first 7 characters of the commit and whose data-version and data-commit attributes hold both in full, filled from the same build values as GET /version, and a browser test after every deploy compares them with the build the deploy job deployed. Where responses and logs carry it too, every HTTP response has the headers App-Version and App-Commit (without the X- prefix RFC 6648 retired), and every log line the fields version and commit, set once in the logger\'s base fields at start; the rest of the line is shaped as the Error handling and logging conventions pack decides.'
 const FORCES = 'This element is released again and again, and each release is read by people who were not in the room: operators deciding whether to deploy it, customers deciding whether to upgrade, support asking which version a user runs. The forces: a version number is a promise, and one that says "patch" over a breaking change costs more trust than no number at all; numbers typed by hand drift, while numbers computed from the history are only as right as the history; notes generated from commits are complete but read like commits, notes written by hand read well but get forgotten; every older line kept in support multiplies the work of each security fix, while supporting only the latest line makes every user keep up; a person approving each release catches what no check describes but makes every release wait for that person; and a release whose tag can move after publication is not one anybody can rely on. Neighbouring packs own the rest: the commit message format and the branching model are decided in the Code review and branching pack, release cadence, rollout and rollback in the Deployment pack, how an API names and retires its versions in the API evolution pack, signing, provenance and SBOMs of what is released in the Software supply chain pack, and how dependencies are pinned in the Dependency hygiene pack.'
 
 const pack: PackSpec = {
   id: 'concern-release-versioning',
   name: 'Release and versioning',
   group: 'sdlc',
-  description: 'How a release of the element is named, described, approved and supported: the version scheme, where the release notes come from, which release lines get security fixes, and who decides that a release goes out. The snippets assume a GitHub repository, GitHub releases and the GitHub CLI.',
-  tags: ['sdlc', 'releases', 'versioning', 'semver', 'calver', 'changelog', 'release notes'],
+  description: 'How a release of the element is named, described, approved and supported: the version scheme, where the release notes come from, which release lines get security fixes, who decides that a release goes out, and where the running element says which release it is. The snippets assume a GitHub repository, GitHub releases and the GitHub CLI.',
+  tags: ['sdlc', 'releases', 'versioning', 'semver', 'calver', 'changelog', 'release notes', 'version endpoint'],
   concern: {
     id: 'release-versioning',
     trigger: 'LIST NODES WHERE (type = "container" OR type = "webapp") AND external != true',
@@ -30,6 +31,8 @@ const pack: PackSpec = {
     { title: 'GitHub Docs: Immutable releases', url: 'https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases' },
     { title: 'GitHub Docs: Adding a security policy to your repository', url: 'https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/add-security-policy' },
     { title: 'GitHub Docs: Deployments and environments (required reviewers)', url: 'https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments' },
+    { title: 'RFC 6648, Deprecating the "X-" Prefix and Similar Constructs in Application Protocols', url: 'https://www.rfc-editor.org/rfc/rfc6648' },
+    { title: 'Playwright: Assertions', url: 'https://playwright.dev/docs/test-assertions' },
   ],
   questions: [
     {
@@ -70,6 +73,16 @@ const pack: PackSpec = {
         { value: 'owner', label: 'the release owner\'s approval of each release', description: 'The job that publishes a release waits in a protected GitHub environment until a member of the release-owner team approves it; with release-please, merging its release pull request starts that job. Pick it with the Deployment pack\'s weekly release train, or when a person must read the notes before customers do.' },
       ],
     },
+    {
+      key: 'SHOWN', title: 'Version shown', label: 'Where does the running element say which version it is?',
+      hint: 'GET /version answers for every element, so that the deploy job can confirm what runs; the question is who else needs to see it. A person reporting a problem reads the interface, an operator a response or a log line, and while several versions run at once (a canary, blue-green, several regions) only a response or a log line tells which one served a request.',
+      default: 'ui',
+      options: [
+        { value: 'ui', label: 'in its interface (the footer or the About page) and at GET /version', description: 'The footer of every page, or the About page, shows the version and the short commit, from the same values GET /version answers with, and a browser test after every deploy compares them with the build deployed. Pick it for anything with a user interface whose users or support need to say which version they see: a web app, an admin console, a desktop or mobile app.' },
+        { value: 'endpoint', label: 'at GET /version only', description: 'Only the endpoint (or /version.json for a static web app) answers. Pick it for an API, a worker or a service with no interface of its own, where the people who ask are operators with a terminal.' },
+        { value: 'everywhere', label: 'in its interface, at GET /version, in a response header and in every log line', description: 'The interface and the endpoint as with the first answer, plus the headers App-Version and App-Commit on every HTTP response and the fields version and commit on every log line. Pick it for an element with an interface that runs in several versions at once (a canary, blue-green, several regions), where a response or a log line has to say which version produced it.' },
+      ],
+    },
   ],
   details: [
     { key: 'RELEASE_HOURS', label: 'Within how many hours must a merged change be in a release? (automatic releases only)', default: '1', number: true },
@@ -79,7 +92,7 @@ const pack: PackSpec = {
   ],
   need: {
     label: 'Every release says what it is',
-    text: 'People and tools outside the team take this element\'s releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; and a GET /version endpoint (a /version.json file for a web app) answering with the version and commit.',
+    text: 'People and tools outside the team take this element\'s releases: they need to know which version they run, what changed in it, whether upgrading breaks them, and how long it will get fixes. Every release has to answer those questions the same way, from a process that runs without heroics and leaves a release as it was published. The snippets assume a GitHub repository (our-org/shop) whose releases are GitHub releases tagged v<version> with their notes in the body; shipped code under src/; CHANGELOG.md and SECURITY.md (with a Supported versions table of rows such as | 2.x | ✅ |, newest first) at the root; maintenance branches release/<line>.x; the deployment manifests under deploy/; a GET /version endpoint (a /version.json file for a web app) answering with the version and commit; and, where the interface shows the version, an element marked data-testid="app-version" in the footer or on the About page.',
   },
   forces: FORCES,
   requirements: [
@@ -88,6 +101,24 @@ const pack: PackSpec = {
       action: 'answer GET /version (a /version.json file for a web app) with the version it was released as (its commit SHA where builds carry no version number) and the full SHA of the commit it was built from, so that the deploy job can confirm both within 90 seconds of every deploy',
       rationale: 'An incident starts with "which build is running?"; a build that reports its own identity answers it in one request and ties what runs to the source it came from (Google SRE book, Release Engineering: every package labelled with its build ID).',
       scenario: { label: 'Deploy confirms what runs', given: 'a release deployed to an environment', when: 'the deploy job calls GET /version', then: 'within 90 seconds the answer names the version and commit the job deployed, and the job fails if it does not' },
+    },
+    {
+      id: 'req-version-shown', label: 'Interface names the running build', when: { SHOWN: ['ui', 'everywhere'] }, ears_type: 'ubiquitous',
+      action: 'show in the footer of every page, or on its About page, the version it was released as and the first 7 characters of its commit, in an element marked data-testid="app-version" whose data-version and data-commit attributes hold both in full, filled from the same build values that GET /version answers with',
+      rationale: 'The people who report a problem see the interface, not the endpoint; a version they can read and quote ties their report to the build that served it, and one source for the interface and the endpoint keeps the two from disagreeing (Google SRE book, Release Engineering: every package labelled with its build ID).',
+      scenario: { label: 'Interface names the deployed build', given: 'a release deployed to staging', when: 'the deploy job opens the application in a browser after the deploy', then: 'the page shows the release\'s version and short commit, the element\'s data-version and data-commit equal what the job deployed and what GET /version answers, and the deploy job fails if any of them differs' },
+    },
+    {
+      id: 'req-version-header', label: 'Every response names its build', when: { SHOWN: ['everywhere'] }, ears_type: 'ubiquitous',
+      action: 'answer every HTTP request, error responses included, with the headers App-Version and App-Commit holding the version it was released as and the full SHA of its commit',
+      rationale: 'While several versions serve traffic at once, a response that names its version tells which one served it, without access to the servers; a header without the X- prefix follows RFC 6648 (Google SRE book, Release Engineering).',
+      scenario: { label: 'Responses carry the build', given: 'the built image started with its version and commit', when: 'the check requests /version, the home page and a path that does not exist', then: 'all three responses, the error included, carry App-Version and App-Commit with the build\'s values' },
+    },
+    {
+      id: 'req-version-logs', label: 'Every log line names its build', when: { SHOWN: ['everywhere'] }, ears_type: 'ubiquitous',
+      action: 'write the version it was released as and the full SHA of its commit as the fields version and commit of every log line it writes',
+      rationale: 'A log line that names its build separates the old version\'s errors from the new one\'s during a rollout and after a rollback, without matching timestamps against deploys (Google SRE book, Release Engineering).',
+      scenario: { label: 'Log lines carry the build', given: 'the built image started with its version and commit', when: 'it serves a few requests and the check reads its standard output', then: 'every line is JSON with version and commit equal to the build\'s values, and the check fails on the first line that is not' },
     },
     {
       id: 'req-semver', label: 'Tags are semantic versions', when: { SCHEME: ['semver'] }, ears_type: 'ubiquitous',
@@ -176,20 +207,20 @@ const pack: PackSpec = {
   adrs: [
     {
       id: 'adr-semver', label: 'Semantic versions', when: { SCHEME: ['semver'] },
-      decision: `Every release of the element is numbered by Semantic Versioning 2.0.0 and tagged vMAJOR.MINOR.PATCH on the commit it was built from. A breaking change to what users rely on (its API, configuration, data formats, command line or image contract) raises MAJOR, new functionality or a deprecation raises MINOR, a fix raises PATCH; while MAJOR is 0 a breaking change raises MINOR, and 1.0.0 is declared when the element is stable. The number is computed from the same categories the release notes are grouped by (commit types, changelog categories or pull request labels), never typed by hand, and a check compares the number with the notes on every release. Every release is a GitHub release, with immutable releases turned on for the repository, so a published tag never moves and a correction is always a new version. The running element answers GET /version with its version and commit. Release notes: {{CHANGELOG}}. Support: {{SUPPORT}}. ${APPROVAL_SENTENCE} A breaking change to an API the element serves is also a MAJOR release here; how that API names its own versions is decided in the API evolution pack.`,
+      decision: `Every release of the element is numbered by Semantic Versioning 2.0.0 and tagged vMAJOR.MINOR.PATCH on the commit it was built from. A breaking change to what users rely on (its API, configuration, data formats, command line or image contract) raises MAJOR, new functionality or a deprecation raises MINOR, a fix raises PATCH; while MAJOR is 0 a breaking change raises MINOR, and 1.0.0 is declared when the element is stable. The number is computed from the same categories the release notes are grouped by (commit types, changelog categories or pull request labels), never typed by hand, and a check compares the number with the notes on every release. Every release is a GitHub release, with immutable releases turned on for the repository, so a published tag never moves and a correction is always a new version. The running element answers GET /version with its version and commit. ${SHOWN_SENTENCE} Release notes: {{CHANGELOG}}. Support: {{SUPPORT}}. ${APPROVAL_SENTENCE} A breaking change to an API the element serves is also a MAJOR release here; how that API names its own versions is decided in the API evolution pack.`,
       consequences: '• Users and their tools (Renovate, Dependabot, version ranges) can tell from the number alone whether an upgrade may break them.\n• Someone decides what counts as breaking: the categories put that decision on each change, with its author, and a wrong category makes a wrong number.\n• Breaking changes become visible and expensive, which pushes towards additive changes and deprecations first.\n• Immutable releases forbid fixing a release in place: a bad release is followed by a new one, never replaced, and assets have to be attached to a draft before it is published.\n• A service that nobody pins gains little from the number beyond the order of its releases.',
       alternatives: '1. Calendar versions: they say how old a release is, not whether it breaks anything.\n2. A commit SHA per build: nothing to number, but nothing for an installer or a dependency bot to compare.\n3. Numbers chosen by hand at release time: where most teams start, and how a breaking change ends up in a patch release.',
     },
     {
       id: 'adr-calver', label: 'Calendar versions', when: { SCHEME: ['calver'] },
-      decision: `Every release of the element is numbered by calendar versioning as vYYYY.M.MICRO (CalVer) and tagged on the commit it was built from. YYYY.M is the UTC year and month in which the release line's first release is published, with no leading zero on the month, so the number stays valid for semantic-versioning tools; MICRO is 0 for that first release and counts the line's later releases. A release with new functionality, a deprecation or a breaking change starts a new line; a release with fixes only is the next MICRO of the newest line. The release workflow computes the tag from the date and the existing tags, since release-please and semantic-release compute semantic versions only. The notes carry a breaking-changes section whenever a release breaks something, because the number does not say so. Every release is a GitHub release, with immutable releases turned on for the repository, so a published tag never moves and a correction is always a new version. The running element answers GET /version with its version and commit. Release notes: {{CHANGELOG}}. Support: {{SUPPORT}}. ${APPROVAL_SENTENCE}`,
+      decision: `Every release of the element is numbered by calendar versioning as vYYYY.M.MICRO (CalVer) and tagged on the commit it was built from. YYYY.M is the UTC year and month in which the release line's first release is published, with no leading zero on the month, so the number stays valid for semantic-versioning tools; MICRO is 0 for that first release and counts the line's later releases. A release with new functionality, a deprecation or a breaking change starts a new line; a release with fixes only is the next MICRO of the newest line. The release workflow computes the tag from the date and the existing tags, since release-please and semantic-release compute semantic versions only. The notes carry a breaking-changes section whenever a release breaks something, because the number does not say so. Every release is a GitHub release, with immutable releases turned on for the repository, so a published tag never moves and a correction is always a new version. The running element answers GET /version with its version and commit. ${SHOWN_SENTENCE} Release notes: {{CHANGELOG}}. Support: {{SUPPORT}}. ${APPROVAL_SENTENCE}`,
       consequences: '• Users and support see at a glance how old a release is and how far behind a customer runs.\n• The number says nothing about compatibility: breaking changes are read in the notes, and dependency bots treat every new line as an upgrade of unknown risk.\n• A fix to a line keeps the line\'s date (2026.10.3 may ship in December), which surprises people who read the number as a release date.\n• No standard release tool computes the number: the release workflow does, and a check holds it to the rule.\n• Immutable releases forbid fixing a release in place; a bad release is followed by a new one.',
       alternatives: '1. Semantic versions: they say whether an upgrade breaks, not how old a release is.\n2. A zero-padded month (YYYY.0M): sorts as text, but is not a valid semantic version, which strict tools such as Cargo and Go refuse (CalVer).\n3. The full date as the version (2026.10.29): no room for two releases a day or for a fix to a line.',
     },
     {
       id: 'adr-build-id', label: 'A commit SHA per build, no version numbers', when: { SCHEME: ['none'] },
       context: `${FORCES} Here the team deploys the element itself, continuously, and nobody outside installs or pins it.`,
-      decision: 'The element has no version numbers and no releases: every build is named by the full SHA of the commit it was built from. The image is tagged with that SHA, the deployment references it by that tag or by digest and never by a mutable tag such as latest, and every production deploy is recorded as a GitHub deployment of its SHA, so what changed between two deploys is GitHub\'s compare view of their SHAs. The running element answers GET /version with that SHA as its version and its commit. No release tool, changelog file or version tag is kept, and nothing older than the latest build is supported. When anyone outside the team starts to install or pin the element, or to be told about its releases, this decision is superseded by semantic or calendar versions.',
+      decision: `The element has no version numbers and no releases: every build is named by the full SHA of the commit it was built from. The image is tagged with that SHA, the deployment references it by that tag or by digest and never by a mutable tag such as latest, and every production deploy is recorded as a GitHub deployment of its SHA, so what changed between two deploys is GitHub\'s compare view of their SHAs. The running element answers GET /version with that SHA as its version and its commit. ${SHOWN_SENTENCE} No release tool, changelog file or version tag is kept, and nothing older than the latest build is supported. When anyone outside the team starts to install or pin the element, or to be told about its releases, this decision is superseded by semantic or calendar versions.`,
       consequences: '• Nothing to number, write or approve: the build id costs nothing and is never wrong.\n• What changed in a deploy is a list of pull requests in a compare view, readable by the team and nobody else.\n• Users and support cannot name a release in words; they quote a SHA or a date.\n• Only the latest build runs, so there is no older release to support or to fix.',
       alternatives: '1. Semantic versions with automatic releases: a number for every merge at the cost of a release tool, worth it once someone outside depends on the element.\n2. Calendar versions: a readable date per release, for products released on a calendar.\n3. The pipeline\'s run number as the version: readable, but tied to one CI system and to nothing in the source.',
     },
@@ -243,6 +274,62 @@ for attempt in 1 2 3 4 5 6; do                               # 6 tries, 90 secon
   sleep 10
 done
 echo "expected $EXPECTED_VERSION at $GITHUB_SHA, the element answers: \${body:-nothing}"; exit 1`,
+    },
+    {
+      id: 'ff-version-shown', label: 'Interface shows the deployed build', when: { SHOWN: ['ui', 'everywhere'] }, characteristic: 'maintainability', scope: 'holistic', cadence: 'triggered', trigger: 'deploy', invocation: 'automated', implements: SCHEMES, checks: ['req-version-shown'],
+      threshold: 'After every deploy the element marked app-version is visible, shows the deployed version and the first 7 characters of the deployed commit, and its data-version and data-commit equal the deployed build\'s and GET /version\'s; otherwise the deploy job fails',
+      description: 'After the endpoint check, the deploy job runs one Playwright test against the environment it deployed, with no retries. The test reads GET /version, opens the page that shows the version (VERSION_PAGE: / for the footer, /about for an About page) and compares what the interface shows with what the job deployed (EXPECTED_VERSION: the tag, or the commit SHA where builds carry no version number; EXPECTED_COMMIT: GITHUB_SHA) and with the endpoint\'s answer, so that a page served by a cached or older build fails the deploy.',
+      tool: 'Playwright Test (@playwright/test 1.5x) in the deploy job',
+      language: 'ts',
+      snippet: `// e2e/version-shown.spec.ts, run by the deploy job after every deploy:
+//   APP_URL=<the environment's address> EXPECTED_VERSION=<the tag, or the commit SHA> EXPECTED_COMMIT=$GITHUB_SHA \\
+//     npx playwright test e2e/version-shown.spec.ts --retries=0
+import { test, expect } from '@playwright/test'
+
+const APP_URL = process.env.APP_URL ?? ''
+const EXPECTED_VERSION = process.env.EXPECTED_VERSION ?? ''
+const EXPECTED_COMMIT = process.env.EXPECTED_COMMIT ?? process.env.GITHUB_SHA ?? ''
+const VERSION_PAGE = process.env.VERSION_PAGE ?? '/'   // /about where the About page shows the version
+
+test('the interface shows the deployed version and commit, as GET /version does', async ({ page, request }) => {
+  expect(APP_URL && EXPECTED_VERSION && EXPECTED_COMMIT, 'set APP_URL, EXPECTED_VERSION and EXPECTED_COMMIT').toBeTruthy()
+  const answer = await request.get(new URL('/version', APP_URL).href)   // /version.json for a web app served as files
+  expect(answer.ok(), \`GET /version answered \${answer.status()}\`).toBe(true)
+  expect(await answer.json()).toMatchObject({ version: EXPECTED_VERSION, commit: EXPECTED_COMMIT })
+
+  await page.goto(new URL(VERSION_PAGE, APP_URL).href)
+  const shown = page.getByTestId('app-version')
+  await expect(shown).toBeVisible()
+  await expect(shown).toHaveAttribute('data-version', EXPECTED_VERSION)
+  await expect(shown).toHaveAttribute('data-commit', EXPECTED_COMMIT)
+  await expect(shown).toContainText(EXPECTED_COMMIT.slice(0, 7))
+  if (EXPECTED_VERSION !== EXPECTED_COMMIT) await expect(shown).toContainText(EXPECTED_VERSION)
+})`,
+    },
+    {
+      id: 'ff-version-everywhere', label: 'Responses and log lines name the build', when: { SHOWN: ['everywhere'] }, characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SCHEMES, checks: ['req-version-header', 'req-version-logs'],
+      threshold: '0 responses among GET /version, / and a path that does not exist without App-Version and App-Commit equal to the build values; 0 log lines without version and commit equal to them; at least 1 log line written',
+      description: 'On every pull request a job builds the image with a test version and the commit as build arguments, starts it, requests the endpoint, the home page and a path that does not exist, and reads the headers of each answer; then it reads the container\'s standard output and fails on any line that is not JSON with the two fields. The image starts the element directly (no npm start in front of it), so nothing else writes to its output. With fixed-layout text lines, as the Error handling and logging conventions pack may decide, grep each line for version= and commit= instead of reading it as JSON.',
+      tool: 'docker, curl and jq in a GitHub Actions step on pull_request',
+      language: 'bash',
+      snippet: `# on every pull request; the element listens on port 8080, takes VERSION and COMMIT as build arguments and logs to standard output
+set -euo pipefail
+VERSION=v0.0.0-check
+COMMIT=$GITHUB_SHA
+docker build --build-arg VERSION="$VERSION" --build-arg COMMIT="$COMMIT" -t version-check .
+cid=$(docker run -d -p 8080:8080 version-check)
+trap 'docker rm -f "$cid" >/dev/null' EXIT
+for attempt in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:8080/version && break; sleep 1; done
+for path in /version / /no-such-page; do
+  headers=$(curl -sS -D - -o /dev/null "http://localhost:8080$path" | tr -d '\\r')
+  grep -Fqix "app-version: $VERSION" <<<"$headers" && grep -Fqix "app-commit: $COMMIT" <<<"$headers" \\
+    || { echo "GET $path does not name its build in App-Version and App-Commit"; exit 1; }
+done
+lines=$(docker logs "$cid" 2>&1)
+[ -n "$lines" ] || { echo "the element wrote no log line"; exit 1; }
+bad=$(jq -Rr --arg v "$VERSION" --arg c "$COMMIT" '(try fromjson catch null) as $line
+  | select(($line | type) != "object" or $line.version != $v or $line.commit != $c)' <<<"$lines")
+[ -z "$bad" ] || { echo "log lines without version $VERSION and commit $COMMIT:"; head -n 3 <<<"$bad"; exit 1; }`,
     },
     {
       id: 'ff-semver-release', label: 'Semantic versions follow their notes', when: { SCHEME: ['semver'] }, characteristic: 'compatibility', scope: 'atomic', cadence: 'triggered', trigger: 'release', invocation: 'automated', implements: ['adr-semver'], checks: ['req-semver', 'req-semver-bump', 'req-immutable'],

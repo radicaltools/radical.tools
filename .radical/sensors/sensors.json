@@ -12,6 +12,15 @@
     "brand-mark": {
       "command": "node .radical/sensors/brand-mark.mjs"
     },
+    "a11y-deadlines": {
+      "command": "node tools/a11y-deadlines.mjs"
+    },
+    "lighthouse-lab-mobile": {
+      "command": "node tools/lighthouse-lab.mjs mobile"
+    },
+    "lighthouse-lab-desktop": {
+      "command": "node tools/lighthouse-lab.mjs desktop"
+    },
     "studio-scale": {
       "adapter": "playwright",
       "args": ["tests/studio/scale.spec.ts", "--cwd", "apps/e2e", "--project", "studio", "--env", "SCALE_MODEL=../../.radical/model", "--env", "SCALE_COPIES=14", "--env", "SCALE_REOPEN=1", "--label", "model=radical-x14"]

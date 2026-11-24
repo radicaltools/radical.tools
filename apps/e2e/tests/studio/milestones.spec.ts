@@ -235,11 +235,11 @@ test('in the Presentations place, a slide card names the milestone its slide sho
   await studio.openSample()
   // Made over Designer: a slide is linked to a milestone there.
   await studio.open('view-ctx', 'designer', studio.activeDocId())
-  const presentations = page.getByRole('button', { name: 'Presentations', exact: true })
+  const presentations = page.getByRole('button', { name: /^Presentations(,|$)/ })
   const cards = page.locator('.pres-place .pres-slide-card')
   const chip = page.locator('.milestone-chip:visible')
   const pickV1 = async (): Promise<void> => {
-    await page.getByRole('tab', { name: 'Milestones', exact: true }).click()
+    await page.getByRole('tab', { name: /^Milestones,/ }).click()
     await page.locator('.lp-snap-card', { hasText: 'v1' }).first().click()
     await expect(page).toHaveURL(/\/s\/snap-v1/)
     await expect(chip).toContainText('Milestone: v1')

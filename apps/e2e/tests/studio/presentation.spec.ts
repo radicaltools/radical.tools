@@ -42,12 +42,13 @@ test('presentations are a place of the activity rail, not a perspective', async 
   await studio.open('v-containers', 'designer')
   const toolbar = page.locator('.toolbar')
   await expect(toolbar.locator('.toolbar-mode-btn')).toHaveText([/Designer/, /Viewer/])
-  const rail = page.getByRole('button', { name: 'Presentations', exact: true })
-  const inspector = page.getByRole('button', { name: 'Inspector', exact: true })
+  const rail = page.getByRole('button', { name: /^Presentations(,|$)/ })
+  const inspector = page.getByRole('button', { name: /^Inspector(,|$)/ })
   // The sections Views and Sequences, a line, Milestones; Presentations
   // under them after a line; the Inspector, a line and Settings at the foot.
   const labels = await page.getByRole('tablist', { name: 'Panel sections' }).getByRole('tab').evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))
-  expect(labels).toEqual(['Views', 'Sequences', 'Milestones'])
+  // Each named with the count it shows (WCAG 2.5.3): "Views, 4".
+  expect(labels.map((l) => l?.replace(/, \d+$/, ''))).toEqual(['Views', 'Sequences', 'Milestones'])
   await expect(page.locator('.lp-rail > .activity-rail-divider')).toHaveCount(1)
   const milestones = page.getByRole('tab', { name: 'Milestones' })
   const [railBox, milestonesBox, inspectorBox] = [await rail.boundingBox(), await milestones.boundingBox(), await inspector.boundingBox()]
@@ -97,7 +98,7 @@ test('presentations are a place of the activity rail, not a perspective', async 
 test('over Viewer presentations are only looked through and played; they are made over Designer', async ({ page, studio }) => {
   // Presentations edited in Designer only (the author, 2026-11-16).
   await studio.open('v-containers', 'viewer')
-  const rail = page.getByRole('button', { name: 'Presentations', exact: true })
+  const rail = page.getByRole('button', { name: /^Presentations(,|$)/ })
   await rail.click()
   const place = page.locator('.lp-place .pres-place')
   const cards = place.locator('.pres-slide-card')
@@ -463,7 +464,7 @@ test('a slide shown in Presenter leaves the view\'s camera Designer\'s, also aft
   await studio.settle()
   const designer = await transform()
 
-  await page.getByRole('button', { name: 'Presentations', exact: true }).click()
+  await page.getByRole('button', { name: /^Presentations(,|$)/ }).click()
   await page.locator('.pres-slide-card .pres-slide-name', { hasText: 'Context' }).click()
   await studio.settle()
   expect(await transform()).not.toBe(designer)

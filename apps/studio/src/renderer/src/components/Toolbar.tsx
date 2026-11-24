@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useLayoutEffect, useRef } from 'react'
+import React, { useCallback, useState, useEffect, useLayoutEffect, useRef, useId } from 'react'
 import { createPortal } from 'react-dom'
 import { useRailSlot } from '@radical/ui/components/RightPanel'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
@@ -303,7 +303,7 @@ function PresentationsRailButton(): React.ReactElement | null {
     <button type="button" className={`lp-rail-tab rail-presentations${open ? ' active' : ''}`}
       onClick={() => { if (!open) openPresentations(); else toggleLeftPanel() }}
       title={`Presentations — build and play slides of the model${name ? `: ${name}, ${slides} slide${slides === 1 ? '' : 's'}` : ''}`}
-      aria-label="Presentations" aria-pressed={open}>
+      aria-label={`Presentations, ${slides} slide${slides === 1 ? '' : 's'}`} aria-pressed={open}>
       <span className="lp-section-icon"><RailIconPresentations /></span>
       <span className="lp-rail-count">{slides}</span>
     </button>
@@ -349,7 +349,9 @@ function InspectorRailButton(): React.ReactElement | null {
         // lit, it folds the left panel and opens it again, the report staying.
         if (!open) { closePresentations(); toggleInspector(true); setLeftCollapsed(false) } else toggleLeftPanel()
       }}
-      title={title} aria-label="Inspector" aria-pressed={open} aria-controls="insp-dock">
+      title={title} aria-label={count === null ? 'Inspector' : `Inspector, ${short(count)} error${count === 1 ? '' : 's'}`} aria-pressed={open}
+      // The Inspector's place is drawn only while it is open.
+      aria-controls={open ? 'insp-dock' : undefined}>
       <span className="lp-section-icon"><RailIconInspector /></span>
       <span className="lp-rail-count">{count === null ? '–' : short(count)}</span>
     </button>
@@ -395,6 +397,50 @@ function RailMenu({ id, label, icon, open, onOpen, onClose, atTop = false, child
         </div>
       )}
     </div>
+  )
+}
+
+/** A setting of a few values in a menu: its values side by side, each a
+ *  menu item radio (a menu holds only menu items, WAI-ARIA, not a select). */
+function MenuChoice<T extends string>({ label, value, options, onChange, disabled = false, title }: {
+  label: string
+  value: T
+  options: Array<{ value: T; label: string }>
+  onChange: (value: T) => void
+  disabled?: boolean
+  title?: string
+}): React.ReactElement {
+  const id = useId()
+  return (
+    <div className="app-menu-row app-menu-choice" title={title}>
+      <span className="app-menu-row-label" id={id}>{label}</span>
+      <div className="app-menu-seg" role="group" aria-labelledby={id}>
+        {options.map((o) => (
+          <button key={o.value} type="button" role="menuitemradio" aria-checked={value === o.value}
+            className={`app-menu-seg-btn${value === o.value ? ' on' : ''}`} disabled={disabled}
+            onClick={() => onChange(o.value)}>{o.label}</button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** A setting on or off in a menu: a menu item checkbox drawn as a row with
+ *  its box at the right. */
+function MenuCheck({ label, checked, onChange, title }: {
+  label: string
+  checked: boolean
+  onChange: (on: boolean) => void
+  title?: string
+}): React.ReactElement {
+  return (
+    <button type="button" role="menuitemcheckbox" aria-checked={checked} className="app-menu-row app-menu-check" title={title}
+      onClick={() => onChange(!checked)}>
+      <span className="app-menu-row-label">{label}</span>
+      <span className={`app-menu-box${checked ? ' on' : ''}`} aria-hidden>
+        {checked && <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 6.2 5 8.6 9.5 3.6" /></svg>}
+      </span>
+    </button>
   )
 }
 
@@ -521,20 +567,9 @@ function AppMenu({
           <div className="app-menu-section">
             <div className="app-menu-label">View</div>
             {showTheme && (
-              <div className="app-menu-row">
-                <span className="app-menu-row-label">Theme</span>
-                <select
-                  className="app-menu-select"
-                  aria-label="Theme"
-                  value={themePref}
-                  onChange={(e) => onThemePref(e.target.value as ThemePref)}
-                  title="System follows the operating system's appearance"
-                >
-                  <option value="system">System</option>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
-              </div>
+              <MenuChoice label="Theme" value={themePref} onChange={onThemePref}
+                title="System follows the operating system's appearance"
+                options={[{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
             )}
             <button
               className={`app-menu-item${smartFitActive ? ' active' : ''}`}
@@ -545,61 +580,25 @@ function AppMenu({
               <span className="app-menu-icon"><IconSmartFit /></span>
               <span className="app-menu-text">Smart fit {smartFitActive ? '(on)' : '(off)'}</span>
             </button>
-            <div className="app-menu-row">
-              <span className="app-menu-row-label">Lines in this model</span>
-              <select
-                className="app-menu-select"
-                aria-label="Lines in this model"
-                value={defaultEdgeStyle}
-                disabled={!editable}
-                onChange={(e) => setDefaultEdgeStyle(e.target.value as 'curved' | 'orthogonal')}
-                title="How All elements, and every view that does not choose its own in its properties, draws relations"
-              >
-                <option value="curved">Curved</option>
-                <option value="orthogonal">Orthogonal</option>
-              </select>
-            </div>
-            <label
-              className="app-menu-row"
-              title="Tidy a view after each change (yours or an agent's), the elements gliding into place, when the view has no Keep smart setting of its own. A view switched on or off keeps its own setting. Kept in this browser"
-            >
-              <span className="app-menu-row-label">Keep smart by default</span>
-              <input
-                type="checkbox"
-                aria-label="Keep smart by default"
-                checked={keepSmartDefault}
-                onChange={(e) => setKeepSmartDefault(e.target.checked)}
-              />
-            </label>
+            <MenuChoice label="Lines in this model" value={defaultEdgeStyle} onChange={setDefaultEdgeStyle} disabled={!editable}
+              title="How All elements, and every view that does not choose its own in its properties, draws relations"
+              options={[{ value: 'curved', label: 'Curved' }, { value: 'orthogonal', label: 'Orthogonal' }]} />
+            <MenuCheck label="Keep smart by default" checked={keepSmartDefault} onChange={setKeepSmartDefault}
+              title="Tidy a view after each change (yours or an agent's), the elements gliding into place, when the view has no Keep smart setting of its own. A view switched on or off keeps its own setting. Kept in this browser" />
           </div>
           <div className="app-menu-divider" />
           <div className="app-menu-section">
             <div className="app-menu-label">Editing</div>
-            <div className="app-menu-row" title="Held on the canvas: drag from an element to another to connect them, click elements to pick several, drop a type from the palette without its wizard">
-              <span className="app-menu-row-label">Special key</span>
-              <select
-                className="app-menu-select"
-                aria-label="Special key"
-                value={connectionModifier}
-                onChange={(e) => setConnectionModifier(e.target.value as ConnectionMod)}
-              >
-                <option value="alt">{isMac ? '⌥ Option' : 'Alt'}</option>
-                <option value="shift">⇧ Shift</option>
-                <option value="ctrl">Ctrl</option>
-                <option value="meta">{isMac ? '⌘ Cmd' : '⊞ Win'}</option>
-              </select>
-            </div>
-            <label
-              className="app-menu-row"
-              title="Open a guided form when you create a node whose type has a wizard (ADR, Requirement, …). The wizard stays available from the properties panel either way."
-            >
-              <span className="app-menu-row-label">Wizard on create</span>
-              <input
-                type="checkbox"
-                checked={studioSettings.nodeWizardOnCreate}
-                onChange={(e) => setNodeWizardOnCreate(e.target.checked)}
-              />
-            </label>
+            <MenuChoice label="Special key" value={connectionModifier} onChange={setConnectionModifier}
+              title="Held on the canvas: drag from an element to another to connect them, click elements to pick several, drop a type from the palette without its wizard"
+              options={[
+                { value: 'alt', label: isMac ? '⌥ Option' : 'Alt' },
+                { value: 'shift', label: '⇧ Shift' },
+                { value: 'ctrl', label: 'Ctrl' },
+                { value: 'meta', label: isMac ? '⌘ Cmd' : '⊞ Win' },
+              ]} />
+            <MenuCheck label="Wizard on create" checked={studioSettings.nodeWizardOnCreate} onChange={setNodeWizardOnCreate}
+              title="Open a guided form when you create a node whose type has a wizard (ADR, Requirement, …). The wizard stays available from the properties panel either way." />
           </div>
           <div className="app-menu-divider" />
           <div className="app-menu-section">

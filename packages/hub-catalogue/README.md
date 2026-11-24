@@ -35,6 +35,11 @@ pack standard* decides:
 - `specProblems` (`src/packSpec.ts`): every requirement named in the `checks`
   of a fitness function imported whenever it is, or `unchecked` with a reason
   the team keeps it by hand.
+  A fitness function may bring its `measure` and `metrics` only when a
+  built-in sensor measures it (`PACK_SENSORS`: `github-actions`, `lighthouse`,
+  `machine`), whose metric names are the same in every project: the measure
+  names the sensor alone (its arguments are the project's), and the
+  conditions name no test.
 - `boundImportProblems` (`src/packCheck.ts`): imported with every combination
   of answers and bound in a shop model, the pack passes `radical check` apart
   from the tests the team still has to name.

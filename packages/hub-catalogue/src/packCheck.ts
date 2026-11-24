@@ -45,7 +45,7 @@ export function answerCombinations(params: Array<{ key: string; options?: Array<
 }
 
 /** Rules a bound import may bring: the checks the team has to name. */
-const LEFT_TO_THE_TEAM = new Set(['scenario-without-metrics', 'fitness-fn-without-metrics'])
+const LEFT_TO_THE_TEAM = new Set(['scenario-without-metrics', 'fitness-fn-without-metrics', 'metric-not-measured'])
 
 /** What goes wrong when the pack is imported and bound, for each
  *  combination of answers; [] when nothing does. */

@@ -711,7 +711,7 @@ test('a canvas slide after a slide without a canvas has its own camera', async (
   // (about 200 console errors, NaN transforms), and the new canvas then
   // took the view's own camera. The guard fixture fails on any error.
   await studio.openSample('view-ctx')
-  await page.getByRole('button', { name: 'Presentations', exact: true }).click()
+  await page.getByRole('button', { name: /^Presentations(,|$)/ }).click()
   await studio.settle()
   await page.locator('.pres-slide-card').nth(2).click()
   await page.getByRole('button', { name: 'Present', exact: true }).click()

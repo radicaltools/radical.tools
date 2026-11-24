@@ -16,8 +16,10 @@ import { documentMetamodel, milestoneViews, originOf } from '../model'
 import { repositoryPart } from '../repositoryMapping'
 import { CHECK_RULES, type CheckModel, type CheckSeverity, type RepositoryMapping, type RuleFinding } from './rules'
 import { BOUND_TESTS, computeEvidence, withBoundTests, type Evidence } from './evidence'
-import { GOAL_RULE, isMetricId, measureGoals, type CheckDimension, type CheckMetricResult, type GoalSetting } from './goals'
+import { ADOPT_MESSAGE, ADOPT_RULE, existingCodeCheckConfig as existingCodeProfile, strictCheckConfig as strictProfile } from './profiles'
+import { CHECK_METRICS, GOAL_RULE, isMetricId, measureGoals, type CheckDimension, type CheckMetricResult, type GoalSetting } from './goals'
 import type { TestCase } from './reports'
+import { CHECK_CONFIG_FILE } from './files'
 import type { Measurement } from './metrics'
 import type { ConcernPack } from '../concerns'
 
@@ -27,7 +29,7 @@ export { MESSAGE_LINES, canonicalTestId, failureMessage, parseTestReport, parseT
 export { TRACE_TYPES, formatTrace, rankOf, traceGap, traceOf, traceTypeLabel, type Trace, type TraceInput, type TraceNode, type TraceResult } from './trace'
 export { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, testsRanAt, type CiRun, type CiSource, type TestResults } from './files'
 export { BOUND_TESTS, ELEMENT_LABEL, TESTED_TYPES, appliedElements, computeEvidence, conditionResults, conditionsOf, measuredElements, withBoundTests, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome, type ConditionOutcome, type ConditionResult } from './evidence'
-export { METRICS_FORMAT, REVIEW_METRIC, convertUnit, evaluateMetric, fitnessResult, formatAge, mergeMeasurements, metricsFileProblems, parseCombine, parseCondition, parseConditions, parseMaxAge, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile, type Combine, type Condition, type Measurement, type MeasurementStore, type MetricsFile } from './metrics'
+export { MACHINE_SPEED_METRIC, MACHINE_WORK_METRIC, METRICS_FORMAT, REVIEW_METRIC, convertUnit, machineSpeedAt, scaledLimit, evaluateMetric, fitnessResult, formatAge, mergeMeasurements, metricsFileProblems, parseCombine, parseCondition, parseConditions, parseMaxAge, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile, type Combine, type Condition, type Measurement, type MeasurementStore, type MetricsFile } from './metrics'
 export { REVIEWS_FILE, REVIEWS_FORMAT, addReview, parseReviewsFile, reviewMeasurements, type Review, type ReviewsFile } from './reviews'
 export { SENSOR_NAMES, commandWords, isSensorName, parseMeasure, type MeasureLine } from './sensors'
 export { CHECK_DIMENSIONS, CHECK_METRICS, GOAL_RULE, type CheckDimension, type CheckPerspective, type CheckMetric, type CheckMetricResult, type GoalSetting } from './goals'
@@ -51,7 +53,7 @@ const STALE_REFERENCE = 'stale-reference'
 
 /** The rules that read the model (checkData), whether it is in a folder or
  *  in memory. */
-const MODEL_RULE_IDS = new Set([STALE_REFERENCE, ...CHECK_RULES.map((r) => r.id), GOAL_RULE.id])
+const MODEL_RULE_IDS = new Set([STALE_REFERENCE, ...CHECK_RULES.map((r) => r.id), GOAL_RULE.id, ADOPT_RULE.id])
 
 export interface CheckFinding extends RuleFinding {
   rule: string
@@ -80,6 +82,9 @@ export interface CheckConfig {
   /** Where radical check --from-ci finds the test reports: the names of the
    *  CI artifacts that hold them (default: every artifact of the run). */
   ci?: { artifacts?: string[] }
+  /** The baselines and goals wait for the first run: radical check --adopt
+   *  takes them once (ADR Strict gate for new models). */
+  adopt?: boolean
 }
 
 export interface CheckRuleResult {
@@ -167,7 +172,7 @@ export interface CheckOptions {
 const byId = <T extends { id: string }>(items: T[]): Record<string, T> =>
   Object.fromEntries(items.map((item) => [item.id, item]))
 
-const ALL_RULES = [...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE]
+const ALL_RULES = [...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE, ADOPT_RULE]
 
 /** Rule and metric ids a check.json may still hold from before `metrics`
  *  replaced `tests` and `threshold`: the id each counts as now, or null for
@@ -353,6 +358,7 @@ function checkData(data: DiagramData, options: CheckOptions, config: CheckConfig
   const evidence = options.tests || options.measurements ? computeEvidence(model) : undefined
   const goals = measureGoals({ model: ownModel, found, ...(evidence ? { evidence } : {}) }, config.goals ?? {})
   goals.findings.forEach((finding) => found.push({ rule: GOAL_RULE.id, ...finding }))
+  if (config.adopt) found.push({ rule: ADOPT_RULE.id, message: ADOPT_MESSAGE, path: CHECK_CONFIG_FILE })
   return {
     found,
     nodeCount: Object.keys(ownModel.nodes).length,
@@ -497,6 +503,15 @@ export function ratchetConfig(config: CheckConfig, result: CheckResult): { confi
 }
 
 export { formatCheckText, formatCheckGithub, type FormatOptions } from './format'
+export { ADOPT_RULE, adoptBaselines, type AdoptedBaselines } from './profiles'
+
+/** The strict profile: every rule an error, every goal at 100%. */
+export const strictCheckConfig = (): CheckConfig => strictProfile(ALL_RULES.map((r) => r.id), CHECK_METRICS.map((m) => m.id))
+/** The profile for existing code: every rule an error, waiting for the
+ *  baselines of its first run (radical check --adopt). */
+export const existingCodeCheckConfig = (): CheckConfig => existingCodeProfile(ALL_RULES.map((r) => r.id))
+/** check.json as radical setup, Forge, Assay and --adopt write it. */
+export const serializeCheckConfig = (config: CheckConfig): string => JSON.stringify(config, null, 2) + '\n'
 export { compareCheckConfig, type CheckConfigChange } from './configChanges'
 
 /** A rule's severity when the config does not set it. */

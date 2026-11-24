@@ -154,43 +154,36 @@ export function WelcomeScreen({ onDismiss, hubWaits }: Props): React.ReactElemen
           {hubWaits && <HubWaiting ids={hubWaits} />}
           {step === 'start' && (
             <div className="welcome-start">
-              <button
-                type="button"
-                className="welcome-choice welcome-choice-primary"
-                onClick={() => setStep('new')}
-                aria-label="New model"
-                aria-describedby="welcome-new-desc"
-              >
+              {/* A card with one button, its title, whose box covers the card
+                  (.welcome-choice-btn::after): its name is the title, the
+                  rest its description (WCAG 2.5.3 Label in Name). */}
+              <div className="welcome-choice welcome-choice-primary">
                 <svg width="18" height="18" viewBox="0 0 14 14" fill="none" aria-hidden="true">
                   <line x1="7" y1="1.5" x2="7" y2="12.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
                   <line x1="1.5" y1="7" x2="12.5" y2="7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
                 </svg>
                 <span className="welcome-choice-text">
-                  <span className="welcome-choice-title">New model</span>
+                  <button type="button" className="welcome-choice-title welcome-choice-btn" onClick={() => setStep('new')}
+                    aria-describedby="welcome-new-desc">New model</button>
                   <span className="welcome-choice-desc" id="welcome-new-desc">
                     {forgeAvailable
                       ? 'Empty or with Radical Forge, kept in this browser, a file or a folder'
                       : 'Pick a metamodel, keep it in this browser, a file or a folder'}
                   </span>
                 </span>
-              </button>
-              <button
-                type="button"
-                className="welcome-choice"
-                onClick={() => setStep('open')}
-                aria-label="Open"
-                aria-describedby="welcome-open-desc"
-              >
+              </div>
+              <div className="welcome-choice">
                 <svg width="18" height="18" viewBox="0 0 14 14" fill="none" aria-hidden="true">
                   <path d="M1.5 3.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
                 </svg>
                 <span className="welcome-choice-text">
-                  <span className="welcome-choice-title">Open</span>
+                  <button type="button" className="welcome-choice-title welcome-choice-btn" onClick={() => setStep('open')}
+                    aria-describedby="welcome-open-desc">Open</button>
                   <span className="welcome-choice-desc" id="welcome-open-desc">
                     From this browser, a file, a folder, or the sample
                   </span>
                 </span>
-              </button>
+              </div>
 
               {/* A newcomer has no models yet: the sample shows what the tool
                   does, with no AI key and no blank canvas. */}

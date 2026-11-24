@@ -12,6 +12,8 @@ import { parseForgeRun } from '@radical/common/formats/forgeRunStatus'
 import { parseModelBase, serializeModelBase } from '@radical/common/formats/modelBase'
 import { FolderModel } from './folderModel'
 import { checkModel } from '@radical/common/check'
+import { concernPacks } from '@radical/common/concerns'
+import { CATALOGUE_DIR, buildIndex, readCatalogue } from '@radical/hub-catalogue'
 
 const folders: string[] = []
 afterEach(async () => { await Promise.all(folders.splice(0).map((folder) => rm(folder, { recursive: true, force: true }))) })
@@ -50,11 +52,16 @@ const BRIEF = '# Click & collect\nShoppers reserve products online and pick them
 
 describe('Radical Forge over MCP', () => {
   it('runs the stages in order with the wizard\'s prompts, and regenerate replaces what a stage added', async () => {
-    const { client, read } = await connect()
+    const { client, folder, read } = await connect()
     try {
       expect(await refused(client, 'forge_clarify', { stage: 'requirements' })).toContain('forge_start first')
 
       const started = await call(client, 'forge_start', { description: BRIEF })
+      // The gate the new model starts with: every rule an error, every goal 100%.
+      expect(started).toContain('Wrote check.json, the gate the new model starts with')
+      const gate = JSON.parse(await readFile(join(folder, 'check.json'), 'utf8'))
+      expect(gate.rules['requirement-without-scenario']).toBe('error')
+      expect(gate.goals['requirements-with-scenario']).toEqual({ min: 100 })
       const need = (await read()).nodes.find((n) => n.type === 'need')!
       expect(need).toMatchObject({ label: 'Click & collect', description: BRIEF, kind: 'brief', source: 'Radical Forge' })
       expect(started).toContain(need.id)
@@ -106,7 +113,7 @@ describe('Radical Forge over MCP', () => {
       await call(client, 'forge_complete_stage', { stage: 'domain', summary: 'No domain model needed.' })
 
       await call(client, 'forge_clarify', { stage: 'fitness' })
-      expect(await refused(client, 'forge_generate', { stage: 'fitness', concerns: [{ id: 'concern-authentication' }] })).toContain('concerns are picked in the Requirements stage')
+      expect(await refused(client, 'forge_generate', { stage: 'fitness', concerns: [{ id: 'concern-authentication' }] })).toContain('concerns are settled in the Requirements and Review stages')
       const fitness = await call(client, 'forge_generate', { stage: 'fitness' })
       expect(fitness).toContain('- Requirements: Pick-up requirement.')
       expect(await refused(client, 'forge_generate', { stage: 'scenarios' })).toContain('still open')
@@ -885,6 +892,74 @@ describe('concern packs in a Forge run', () => {
       await client.close()
     }
   }, 60_000)
+
+  it('proposes the baseline packs in the Requirements clarify, and generates without those the user dropped (Baseline packs proposed)', async () => {
+    const { client, read } = await connect()
+    try {
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
+      const clarify = await call(client, 'forge_clarify', { stage: 'requirements' })
+      expect(clarify).toContain('Always include the baseline packs: ')
+      for (const id of ['concern-ci-cd-pipeline', 'concern-test-strategy', 'concern-release-versioning', 'concern-code-quality-gate']) expect(clarify).toContain(`- ${id} | `)
+      expect(clarify).toContain('When people use the system through screens (a web, mobile or desktop app), also include ')
+      expect(clarify).toContain('Present your picks to the user as proposed, each checked, the baseline packs among them')
+      expect(clarify).toContain('a pack the user dropped is left out')
+      // The user unchecked every baseline pack: only what they kept comes in.
+      const brief = await call(client, 'forge_generate', { stage: 'requirements', concerns: [{ id: 'concern-authentication', answers: { IDENTITY: 'none', MACHINE: 'none' } }] })
+      expect(brief).toContain('Imported the concern packs the user confirmed, whole and unbound: Authentication.')
+      const concerns = (await read()).nodes.filter((n) => n.type === 'adr').map((n) => (n as unknown as { concern?: string }).concern)
+      expect(new Set(concerns)).toEqual(new Set(['authentication']))
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+
+  it('settles in Review the open concerns a web app raises, bound at once to the web app, and a regenerate takes them out (Open concerns settled in Review)', async () => {
+    const { client, read } = await connect()
+    try {
+      await call(client, 'forge_start', { description: BRIEF, views: { structure: 'layers' } })
+      await call(client, 'forge_skip_stage', { stages: ['requirements', 'domain', 'fitness', 'scenarios', 'states', 'processes', 'mockups'], reason: 'only the C4 model here' })
+      await call(client, 'forge_clarify', { stage: 'c4' })
+      await call(client, 'forge_generate', { stage: 'c4' })
+      // The C4 stage makes a web app people use and settles no UX concern.
+      await call(client, 'add_node', { tempId: 'user', type: 'person', label: 'Shopper' })
+      await call(client, 'add_node', { tempId: 'shop', type: 'system', label: 'Shop' })
+      await call(client, 'add_node', { tempId: 'web', type: 'webapp', label: 'Storefront', parentId: 'shop' })
+      await call(client, 'add_relation', { sourceId: 'user', targetId: 'web', relationType: 'interacts' })
+      await call(client, 'forge_complete_stage', { stage: 'c4', summary: 'The shop.' })
+      expect(await call(client, 'get_issues', { concept: 'concern-usability' })).toContain('Unaddressed concerns')
+
+      const clarify = await call(client, 'forge_clarify', { stage: 'review' })
+      expect(clarify).toContain('These concerns the model raises are still open')
+      expect(clarify).toContain('Settle them')
+      expect(clarify).toMatch(/- concern-usability \| Usability: .* Open for: "Storefront"\./)
+      expect(clarify).toContain('  - NAVIGATION: ')
+      expect(clarify).toContain('Present all of them to the user as proposed, each checked')
+      expect(clarify).not.toContain('Always include the baseline packs')
+
+      const brief = await call(client, 'forge_generate', { stage: 'review', concerns: [{ id: 'concern-usability', answers: { NAVIGATION: 'shared' } }] })
+      expect(brief).toContain('Settled the open concerns the user confirmed, each bound where its concern applies: Usability ("Storefront").')
+      expect(brief).toContain('Concerns already decided by Hub concern packs')
+      const data = await read()
+      const web = data.nodes.find((n) => n.label === 'Storefront')!
+      const adrs = data.nodes.filter((n) => n.type === 'adr' && (n as unknown as { concern?: string }).concern === 'usability')
+      expect(adrs.length).toBeGreaterThan(0)
+      for (const adr of adrs) {
+        expect(adr).toMatchObject({ status: 'accepted' })
+        expect(data.relations.some((r) => r.sourceId === adr.id && r.targetId === web.id && r.relationType === 'constrains')).toBe(true)
+      }
+      expect(await call(client, 'get_issues', { concept: 'concern-usability' })).not.toContain('Unaddressed concerns')
+      const usability = concernPacks(buildIndex(readCatalogue(CATALOGUE_DIR))).filter((p) => p.id === 'concern-usability')
+      const findings = checkModel(data, {}, { concerns: usability }).findings
+      expect(findings.filter((f) => f.rule === 'concern-unaddressed' || f.rule === 'concern-unbound')).toEqual([])
+      await call(client, 'forge_complete_stage', { stage: 'review', summary: 'Usability settled.' })
+
+      // A regenerate takes out what the stage imported.
+      await call(client, 'forge_generate', { stage: 'review', regenerate: true, concerns: [] })
+      expect((await read()).nodes.some((n) => (n as unknown as { concern?: string }).concern === 'usability')).toBe(false)
+    } finally {
+      await client.close()
+    }
+  }, 90_000)
 
   it('leaves out the stages a back end does not need, in one call, with the reason (Agent skips the stages a back end does not need)', async () => {
     const { client, folder } = await connect()

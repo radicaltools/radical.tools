@@ -28,7 +28,7 @@ import { applyTreeLayout } from '@radical/layout/elkLayout'
 import { COLLAPSED_HEIGHT, COLLAPSED_WIDTH, isContainerType, pinnedNodeIds, viewCanvasPositions, withCanvasPositions, type C4Node, type DiagramData, type DiagramView, type LayoutConstraint, type NodePosition } from '@radical/common/c4'
 import { documentMetamodel, originOf, ownModel } from '@radical/common/model'
 import { REPOSITORY_FILE, builtIn, parseRepositoryFile, serializeRepositoryFile, testsBoundTo, type RepositoryFile } from '@radical/common/repositoryMapping'
-import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, WORD_RULES, computeEvidence, conditionsOf, formatAge, formatTrace, parseCheckConfig, parseMeasurementStore, parseTestResults, quoteValueGaps, rebindTests, testsRanAt, traceOf, verifiedHere, withBoundTests, wordFindings, type CheckModel } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, existingCodeCheckConfig, serializeCheckConfig, strictCheckConfig, MEASUREMENTS_FILE, TEST_RESULTS_FILE, WORD_RULES, computeEvidence, conditionsOf, formatAge, formatTrace, parseCheckConfig, parseMeasurementStore, parseTestResults, quoteValueGaps, rebindTests, testsRanAt, traceOf, verifiedHere, withBoundTests, wordFindings, type CheckModel } from '@radical/common/check'
 import { mappingRoot, repositoryFileOf } from '@radical/node-files/repositoryLayout'
 import { FEDERATION_FILE, parseFederationFile, withOtherModels } from '@radical/common/federation'
 import { viewDrawnIds } from '@radical/common/viewPipeline'
@@ -488,6 +488,22 @@ export class FolderModel {
   /** Saves `content` (the model before a Forge run) as the folder's base
    *  unless git saved one; a line for the answer when it did. A failed write
    *  never fails the call. */
+  /** The gate a model made by Forge or Assay starts with, written into a
+   *  folder that has no check.json (ADR Strict gate for new models): Forge's
+   *  model starts with its code, so every rule is an error and every goal
+   *  100%; Assay's describes code that was there, so every rule is an error
+   *  waiting for the baselines of its first run. */
+  private async writeGate(name: string): Promise<string> {
+    if (name !== 'forge_start' && name !== 'assay_finish') return ''
+    const file = join(this.folder, CHECK_CONFIG_FILE)
+    if (await stat(file).then(() => true, () => false)) return ''
+    const forge = name === 'forge_start'
+    await writeFile(file, serializeCheckConfig(forge ? strictCheckConfig() : existingCodeCheckConfig()))
+    return forge
+      ? `\n\nWrote ${CHECK_CONFIG_FILE}, the gate the new model starts with: every rule an error and every goal at 100% (radical check and Studio's Inspector read it).`
+      : `\n\nWrote ${CHECK_CONFIG_FILE} for existing code: every rule an error, waiting for the baselines of its first run. Once the model is complete, run radical check --adopt (with the test reports) and commit check.json.`
+  }
+
   private async saveForgeBase(content: string): Promise<string> {
     try {
       if (!mayReplaceWithForgeBase(await readEditorStateFile(this.folder, MODEL_BASE_FILE))) return ''
@@ -975,7 +991,7 @@ export class FolderModel {
         result.commit?.()
         if (FORGE_TOOLS.has(name)) await this.writeForgeStatus()
         if (ASSAY_TOOLS.has(name)) await this.writeAssayStatus()
-        return { ok: true, text: result.resultText + (forgeBase ? await this.saveForgeBase(forgeBase) : '') + (result.afterWrite ? await result.afterWrite() : '') }
+        return { ok: true, text: result.resultText + (forgeBase ? await this.saveForgeBase(forgeBase) : '') + (result.afterWrite ? await result.afterWrite() : '') + await this.writeGate(name) }
       }
 
       let changed = result.data ?? facade.toDiagramData()
@@ -1009,6 +1025,7 @@ export class FolderModel {
       if (FORGE_TOOLS.has(name)) await this.writeForgeStatus()
       if (ASSAY_TOOLS.has(name)) await this.writeAssayStatus()
       if (forgeBase) outcome.text += await this.saveForgeBase(forgeBase)
+      outcome.text += await this.writeGate(name)
       // A metamodel tool changed the types: re-advertise the schemas.
       if (this.refreshTools(metamodel)) return { ...outcome, toolsChanged: true }
       return outcome

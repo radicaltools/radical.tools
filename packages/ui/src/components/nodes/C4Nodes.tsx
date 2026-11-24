@@ -996,7 +996,7 @@ export const ScenarioNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) =
 
       {/* Row 3: given/when/then preview */}
       <div style={{ flex: 1, padding: '2px 7px 4px', overflow: 'hidden' }}>
-        <span style={{ fontSize: 9, color: preview ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)', fontStyle: 'italic', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        <span style={{ fontSize: 9, color: preview ? '#fff' : 'rgba(255,255,255,0.9)', fontStyle: 'italic', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {preview || 'Given / When / Then…'}
         </span>
       </div>
@@ -1122,7 +1122,7 @@ export const NeedNode = memo(({ data, selected }: NodeProps<C4NodeRFData>) => {
 
       {/* Row 3: start of the free text */}
       <div style={{ flex: 1, padding: '2px 7px 4px', overflow: 'hidden' }}>
-        <span style={{ fontSize: 9, color: text ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)', fontStyle: text ? 'normal' : 'italic', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        <span style={{ fontSize: 9, color: text ? '#fff' : 'rgba(255,255,255,0.9)', fontStyle: text ? 'normal' : 'italic', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {text || 'No text yet'}
         </span>
       </div>
@@ -1185,7 +1185,7 @@ export const RequirementNode = memo(({ data, selected }: NodeProps<C4NodeRFData>
 
       {/* Row 3: EARS sentence */}
       <div style={{ flex: 1, padding: '2px 7px 4px', overflow: 'hidden' }}>
-        <span style={{ fontSize: 9, color: complete ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)', fontStyle: 'italic', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        <span style={{ fontSize: 9, color: complete ? '#fff' : 'rgba(255,255,255,0.9)', fontStyle: 'italic', lineHeight: '1.3', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {sentence}
         </span>
       </div>

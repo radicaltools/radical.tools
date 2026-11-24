@@ -42,6 +42,12 @@
     "targetId": "1188ff65-fa36-43a6-be01-b01fcc8481f0"
   },
   {
+    "id": "00b567b2-0846-4d0f-a706-271b4c1b780a",
+    "relationType": "constrains",
+    "sourceId": "ec21907b-133e-4901-8585-dd34b5c52330",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
+  },
+  {
     "id": "00beeb37-33b3-4ec2-ab72-4f1c04013355",
     "relationType": "satisfies",
     "sourceId": "76f6dad3-9f4d-4942-b9e4-4b6cb46b14fd",
@@ -66,6 +72,12 @@
     "targetId": "140911f0-ddb3-4ecf-a05a-55c64e299e7a"
   },
   {
+    "id": "010990b3-9e52-40af-a087-856b17ce3c7d",
+    "relationType": "constrains",
+    "sourceId": "da430403-1690-4a8a-97da-65af664af006",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
     "id": "010e85b9-cd2f-4181-b5bb-80d10b9e4f9c",
     "relationType": "derives",
     "sourceId": "5156b25a-1b54-494b-b089-2286c203c88b",
@@ -76,6 +88,12 @@
     "relationType": "satisfies",
     "sourceId": "0dd058ca-b674-4a65-8b4e-07d87e50a5b0",
     "targetId": "9bed44a4-ea04-45dd-aab7-46930b201dfe"
+  },
+  {
+    "id": "011f1bc7-6aca-4552-a642-6334aefaa71d",
+    "relationType": "constrains",
+    "sourceId": "4dabc3ca-84ee-4081-8ded-6aea912acc88",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
     "id": "012758c2-963a-4488-b7d6-76714cd6ddf2",
@@ -180,6 +198,12 @@
     "relationType": "satisfies",
     "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
     "targetId": "6bb4689a-3c89-4520-ba90-3139af1eed54"
+  },
+  {
+    "id": "020df9d8-3006-464e-b5f5-d767fb1a4a89",
+    "relationType": "constrains",
+    "sourceId": "7d3c36b3-7e62-46a9-af26-2556937a5d37",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "0220e874-81a1-48dc-8820-ede69b92e558",
@@ -526,6 +550,18 @@
     "targetId": "bdb7219d-d55e-42db-a00f-ea777de89780"
   },
   {
+    "id": "06242cf2-b61f-4870-a9ee-86304f350465",
+    "relationType": "constrains",
+    "sourceId": "fa30059d-5ec9-4a8c-9821-b5e3db19c812",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
+    "id": "06274856-253d-4581-8859-d8a5a6f2ddd4",
+    "relationType": "constrains",
+    "sourceId": "6fd21664-6402-4869-b26d-61cdf1ef681e",
+    "targetId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b"
+  },
+  {
     "id": "0631f58b-e80d-48c1-bc99-a6603de11ff7",
     "relationType": "derives",
     "sourceId": "edbf0f54-0ada-45e8-b351-d745ad125928",
@@ -587,6 +623,12 @@
     "targetId": "f5b72a9c-6238-446b-bc89-37d98d5e162c"
   },
   {
+    "id": "0684c1a9-e806-4370-a830-0eb4488fa5a9",
+    "relationType": "constrains",
+    "sourceId": "65adadc6-1f32-41ff-a8b4-8f2e01920250",
+    "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba"
+  },
+  {
     "id": "069556f0-3f0b-4012-8d18-3af96f6fb954",
     "relationType": "verifies",
     "sourceId": "853a5b25-ea1c-4f3d-a96a-61c6979f3023",
@@ -603,6 +645,12 @@
     "relationType": "verifies",
     "sourceId": "40680d72-2939-4952-a0af-12ffa4a1f664",
     "targetId": "1dbb2ec4-65d1-4195-9394-867bd8877e94"
+  },
+  {
+    "id": "06dbf081-d643-4beb-ba64-096bfeec3bc7",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "55aaeeca-7d93-4c88-b8f0-5050aca3d91a"
   },
   {
     "id": "06e34d2e-4c63-4ee7-8f63-723b1427176c",
@@ -639,6 +687,12 @@
     "relationType": "verifies",
     "sourceId": "0947887b-9884-49ee-8f00-3e5a85aa5d52",
     "targetId": "f2ed2d8c-91aa-45fb-b28f-d7ba358f150e"
+  },
+  {
+    "id": "071b6ddc-ac60-49b5-a99d-879554310a0b",
+    "relationType": "satisfies",
+    "sourceId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "targetId": "28d746a3-aee3-4622-a682-40bc3a340b98"
   },
   {
     "id": "071ba2cd-c659-479d-a8ba-30f6d36fbdb0",
@@ -695,6 +749,12 @@
     "targetId": "f33ce51a-c830-4765-b8c6-2f18ec8d9da5"
   },
   {
+    "id": "07b1c5b6-ac72-48d4-a713-21093b06edbc",
+    "relationType": "satisfies",
+    "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
+    "targetId": "54fbd45f-199b-41c2-8670-cfd0d756eb97"
+  },
+  {
     "id": "07b253f0-5f4b-417b-b969-70fea98ea3a7",
     "relationType": "satisfies",
     "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
@@ -705,6 +765,12 @@
     "relationType": "derives",
     "sourceId": "7bd1d938-c558-43fc-8db4-2df21761ac3b",
     "targetId": "7f59b9b2-2fd3-448a-9b2f-415c9d1f7a8f"
+  },
+  {
+    "id": "07c8caa0-44d9-41ad-9274-4c5ef54632b3",
+    "relationType": "constrains",
+    "sourceId": "d0223cac-c464-4b5d-b2ba-7e266ff2b4c1",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
     "id": "07cd1df5-d129-4aa7-9c14-45e2b17335c8",
@@ -772,6 +838,18 @@
     "relationType": "satisfies",
     "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
     "targetId": "a99f01e6-d5c7-47db-87a1-a94c44677a26"
+  },
+  {
+    "id": "0830eb08-0dec-4df0-8df5-ced4f252b486",
+    "relationType": "constrains",
+    "sourceId": "da430403-1690-4a8a-97da-65af664af006",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
+    "id": "083f7daf-fdd7-4f70-bb47-4cb7ef07965d",
+    "relationType": "constrains",
+    "sourceId": "da430403-1690-4a8a-97da-65af664af006",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "0843a07e-1f75-426a-bbf9-b2b6778b61c5",
@@ -870,6 +948,12 @@
     "targetId": "224b849a-621f-456d-bee7-2b15f10fd82f"
   },
   {
+    "id": "09da4b80-f163-4fb6-99af-154227d53ac5",
+    "relationType": "implements",
+    "sourceId": "d0223cac-c464-4b5d-b2ba-7e266ff2b4c1",
+    "targetId": "2408cf76-ab15-49e4-b0ec-2dc3e2104366"
+  },
+  {
     "id": "0a1bba6a-87d3-4005-ac24-4a49a746c887",
     "relationType": "constrains",
     "sourceId": "b9eb64d3-73a7-4fb4-929b-38317f58956e",
@@ -886,6 +970,12 @@
     "relationType": "verifies",
     "sourceId": "5d1db7bf-cae3-4b3d-9b19-f266ed76eaaf",
     "targetId": "9c38b50f-0829-4fa8-a34c-4d6c1c0350d1"
+  },
+  {
+    "id": "0a2f062a-32af-4534-9d80-b29893e5c649",
+    "relationType": "constrains",
+    "sourceId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
   },
   {
     "id": "0a3555aa-ed22-44d3-a69e-a820c66c9f1b",
@@ -936,6 +1026,12 @@
     "targetId": "09adfbab-2099-47fe-a678-84404152ebb7"
   },
   {
+    "id": "0a7ac137-dc5a-4f41-8a43-602da42cae14",
+    "relationType": "satisfies",
+    "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+    "targetId": "640e1d91-fdf4-458b-9013-3571820a00a7"
+  },
+  {
     "id": "0acacf57-aff7-4a5c-a974-9ac0cc67d76e",
     "relationType": "constrains",
     "sourceId": "5dca88c1-d0f4-400d-85bc-c2cca4402f0b",
@@ -946,6 +1042,19 @@
     "relationType": "verifies",
     "sourceId": "b5992981-7b2f-4f91-bbde-b3d0f6dc1799",
     "targetId": "270f5f16-80fe-4f8a-90b7-5316b3b1affb"
+  },
+  {
+    "id": "0b122a54-c932-4687-90bb-13fae7fda6bc",
+    "quote": "saves the reference",
+    "relationType": "derives",
+    "sourceId": "f1cf2267-82df-4cd3-860d-c0b5df01dda0",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
+  },
+  {
+    "id": "0b15feba-05da-428f-b68b-927325df3e43",
+    "relationType": "implements",
+    "sourceId": "7d194b7a-6ee3-4361-963c-89de87743097",
+    "targetId": "0e7cbb1d-8c19-4928-a1d7-4fe97c2d6ad3"
   },
   {
     "id": "0b18be77-4e31-4b08-8722-2bf0dc298c82",
@@ -1039,10 +1148,22 @@
     "targetId": "f954ae39-d304-4f62-8259-e5e342df6458"
   },
   {
+    "id": "0ba3831d-5610-4afc-936f-b841ce0566c8",
+    "relationType": "verifies",
+    "sourceId": "2537f4b4-6b89-4b8d-bdea-92cd868f95a0",
+    "targetId": "54fbd45f-199b-41c2-8670-cfd0d756eb97"
+  },
+  {
     "id": "0bad6470-32e9-4d69-b416-a1181b7bbcdc",
     "relationType": "satisfies",
     "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
     "targetId": "c3352f3e-6e07-4404-a4dd-2977eb2924f3"
+  },
+  {
+    "id": "0bcefadf-5033-47f9-aefe-6beb0328ea4c",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "f6ead461-d897-4512-9d0d-6fb82419e413"
   },
   {
     "id": "0c1676f2-d19f-42a1-bbbd-affd80ad59a6",
@@ -1118,6 +1239,12 @@
     "targetId": "3cb01e62-2beb-4bc8-bc1b-bcc93ff847f4"
   },
   {
+    "id": "0cbe97c5-4aa5-4672-9d9f-a063a3478324",
+    "relationType": "implements",
+    "sourceId": "80210184-8ca0-4fce-a5f7-d7006aad16e8",
+    "targetId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae"
+  },
+  {
     "id": "0cc53340-7223-4347-8f0e-10a22c063bc7",
     "relationType": "derives",
     "sourceId": "dde90528-bef5-4c6d-9aa9-d3ebf37599cc",
@@ -1190,10 +1317,22 @@
     "targetId": "be1d75b2-88af-4450-afa1-75e0732c2595"
   },
   {
+    "id": "0d5ba6ec-fccd-48af-a32a-95d3ae53475b",
+    "relationType": "satisfies",
+    "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+    "targetId": "047d8115-3091-49c5-8a2a-44954a73b303"
+  },
+  {
     "id": "0d813f80-a70d-4f15-80c1-7c0dc69bee69",
     "relationType": "satisfies",
     "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
     "targetId": "3b2debb1-bba6-493c-b7a2-a390f2009d7d"
+  },
+  {
+    "id": "0d83e989-60e2-4afe-905d-b512eacba026",
+    "relationType": "constrains",
+    "sourceId": "7d3c36b3-7e62-46a9-af26-2556937a5d37",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
   },
   {
     "id": "0d861b8d-caa6-4f67-af8d-32ab4e140594",
@@ -1281,6 +1420,13 @@
     "targetId": "d0764314-9e61-47cc-9b60-1e95bb4f2a05"
   },
   {
+    "id": "0e174369-b290-4e8c-b92c-ef4c2be2f82f",
+    "quote": "People use this front end to get their tasks done, most without training. They must find their way with navigation that stays the same from page to page, links that are neither repeated nor vague (not the same link five times on one page, not five links named \"Read more\"), forms that say what went wrong and where, and empty views that say why they are empty; and the usability of the whole must be reviewed against recognised principles on a schedule, not only after users complain. The checks assume Playwright tests under tests/ux with tests/ux/journeys.ts listing the main journeys' pages in the order a user walks them (PAGES: path, and the section where sections have their own navigation), their forms (FORMS: path, the submit button's name, the label of one field with a format to check) and the views that start empty for a new account (EMPTY_VIEWS: path); playwright.config sets the baseURL and, for pages behind sign-in, a storageState. Each test fails on its own in a plain run and, run by radical sense playwright, writes what it measured as a radical-metrics/1 file into RADICAL_METRICS_DIR.",
+    "relationType": "derives",
+    "sourceId": "590a80a7-fe6f-437a-83be-81002022e6c9",
+    "targetId": "9f04e33f-e331-4def-b39d-61307043c347"
+  },
+  {
     "id": "0e277428-da0b-4e18-967e-75a7cffffd72",
     "relationType": "verifies",
     "sourceId": "868642d1-7bfa-45ae-9c5b-9521d5b80a2b",
@@ -1345,6 +1491,12 @@
     "relationType": "verifies",
     "sourceId": "ab769c1c-e999-4a9e-adfd-447a0f9892ab",
     "targetId": "58b63448-2aa5-4e8b-b45e-1e2135f48123"
+  },
+  {
+    "id": "0f824185-328f-493a-9de5-7863adf3a2a5",
+    "relationType": "constrains",
+    "sourceId": "27dce77e-5ca2-4a3e-9ddb-f1d297b5b667",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
     "id": "0f86676e-382f-474d-a0a2-b1f998e6fd28",
@@ -1437,6 +1589,12 @@
     "targetId": "5417eacf-7bca-415f-aeaf-02fd4cddf50e"
   },
   {
+    "id": "1044ef23-f1c2-4cf4-b809-d4b9f6690d5f",
+    "relationType": "satisfies",
+    "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+    "targetId": "9d945abc-1ed0-4581-968f-72b4874539f6"
+  },
+  {
     "id": "104a6c0c-5420-4623-9b80-773ed433306b",
     "relationType": "satisfies",
     "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
@@ -1465,6 +1623,12 @@
     "relationType": "verifies",
     "sourceId": "f4f15583-00a5-40f6-a1ef-657f4d749b30",
     "targetId": "827d6a5b-4ffc-45a2-b71c-bdfd57e2e6ee"
+  },
+  {
+    "id": "10957c31-8ff1-4aa9-9756-17acae79ba0d",
+    "relationType": "verifies",
+    "sourceId": "82a33fe6-93ad-445c-8efe-69f9b7a72651",
+    "targetId": "b59c9923-232c-4759-a461-241946413179"
   },
   {
     "id": "1096ce61-520d-4d36-b492-f9db74beca41",
@@ -1636,6 +1800,12 @@
     "targetId": "37611a1b-233c-4094-882a-0a52d65ef667"
   },
   {
+    "id": "124fee7b-5694-4a1e-9179-f4e2b5557733",
+    "relationType": "satisfies",
+    "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+    "targetId": "55aaeeca-7d93-4c88-b8f0-5050aca3d91a"
+  },
+  {
     "event": "6a870be5-b9d9-449e-9384-e994d25f70e8",
     "id": "125e25b9-0e44-48de-8065-e8b0af4dba7b",
     "relationType": "transition",
@@ -1677,6 +1847,12 @@
     "relationType": "implements",
     "sourceId": "3015c7f5-e82a-4a9a-b0fb-b9990a5ef6eb",
     "targetId": "53a770a9-ce40-4708-aea8-7d5ef717d8f3"
+  },
+  {
+    "id": "1298caaa-efd3-4136-9ef1-70994ab35678",
+    "relationType": "satisfies",
+    "sourceId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "targetId": "55aaeeca-7d93-4c88-b8f0-5050aca3d91a"
   },
   {
     "id": "12b0073e-3fd2-4fa4-b1f2-2ef2a8665b7b",
@@ -1838,6 +2014,13 @@
     "targetId": "0b8a85af-019b-4341-9191-466b1d461218"
   },
   {
+    "id": "146bb66b-a7a1-4be2-9406-008955fcd555",
+    "quote": "People use this front end to get their tasks done, most without training. They must find their way with navigation that stays the same from page to page, links that are neither repeated nor vague (not the same link five times on one page, not five links named \"Read more\"), forms that say what went wrong and where, and empty views that say why they are empty; and the usability of the whole must be reviewed against recognised principles on a schedule, not only after users complain. The checks assume Playwright tests under tests/ux with tests/ux/journeys.ts listing the main journeys' pages in the order a user walks them (PAGES: path, and the section where sections have their own navigation), their forms (FORMS: path, the submit button's name, the label of one field with a format to check) and the views that start empty for a new account (EMPTY_VIEWS: path); playwright.config sets the baseURL and, for pages behind sign-in, a storageState. Each test fails on its own in a plain run and, run by radical sense playwright, writes what it measured as a radical-metrics/1 file into RADICAL_METRICS_DIR.",
+    "relationType": "derives",
+    "sourceId": "80d49c76-ad53-4309-ae2f-fbf5faa449b8",
+    "targetId": "9f04e33f-e331-4def-b39d-61307043c347"
+  },
+  {
     "id": "146cdcee-5cea-4e20-9f1f-96f76f0f3d06",
     "relationType": "verifies",
     "sourceId": "ae095007-ad10-4651-bdcd-54fc9fb2aa65",
@@ -1862,6 +2045,12 @@
     "targetId": "cbcb6f8e-7c0e-4931-8bd1-f011e0b69703"
   },
   {
+    "id": "14ae6004-7b32-47b8-83d1-8652c7738ecd",
+    "relationType": "constrains",
+    "sourceId": "0e7cbb1d-8c19-4928-a1d7-4fe97c2d6ad3",
+    "targetId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e"
+  },
+  {
     "id": "14b33366-380f-4d66-9556-c08100e8eca8",
     "relationType": "verifies",
     "sourceId": "132112b1-10ed-4f77-8366-90db0dca5d11",
@@ -1874,6 +2063,12 @@
     "targetId": "6f99e8b7-da50-4762-8319-94ee49a997e1"
   },
   {
+    "id": "14d6d688-a80b-4ad7-a1d1-dc5e19a07d3b",
+    "relationType": "satisfies",
+    "sourceId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "targetId": "b319c535-717f-46d5-aeb9-08c30c475ebb"
+  },
+  {
     "id": "14e02b8a-fd07-4a29-bbd6-a30176080a54",
     "relationType": "derives",
     "sourceId": "4c737e21-2450-4e40-989e-f0fa98925b2d",
@@ -1884,6 +2079,12 @@
     "relationType": "traces-to",
     "sourceId": "c7064e56-4e11-4734-bdab-5c1eb5a80ee6",
     "targetId": "110c8d91-bac4-44ee-8afd-eda95d9643a3"
+  },
+  {
+    "id": "14e73e90-2d46-4435-bfd5-d60143c3ae0c",
+    "relationType": "implements",
+    "sourceId": "76785b6e-2bd8-45ce-8bef-c528ce7354f9",
+    "targetId": "09634404-680b-4285-8cd7-d4af7d6c8374"
   },
   {
     "id": "14e985dc-34f3-49f3-a4db-7cb055059627",
@@ -1902,6 +2103,12 @@
     "relationType": "verifies",
     "sourceId": "bae5e8b0-1f2a-4347-b404-0820a74606c8",
     "targetId": "ad036309-e907-4b40-b459-921bd107712f"
+  },
+  {
+    "id": "14f2281f-ceb8-44ce-8eac-f1498733c4aa",
+    "relationType": "constrains",
+    "sourceId": "a8d85e43-4d58-4cae-b61a-4de9f457194a",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
     "id": "15185ad5-ca0d-4a31-aa76-f4e0c355a2fc",
@@ -2238,6 +2445,12 @@
     "targetId": "f0f986ba-5e21-4725-bfc8-8d011d38b7ef"
   },
   {
+    "id": "18d17b39-cd81-4f92-bbeb-ac101a4b76de",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "8139f75f-7d85-487c-be5e-038877df549d"
+  },
+  {
     "id": "18f155c2-5da5-4f67-8a2d-4ef127e0f9fe",
     "label": "renders concepts with",
     "relationType": "interacts",
@@ -2273,6 +2486,12 @@
     "relationType": "derives",
     "sourceId": "1b3d6d74-456f-460b-8e44-d905a1bb475c",
     "targetId": "4219a47d-6248-4bb6-a03a-231c5bb44773"
+  },
+  {
+    "id": "1979e635-fd47-41ae-891e-9f490c5a5c8c",
+    "relationType": "satisfies",
+    "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+    "targetId": "28d746a3-aee3-4622-a682-40bc3a340b98"
   },
   {
     "id": "198599fb-04f6-4b82-8fc7-ae12b67eac49",
@@ -2414,6 +2633,12 @@
     "targetId": "5d58c3d6-6c32-4969-a88c-874de735ea7a"
   },
   {
+    "id": "1a8af31d-7420-4af2-a4b2-7b7b2347627e",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "becedbca-1e35-4d1f-a25f-66a099004e40"
+  },
+  {
     "id": "1a9164e6-dfcd-4b99-ab50-2720b0f47bbe",
     "relationType": "verifies",
     "sourceId": "4a1d36e1-c506-4875-9a26-03a9bf2f0e84",
@@ -2436,6 +2661,12 @@
     "relationType": "derives",
     "sourceId": "ef167156-3308-4332-9354-889bb3691e38",
     "targetId": "4273bb3f-8209-47ce-abdd-26c701b5348e"
+  },
+  {
+    "id": "1aea909b-ab30-41a5-ac61-5f8c0ecfbbc5",
+    "relationType": "satisfies",
+    "sourceId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3",
+    "targetId": "640e1d91-fdf4-458b-9013-3571820a00a7"
   },
   {
     "id": "1affcc6c-9fd1-4e3d-9d24-da108a340f61",
@@ -2520,6 +2751,12 @@
     "relationType": "verifies",
     "sourceId": "381d78fb-87b0-4428-8034-2e2323500c59",
     "targetId": "7f5a39b1-b58e-4e58-90e2-1b1fe9323d19"
+  },
+  {
+    "id": "1bf5bd50-b5e8-4fb3-905d-365e2dbd870c",
+    "relationType": "constrains",
+    "sourceId": "ec21907b-133e-4901-8585-dd34b5c52330",
+    "targetId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b"
   },
   {
     "id": "1c0441fb-36c6-41f8-9026-e543aff7eb07",
@@ -2648,6 +2885,12 @@
     "targetId": "960faa6c-c23c-47cf-925a-fd3d4b8ff592"
   },
   {
+    "id": "1d3e5a02-d052-4dba-9e1c-41e16db630f7",
+    "relationType": "constrains",
+    "sourceId": "7d194b7a-6ee3-4361-963c-89de87743097",
+    "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  {
     "id": "1d53a103-6042-48a3-be34-d3f2704836ca",
     "relationType": "traces-to",
     "sourceId": "462fb6fe-ebb3-4d97-bce7-fe19092d9f06",
@@ -2694,6 +2937,12 @@
     "relationType": "traces-to",
     "sourceId": "cf4f0b4f-73d7-469a-be2e-c98393ace75a",
     "targetId": "0844cfc0-df6f-40b6-ac08-18c1327bf90a"
+  },
+  {
+    "id": "1dfe21ec-e6f6-4dd3-b381-fe196f22c93c",
+    "relationType": "verifies",
+    "sourceId": "d8597ec6-9641-47e1-884e-67e00d6d101c",
+    "targetId": "b59c9923-232c-4759-a461-241946413179"
   },
   {
     "id": "1e01c007-ee71-44fb-bf7f-d5699ada7351",
@@ -2778,6 +3027,12 @@
     "relationType": "traces-to",
     "sourceId": "49ebdea3-797d-4a0e-a36c-b40dd6f6f8e4",
     "targetId": "0b366741-baea-4a3f-b8e7-e65521a33784"
+  },
+  {
+    "id": "1ed6f1fa-a12d-45d5-ab07-77b9f98f5fde",
+    "relationType": "traces-to",
+    "sourceId": "9d945abc-1ed0-4581-968f-72b4874539f6",
+    "targetId": "000b9208-5963-41bd-8ddd-e69e571b5b36"
   },
   {
     "id": "1edb05a9-d160-4958-9f7b-2c3e1eef113b",
@@ -2912,6 +3167,12 @@
     "targetId": "c02a7689-136f-4d05-8b6c-fe64b7442651"
   },
   {
+    "id": "20daf17b-cf6b-4292-837a-8231c92fe4aa",
+    "relationType": "constrains",
+    "sourceId": "aed804e8-d136-4eb1-9199-942fa27af811",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
     "id": "21061cf9-78ee-4fd6-8d11-5f3852392174",
     "relationType": "derives",
     "sourceId": "95b99c2c-25b2-45a4-96b5-b2197f8dd151",
@@ -2948,16 +3209,34 @@
     "targetId": "0f3597bd-aba0-4ee0-ba01-d3cfb9873297"
   },
   {
+    "id": "2143da03-b673-44a3-b0e3-84db79e21c62",
+    "relationType": "constrains",
+    "sourceId": "c3822333-db92-4a88-b679-1f731008f8d8",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
     "id": "21490742-0573-4291-8f48-0dcc437c8100",
     "relationType": "satisfies",
     "sourceId": "03d6d7e6-d633-43bb-a5bb-b1583813ece6",
     "targetId": "5b0ce114-4db1-463c-9d0d-f75a1d3b552f"
   },
   {
+    "id": "2157947c-8aba-49b7-a4c7-1695dc4c0dbc",
+    "relationType": "constrains",
+    "sourceId": "a5f1e099-e069-4eaf-8243-fe4bf80f49a9",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
     "id": "2161b0ea-bf17-4c72-a5d5-518936081176",
     "relationType": "implements",
     "sourceId": "54513b8e-ffe3-4af1-81c7-65eefa7481b7",
     "targetId": "ae71db46-0614-4310-95b7-6d6ed8f54a52"
+  },
+  {
+    "id": "216a83b6-54aa-46f5-80de-b77f435616ce",
+    "relationType": "traces-to",
+    "sourceId": "fd4bbc67-0b08-414b-b976-68b7728a1d12",
+    "targetId": "9be1c7c9-ff37-4f31-a4a6-e1db78d9c540"
   },
   {
     "id": "2175c582-d1e6-4289-b738-bfb934fcd552",
@@ -2982,6 +3261,12 @@
     "relationType": "verifies",
     "sourceId": "b4c52bdc-3f40-4f7d-843e-5a3672fb8690",
     "targetId": "34ac303a-d2d1-4da8-b96a-aeff420e5abc"
+  },
+  {
+    "id": "2195cec4-7bc2-4042-a23d-bc75a962e39e",
+    "relationType": "constrains",
+    "sourceId": "27dce77e-5ca2-4a3e-9ddb-f1d297b5b667",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
   },
   {
     "id": "21bc1a95-2f0c-4ca3-9be0-7505758706a1",
@@ -3105,6 +3390,12 @@
     "targetId": "e48c16ec-0861-48b3-b23d-9a2d7e2dd1a6"
   },
   {
+    "id": "229f3e10-719b-47ab-8eed-0e2e79fb2cf5",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "d6fa7162-c43f-4a78-9f84-2b2a9c6f20a0"
+  },
+  {
     "id": "22a0aaf6-406a-4f2f-a879-0abf1fa0c87f",
     "relationType": "verifies",
     "sourceId": "172aa7d9-f51f-4609-9870-944b80661756",
@@ -3184,6 +3475,13 @@
     "targetId": "24ee8e23-687c-4355-a58f-debeb76fb07d"
   },
   {
+    "id": "23977133-8f46-4833-912b-12e72bd0dbde",
+    "quote": "People use this front end to get their tasks done, most without training. They must find their way with navigation that stays the same from page to page, links that are neither repeated nor vague (not the same link five times on one page, not five links named \"Read more\"), forms that say what went wrong and where, and empty views that say why they are empty; and the usability of the whole must be reviewed against recognised principles on a schedule, not only after users complain. The checks assume Playwright tests under tests/ux with tests/ux/journeys.ts listing the main journeys' pages in the order a user walks them (PAGES: path, and the section where sections have their own navigation), their forms (FORMS: path, the submit button's name, the label of one field with a format to check) and the views that start empty for a new account (EMPTY_VIEWS: path); playwright.config sets the baseURL and, for pages behind sign-in, a storageState. Each test fails on its own in a plain run and, run by radical sense playwright, writes what it measured as a radical-metrics/1 file into RADICAL_METRICS_DIR.",
+    "relationType": "derives",
+    "sourceId": "e02ad18c-bbbc-4a2f-95f5-909b661ce105",
+    "targetId": "9f04e33f-e331-4def-b39d-61307043c347"
+  },
+  {
     "id": "23a01dbf-5a52-4dbb-9500-a6693451182e",
     "relationType": "derives",
     "sourceId": "00909ac5-2274-4898-96c7-990e9c4801de",
@@ -3218,6 +3516,12 @@
     "relationType": "derives",
     "sourceId": "cb9b43e5-de2b-413a-9e5e-b1475b973491",
     "targetId": "d61164ac-ff91-4c94-b7dd-0cdc5226e5df"
+  },
+  {
+    "id": "23c0c92a-a105-4d41-bc60-6c9b45c9817a",
+    "relationType": "satisfies",
+    "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+    "targetId": "640e1d91-fdf4-458b-9013-3571820a00a7"
   },
   {
     "id": "23f21111-e9a5-4fa1-8bf9-65e0f98eeeee",
@@ -3281,6 +3585,12 @@
     "targetId": "cd8853c0-a01f-4c50-a58e-499112b2ac4b"
   },
   {
+    "id": "24d58ead-b074-4420-8646-3aed13f87fcd",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "1a5aa622-3a32-4342-9c2a-2efae7463b84"
+  },
+  {
     "id": "24d6ecff-37b4-4f62-81d1-77e80e339b5f",
     "relationType": "satisfies",
     "sourceId": "08c445dd-e14d-47dd-b4b1-1776a539dcbc",
@@ -3298,6 +3608,12 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "64e73f4b-f002-4ad6-8d7f-a8ed7eeaac31"
+  },
+  {
+    "id": "250cecde-5a8e-4840-a9d6-97ea490f30b7",
+    "relationType": "constrains",
+    "sourceId": "d0223cac-c464-4b5d-b2ba-7e266ff2b4c1",
+    "targetId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3"
   },
   {
     "id": "2515c1b8-cc7d-462f-8160-2c8ac858fdd8",
@@ -3328,6 +3644,12 @@
     "relationType": "derives",
     "sourceId": "c3e95346-db9e-4a56-a656-079ff1be764a",
     "targetId": "5a11c385-b16b-47c2-b6e2-0ec281e86dbe"
+  },
+  {
+    "id": "2553d832-6d65-4f43-b18f-f745513e96b9",
+    "relationType": "satisfies",
+    "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+    "targetId": "478754a3-1569-4483-8890-5bd586eba6e1"
   },
   {
     "id": "2565ade0-6b47-4d97-bb5d-28f0a5a1c565",
@@ -3406,6 +3728,12 @@
     "relationType": "derives",
     "sourceId": "233d5df5-4cec-466b-a414-aa9bc96e75bd",
     "targetId": "4273bb3f-8209-47ce-abdd-26c701b5348e"
+  },
+  {
+    "id": "262b8eb8-7f22-418f-bca7-bb1460ad1ae9",
+    "relationType": "satisfies",
+    "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+    "targetId": "e1dd7654-02cb-4ee5-961a-c6520f58c890"
   },
   {
     "id": "262b98b4-e02a-48e7-b49e-1240c6f5369b",
@@ -3577,6 +3905,12 @@
     "targetId": "55cd24b4-b12b-4508-994b-de05fd43ce69"
   },
   {
+    "id": "27b8dc2e-557e-46a4-8bf4-58c87295790d",
+    "relationType": "constrains",
+    "sourceId": "a8d85e43-4d58-4cae-b61a-4de9f457194a",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
+  },
+  {
     "id": "27c283f3-e596-463b-af0f-6487f48d0f2c",
     "relationType": "derives",
     "sourceId": "c642f8a0-51d0-47d0-9a13-96844bc6440c",
@@ -3587,6 +3921,13 @@
     "relationType": "verifies",
     "sourceId": "02f475d7-1908-418d-983d-225b7f0a4027",
     "targetId": "bcde343d-1b42-45bb-b0a8-b9241d458fea"
+  },
+  {
+    "id": "27db8c74-2c12-4902-a2dc-46f381210bf0",
+    "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/.",
+    "relationType": "derives",
+    "sourceId": "e1dd7654-02cb-4ee5-961a-c6520f58c890",
+    "targetId": "38242f71-4f98-4646-906a-ead71fbb49e5"
   },
   {
     "id": "27e47c6c-901a-4f5c-b2dd-b8da5ee22f6b",
@@ -3634,6 +3975,12 @@
     "targetId": "d6dc1eff-89c9-46c2-a767-62467b0471c8"
   },
   {
+    "id": "28be6100-d979-48ab-8517-5a9613a3d181",
+    "relationType": "constrains",
+    "sourceId": "80210184-8ca0-4fce-a5f7-d7006aad16e8",
+    "targetId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3"
+  },
+  {
     "id": "28c18567-fbd4-43df-9510-dfee32e0a05e",
     "relationType": "constrains",
     "sourceId": "b9ef9cb1-99f1-4b23-9b4b-97c0b56a072f",
@@ -3678,10 +4025,22 @@
     "targetId": "fbf0bc24-f535-4e68-a459-47ee6f253a26"
   },
   {
+    "id": "295f46c7-1326-4c18-8f32-28fb567b16a8",
+    "relationType": "constrains",
+    "sourceId": "2408cf76-ab15-49e4-b0ec-2dc3e2104366",
+    "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba"
+  },
+  {
     "id": "296101e5-a60a-45d9-9fcc-49168a215200",
     "relationType": "satisfies",
     "sourceId": "32793ee9-a939-498b-a71e-77831ce7ef4c",
     "targetId": "cf9ab114-0239-4c51-adf7-0ce516a5000e"
+  },
+  {
+    "id": "2978fc5d-f636-4131-b27c-12749555d6c4",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "e02ad18c-bbbc-4a2f-95f5-909b661ce105"
   },
   {
     "id": "299a2007-791d-4387-875b-56e4a15fd1e6",
@@ -3744,6 +4103,12 @@
     "targetId": "ff39277b-2b38-473a-8ecc-e9d4944908ba"
   },
   {
+    "id": "2a260a3a-53db-4ad9-a2de-607701b2bf79",
+    "relationType": "constrains",
+    "sourceId": "902d4565-5101-4f8f-b584-ed440133392e",
+    "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  {
     "id": "2a28f9e5-3e44-4ff6-a7e3-96543ad4604d",
     "relationType": "verifies",
     "sourceId": "cd074891-77a3-446a-b8db-fdd98d197855",
@@ -3769,6 +4134,12 @@
     "targetId": "0d5c705a-f262-43c3-a585-e61e0a925ef8"
   },
   {
+    "id": "2a7aa9aa-09a4-4d02-9867-6b67881889fa",
+    "relationType": "satisfies",
+    "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+    "targetId": "e5244b38-b51b-4360-be87-a9c68a205885"
+  },
+  {
     "id": "2ab661b4-a863-4759-a4f3-16d0bc826de2",
     "relationType": "derives",
     "sourceId": "26b29eee-7617-4f5c-815a-031e2178bc36",
@@ -3785,6 +4156,12 @@
     "relationType": "derives",
     "sourceId": "e1de6e31-29c1-446b-97a3-bf26ea3eafad",
     "targetId": "0b8590ab-daf6-4b95-972e-67d03a743b74"
+  },
+  {
+    "id": "2af0959a-0e01-4587-a755-1c9d2cd82ac6",
+    "relationType": "satisfies",
+    "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+    "targetId": "cc8568e0-1c2e-42d6-9fcc-90c98e32f910"
   },
   {
     "id": "2b00d356-1543-420f-a023-d999347e9010",
@@ -3816,6 +4193,13 @@
     "relationType": "verifies",
     "sourceId": "7759f831-f353-4832-ace7-71eff83ccecd",
     "targetId": "405281c4-5a2c-43e0-9d80-93644d3f5573"
+  },
+  {
+    "id": "2b27708b-ed6f-402b-8b96-e65e9c40d857",
+    "quote": "I want this built into Radical\nthe condition says outright that it scales: `test.duration.max{kind=unit} <= 100 ms scaled`\nThe engine multiplies the limit (never below ×1)\n\"100 ms × 2.4 = 240 ms\"\nThe measurements stay raw.",
+    "relationType": "derives",
+    "sourceId": "b59c9923-232c-4759-a461-241946413179",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
   },
   {
     "id": "2b32a944-b833-467f-b279-86f545a8f7f6",
@@ -4090,6 +4474,13 @@
     "targetId": "7e445183-ea24-4338-abca-b7934e94ccf0"
   },
   {
+    "id": "2d72712b-4430-474c-94c1-5af2d00a08e0",
+    "quote": "Only lighthouse\n`radical sense lighthouse` reads Lighthouse/LHCI reports\nseparately for mobile and desktop, per page\nverifying web vitals in sensors",
+    "relationType": "derives",
+    "sourceId": "e40075e8-83db-4645-9ff3-e754d236102e",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
+  },
+  {
     "id": "2d8246d5-b652-4e2c-a37d-73c7e3989c0d",
     "relationType": "constrains",
     "sourceId": "38f9a288-f924-4f37-96fd-bd1d78660415",
@@ -4120,6 +4511,13 @@
     "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
   },
   {
+    "id": "2dbdb449-b6b5-4ae0-9360-7416a7d7f1a7",
+    "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/.",
+    "relationType": "derives",
+    "sourceId": "478754a3-1569-4483-8890-5bd586eba6e1",
+    "targetId": "38242f71-4f98-4646-906a-ead71fbb49e5"
+  },
+  {
     "id": "2dcda1d5-04f7-425c-8cf9-ca1a38c4881e",
     "relationType": "derives",
     "sourceId": "158aa6b9-2793-4777-b83c-4b153916bd23",
@@ -4148,6 +4546,12 @@
     "relationType": "verifies",
     "sourceId": "6440e750-eed6-438b-9e41-e62f58a43050",
     "targetId": "df771df3-4ad6-45c7-97ac-f4445e2a110d"
+  },
+  {
+    "id": "2e089e28-7a0b-4702-8db7-51973df6887d",
+    "relationType": "constrains",
+    "sourceId": "6f184a44-80e3-485b-a003-b7c5eebcc904",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
     "id": "2e1b0398-6bea-4b99-b082-18a0ffdc750c",
@@ -4184,6 +4588,12 @@
     "relationType": "satisfies",
     "sourceId": "024d390d-832f-4258-8ca2-89530b50877e",
     "targetId": "ea245523-a56d-4efd-9833-4a2f95696dd1"
+  },
+  {
+    "id": "2e8006ea-3d81-4c93-8435-f180aa0dda3d",
+    "relationType": "constrains",
+    "sourceId": "6fd21664-6402-4869-b26d-61cdf1ef681e",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
     "id": "2e835a80-9806-4c3f-8971-6be6e3cbe297",
@@ -4481,6 +4891,12 @@
     "targetId": "ef68b905-45d2-4f6c-bce7-a2d20802f7b5"
   },
   {
+    "id": "3142034b-9aa6-4222-a972-27fd512fc11b",
+    "relationType": "constrains",
+    "sourceId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae",
+    "targetId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b"
+  },
+  {
     "id": "316c4433-9a2b-408b-903c-6bf3f1440e8b",
     "relationType": "verifies",
     "sourceId": "2e9c91b9-1594-457c-88da-ba1c826a07f2",
@@ -4503,6 +4919,18 @@
     "relationType": "verifies",
     "sourceId": "6b8ab2de-7f49-4c58-bd48-bee37578dcb4",
     "targetId": "62b6849d-5aff-4d06-b0cd-776b410b6a6b"
+  },
+  {
+    "id": "31b827a2-6fd1-411e-9f2f-57a40f64d30d",
+    "relationType": "traces-to",
+    "sourceId": "54fbd45f-199b-41c2-8670-cfd0d756eb97",
+    "targetId": "9be1c7c9-ff37-4f31-a4a6-e1db78d9c540"
+  },
+  {
+    "id": "31cfbef0-71d3-4e92-96cb-1bfe36a70f7d",
+    "relationType": "constrains",
+    "sourceId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "31d06a99-c081-47f5-92e4-b286c70b0377",
@@ -4578,6 +5006,12 @@
     "targetId": "64ca6112-45d2-4729-b17e-bcdb952da389"
   },
   {
+    "id": "3277e376-8178-43f5-99d2-abbd30196726",
+    "relationType": "traces-to",
+    "sourceId": "5bada32a-9246-4044-8b1a-a0a3cc7a9d91",
+    "targetId": "57da9569-ea1f-4f0f-bdb9-db525bbaa631"
+  },
+  {
     "id": "32823176-938a-4f00-a563-78e4ba19487f",
     "relationType": "constrains",
     "sourceId": "80ad0d61-7922-49d8-919a-0cbdd58f0092",
@@ -4588,6 +5022,12 @@
     "relationType": "constrains",
     "sourceId": "a4d8d593-831c-4d4d-afe1-e2dd3984633c",
     "targetId": "3027b577-5042-4975-a7cf-0aad08adb14f"
+  },
+  {
+    "id": "329b285e-4db5-4940-863b-0737f73b0af4",
+    "relationType": "satisfies",
+    "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+    "targetId": "b319c535-717f-46d5-aeb9-08c30c475ebb"
   },
   {
     "id": "32a21b3b-05d2-4cdf-b2fe-9c02fe65a0a0",
@@ -4699,6 +5139,12 @@
     "targetId": "ebfe2e99-e122-4bf8-ad76-a5841c1865d7"
   },
   {
+    "id": "33810ca3-3df8-48b1-a6b3-cdc20d03d164",
+    "relationType": "verifies",
+    "sourceId": "fdec13d7-76d8-4600-b410-d9f749cab0a1",
+    "targetId": "89fa4a8f-2c19-4f02-b39b-cd6b3bf96833"
+  },
+  {
     "id": "33898952-66c7-4caa-8b60-20922b05035f",
     "relationType": "verifies",
     "sourceId": "7e9d975c-6540-41f5-8adb-8981bc68cf7b",
@@ -4745,6 +5191,13 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "c6fccca5-a488-4ef6-9e1b-045998930d00"
+  },
+  {
+    "id": "33fcfef1-b970-4992-86b0-a1ff48ed2979",
+    "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/.",
+    "relationType": "derives",
+    "sourceId": "b319c535-717f-46d5-aeb9-08c30c475ebb",
+    "targetId": "38242f71-4f98-4646-906a-ead71fbb49e5"
   },
   {
     "id": "3414459a-bb16-4a55-aa7f-b4ee90affcd4",
@@ -4897,6 +5350,12 @@
     "relationType": "derives",
     "sourceId": "ce6ba211-ba64-4252-bdf3-f1b043516bcc",
     "targetId": "157f7331-5a0f-4b2e-8524-06a7a9152234"
+  },
+  {
+    "id": "35531563-61c3-48f6-b182-a9f11b98af6f",
+    "relationType": "verifies",
+    "sourceId": "1d597a0b-6963-41de-ab0e-4c7767a496e9",
+    "targetId": "9e09b3d9-9b21-487e-97de-2a692eb3f714"
   },
   {
     "id": "3561a480-199f-4483-a395-a21318e61ef6",
@@ -5111,6 +5570,12 @@
     "targetId": "f5b72a9c-6238-446b-bc89-37d98d5e162c"
   },
   {
+    "id": "37d47105-b287-4a5e-bb66-bd5b727f6bea",
+    "relationType": "implements",
+    "sourceId": "a5f1e099-e069-4eaf-8243-fe4bf80f49a9",
+    "targetId": "aed804e8-d136-4eb1-9199-942fa27af811"
+  },
+  {
     "id": "37dbe39b-fb6c-4524-8b54-2d7bd99ad8a2",
     "relationType": "verifies",
     "sourceId": "38d5607f-d36a-492d-a055-b4d81e988692",
@@ -5133,6 +5598,13 @@
     "relationType": "verifies",
     "sourceId": "79e13992-175f-4044-8f62-d5aa4d920be3",
     "targetId": "28b5fd94-c9ee-4441-a5f4-2a2576cb9a0f"
+  },
+  {
+    "id": "3841e3bb-a923-4352-b8ec-0e8c1eac581e",
+    "quote": "`radical sense github-actions` reads, through `gh`, the workflow runs and the branch protection\n(ci.pr.duration.p90, ci.main.success.rate, ci.required-checks)\nOther platforms (GitLab) add adapters by pull request.",
+    "relationType": "derives",
+    "sourceId": "2334a12e-58a9-4d71-8d90-3c73040f3976",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
   },
   {
     "id": "384a642b-0d44-46d5-a7f0-b263ab8b4dda",
@@ -5177,6 +5649,12 @@
     "targetId": "eb4239bc-10bb-4747-a679-7142b5112e9e"
   },
   {
+    "id": "3895a81f-9c2e-449b-bd84-30fb569c7d6a",
+    "relationType": "satisfies",
+    "sourceId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "targetId": "640e1d91-fdf4-458b-9013-3571820a00a7"
+  },
+  {
     "id": "38ac33a1-c925-4246-bc2e-537acde0c2b1",
     "relationType": "verifies",
     "sourceId": "e9b4d0df-3cb0-4610-9e6d-be405907ceea",
@@ -5193,6 +5671,18 @@
     "relationType": "derives",
     "sourceId": "0dea3492-0349-491f-a744-5ed676143d7e",
     "targetId": "647d92bf-5dfa-4d28-8979-fd74ea45aece"
+  },
+  {
+    "id": "38e80674-17c7-446d-80a1-a716ba242f5c",
+    "relationType": "satisfies",
+    "sourceId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "targetId": "cc8568e0-1c2e-42d6-9fcc-90c98e32f910"
+  },
+  {
+    "id": "38e9cc47-3eb3-4582-aa83-9c179628373a",
+    "relationType": "constrains",
+    "sourceId": "2408cf76-ab15-49e4-b0ec-2dc3e2104366",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
   },
   {
     "id": "38ec17b9-a1dc-4481-afc3-1da5615784c0",
@@ -5223,6 +5713,12 @@
     "relationType": "derives",
     "sourceId": "affc810e-69c8-4dc5-9dd4-97ccaa015ea3",
     "targetId": "611eca8e-99ea-4177-ae99-f264539307db"
+  },
+  {
+    "id": "3965bc83-e027-43c6-bac2-6a0b19df3d8b",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "e02ad18c-bbbc-4a2f-95f5-909b661ce105"
   },
   {
     "id": "3985ff19-ec0c-426a-995a-f94893d1f48f",
@@ -5277,6 +5773,12 @@
     "relationType": "satisfies",
     "sourceId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e",
     "targetId": "fab94c16-db16-4909-ba5c-e7c86f1e63eb"
+  },
+  {
+    "id": "39f37820-3e28-417c-9223-b7c8769e68f8",
+    "relationType": "constrains",
+    "sourceId": "6fd21664-6402-4869-b26d-61cdf1ef681e",
+    "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
   },
   {
     "id": "39f8a2e5-0f1d-46e2-95f3-68acf72f8cce",
@@ -5431,6 +5933,12 @@
     "targetId": "8dd66f76-7dcc-411e-93f7-f89be1b81167"
   },
   {
+    "id": "3ae423b9-3937-4324-85d9-24f6ce99f071",
+    "relationType": "verifies",
+    "sourceId": "22e16636-c9b7-4f3d-a996-b27e5bebcad8",
+    "targetId": "e02ad18c-bbbc-4a2f-95f5-909b661ce105"
+  },
+  {
     "id": "3afa1550-43e1-4bc3-9f07-e501a5a4fbbc",
     "relationType": "verifies",
     "sourceId": "049ee8fe-9cfa-4a0c-95a9-6f0cf2d27b1c",
@@ -5521,6 +6029,12 @@
     "targetId": "99af51ad-0e04-4bef-8ab1-45e61d867f57"
   },
   {
+    "id": "3bab16bd-c941-41cd-bcd6-3692b14e142b",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "047d8115-3091-49c5-8a2a-44954a73b303"
+  },
+  {
     "id": "3baf6abd-d894-46e1-aa9d-8d7923de9fec",
     "relationType": "verifies",
     "sourceId": "3b21468e-05eb-4a1d-bbe6-eff7b11f712d",
@@ -5533,10 +6047,22 @@
     "targetId": "1b2f3ecc-0906-4b58-867f-12d30819c8e7"
   },
   {
+    "id": "3bb6d143-9fae-48b2-b17c-db8be0e43038",
+    "relationType": "verifies",
+    "sourceId": "90f601ad-08b9-4c75-8392-08b064c6fa76",
+    "targetId": "1a5aa622-3a32-4342-9c2a-2efae7463b84"
+  },
+  {
     "id": "3bc293ae-5e48-4118-a959-8ee431cfd01c",
     "relationType": "derives",
     "sourceId": "4baf704a-f18f-4005-ae67-5f488d7fa980",
     "targetId": "4a890d47-e1fd-4c0d-be86-646775f45435"
+  },
+  {
+    "id": "3bdd23e9-7636-4f43-94c9-00aa59c6331f",
+    "relationType": "satisfies",
+    "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+    "targetId": "cc8568e0-1c2e-42d6-9fcc-90c98e32f910"
   },
   {
     "id": "3be36922-dcf1-4bd6-ad08-0d80f14bff39",
@@ -5555,6 +6081,12 @@
     "relationType": "derives",
     "sourceId": "b7250ae8-f0ec-4f8f-bc21-f2502f710dba",
     "targetId": "a2734db2-06ac-481e-ad00-9b5338a4420d"
+  },
+  {
+    "id": "3c2672b5-671b-4d23-8033-3b484fe83347",
+    "relationType": "verifies",
+    "sourceId": "fe866c7e-f898-4079-b093-604cbbe4a509",
+    "targetId": "80d49c76-ad53-4309-ae2f-fbf5faa449b8"
   },
   {
     "id": "3c3c07de-4286-4298-b261-9303ba502fc4",
@@ -5635,6 +6167,12 @@
     "targetId": "0bd8eec3-7d14-4562-890f-8ef992d2cdb6"
   },
   {
+    "id": "3cfc1e1a-555f-41e6-b140-bd76697326b4",
+    "relationType": "traces-to",
+    "sourceId": "2334a12e-58a9-4d71-8d90-3c73040f3976",
+    "targetId": "195fb6b6-e3d8-47e3-b6d2-6d2b67791e80"
+  },
+  {
     "id": "3d38205e-9bdb-4237-b307-78630d95b5da",
     "relationType": "satisfies",
     "sourceId": "156f4473-a44b-424f-b5c1-62e044522faf",
@@ -5701,6 +6239,12 @@
     "targetId": "e02c1714-a9d7-43de-9afc-13e44525b9bf"
   },
   {
+    "id": "3dcfaf42-ed84-4d46-9deb-ded94c071c56",
+    "relationType": "satisfies",
+    "sourceId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3",
+    "targetId": "28d746a3-aee3-4622-a682-40bc3a340b98"
+  },
+  {
     "id": "3dee2476-77a7-4bc4-8c68-908941bad888",
     "relationType": "constrains",
     "sourceId": "d025a7f8-ed40-469c-b92b-324bfda399c4",
@@ -5735,6 +6279,12 @@
     "relationType": "derives",
     "sourceId": "8a93c06a-1e5c-4360-b2c6-c16a367ffc97",
     "targetId": "b3833741-0a68-4714-9b2b-cd84c8de9331"
+  },
+  {
+    "id": "3e14fcd0-a6e4-4ab7-b1ad-deec1be9b239",
+    "relationType": "satisfies",
+    "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+    "targetId": "95058b84-577d-47ed-b8cb-65445f1c7aba"
   },
   {
     "description": "arranges the views of the model",
@@ -5774,10 +6324,22 @@
     "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
   },
   {
+    "id": "3e58ae67-2710-4f21-b083-7e98a7f17a47",
+    "relationType": "satisfies",
+    "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+    "targetId": "047d8115-3091-49c5-8a2a-44954a73b303"
+  },
+  {
     "id": "3e60e01f-73de-4d61-b8a2-2f13e42f56c6",
     "relationType": "satisfies",
     "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
     "targetId": "01922289-6b7d-4fce-8377-0abefb6d471a"
+  },
+  {
+    "id": "3e970474-41b7-46b5-b580-8d0ef8a5bdfb",
+    "relationType": "constrains",
+    "sourceId": "9b4ef8fc-9df8-4cd4-b88a-fa598c729b5c",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
   },
   {
     "id": "3e989a19-a6b8-4fdd-9121-1d7e0335f49c",
@@ -5856,6 +6418,18 @@
     "relationType": "satisfies",
     "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
     "targetId": "b680e082-f271-4cab-a882-db7970ca5514"
+  },
+  {
+    "id": "3f181fbe-0b6d-4cd6-b1a4-57b7a251b318",
+    "relationType": "constrains",
+    "sourceId": "80210184-8ca0-4fce-a5f7-d7006aad16e8",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
+    "id": "3f1ee382-7866-482e-8fac-ebffff62c0d2",
+    "relationType": "verifies",
+    "sourceId": "a9b5a4d8-13af-4b9c-8bf8-98f827fa01d5",
+    "targetId": "047d8115-3091-49c5-8a2a-44954a73b303"
   },
   {
     "id": "3f23fe90-3728-457e-8202-2324de508150",
@@ -5986,6 +6560,13 @@
     "targetId": "939dde75-a293-4aab-a570-2b2c28ef5011"
   },
   {
+    "id": "40bdf6e1-63ec-4dba-ba33-08ce154f70a9",
+    "quote": "Accessibility (takes axe and the keyboard, WCAG 2.2 AA)",
+    "relationType": "derives",
+    "sourceId": "9d945abc-1ed0-4581-968f-72b4874539f6",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
+  },
+  {
     "id": "40be34e6-7976-4970-9f3d-94528a941319",
     "relationType": "satisfies",
     "sourceId": "5440fe6d-8ae5-4c57-858d-41a4e1c087c9",
@@ -6032,6 +6613,12 @@
     "relationType": "verifies",
     "sourceId": "d7431a7a-278a-4f88-b8e2-c117aa43b6d3",
     "targetId": "158aa6b9-2793-4777-b83c-4b153916bd23"
+  },
+  {
+    "id": "4112a64b-ba32-467a-b1ca-556d4749149f",
+    "relationType": "verifies",
+    "sourceId": "fde7b8cb-90e9-465b-a128-263331d87fbc",
+    "targetId": "d02b2b8d-622c-48ee-bf95-739b432944e8"
   },
   {
     "id": "4133e6db-d029-4785-b53f-6545ee142d44",
@@ -6088,6 +6675,12 @@
     "targetId": "87d19f09-14ef-4e28-802a-640769e7271b"
   },
   {
+    "id": "41a1b37d-4535-4469-8f46-41d40f081763",
+    "relationType": "satisfies",
+    "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+    "targetId": "28d746a3-aee3-4622-a682-40bc3a340b98"
+  },
+  {
     "id": "41a3c4c8-b0c9-4213-b4e4-d802b9dc0e0d",
     "relationType": "derives",
     "sourceId": "f9fe8a89-1b29-43b3-b9bc-683dbdd2ba55",
@@ -6116,6 +6709,12 @@
     "relationType": "verifies",
     "sourceId": "c5cf7827-5129-4aed-82f9-3f10ba772f66",
     "targetId": "24e7f236-9c77-4dd3-8b31-5ba4abe09e8a"
+  },
+  {
+    "id": "41df232d-8f60-46b2-b32d-9f820b23facd",
+    "relationType": "satisfies",
+    "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+    "targetId": "54fbd45f-199b-41c2-8670-cfd0d756eb97"
   },
   {
     "id": "41e19f98-7ca1-455d-9b84-2478a4e48145",
@@ -6189,6 +6788,12 @@
     "relationType": "derives",
     "sourceId": "5233a918-a426-4fdd-8d41-837a07ea7c7d",
     "targetId": "48604bc7-944d-4bea-bf39-ec39a7b329b0"
+  },
+  {
+    "id": "424d3d31-6cdd-4af6-bb49-4d3f0f76520d",
+    "relationType": "constrains",
+    "sourceId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
     "id": "426533bf-9c86-44f8-b564-0d71e36a874f",
@@ -6307,6 +6912,18 @@
     "targetId": "4b15f0b3-19e6-42ba-b36b-6be8c2630988"
   },
   {
+    "id": "43671038-88bc-4233-8050-fb89a1a0a10a",
+    "relationType": "satisfies",
+    "sourceId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e",
+    "targetId": "9cf4dc15-4d62-46f1-8ccd-19019ad0af3c"
+  },
+  {
+    "id": "438dcc1b-8daf-4abd-9ec9-72dcdee05e01",
+    "relationType": "satisfies",
+    "sourceId": "85565274-ba9a-4907-bd77-8df441930b28",
+    "targetId": "e40075e8-83db-4645-9ff3-e754d236102e"
+  },
+  {
     "id": "43a4a896-0671-447f-b675-04c0fe17c3ef",
     "relationType": "traces-to",
     "sourceId": "20415bf3-ca3b-4385-aad8-6f8f38380c2b",
@@ -6373,6 +6990,13 @@
     "targetId": "95b99c2c-25b2-45a4-96b5-b2197f8dd151"
   },
   {
+    "id": "44532ae7-8e93-4b13-8ab7-93c38062004f",
+    "quote": "Frontend stack keeps the framework, rendering, browsers and the JS budget",
+    "relationType": "derives",
+    "sourceId": "95058b84-577d-47ed-b8cb-65445f1c7aba",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
+  },
+  {
     "id": "44581c5b-ee4c-48cd-be52-66baa190361f",
     "relationType": "satisfies",
     "sourceId": "917d9018-dff9-45b1-87dc-d01f8ac836bb",
@@ -6392,6 +7016,12 @@
     "targetId": "811927c5-4edd-41c1-9f8d-c3e4aec08ba9"
   },
   {
+    "id": "447ebd10-c683-4a50-9d0a-a3f0971f33f0",
+    "relationType": "satisfies",
+    "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+    "targetId": "b319c535-717f-46d5-aeb9-08c30c475ebb"
+  },
+  {
     "id": "44b3cb2b-f0f6-4b9c-8f90-4fc79a0afba6",
     "relationType": "derives",
     "sourceId": "c50054d8-2ca1-447d-bb06-fa3936cace38",
@@ -6408,6 +7038,12 @@
     "relationType": "verifies",
     "sourceId": "a0c8812a-3193-485b-ac83-0a42d4148639",
     "targetId": "140911f0-ddb3-4ecf-a05a-55c64e299e7a"
+  },
+  {
+    "id": "450a3300-daf5-4e59-a646-906c6005e214",
+    "relationType": "constrains",
+    "sourceId": "ec21907b-133e-4901-8585-dd34b5c52330",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
   },
   {
     "id": "450cdd92-cc38-4d26-a41a-10e2cf8081d8",
@@ -6585,10 +7221,22 @@
     "targetId": "cdefa455-5e6f-4395-8261-f61398610d02"
   },
   {
+    "id": "470b1a5b-e3bc-4adf-baf0-d9e9b2fadcf3",
+    "relationType": "constrains",
+    "sourceId": "7d3c36b3-7e62-46a9-af26-2556937a5d37",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
     "id": "470bd0d2-415a-4e40-a31a-dd98af42c42a",
     "relationType": "verifies",
     "sourceId": "347fa4fb-5b48-4630-a281-cc5f2b3b2bb3",
     "targetId": "67ff0f59-c354-4ba2-ba8d-d0cd3982b700"
+  },
+  {
+    "id": "47142457-8535-4f37-bc0a-0e847c6ac935",
+    "relationType": "implements",
+    "sourceId": "d2567b83-d48f-4fef-be18-0866b613f574",
+    "targetId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae"
   },
   {
     "id": "47254435-1d77-4126-8f89-4e452b0ff1b7",
@@ -6681,10 +7329,22 @@
     "targetId": "adf2f053-6d47-4e04-83df-a7722b3e726b"
   },
   {
+    "id": "47ca27fe-2d07-4b28-9197-621b435ed527",
+    "relationType": "satisfies",
+    "sourceId": "156f4473-a44b-424f-b5c1-62e044522faf",
+    "targetId": "b471b5b9-bdc2-450c-a6e7-baf31062c6c2"
+  },
+  {
     "id": "47d3d683-40af-4211-9cd8-e8d795ce9d2d",
     "relationType": "traces-to",
     "sourceId": "2afd5639-ba40-4d52-bbc5-67d2488e7706",
     "targetId": "fb78a7ee-a696-484c-a99f-c02525ed8b8e"
+  },
+  {
+    "id": "47d7263e-241c-46ef-b2e9-6deada87d99b",
+    "relationType": "satisfies",
+    "sourceId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3",
+    "targetId": "b319c535-717f-46d5-aeb9-08c30c475ebb"
   },
   {
     "id": "47ef9a9b-c4ec-4f02-bee2-d75eab5f4e61",
@@ -6697,6 +7357,19 @@
     "relationType": "satisfies",
     "sourceId": "85565274-ba9a-4907-bd77-8df441930b28",
     "targetId": "f6b9184c-e5cc-4c22-8d93-213f49104a12"
+  },
+  {
+    "id": "48035ef3-3ea4-459c-83de-1dc2f4276bd6",
+    "quote": "the same link\na separate concern in the Hub would help\nrefer to some standard\nUsability (navigation, links, forms, errors)",
+    "relationType": "derives",
+    "sourceId": "e5244b38-b51b-4360-be87-a9c68a205885",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
+  },
+  {
+    "id": "480d2161-0879-4165-928a-c0ceea9ffb6b",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "89fa4a8f-2c19-4f02-b39b-cd6b3bf96833"
   },
   {
     "id": "483018d2-da41-4aa3-85ce-1c35d985635f",
@@ -6745,6 +7418,25 @@
     "relationType": "derives",
     "sourceId": "54215859-48cb-4f1a-bc8e-e42a8f216a93",
     "targetId": "d7f6d795-976a-40f0-b237-a12ac985c37c"
+  },
+  {
+    "id": "48aad711-2f48-4110-b179-393526ce6231",
+    "quote": "People with disabilities use this front end with a keyboard, a screen reader, magnification or voice control, and the law may require that they can. Every function of the main journeys must work for them, to a WCAG level that is decided and checked on every change, with what automated checks cannot see tested by people, what is not yet accessible stated openly, and failures fixed on a schedule rather than when someone complains. The checks assume Playwright tests under tests/a11y with tests/a11y/pages.ts listing the pages of the main journeys (PAGES: path) and the states worth checking (STATES: a name, a path and, where needed, the steps that open a dialog, show a form's errors or empty a list); playwright.config sets the baseURL and, for pages behind sign-in, a storageState. Each test fails on its own in a plain run and, run by radical sense playwright, writes what it measured as a radical-metrics/1 file into RADICAL_METRICS_DIR.",
+    "relationType": "derives",
+    "sourceId": "f6ead461-d897-4512-9d0d-6fb82419e413",
+    "targetId": "278066be-80d4-4e94-b25b-c9772c7c6bf6"
+  },
+  {
+    "id": "48af3d7b-41b7-45a6-91a8-36e5cbf77833",
+    "relationType": "constrains",
+    "sourceId": "76785b6e-2bd8-45ce-8bef-c528ce7354f9",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
+    "id": "48c7605f-4f37-4758-85eb-550971ba1b1f",
+    "relationType": "satisfies",
+    "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+    "targetId": "640e1d91-fdf4-458b-9013-3571820a00a7"
   },
   {
     "id": "48c9c1e4-224b-4af9-806f-d44c90a6a76e",
@@ -6853,6 +7545,12 @@
     "targetId": "7f59b9b2-2fd3-448a-9b2f-415c9d1f7a8f"
   },
   {
+    "id": "49c961f5-87d2-4a0b-9e20-ba23efeeae4e",
+    "relationType": "traces-to",
+    "sourceId": "95058b84-577d-47ed-b8cb-65445f1c7aba",
+    "targetId": "000b9208-5963-41bd-8ddd-e69e571b5b36"
+  },
+  {
     "id": "49e6b48b-578f-461d-b2d3-867ee0819ecb",
     "relationType": "verifies",
     "sourceId": "4a2b45f6-4ff2-45d4-b404-4cbe1020e331",
@@ -6944,6 +7642,12 @@
     "targetId": "7763e7a7-6ec9-4836-abec-c614803e1c5d"
   },
   {
+    "id": "4a70a16e-031f-48b2-9f87-f00a9b79ee5f",
+    "relationType": "verifies",
+    "sourceId": "2d61e95a-f9a7-4196-a8fb-c840b982ab80",
+    "targetId": "640e1d91-fdf4-458b-9013-3571820a00a7"
+  },
+  {
     "id": "4a72157b-4a7f-488d-8e32-15296c91119e",
     "relationType": "verifies",
     "sourceId": "45f18f82-2def-4bc5-9fcf-5e0861316fa2",
@@ -6980,6 +7684,12 @@
     "targetId": "0b8590ab-daf6-4b95-972e-67d03a743b74"
   },
   {
+    "id": "4aa2d214-5c26-4b57-8b2c-6ea8cecdb576",
+    "relationType": "implements",
+    "sourceId": "b524d3b8-4e48-4e63-ba30-1b0c38d96bbf",
+    "targetId": "49c023a9-0046-4565-9bf8-75034af7cd6f"
+  },
+  {
     "id": "4aacf59c-0fba-47bf-87bc-4b5ce1e239aa",
     "relationType": "satisfies",
     "sourceId": "08c445dd-e14d-47dd-b4b1-1776a539dcbc",
@@ -6992,10 +7702,22 @@
     "targetId": "4219a47d-6248-4bb6-a03a-231c5bb44773"
   },
   {
+    "id": "4b145e16-d9ca-4390-8cc5-6e0e2f61a812",
+    "relationType": "constrains",
+    "sourceId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
     "id": "4b1dd478-265a-486c-976a-3617f8f83d43",
     "relationType": "satisfies",
     "sourceId": "bdcfe019-e771-4c56-ba74-0ea611571502",
     "targetId": "82850ee4-5c85-407c-8597-af1a919434ab"
+  },
+  {
+    "id": "4b220d2b-4362-4b7d-9107-5a02e7bacbcb",
+    "relationType": "constrains",
+    "sourceId": "57da9569-ea1f-4f0f-bdb9-db525bbaa631",
+    "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
   },
   {
     "id": "4b2ef64d-249a-4df7-87c7-7b2ea1b4103d",
@@ -7155,6 +7877,12 @@
     "targetId": "372273e4-8af5-46b7-a608-30af64164053"
   },
   {
+    "id": "4cbf069e-6b71-454a-8355-8e9db4367e98",
+    "relationType": "satisfies",
+    "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
+    "targetId": "b59c9923-232c-4759-a461-241946413179"
+  },
+  {
     "id": "4ccf7599-5626-4719-bc7f-b9d1d39ce3c2",
     "relationType": "satisfies",
     "sourceId": "32793ee9-a939-498b-a71e-77831ce7ef4c",
@@ -7165,6 +7893,12 @@
     "relationType": "verifies",
     "sourceId": "e87cb07c-8f54-47da-92f7-24edc10bc687",
     "targetId": "1398e996-e863-4aee-9f35-3c84059007be"
+  },
+  {
+    "id": "4cd29a0e-5057-4344-bb70-47abca9d8d36",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "d02b2b8d-622c-48ee-bf95-739b432944e8"
   },
   {
     "id": "4cf0a847-adb1-445e-a5da-ec946c55f3ba",
@@ -7189,6 +7923,12 @@
     "relationType": "satisfies",
     "sourceId": "917d9018-dff9-45b1-87dc-d01f8ac836bb",
     "targetId": "67c60d95-774c-4f55-978a-9ad63e9f256a"
+  },
+  {
+    "id": "4d170861-b652-4fc3-a85c-8ae80658c7ce",
+    "relationType": "satisfies",
+    "sourceId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3",
+    "targetId": "55aaeeca-7d93-4c88-b8f0-5050aca3d91a"
   },
   {
     "id": "4d2e66c6-c65f-4353-ac3d-1e49cf591449",
@@ -7294,6 +8034,12 @@
     "targetId": "a6fb0b37-f3ed-4e0c-84a5-1e2b313bed12"
   },
   {
+    "id": "4dfda749-c2c3-4196-a66b-623545f561ff",
+    "relationType": "constrains",
+    "sourceId": "4afeef62-f0ca-40f8-9d49-16d74a3ac1b4",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
     "id": "4e04ea81-2d45-491d-ad79-35b9bd3323d1",
     "relationType": "verifies",
     "sourceId": "3eca9467-7cfd-4cd1-9ce2-9fef4fc8630f",
@@ -7336,6 +8082,19 @@
     "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
   },
   {
+    "id": "4e82fef2-96f4-4ff1-8a7e-a6eb49214145",
+    "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/.",
+    "relationType": "derives",
+    "sourceId": "640e1d91-fdf4-458b-9013-3571820a00a7",
+    "targetId": "38242f71-4f98-4646-906a-ead71fbb49e5"
+  },
+  {
+    "id": "4e8682d5-ad0b-4555-860a-4d4c042634e8",
+    "relationType": "verifies",
+    "sourceId": "a6ca8b27-10bd-43c6-a09f-564510342b61",
+    "targetId": "8139f75f-7d85-487c-be5e-038877df549d"
+  },
+  {
     "id": "4e99772c-2113-4515-8993-d097e2a0f26b",
     "relationType": "verifies",
     "sourceId": "fae99b57-0571-4d6e-b596-7e6efb8f2cc1",
@@ -7358,6 +8117,12 @@
     "relationType": "derives",
     "sourceId": "9d1ad440-dbc8-482f-8e5d-bbf548cb4c3d",
     "targetId": "87d19f09-14ef-4e28-802a-640769e7271b"
+  },
+  {
+    "id": "4ec3e3d0-4cc6-4f99-b795-baf7b7dd0360",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "d6fa7162-c43f-4a78-9f84-2b2a9c6f20a0"
   },
   {
     "id": "4ec8ddb4-6be6-401c-85f8-1fad624cfefa",
@@ -7400,6 +8165,12 @@
     "relationType": "satisfies",
     "sourceId": "f2d51835-1d89-4283-a8b9-6f3b3e060f05",
     "targetId": "769e5dff-4d80-4b0f-ac16-a79aa26f11df"
+  },
+  {
+    "id": "4ef9a401-b978-425a-9e9e-806351253da8",
+    "relationType": "verifies",
+    "sourceId": "8a9176ac-37e9-4ccf-8b62-b19c3ba57fef",
+    "targetId": "cc8568e0-1c2e-42d6-9fcc-90c98e32f910"
   },
   {
     "id": "4f1b81e4-c72d-4fb8-a9e5-45f72be538b9",
@@ -7721,6 +8492,18 @@
     "targetId": "16931618-6985-448b-a70c-ca7ab5256f20"
   },
   {
+    "id": "524c1a01-2e4e-4507-b83e-3209a1f6ca2f",
+    "relationType": "constrains",
+    "sourceId": "0e7cbb1d-8c19-4928-a1d7-4fe97c2d6ad3",
+    "targetId": "156f4473-a44b-424f-b5c1-62e044522faf"
+  },
+  {
+    "id": "524c50e6-d8cd-4829-a13f-a65da7096505",
+    "relationType": "constrains",
+    "sourceId": "ec21907b-133e-4901-8585-dd34b5c52330",
+    "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
+  },
+  {
     "id": "5258b1ad-1d1f-44c2-b70b-8c6cbf6cdc8a",
     "relationType": "derives",
     "sourceId": "7665d59f-735a-46e3-9438-794291a07450",
@@ -7869,6 +8652,12 @@
     "relationType": "traces-to",
     "sourceId": "1b3d6d74-456f-460b-8e44-d905a1bb475c",
     "targetId": "38f9a288-f924-4f37-96fd-bd1d78660415"
+  },
+  {
+    "id": "53ed5dfa-e08e-4d5b-9d4e-789137db6119",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "cc8568e0-1c2e-42d6-9fcc-90c98e32f910"
   },
   {
     "id": "541ba305-6767-4a5d-93b7-3084691af153",
@@ -8035,6 +8824,18 @@
     "targetId": "559faf51-415a-4d8e-b9ab-76e1f1bfe350"
   },
   {
+    "id": "55a60656-c4db-4092-80ee-40e32f302c3b",
+    "relationType": "constrains",
+    "sourceId": "a8d85e43-4d58-4cae-b61a-4de9f457194a",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
+    "id": "55a8ee7f-986c-48b2-9039-0e6e6496cab3",
+    "relationType": "verifies",
+    "sourceId": "6d41ab93-a6c7-4659-bbb7-66bdf62bfc6d",
+    "targetId": "28ee1b6c-9414-431a-971d-a78121727e5c"
+  },
+  {
     "id": "55aefb40-91d5-439d-aaba-65e461a3351d",
     "relationType": "constrains",
     "sourceId": "427cb7f5-d53b-4791-98e6-d2d753ae810f",
@@ -8089,6 +8890,24 @@
     "targetId": "d3944f6d-1daa-42cd-a5c0-563dc553692c"
   },
   {
+    "id": "5692ef9e-718d-4984-9384-9ccbb2023b74",
+    "relationType": "constrains",
+    "sourceId": "4afeef62-f0ca-40f8-9d49-16d74a3ac1b4",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
+    "id": "56936a6c-b07f-46e7-a5a9-8500e6283f4c",
+    "relationType": "constrains",
+    "sourceId": "76785b6e-2bd8-45ce-8bef-c528ce7354f9",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
+    "id": "56e63cac-e203-4903-9e5e-8e49d128bfcd",
+    "relationType": "verifies",
+    "sourceId": "7a532f19-b3c5-4e4d-ae93-4611b36139e3",
+    "targetId": "b319c535-717f-46d5-aeb9-08c30c475ebb"
+  },
+  {
     "id": "56fe1049-90b8-455d-8368-b18db83f5675",
     "relationType": "satisfies",
     "sourceId": "cb6a98d3-c5bf-4dab-a8c3-ef9072d77086",
@@ -8105,6 +8924,12 @@
     "relationType": "verifies",
     "sourceId": "1a6188ec-7604-4997-820a-35494ced8991",
     "targetId": "67c60d95-774c-4f55-978a-9ad63e9f256a"
+  },
+  {
+    "id": "571cc4ba-f52c-4b7e-b7dc-36769394c3d0",
+    "relationType": "constrains",
+    "sourceId": "9b4ef8fc-9df8-4cd4-b88a-fa598c729b5c",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
     "id": "571f5372-378e-4516-a72d-696663fb2ce1",
@@ -8388,6 +9213,12 @@
     "targetId": "2f2472aa-3e93-41d6-a522-e17ebd4d5f47"
   },
   {
+    "id": "5a52a58b-23a4-4517-9940-7eefb7fd93d4",
+    "relationType": "satisfies",
+    "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+    "targetId": "55aaeeca-7d93-4c88-b8f0-5050aca3d91a"
+  },
+  {
     "id": "5a842ddd-7ddf-49c5-b3e6-57c6390fc52a",
     "relationType": "implements",
     "sourceId": "e41c4ac6-8b6e-44d3-93e1-dc97f18b4272",
@@ -8534,6 +9365,12 @@
     "targetId": "b3833741-0a68-4714-9b2b-cd84c8de9331"
   },
   {
+    "id": "5bd26642-a2c5-4f22-bdf8-6fcff3714afb",
+    "relationType": "constrains",
+    "sourceId": "89100b5b-964b-42b7-ac74-f20a84cee6cc",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
     "id": "5be1c0cc-f64b-435b-953e-eccad28fc173",
     "relationType": "satisfies",
     "sourceId": "156f4473-a44b-424f-b5c1-62e044522faf",
@@ -8562,6 +9399,12 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "edbf0f54-0ada-45e8-b351-d745ad125928"
+  },
+  {
+    "id": "5c2b08c6-2b37-4d1d-b41a-17a65dc5ab1d",
+    "relationType": "verifies",
+    "sourceId": "387bb5c8-1c0e-4074-a9fc-b08e52cb0a10",
+    "targetId": "3bec0807-a239-41d1-995e-b41ff50279c4"
   },
   {
     "id": "5c3e0f22-eff0-466c-a7a7-95cbc2f24971",
@@ -8654,6 +9497,12 @@
     "relationType": "constrains",
     "sourceId": "3b7121e4-2193-478f-9fd0-d4d59f7245fa",
     "targetId": "34d283c6-4a68-45eb-a01c-1d438bb9d805"
+  },
+  {
+    "id": "5d4695d9-2d35-4610-b860-11d6208d9920",
+    "relationType": "verifies",
+    "sourceId": "782f4aba-7ce3-4541-8571-58e043829569",
+    "targetId": "b471b5b9-bdc2-450c-a6e7-baf31062c6c2"
   },
   {
     "id": "5d483565-1471-46f9-9f22-2934cb5b1611",
@@ -8790,6 +9639,12 @@
     "targetId": "a08a857e-3478-45eb-ad23-408b52a37169"
   },
   {
+    "id": "5e5ed027-4fb7-4011-9576-968eaf20ab18",
+    "relationType": "constrains",
+    "sourceId": "d2567b83-d48f-4fef-be18-0866b613f574",
+    "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba"
+  },
+  {
     "id": "5e823855-f9ce-40ab-8ed9-f04304289b57",
     "relationType": "verifies",
     "sourceId": "5cf16eff-2c71-49c0-a2d9-445dc92367d2",
@@ -8877,6 +9732,12 @@
     "targetId": "12a21c0f-dd2e-465d-adc5-3b3373bb079e"
   },
   {
+    "id": "5f513198-b122-47da-9e1e-47a7e22003d0",
+    "relationType": "implements",
+    "sourceId": "7d3c36b3-7e62-46a9-af26-2556937a5d37",
+    "targetId": "fa30059d-5ec9-4a8c-9821-b5e3db19c812"
+  },
+  {
     "id": "5f56c0ee-c969-43e8-bfd6-a129070eb964",
     "relationType": "verifies",
     "sourceId": "34dfc838-21ff-485e-82e6-6f2f8bb7b559",
@@ -8907,6 +9768,12 @@
     "targetId": "de0350a3-84b0-48d4-b255-0718049b181e"
   },
   {
+    "id": "5f9ddabc-4c3c-4493-aef7-3f47e09fe8ef",
+    "relationType": "constrains",
+    "sourceId": "a8d85e43-4d58-4cae-b61a-4de9f457194a",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
     "id": "5fabf6dc-7180-416c-ac0f-2626cb21956c",
     "relationType": "derives",
     "sourceId": "aac21b83-a35d-48d9-a69e-839789bf09df",
@@ -8923,6 +9790,12 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "57e6da7c-a8b7-4f9d-9eff-972ccbd0e3ed"
+  },
+  {
+    "id": "5fd80e3f-1077-4f83-bf5c-4e9282420164",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "8139f75f-7d85-487c-be5e-038877df549d"
   },
   {
     "id": "5fd8c45d-d3c1-4943-a372-ffc3ed614b84",
@@ -8972,6 +9845,19 @@
     "relationType": "derives",
     "sourceId": "f63e9415-f5a7-41db-8a05-4c70c4a7732d",
     "targetId": "ed9cf496-4559-4eed-bbac-8ba6d7d76300"
+  },
+  {
+    "id": "605490ac-90df-42da-909e-c2f1dd7e8f48",
+    "quote": "versioning, showing the version in the application",
+    "relationType": "derives",
+    "sourceId": "28ee1b6c-9414-431a-971d-a78121727e5c",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
+  },
+  {
+    "id": "6063ca95-9f48-462f-8516-d24bf6f78cfc",
+    "relationType": "traces-to",
+    "sourceId": "9e09b3d9-9b21-487e-97de-2a692eb3f714",
+    "targetId": "000b9208-5963-41bd-8ddd-e69e571b5b36"
   },
   {
     "id": "6067f020-2caa-40a7-909c-c60da25cf066",
@@ -9056,6 +9942,12 @@
     "relationType": "verifies",
     "sourceId": "d4bd7629-9519-407f-af02-b83dbf49c04b",
     "targetId": "daf3ff10-ec99-4c6b-a63f-dcd7d5cfbea9"
+  },
+  {
+    "id": "60f5cbc8-c792-4815-b248-f93539aa7f31",
+    "relationType": "satisfies",
+    "sourceId": "85565274-ba9a-4907-bd77-8df441930b28",
+    "targetId": "5bada32a-9246-4044-8b1a-a0a3cc7a9d91"
   },
   {
     "id": "61007542-ccad-4526-9c54-d0979558143c",
@@ -9175,6 +10067,12 @@
     "targetId": "51886165-61b6-4688-afee-a1e1e326c790"
   },
   {
+    "id": "621b9d38-5335-4a71-8f3d-489514f2b4c1",
+    "relationType": "constrains",
+    "sourceId": "65adadc6-1f32-41ff-a8b4-8f2e01920250",
+    "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
+  },
+  {
     "id": "621d81b2-24dc-43e3-b730-aa0d62c43c27",
     "relationType": "derives",
     "sourceId": "be2e4070-085d-466d-8be1-0288a011d31d",
@@ -9254,6 +10152,18 @@
     "targetId": "559faf51-415a-4d8e-b9ab-76e1f1bfe350"
   },
   {
+    "id": "62e88c1a-37aa-4ee4-b682-793f8a0a62b8",
+    "relationType": "traces-to",
+    "sourceId": "28ee1b6c-9414-431a-971d-a78121727e5c",
+    "targetId": "000b9208-5963-41bd-8ddd-e69e571b5b36"
+  },
+  {
+    "id": "62fe7a15-b8c9-4d4f-bfcc-f9b376b94c5f",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "478754a3-1569-4483-8890-5bd586eba6e1"
+  },
+  {
     "id": "630740ca-3313-499d-8522-54c71b2e09cc",
     "relationType": "derives",
     "sourceId": "272365fa-7c38-454f-9b67-53e17aebc150",
@@ -9308,11 +10218,23 @@
     "targetId": "465f5a55-2988-4383-a028-11291c548659"
   },
   {
+    "id": "63ab11aa-98ec-4fc6-a522-9a812925d3ac",
+    "relationType": "constrains",
+    "sourceId": "d2567b83-d48f-4fef-be18-0866b613f574",
+    "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
+  },
+  {
     "id": "63b0ede2-f28f-4605-b701-1192a278fc0a",
     "label": "runs",
     "relationType": "interacts",
     "sourceId": "85905679-2235-47b3-8321-b7ef18209b9b",
     "targetId": "85565274-ba9a-4907-bd77-8df441930b28"
+  },
+  {
+    "id": "63ba70b3-9932-49dd-b77a-e77591d28a26",
+    "relationType": "implements",
+    "sourceId": "89100b5b-964b-42b7-ac74-f20a84cee6cc",
+    "targetId": "c3822333-db92-4a88-b679-1f731008f8d8"
   },
   {
     "id": "63c17d0a-52a2-4cee-a2a0-dadd8ae609da",
@@ -9326,6 +10248,12 @@
     "relationType": "satisfies",
     "sourceId": "67e8199c-9c68-4ca4-9cbe-28b449acf5a4",
     "targetId": "8a276a1a-bb87-49ae-9325-34bddce6a6a7"
+  },
+  {
+    "id": "63e0097a-f653-4388-b9d9-c94a5cb47411",
+    "relationType": "constrains",
+    "sourceId": "d0223cac-c464-4b5d-b2ba-7e266ff2b4c1",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
   },
   {
     "id": "63e4fbcd-8e6e-4d3c-b89a-b48178bda40b",
@@ -9352,6 +10280,12 @@
     "targetId": "ea105c2f-cf5d-4707-96ae-64d1f6dfb3ca"
   },
   {
+    "id": "640a49ee-f967-487c-99f2-641f0fd4cf01",
+    "relationType": "constrains",
+    "sourceId": "2408cf76-ab15-49e4-b0ec-2dc3e2104366",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
     "id": "641f0e55-2eb3-435c-bc13-b3618f77b507",
     "relationType": "verifies",
     "sourceId": "05f938fd-b7d8-4c9d-a741-8b77083c8123",
@@ -9370,10 +10304,35 @@
     "targetId": "7763e7a7-6ec9-4836-abec-c614803e1c5d"
   },
   {
+    "id": "644e123a-14c5-453c-9e47-2bf1161f68bf",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "b319c535-717f-46d5-aeb9-08c30c475ebb"
+  },
+  {
     "id": "644fd7ff-3440-4d95-a2de-ab3cf75d5b92",
     "relationType": "verifies",
     "sourceId": "5534925e-b747-4723-8c17-718bb222f9f3",
     "targetId": "364b6aa3-6057-4c10-973d-b2da937c0ab8"
+  },
+  {
+    "id": "6462cc7e-db29-494e-915c-5faa1a6d5d51",
+    "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/.",
+    "relationType": "derives",
+    "sourceId": "cc8568e0-1c2e-42d6-9fcc-90c98e32f910",
+    "targetId": "38242f71-4f98-4646-906a-ead71fbb49e5"
+  },
+  {
+    "id": "647e7af0-629e-47ba-95ac-58349d28527b",
+    "relationType": "traces-to",
+    "sourceId": "e5244b38-b51b-4360-be87-a9c68a205885",
+    "targetId": "000b9208-5963-41bd-8ddd-e69e571b5b36"
+  },
+  {
+    "id": "648213c4-41c0-47db-8503-a50bd576e417",
+    "relationType": "constrains",
+    "sourceId": "41d43d27-9948-4729-8a80-5fef3f720ac3",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "64923562-9518-4fe1-ae91-61bbf6a11945",
@@ -9394,10 +10353,23 @@
     "targetId": "65b0767b-6771-472a-9e97-f234586e0e3c"
   },
   {
+    "id": "64b6b12f-84c8-479f-b232-63afc1019c7c",
+    "quote": "People use this front end to get their tasks done, most without training. They must find their way with navigation that stays the same from page to page, links that are neither repeated nor vague (not the same link five times on one page, not five links named \"Read more\"), forms that say what went wrong and where, and empty views that say why they are empty; and the usability of the whole must be reviewed against recognised principles on a schedule, not only after users complain. The checks assume Playwright tests under tests/ux with tests/ux/journeys.ts listing the main journeys' pages in the order a user walks them (PAGES: path, and the section where sections have their own navigation), their forms (FORMS: path, the submit button's name, the label of one field with a format to check) and the views that start empty for a new account (EMPTY_VIEWS: path); playwright.config sets the baseURL and, for pages behind sign-in, a storageState. Each test fails on its own in a plain run and, run by radical sense playwright, writes what it measured as a radical-metrics/1 file into RADICAL_METRICS_DIR.",
+    "relationType": "derives",
+    "sourceId": "d02b2b8d-622c-48ee-bf95-739b432944e8",
+    "targetId": "9f04e33f-e331-4def-b39d-61307043c347"
+  },
+  {
     "id": "64c8170d-b4e2-43ec-9b4b-1ac70eaad179",
     "relationType": "satisfies",
     "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
     "targetId": "e1db81db-0a60-4437-a539-7ff83974b99b"
+  },
+  {
+    "id": "64e1fc7f-f0d6-4651-8931-b72f65b3bd39",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "f6ead461-d897-4512-9d0d-6fb82419e413"
   },
   {
     "id": "6547109f-dd3d-4863-b809-edd2e7de9b7c",
@@ -9521,6 +10493,12 @@
     "targetId": "738eb5b7-6293-440e-bb82-1866af593142"
   },
   {
+    "id": "65f9a90c-a09a-4bd6-9cc3-82309505dc06",
+    "relationType": "constrains",
+    "sourceId": "76785b6e-2bd8-45ce-8bef-c528ce7354f9",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
     "id": "6613f0e7-db9f-439a-a220-d7c152a0845a",
     "relationType": "constrains",
     "sourceId": "000b9208-5963-41bd-8ddd-e69e571b5b36",
@@ -9618,6 +10596,13 @@
     "targetId": "38273996-3980-485a-bcd3-f68be8d0faf0"
   },
   {
+    "id": "6796b5e3-6d21-46ce-8f3b-a10097006f06",
+    "quote": "the Review stage lists the concerns the model triggers (concern-unaddressed) and asks their questions before it ends",
+    "relationType": "derives",
+    "sourceId": "fd4bbc67-0b08-414b-b976-68b7728a1d12",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
+  },
+  {
     "id": "6796c890-6343-4000-9085-bf676aa960f7",
     "relationType": "derives",
     "sourceId": "ed01c892-c440-4072-a41d-cb3ffdaee97e",
@@ -9628,6 +10613,18 @@
     "relationType": "satisfies",
     "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
     "targetId": "ff13b192-3e4c-40b7-af94-2073bbc9afe0"
+  },
+  {
+    "id": "67af012b-2e5a-4da3-852b-2f60b064f232",
+    "relationType": "constrains",
+    "sourceId": "65adadc6-1f32-41ff-a8b4-8f2e01920250",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
+    "id": "67cedc99-663a-4d39-a2f4-f793a54ccb56",
+    "relationType": "implements",
+    "sourceId": "6f184a44-80e3-485b-a003-b7c5eebcc904",
+    "targetId": "09634404-680b-4285-8cd7-d4af7d6c8374"
   },
   {
     "id": "67d234b4-5d5b-4300-bc31-5869c7f070cb",
@@ -9646,6 +10643,12 @@
     "relationType": "verifies",
     "sourceId": "9f539754-f002-4492-bb89-d42189bbee1f",
     "targetId": "21d17477-69bd-4298-8903-35336632a002"
+  },
+  {
+    "id": "67f297b1-993e-4172-84d4-399333d8f713",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "640e1d91-fdf4-458b-9013-3571820a00a7"
   },
   {
     "id": "67f78aa5-1693-41b9-8005-84eaccb1d3a7",
@@ -9758,6 +10761,12 @@
     "targetId": "e1de6e31-29c1-446b-97a3-bf26ea3eafad"
   },
   {
+    "id": "695db716-249e-4a7b-8716-9cd281ae6841",
+    "relationType": "verifies",
+    "sourceId": "e7514bfa-6fc2-4430-aeea-970d747db9e2",
+    "targetId": "9d945abc-1ed0-4581-968f-72b4874539f6"
+  },
+  {
     "id": "697b0c51-fb10-4a2b-991b-e57dc6d2751c",
     "relationType": "verifies",
     "sourceId": "8d273868-d5d5-4197-ab47-b403c92fda32",
@@ -9798,6 +10807,12 @@
     "relationType": "derives",
     "sourceId": "9dd227e0-19e5-4cd3-8d19-ac6960163123",
     "targetId": "c7800ee4-60c0-4d98-a317-00e58828fb6e"
+  },
+  {
+    "id": "69acaf03-f183-4713-a2ea-277d08449b2d",
+    "relationType": "verifies",
+    "sourceId": "3f7c4f12-e6e2-4f59-bb6c-ae9625abbcd5",
+    "targetId": "becedbca-1e35-4d1f-a25f-66a099004e40"
   },
   {
     "id": "69c57e99-223c-4b32-a70f-3b68163b985a",
@@ -9969,6 +10984,12 @@
     "targetId": "fe81322a-ee81-4eb8-9576-c420557dfe99"
   },
   {
+    "id": "6b922146-5da9-4f76-99ac-a4ee683ff76f",
+    "relationType": "constrains",
+    "sourceId": "a5f1e099-e069-4eaf-8243-fe4bf80f49a9",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
     "id": "6b94f8fd-be56-4265-80e5-fba9ae7f7051",
     "relationType": "verifies",
     "sourceId": "c889c91f-38d1-4861-b48f-956ebb932608",
@@ -10009,6 +11030,12 @@
     "relationType": "verifies",
     "sourceId": "903e53f2-3e72-473d-9f86-c99ece7cf21e",
     "targetId": "3b101a8b-f56c-4483-a34d-d0ba0676ac15"
+  },
+  {
+    "id": "6bc3f6ca-0eb9-4364-b740-a3daac70ad35",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "28d746a3-aee3-4622-a682-40bc3a340b98"
   },
   {
     "id": "6bd9355b-851f-42e0-b09f-d001fdf77d60",
@@ -10095,6 +11122,12 @@
     "targetId": "2649ea79-d87c-4212-bd36-e9bb7a8082e8"
   },
   {
+    "id": "6c83f3d8-5927-4753-8206-524d2991cbf1",
+    "relationType": "constrains",
+    "sourceId": "a8d85e43-4d58-4cae-b61a-4de9f457194a",
+    "targetId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3"
+  },
+  {
     "id": "6c84099c-c510-4749-89a5-b2387353a3cd",
     "relationType": "derives",
     "sourceId": "f5f7cd11-2115-4632-8785-5bdf4e67cb80",
@@ -10161,6 +11194,13 @@
     "relationType": "transition",
     "sourceId": "d4a4d3ec-dcf3-4912-9ab4-a0fb4af41e49",
     "targetId": "b140b8c9-5989-44f1-a389-157107a29b01"
+  },
+  {
+    "id": "6d7026e9-016a-4b15-8b45-3e66d4cbfb4e",
+    "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/.",
+    "relationType": "derives",
+    "sourceId": "047d8115-3091-49c5-8a2a-44954a73b303",
+    "targetId": "38242f71-4f98-4646-906a-ead71fbb49e5"
   },
   {
     "id": "6da7717d-1428-4933-9563-7e46051b2f99",
@@ -10380,6 +11420,12 @@
     "targetId": "3c344c4a-3f1b-463d-a1eb-dfc0ab8e8030"
   },
   {
+    "id": "6fd683b9-5cce-4f34-be40-03cbcd040a7e",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "3bec0807-a239-41d1-995e-b41ff50279c4"
+  },
+  {
     "id": "6ff46c5c-7b64-49df-bf67-ddd81b9b0acd",
     "relationType": "satisfies",
     "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
@@ -10527,6 +11573,12 @@
     "targetId": "f7bf20b8-9baf-4c85-9da4-ddf93f457a98"
   },
   {
+    "id": "711f2460-a1a0-4cfe-9e3d-d9f307d5ec84",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "489f02f8-de47-415c-986a-ec32126fa7fe"
+  },
+  {
     "id": "7133c5ff-8551-4441-8a4d-4256566dc6d3",
     "relationType": "verifies",
     "sourceId": "f68ed0f7-d8b2-4263-a6fd-9004e6dac43d",
@@ -10543,6 +11595,12 @@
     "relationType": "performed-by",
     "sourceId": "e5e813ae-8009-40ae-982e-362fdbc67db4",
     "targetId": "c1c3c2ce-497e-4ebb-806f-c5beb9fa9815"
+  },
+  {
+    "id": "71892bc8-63be-47b7-8255-094a5b98b8fe",
+    "relationType": "satisfies",
+    "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+    "targetId": "28ee1b6c-9414-431a-971d-a78121727e5c"
   },
   {
     "id": "71a83d2d-493d-4868-8135-080ccccf5010",
@@ -10567,6 +11625,12 @@
     "relationType": "verifies",
     "sourceId": "b5b042bf-52f5-4661-ba60-56bf78f88b79",
     "targetId": "0f125eb5-6f65-4523-a583-3b4a0bec44b7"
+  },
+  {
+    "id": "71da9055-952c-4b6d-a654-395fceef4a1c",
+    "relationType": "constrains",
+    "sourceId": "c3822333-db92-4a88-b679-1f731008f8d8",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
     "id": "71e684b3-beeb-4240-bd0f-566778cb196e",
@@ -10623,6 +11687,12 @@
     "targetId": "565e5122-1760-436e-abc1-27ede4312bdc"
   },
   {
+    "id": "724caad4-ae17-405c-a8b3-137b2e083d56",
+    "relationType": "constrains",
+    "sourceId": "a8d85e43-4d58-4cae-b61a-4de9f457194a",
+    "targetId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b"
+  },
+  {
     "id": "725bd903-1b5b-4f8e-bc82-382eebbf7d5e",
     "relationType": "satisfies",
     "sourceId": "32793ee9-a939-498b-a71e-77831ce7ef4c",
@@ -10639,6 +11709,12 @@
     "relationType": "derives",
     "sourceId": "77e18ea3-eff8-4f86-b64c-f32b1a66ab80",
     "targetId": "fdd25640-6955-44fd-bb26-3440644f8614"
+  },
+  {
+    "id": "726784c8-b691-492d-99a0-fa16db7f60a6",
+    "relationType": "verifies",
+    "sourceId": "1d597a0b-6963-41de-ab0e-4c7767a496e9",
+    "targetId": "e5244b38-b51b-4360-be87-a9c68a205885"
   },
   {
     "id": "72784404-1d5a-4f53-b618-d94ea4b35560",
@@ -10756,6 +11832,12 @@
     "targetId": "cc714896-0081-4844-b0ee-763bf5a21e1f"
   },
   {
+    "id": "7375d422-a222-4d02-b584-bd160543cc14",
+    "relationType": "constrains",
+    "sourceId": "4afeef62-f0ca-40f8-9d49-16d74a3ac1b4",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
     "id": "737b9904-e4e1-4724-9b31-c310c68bd988",
     "relationType": "verifies",
     "sourceId": "a724ed72-0c22-4f41-a7bb-760ce3622b2e",
@@ -10822,6 +11904,12 @@
     "targetId": "cb6a98d3-c5bf-4dab-a8c3-ef9072d77086"
   },
   {
+    "id": "743c9d6f-b038-440a-bf93-327d30967a29",
+    "relationType": "constrains",
+    "sourceId": "a8d85e43-4d58-4cae-b61a-4de9f457194a",
+    "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba"
+  },
+  {
     "id": "743eb4f8-22a8-4fe3-93b0-20ff9d5e0112",
     "relationType": "derives",
     "sourceId": "1300e9b1-3b19-4700-9c95-5d25808ee887",
@@ -10834,10 +11922,22 @@
     "targetId": "2046ca00-594a-4946-a08c-d39ad64559b6"
   },
   {
+    "id": "7461533c-a558-4b03-bbc6-47963a70b3c0",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "28d746a3-aee3-4622-a682-40bc3a340b98"
+  },
+  {
     "id": "746a63f8-6279-41a2-9843-1cb20e960cd4",
     "relationType": "constrains",
     "sourceId": "b1b433f8-2c80-4c8b-b0fd-b11c3610544d",
     "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  {
+    "id": "746b6948-c0e2-431d-8a9f-f9e79de3f802",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "89fa4a8f-2c19-4f02-b39b-cd6b3bf96833"
   },
   {
     "id": "748de323-b708-43ec-a3e2-c77693091a8f",
@@ -10850,6 +11950,12 @@
     "relationType": "verifies",
     "sourceId": "8c1d8a87-415a-4366-b181-4a7116e74a28",
     "targetId": "e3b7e896-022b-4fa0-b343-7440d4ba2b5e"
+  },
+  {
+    "id": "74a6fbbf-790d-472e-8ca4-ffbd516c1991",
+    "relationType": "constrains",
+    "sourceId": "ec21907b-133e-4901-8585-dd34b5c52330",
+    "targetId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3"
   },
   {
     "id": "74ce50dc-ea10-4a0c-b716-791c65c111bb",
@@ -10874,6 +11980,13 @@
     "relationType": "verifies",
     "sourceId": "40a52f98-bcbe-4c56-a146-f720fd799bff",
     "targetId": "c9e097db-0354-4000-be0b-36b845e7f2bf"
+  },
+  {
+    "id": "74df6bf9-0220-43b7-9dae-4057f91c8996",
+    "quote": "\"UX & Accessibility\" group",
+    "relationType": "derives",
+    "sourceId": "f3190c2b-5608-40ce-8aa2-b65c4107fac1",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
   },
   {
     "id": "74f5dd71-79a6-4f5c-8b37-3322d4bd0a81",
@@ -11087,6 +12200,12 @@
     "targetId": "0e180cb1-5bac-46de-814f-7884ee6caf4f"
   },
   {
+    "id": "76c224cc-ee72-449a-894e-96d065fb94ba",
+    "relationType": "verifies",
+    "sourceId": "f37bd3e6-6082-4c8f-a8a3-608cf29964b4",
+    "targetId": "489f02f8-de47-415c-986a-ec32126fa7fe"
+  },
+  {
     "id": "76ce3d82-64a5-42dc-80bc-ecf6ceca5c49",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -11097,6 +12216,12 @@
     "relationType": "derives",
     "sourceId": "1b4b50ca-d1e7-4160-9773-50aaa35cdb94",
     "targetId": "d8c06b7a-97f4-4e61-a9e5-5145b56c1e64"
+  },
+  {
+    "id": "770025f4-eed7-4e7c-b7d8-9e0528b99a1c",
+    "relationType": "constrains",
+    "sourceId": "fa30059d-5ec9-4a8c-9821-b5e3db19c812",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
   },
   {
     "id": "77014198-203e-40cc-89d0-50dcfb62e1cf",
@@ -11127,6 +12252,12 @@
     "relationType": "traces-to",
     "sourceId": "66e31ca1-6161-4254-9e67-179a62b9a399",
     "targetId": "4c17ae3e-db1b-4f42-9a57-d7a0b81733d9"
+  },
+  {
+    "id": "771fe6b5-4387-4b99-a793-bb63ee5c1088",
+    "relationType": "constrains",
+    "sourceId": "84859577-2c97-4afe-928c-af4e3e34ad1a",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "772f4e6e-a0c7-4737-9048-a649b0ddcdd5",
@@ -11496,6 +12627,12 @@
     "targetId": "5d8ffddf-95d1-49ff-a154-98cf9737a094"
   },
   {
+    "id": "7a0f71c8-0f09-43d1-8443-b35219fffc71",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "d02b2b8d-622c-48ee-bf95-739b432944e8"
+  },
+  {
     "id": "7a0f74d8-9bb2-4c2b-bd81-de0aa8362b21",
     "label": "bundled into",
     "relationType": "interacts",
@@ -11513,6 +12650,12 @@
     "relationType": "verifies",
     "sourceId": "955627cc-64a4-4923-9062-cab714a7a508",
     "targetId": "9088b38b-2284-455c-b777-0789be856629"
+  },
+  {
+    "id": "7a376163-bb80-49d3-a90c-c44309683dd4",
+    "relationType": "implements",
+    "sourceId": "902d4565-5101-4f8f-b584-ed440133392e",
+    "targetId": "57da9569-ea1f-4f0f-bdb9-db525bbaa631"
   },
   {
     "id": "7a405f8d-5eb2-47c4-9ffa-bb3716f237ec",
@@ -11650,6 +12793,12 @@
     "targetId": "41fad17d-dab5-456e-9943-f8bf4cd3f764"
   },
   {
+    "id": "7b39c14c-1870-4162-82b5-a59beeb99587",
+    "relationType": "satisfies",
+    "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+    "targetId": "e1dd7654-02cb-4ee5-961a-c6520f58c890"
+  },
+  {
     "id": "7b52c56b-05fb-42f6-9f13-afd4025abf54",
     "relationType": "derives",
     "sourceId": "01635a8a-9c61-4e42-b1c9-5a3882914c15",
@@ -11734,6 +12883,12 @@
     "targetId": "e1de6e31-29c1-446b-97a3-bf26ea3eafad"
   },
   {
+    "id": "7bf3b8e8-d8f5-42a8-9e6c-448ad7e45abe",
+    "relationType": "verifies",
+    "sourceId": "92eeab3e-6800-4271-8394-3e654620e751",
+    "targetId": "2334a12e-58a9-4d71-8d90-3c73040f3976"
+  },
+  {
     "id": "7bfd597a-f977-4403-ac49-adf1bcaffe35",
     "relationType": "implements",
     "sourceId": "e7c8c7ff-8512-490c-aeda-9fb3a6367dab",
@@ -11744,6 +12899,12 @@
     "relationType": "verifies",
     "sourceId": "de678c30-acf0-4848-8555-c687c7686980",
     "targetId": "600f300b-d75d-4a71-86cf-cd3611f0cd92"
+  },
+  {
+    "id": "7c22b43e-603e-43f6-becc-f5a3a8f8df8d",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "becedbca-1e35-4d1f-a25f-66a099004e40"
   },
   {
     "id": "7c2a1d4d-6855-4141-9f9a-ffba397bb224",
@@ -11786,6 +12947,12 @@
     "relationType": "verifies",
     "sourceId": "28b96e68-030b-4d30-b525-97dde7811a57",
     "targetId": "0d68d40c-e015-451b-adf0-1e256bd7df6e"
+  },
+  {
+    "id": "7d0a0cd1-d226-4dc3-bfee-60090edf7440",
+    "relationType": "satisfies",
+    "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+    "targetId": "334e58d2-95bc-40af-9f8b-f4d44e126742"
   },
   {
     "id": "7d10a1f0-fb23-4571-89bc-e02960a019fb",
@@ -11853,6 +13020,12 @@
     "relationType": "verifies",
     "sourceId": "e0b4156b-e187-48dc-9e46-c9abcfeb8857",
     "targetId": "7b7b2c3e-15f3-44dd-a970-e6cd3c3f292b"
+  },
+  {
+    "id": "7d880439-f85b-4022-8992-0f2b77b26bd2",
+    "relationType": "verifies",
+    "sourceId": "d413b123-6d1b-4eda-883a-646c865ce6e8",
+    "targetId": "fd4bbc67-0b08-414b-b976-68b7728a1d12"
   },
   {
     "id": "7d94df6c-b08b-472d-8077-7169b69c751e",
@@ -11943,6 +13116,19 @@
     "relationType": "derives",
     "sourceId": "bcc216d1-7896-405b-871b-298f8290883c",
     "targetId": "0547a0d4-ee5c-4a35-a763-c3be86838039"
+  },
+  {
+    "id": "7e8726f0-61e5-4495-ba0f-501042f03ec3",
+    "relationType": "constrains",
+    "sourceId": "4dabc3ca-84ee-4081-8ded-6aea912acc88",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
+    "id": "7e8cb1fd-fcf0-417e-a79c-b75369255d12",
+    "quote": "baselines from the first run",
+    "relationType": "derives",
+    "sourceId": "d69665b4-33bc-46e0-8edf-a41126bd4d10",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
   },
   {
     "id": "7e9f6de1-0be7-4123-9d19-9ef7bd47207a",
@@ -12036,6 +13222,18 @@
     "relationType": "satisfies",
     "sourceId": "32793ee9-a939-498b-a71e-77831ce7ef4c",
     "targetId": "9b087a72-9ba9-48a6-834e-319cbe40f887"
+  },
+  {
+    "id": "7fba9937-3e1d-46f0-9731-cb7ce5966f2b",
+    "relationType": "traces-to",
+    "sourceId": "9cf4dc15-4d62-46f1-8ccd-19019ad0af3c",
+    "targetId": "0e7cbb1d-8c19-4928-a1d7-4fe97c2d6ad3"
+  },
+  {
+    "id": "7fcb010f-7807-4ea6-8a9f-337cecb8e249",
+    "relationType": "traces-to",
+    "sourceId": "d69665b4-33bc-46e0-8edf-a41126bd4d10",
+    "targetId": "0e7cbb1d-8c19-4928-a1d7-4fe97c2d6ad3"
   },
   {
     "id": "7fdaa6b8-149a-4544-b75d-c1ad1a569052",
@@ -12148,6 +13346,12 @@
     "targetId": "88fd21dd-e52d-44e3-a9f1-e6532151edba"
   },
   {
+    "id": "811f9fc8-fadd-483f-8069-666da29ff688",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "1a5aa622-3a32-4342-9c2a-2efae7463b84"
+  },
+  {
     "id": "8143ea96-fa6a-4168-8b93-9108865388fb",
     "relationType": "traces-to",
     "sourceId": "c8e2e282-69ff-47a3-8eae-edadc1616e02",
@@ -12176,6 +13380,12 @@
     "relationType": "verifies",
     "sourceId": "e65765b1-2997-4c3c-8cc4-8479faa96589",
     "targetId": "1b2f3ecc-0906-4b58-867f-12d30819c8e7"
+  },
+  {
+    "id": "8163c952-c083-43d7-b169-3d8fa3fce121",
+    "relationType": "constrains",
+    "sourceId": "2408cf76-ab15-49e4-b0ec-2dc3e2104366",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
     "id": "8184b7ae-a9fd-4c9e-ab73-ab1470967a6d",
@@ -12251,6 +13461,12 @@
     "targetId": "836ccef2-64a4-4d27-82f1-ba64413242d7"
   },
   {
+    "id": "8243f2c8-88e4-44e9-80e0-068e971a05ef",
+    "relationType": "constrains",
+    "sourceId": "902d4565-5101-4f8f-b584-ed440133392e",
+    "targetId": "85565274-ba9a-4907-bd77-8df441930b28"
+  },
+  {
     "id": "82693f81-4350-4f2f-a91d-78a5c45a97b2",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -12318,6 +13534,12 @@
     "targetId": "aa1dd847-37e0-44a5-b73e-0f6da024f402"
   },
   {
+    "id": "830b99c6-3b56-494c-be55-169d4805c028",
+    "relationType": "satisfies",
+    "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+    "targetId": "478754a3-1569-4483-8890-5bd586eba6e1"
+  },
+  {
     "id": "830d2d5b-c34e-4872-a825-5af8bf929bbb",
     "relationType": "verifies",
     "sourceId": "a19992e7-551a-4e13-afec-2f1e9f261e10",
@@ -12354,6 +13576,12 @@
     "targetId": "104eb9ed-8c87-4875-9339-a251240b3897"
   },
   {
+    "id": "8349f05d-f6e2-487c-a45b-76b4d9fdb965",
+    "relationType": "constrains",
+    "sourceId": "09634404-680b-4285-8cd7-d4af7d6c8374",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
     "id": "83550eb6-3cd9-442a-8760-ec9dcbd7b803",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -12378,10 +13606,22 @@
     "targetId": "5d58c3d6-6c32-4969-a88c-874de735ea7a"
   },
   {
+    "id": "83a8aba3-8024-4105-80fd-96e2b717de86",
+    "relationType": "constrains",
+    "sourceId": "6fd21664-6402-4869-b26d-61cdf1ef681e",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
     "id": "83d3384a-18f7-44b7-9998-5bef9c4919c3",
     "relationType": "satisfies",
     "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
     "targetId": "6edf7637-1490-452b-a653-f12efcdeff87"
+  },
+  {
+    "id": "83e1d172-2d5c-4b39-913b-0b3d3d17cb9e",
+    "relationType": "constrains",
+    "sourceId": "6fd21664-6402-4869-b26d-61cdf1ef681e",
+    "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba"
   },
   {
     "id": "84129bd4-41ea-4857-9382-5818fc256ba7",
@@ -12456,6 +13696,12 @@
     "relationType": "verifies",
     "sourceId": "3f19abaf-6672-47b2-ba77-35b8d28fd81c",
     "targetId": "ab0af1be-39f0-416d-abd3-392110f1b22b"
+  },
+  {
+    "id": "8551a6ac-779d-4f75-95e9-6824b8c208cc",
+    "relationType": "constrains",
+    "sourceId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
     "id": "85757663-9a50-46d5-a643-0ca723f11e36",
@@ -12622,10 +13868,22 @@
     "targetId": "5d8ffddf-95d1-49ff-a154-98cf9737a094"
   },
   {
+    "id": "870742da-3d61-43cd-b67a-7bbc2610e545",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "489f02f8-de47-415c-986a-ec32126fa7fe"
+  },
+  {
     "id": "872cc212-d5d9-4b3e-8d26-21f784ec242b",
     "relationType": "derives",
     "sourceId": "b680e082-f271-4cab-a882-db7970ca5514",
     "targetId": "a9394a73-6e11-43a8-a8af-1fa1e42ba31f"
+  },
+  {
+    "id": "872cd175-83d7-466b-8dda-0050406b1351",
+    "relationType": "traces-to",
+    "sourceId": "f1cf2267-82df-4cd3-860d-c0b5df01dda0",
+    "targetId": "57da9569-ea1f-4f0f-bdb9-db525bbaa631"
   },
   {
     "id": "872ec47c-17d9-4ac1-9cfb-0789677f5b92",
@@ -12681,6 +13939,13 @@
     "relationType": "derives",
     "sourceId": "47c0a20b-e190-439f-943c-e0e6124a5d40",
     "targetId": "222d462b-5153-41c2-b6c8-f31a148e75de"
+  },
+  {
+    "id": "878c1da8-f71b-4d78-a9e7-76852b4b5373",
+    "quote": "People with disabilities use this front end with a keyboard, a screen reader, magnification or voice control, and the law may require that they can. Every function of the main journeys must work for them, to a WCAG level that is decided and checked on every change, with what automated checks cannot see tested by people, what is not yet accessible stated openly, and failures fixed on a schedule rather than when someone complains. The checks assume Playwright tests under tests/a11y with tests/a11y/pages.ts listing the pages of the main journeys (PAGES: path) and the states worth checking (STATES: a name, a path and, where needed, the steps that open a dialog, show a form's errors or empty a list); playwright.config sets the baseURL and, for pages behind sign-in, a storageState. Each test fails on its own in a plain run and, run by radical sense playwright, writes what it measured as a radical-metrics/1 file into RADICAL_METRICS_DIR.",
+    "relationType": "derives",
+    "sourceId": "89fa4a8f-2c19-4f02-b39b-cd6b3bf96833",
+    "targetId": "278066be-80d4-4e94-b25b-c9772c7c6bf6"
   },
   {
     "id": "879098cf-187b-48df-a856-2a8ff6dc98c2",
@@ -12769,10 +14034,23 @@
     "targetId": "917d9018-dff9-45b1-87dc-d01f8ac836bb"
   },
   {
+    "id": "8853157d-57d4-4f99-87d0-1c6bed3b2aa1",
+    "quote": "People open this front end on their own phones and computers, over networks they do not choose, some zoomed in, most with a thumb. A page that paints late, jumps while it loads, answers a tap slowly, scrolls sideways or has targets too small to hit loses them, however it looks on a developer's laptop. The budget it is held to and the rules for small screens must be written down, measured on every change and, once it is live, from real visits, and judged in one place. The checks assume the main pages are listed in the tests (/, /search and /checkout in the snippets), a preview server on http://localhost:4173 (npm run preview), and, with real-user monitoring, a table rum_events(name, value, device, page_group, received_at) that the page's beacons fill.",
+    "relationType": "derives",
+    "sourceId": "1a5aa622-3a32-4342-9c2a-2efae7463b84",
+    "targetId": "ce910f46-7e18-44d3-9e0b-811f4775fb57"
+  },
+  {
     "id": "8885ffc3-6fc5-43d3-b3ef-efcd63465912",
     "relationType": "verifies",
     "sourceId": "6495b5ee-1eef-4114-a5a5-8c21eda35e68",
     "targetId": "3e5d9941-57b7-4e51-8f05-2562504826dc"
+  },
+  {
+    "id": "888f0d79-06e9-4293-b4aa-429c0c9ded19",
+    "relationType": "verifies",
+    "sourceId": "43732a01-c185-4bf4-8484-ee82f74955c1",
+    "targetId": "55aaeeca-7d93-4c88-b8f0-5050aca3d91a"
   },
   {
     "id": "889c8b54-e220-41be-b1af-139ad1ed75c1",
@@ -12809,6 +14087,12 @@
     "relationType": "verifies",
     "sourceId": "5fb718b4-f631-436b-abf0-d4c91abb7d1a",
     "targetId": "dbc05b95-40d5-4333-9683-585b1d4028f7"
+  },
+  {
+    "id": "88dc1c6d-45b7-40da-98b3-2f335dd5bf11",
+    "relationType": "verifies",
+    "sourceId": "77d7edd0-9856-4c59-acc0-2af80cfdc16e",
+    "targetId": "d6fa7162-c43f-4a78-9f84-2b2a9c6f20a0"
   },
   {
     "id": "88e76ad0-47a8-4d60-9e51-65222374df01",
@@ -12869,6 +14153,12 @@
     "relationType": "derives",
     "sourceId": "e1de5d03-c7df-43d3-adec-aa0fc01fd655",
     "targetId": "157f7331-5a0f-4b2e-8524-06a7a9152234"
+  },
+  {
+    "id": "894b047b-1f34-4014-bae3-d520ed4b547c",
+    "relationType": "verifies",
+    "sourceId": "ebb6b3df-cbb4-4819-80d3-e745bf92fe03",
+    "targetId": "f6ead461-d897-4512-9d0d-6fb82419e413"
   },
   {
     "description": "CLI npm releases use the shared npm-publish.yml workflow with package=cli.",
@@ -13128,6 +14418,12 @@
     "targetId": "0bd8eec3-7d14-4562-890f-8ef992d2cdb6"
   },
   {
+    "id": "8b61a251-a53c-45d9-9371-3cc388de52c9",
+    "relationType": "satisfies",
+    "sourceId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3",
+    "targetId": "cc8568e0-1c2e-42d6-9fcc-90c98e32f910"
+  },
+  {
     "id": "8b6efe48-2250-4c39-91f1-baf2cead238f",
     "relationType": "satisfies",
     "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
@@ -13174,6 +14470,12 @@
     "relationType": "satisfies",
     "sourceId": "024d390d-832f-4258-8ca2-89530b50877e",
     "targetId": "ae62c2b3-448f-45c4-b081-9170410fec37"
+  },
+  {
+    "id": "8beee59f-7bba-4068-934e-3d454e27829e",
+    "relationType": "satisfies",
+    "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+    "targetId": "55aaeeca-7d93-4c88-b8f0-5050aca3d91a"
   },
   {
     "description": "reads the model and its metamodel",
@@ -13229,6 +14531,12 @@
     "relationType": "verifies",
     "sourceId": "71fc0154-4260-4fdc-a0c1-089ada78efa4",
     "targetId": "0f125eb5-6f65-4523-a583-3b4a0bec44b7"
+  },
+  {
+    "id": "8ca59eaf-cc2a-4ade-9b11-4711c3a60619",
+    "relationType": "constrains",
+    "sourceId": "4dabc3ca-84ee-4081-8ded-6aea912acc88",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "8cdb5186-ec1f-4cef-a18f-3b9f4148c090",
@@ -13323,6 +14631,12 @@
     "targetId": "1bfcb405-1c9a-43dd-8872-e182c709b3e9"
   },
   {
+    "id": "8de87d63-c74a-41be-98d7-54a0b3f93941",
+    "relationType": "constrains",
+    "sourceId": "ec21907b-133e-4901-8585-dd34b5c52330",
+    "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba"
+  },
+  {
     "id": "8deb8671-2fec-4fcd-af5f-f6e6175a6b48",
     "label": "uses",
     "relationType": "interacts",
@@ -13352,6 +14666,12 @@
     "relationType": "verifies",
     "sourceId": "5f72c968-5bd0-45bb-afdb-da2ebd7e5069",
     "targetId": "7a16cab3-535f-4556-83a1-f4ed81746679"
+  },
+  {
+    "id": "8e424a19-16a1-4433-ad56-8788a35df79a",
+    "relationType": "satisfies",
+    "sourceId": "85565274-ba9a-4907-bd77-8df441930b28",
+    "targetId": "2334a12e-58a9-4d71-8d90-3c73040f3976"
   },
   {
     "id": "8e591782-5ed5-4613-b639-4b37e325b28b",
@@ -13409,10 +14729,22 @@
     "targetId": "3f6b0f3e-9a75-4ad9-813a-2daaabaee8f4"
   },
   {
+    "id": "8ec31b65-a91f-4721-b4fc-c46f86ad52df",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "489f02f8-de47-415c-986a-ec32126fa7fe"
+  },
+  {
     "id": "8ec68045-fe55-4934-b921-d6de983b0c0f",
     "relationType": "verifies",
     "sourceId": "58502df3-d03b-40a1-9239-fb6d5956e66b",
     "targetId": "6994c3bf-c6c7-4cdd-ba2f-ed0b6b5a6179"
+  },
+  {
+    "id": "8ed82414-b211-4fb4-978f-1bf89417de9d",
+    "relationType": "satisfies",
+    "sourceId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "targetId": "e1dd7654-02cb-4ee5-961a-c6520f58c890"
   },
   {
     "id": "8f0edf9c-1f65-4a2b-b9bd-762e3dd4d6b7",
@@ -13487,6 +14819,12 @@
     "relationType": "verifies",
     "sourceId": "e87cb07c-8f54-47da-92f7-24edc10bc687",
     "targetId": "bcc216d1-7896-405b-871b-298f8290883c"
+  },
+  {
+    "id": "8f92dcea-f83d-4434-b4a6-bb575df04b36",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "334e58d2-95bc-40af-9f8b-f4d44e126742"
   },
   {
     "id": "8fa40fb1-a661-4627-ac2a-36dc2945b016",
@@ -13581,6 +14919,12 @@
     "targetId": "5bae57b7-ffe0-42b3-98ce-f96dfb62a3ef"
   },
   {
+    "id": "9063be29-c553-4793-83a8-26c6e5329fbc",
+    "relationType": "satisfies",
+    "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+    "targetId": "334e58d2-95bc-40af-9f8b-f4d44e126742"
+  },
+  {
     "id": "90681a03-2895-4236-9332-3a58f0eadbbc",
     "relationType": "constrains",
     "sourceId": "5eab149c-520e-4e36-83c6-39e642ba65d0",
@@ -13603,6 +14947,12 @@
     "relationType": "verifies",
     "sourceId": "d2c7838e-bf69-4a8c-a393-f748e2aa3d39",
     "targetId": "5d5e9da2-94be-44e0-ab09-67979ec3685d"
+  },
+  {
+    "id": "90b9b319-07e2-4a67-8d30-e014a03cc47d",
+    "relationType": "constrains",
+    "sourceId": "80210184-8ca0-4fce-a5f7-d7006aad16e8",
+    "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
   },
   {
     "id": "90d0d72e-1da8-4e17-87e2-ac8095989664",
@@ -13708,6 +15058,18 @@
     "targetId": "1bf29152-a346-438f-8654-f5be50835edb"
   },
   {
+    "id": "920a25a6-ee51-4653-907c-cafacf4906cf",
+    "relationType": "satisfies",
+    "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+    "targetId": "334e58d2-95bc-40af-9f8b-f4d44e126742"
+  },
+  {
+    "id": "920d1e46-154a-44b3-a0b9-1d8f65770fe4",
+    "relationType": "satisfies",
+    "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+    "targetId": "e1dd7654-02cb-4ee5-961a-c6520f58c890"
+  },
+  {
     "id": "92100d22-bdfc-452e-bae9-7b3a6b0814e3",
     "relationType": "satisfies",
     "sourceId": "b66354fc-6237-40a6-bd7d-3ecd3dd64a1e",
@@ -13718,6 +15080,12 @@
     "relationType": "traces-to",
     "sourceId": "ed01c892-c440-4072-a41d-cb3ffdaee97e",
     "targetId": "427cb7f5-d53b-4791-98e6-d2d753ae810f"
+  },
+  {
+    "id": "92227913-7645-4c18-8161-f62b4fe31df7",
+    "relationType": "verifies",
+    "sourceId": "bb427101-c6f8-467b-9ce3-c6fe8d10ecc5",
+    "targetId": "b471b5b9-bdc2-450c-a6e7-baf31062c6c2"
   },
   {
     "id": "9226c9c0-2a58-4023-994d-9c12277ab6c1",
@@ -13748,6 +15116,12 @@
     "relationType": "derives",
     "sourceId": "18d7658e-a9dd-40c7-b571-ae6a25601c62",
     "targetId": "d54803b1-292b-49bd-b723-ef8a5930dc6e"
+  },
+  {
+    "id": "9286c459-a59e-47b8-a342-578221531fe3",
+    "relationType": "satisfies",
+    "sourceId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "targetId": "334e58d2-95bc-40af-9f8b-f4d44e126742"
   },
   {
     "id": "92a1a131-1efd-426a-a466-cb276e979eb8",
@@ -13900,6 +15274,13 @@
     "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
   },
   {
+    "id": "93e9e8b4-3e0e-45d5-a809-a3eaa207ed1e",
+    "quote": "Mobile & perceived performance (takes Web Vitals lab and field separately for mobile and desktop, Reflow 320 px, touch targets, screenshots on phones)\nthe look in mobile mode\ndata from real users stays with one's own RUM",
+    "relationType": "derives",
+    "sourceId": "9e09b3d9-9b21-487e-97de-2a692eb3f714",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
+  },
+  {
     "id": "9410d3a8-ac48-4b34-aede-03d3c429e807",
     "relationType": "derives",
     "sourceId": "eab07f2c-b0ed-452a-8feb-8d3f1ece02d1",
@@ -13910,6 +15291,13 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "85061442-a2cf-4110-ac0c-356abce02e48"
+  },
+  {
+    "id": "9436f150-be38-4c6c-bb0e-b95b9c78c6ab",
+    "quote": "is there a pack in the Hub that speaks about good CI/CD practices\nwith sensors and so on that make you measure them\npipeline as code, required checks and branch protection, build once and promote the artifact, OIDC instead of static secrets",
+    "relationType": "derives",
+    "sourceId": "cda13e7f-1703-4d3a-82f6-17b80acc2762",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
   },
   {
     "id": "94442f8c-53c5-4d5a-a715-ff794b5bd7a0",
@@ -13978,6 +15366,12 @@
     "targetId": "05608e72-b286-4d06-8760-b6b4e9d966a2"
   },
   {
+    "id": "94d4dc4d-d79a-4ad3-b7f6-5f14c3110e60",
+    "relationType": "constrains",
+    "sourceId": "d0223cac-c464-4b5d-b2ba-7e266ff2b4c1",
+    "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba"
+  },
+  {
     "id": "94e03cce-ea43-4012-b924-363b34ecdb16",
     "relationType": "verifies",
     "sourceId": "40ed544b-79fe-44b5-9e24-3ce7c1af05c8",
@@ -13988,6 +15382,12 @@
     "relationType": "verifies",
     "sourceId": "c01b2fa5-1a14-4f36-94f0-775a353b38c6",
     "targetId": "963cba85-ed07-4171-ab9c-e8038d2fd528"
+  },
+  {
+    "id": "94f4ba55-c85f-4cb6-b84d-92d980ea75b5",
+    "relationType": "verifies",
+    "sourceId": "6da94bdb-e378-48e4-a45e-3ebb1e5df427",
+    "targetId": "e1dd7654-02cb-4ee5-961a-c6520f58c890"
   },
   {
     "id": "9515d9ea-40a2-4db2-8edc-d0a64341b33f",
@@ -14117,10 +15517,23 @@
     "targetId": "7eff976f-5f58-4211-a0e8-fa7d66309f3a"
   },
   {
+    "id": "964883e2-b23d-453b-899a-4d72f755ff69",
+    "relationType": "satisfies",
+    "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+    "targetId": "28d746a3-aee3-4622-a682-40bc3a340b98"
+  },
+  {
     "id": "964ae95e-8a0a-4021-b7c7-2ffa3c351249",
     "relationType": "verifies",
     "sourceId": "9c2382c1-20b5-414e-9e3f-2c062d29c048",
     "targetId": "58290fb6-132a-43ec-8041-2c527e2ee813"
+  },
+  {
+    "id": "965d6174-8a52-4d03-a9ba-8a3d2de3df82",
+    "quote": "have the good UX and SDLC practices in it at once\nthe Requirements stage always proposes (checked, can be unchecked) the baseline packs of every system: CI/CD pipeline, Test strategy, Release and versioning, Code quality gate, and with an interface for people Usability, Accessibility and Mobile",
+    "relationType": "derives",
+    "sourceId": "54fbd45f-199b-41c2-8670-cfd0d756eb97",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
   },
   {
     "id": "9660a03f-80a2-427e-a661-63d93ccd7673",
@@ -14133,6 +15546,12 @@
     "relationType": "lifecycle-of",
     "sourceId": "d4fa1d4a-8211-4364-9ad5-37e6cacc2b3a",
     "targetId": "60a37a79-3fb4-435d-82c9-87ec3582f2f8"
+  },
+  {
+    "id": "968ad7b3-907e-4e39-928b-fbd1816d1e3a",
+    "relationType": "constrains",
+    "sourceId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae",
+    "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
   },
   {
     "id": "9692cfb7-e61b-4b19-a48a-e4c157d3c31b",
@@ -14193,6 +15612,12 @@
     "relationType": "verifies",
     "sourceId": "23613b8c-3ae6-4cf9-84dd-477aa2a346e6",
     "targetId": "38273996-3980-485a-bcd3-f68be8d0faf0"
+  },
+  {
+    "id": "9775292d-dbce-4b1f-aea5-7677fef2493a",
+    "relationType": "verifies",
+    "sourceId": "79d30757-ac00-49ea-80fd-9d21098fbc53",
+    "targetId": "478754a3-1569-4483-8890-5bd586eba6e1"
   },
   {
     "id": "979dd571-e5cf-4ebe-9dba-90998b1a12e7",
@@ -14309,6 +15734,12 @@
     "targetId": "a07af769-bc42-4720-8c85-10eb172e348b"
   },
   {
+    "id": "98c8c40f-d0f3-4459-98cb-3d75cf18806b",
+    "relationType": "constrains",
+    "sourceId": "c3822333-db92-4a88-b679-1f731008f8d8",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
     "id": "98d05688-e77b-4ba0-8e6f-ad4e8075dd7d",
     "relationType": "derives",
     "sourceId": "0f3597bd-aba0-4ee0-ba01-d3cfb9873297",
@@ -14319,6 +15750,18 @@
     "relationType": "satisfies",
     "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
     "targetId": "b566632d-634c-46dc-a7f8-32ce5a8a9664"
+  },
+  {
+    "id": "98de0091-0af5-4a08-b2cd-cfd7a41bd4b0",
+    "relationType": "constrains",
+    "sourceId": "65adadc6-1f32-41ff-a8b4-8f2e01920250",
+    "targetId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3"
+  },
+  {
+    "id": "98e6ad3d-a0fd-4efb-88fb-13a04750f0db",
+    "relationType": "satisfies",
+    "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
+    "targetId": "b471b5b9-bdc2-450c-a6e7-baf31062c6c2"
   },
   {
     "id": "98ea3a7a-a317-443b-9575-3b1e744b0fd5",
@@ -14455,6 +15898,12 @@
     "targetId": "d4a4d3ec-dcf3-4912-9ab4-a0fb4af41e49"
   },
   {
+    "id": "9a2fc441-3c00-4c79-9fba-b4928bc0d53e",
+    "relationType": "satisfies",
+    "sourceId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e",
+    "targetId": "fd4bbc67-0b08-414b-b976-68b7728a1d12"
+  },
+  {
     "id": "9a5be939-e18d-4f04-9270-255747f5baf0",
     "relationType": "satisfies",
     "sourceId": "3027b577-5042-4975-a7cf-0aad08adb14f",
@@ -14564,6 +16013,18 @@
     "targetId": "6fb01e7c-846d-417b-93f6-f236f9ac7989"
   },
   {
+    "id": "9b35b16e-4768-44c6-b7d3-980a8d149850",
+    "relationType": "constrains",
+    "sourceId": "27dce77e-5ca2-4a3e-9ddb-f1d297b5b667",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
+    "id": "9b4d322b-9da6-435c-93ad-b48e3ec957be",
+    "relationType": "satisfies",
+    "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+    "targetId": "047d8115-3091-49c5-8a2a-44954a73b303"
+  },
+  {
     "id": "9b524440-0eee-447f-920f-b554a0e8229f",
     "relationType": "verifies",
     "sourceId": "8b8e3425-b86b-49a1-bd18-5edf413426de",
@@ -14593,6 +16054,12 @@
     "relationType": "interacts",
     "sourceId": "3ee58343-871e-42c0-a3f8-f290ad4619b4",
     "targetId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa"
+  },
+  {
+    "id": "9bd986c5-6ed4-4deb-b300-ee03ef7e0bb9",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "334e58d2-95bc-40af-9f8b-f4d44e126742"
   },
   {
     "id": "9bdb2094-e284-4475-a8f1-b19003cc582f",
@@ -14827,6 +16294,12 @@
     "targetId": "62f79689-9555-444b-bfef-db6b512a83c0"
   },
   {
+    "id": "9e44df5b-c712-4bef-832a-40b11758f0f7",
+    "relationType": "constrains",
+    "sourceId": "d2567b83-d48f-4fef-be18-0866b613f574",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
     "id": "9e52616c-1ab4-4df7-9b95-0eb17073a261",
     "relationType": "implements",
     "sourceId": "8be2761d-53e9-4ad8-b0ce-6f5e11b800ce",
@@ -14851,10 +16324,29 @@
     "targetId": "7a906485-5df7-4650-a695-fb3bca2dd075"
   },
   {
+    "id": "9e9c26c6-d94a-4824-b3b5-d68c0a35abb5",
+    "quote": "by default check.json is not very restrictive\nespecially in new solutions written with the help of the radical tools\nevery rule = error (also test-skipped/not-run, metric-stale/not-measured, concern-unaddressed), all goals 100%",
+    "relationType": "derives",
+    "sourceId": "9cf4dc15-4d62-46f1-8ccd-19019ad0af3c",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
+  },
+  {
+    "id": "9e9d380d-ac19-4271-bd68-209df5ac15cb",
+    "relationType": "constrains",
+    "sourceId": "16286b31-2fef-4d1a-8212-471cc68039b8",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
     "id": "9e9d4085-6ac8-49a8-bea8-b22a5f32b6fe",
     "relationType": "satisfies",
     "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
     "targetId": "b7b10084-f9fc-4115-b67f-4f0b068608da"
+  },
+  {
+    "id": "9ea25aad-b696-470a-9a82-d37a6ca56142",
+    "relationType": "satisfies",
+    "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+    "targetId": "9cf4dc15-4d62-46f1-8ccd-19019ad0af3c"
   },
   {
     "id": "9eabd6d5-adf4-45f1-9cf3-6681e3c6179d",
@@ -14906,6 +16398,12 @@
     "targetId": "85dd5d84-52ae-4df0-bd02-458d008f60aa"
   },
   {
+    "id": "9f3ec88f-8e00-40f5-92d0-0c0a39af4ef7",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "e1dd7654-02cb-4ee5-961a-c6520f58c890"
+  },
+  {
     "cardinality": "one",
     "description": "writes its stages into",
     "id": "9f45cf0c-c429-434e-94df-333b3de30b37",
@@ -14938,6 +16436,12 @@
     "relationType": "verifies",
     "sourceId": "3c856053-99bb-47f4-9ced-6a505309145b",
     "targetId": "4d80ae8c-7d44-44f4-a547-14c023a8c0e0"
+  },
+  {
+    "id": "9f610cd2-cce4-4184-9e35-506243233226",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "80d49c76-ad53-4309-ae2f-fbf5faa449b8"
   },
   {
     "id": "9f76bc3f-8c67-4e0b-a988-0a9d41678ca7",
@@ -15028,6 +16532,18 @@
     "relationType": "implements",
     "sourceId": "54513b8e-ffe3-4af1-81c7-65eefa7481b7",
     "targetId": "2ebe793f-dc6a-4394-9e90-38e5811ceb01"
+  },
+  {
+    "id": "a01d6513-84fe-4b56-82ca-b7b70cb48b54",
+    "relationType": "constrains",
+    "sourceId": "41d43d27-9948-4729-8a80-5fef3f720ac3",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
+    "id": "a0436234-1968-4f76-92c3-109b848f2501",
+    "relationType": "traces-to",
+    "sourceId": "e40075e8-83db-4645-9ff3-e754d236102e",
+    "targetId": "195fb6b6-e3d8-47e3-b6d2-6d2b67791e80"
   },
   {
     "id": "a049aae5-fdb9-495b-abfb-8333e300267e",
@@ -15121,10 +16637,23 @@
     "targetId": "f0f986ba-5e21-4725-bfc8-8d011d38b7ef"
   },
   {
+    "id": "a14c0082-a6bd-47a5-a9bf-88ab383c9333",
+    "quote": "People open this front end on their own phones and computers, over networks they do not choose, some zoomed in, most with a thumb. A page that paints late, jumps while it loads, answers a tap slowly, scrolls sideways or has targets too small to hit loses them, however it looks on a developer's laptop. The budget it is held to and the rules for small screens must be written down, measured on every change and, once it is live, from real visits, and judged in one place. The checks assume the main pages are listed in the tests (/, /search and /checkout in the snippets), a preview server on http://localhost:4173 (npm run preview), and, with real-user monitoring, a table rum_events(name, value, device, page_group, received_at) that the page's beacons fill.",
+    "relationType": "derives",
+    "sourceId": "d6fa7162-c43f-4a78-9f84-2b2a9c6f20a0",
+    "targetId": "ce910f46-7e18-44d3-9e0b-811f4775fb57"
+  },
+  {
     "id": "a16dd0de-99d3-4797-940a-1fd544e68bca",
     "relationType": "satisfies",
     "sourceId": "f2d51835-1d89-4283-a8b9-6f3b3e060f05",
     "targetId": "c7ed708c-9b95-42b1-90f9-4d42ad67c627"
+  },
+  {
+    "id": "a16e941e-0965-4877-836a-5f01c1cb3252",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "478754a3-1569-4483-8890-5bd586eba6e1"
   },
   {
     "id": "a185c128-e932-4cde-8e62-a577fb89c4c1",
@@ -15221,6 +16750,12 @@
     "targetId": "625755f9-888f-4dd3-8836-4e6135ec9da0"
   },
   {
+    "id": "a2991843-3d00-4a92-908f-21f8d4de5dc3",
+    "relationType": "constrains",
+    "sourceId": "ec21907b-133e-4901-8585-dd34b5c52330",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
+  },
+  {
     "id": "a2adeac6-d02f-48ee-85ff-bab0d20d215e",
     "relationType": "satisfies",
     "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
@@ -15243,6 +16778,24 @@
     "relationType": "verifies",
     "sourceId": "cd029ea3-4590-4152-8c50-46204f23d2cc",
     "targetId": "4c7ac23f-e771-4269-aaaa-9aa5dd87a537"
+  },
+  {
+    "id": "a2db2fc3-69e4-47fe-a73c-9b230a6148c8",
+    "relationType": "constrains",
+    "sourceId": "b524d3b8-4e48-4e63-ba30-1b0c38d96bbf",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
+    "id": "a2e6072c-91a4-425a-84da-93e888358d26",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "334e58d2-95bc-40af-9f8b-f4d44e126742"
+  },
+  {
+    "id": "a2e6bddb-f4c6-4649-8c42-cf6584aa86da",
+    "relationType": "satisfies",
+    "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+    "targetId": "cda13e7f-1703-4d3a-82f6-17b80acc2762"
   },
   {
     "id": "a2eca3da-b4a1-430e-8308-63b8f6e95434",
@@ -15401,6 +16954,12 @@
     "targetId": "f0f986ba-5e21-4725-bfc8-8d011d38b7ef"
   },
   {
+    "id": "a49dc413-df35-4cfb-b4c8-1ca73e1b59f1",
+    "relationType": "satisfies",
+    "sourceId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "targetId": "478754a3-1569-4483-8890-5bd586eba6e1"
+  },
+  {
     "id": "a4a5caa4-b5c2-4599-a4e1-2d84435d6841",
     "relationType": "derives",
     "sourceId": "6b07967a-7c01-4168-a854-72e947065484",
@@ -15432,6 +16991,12 @@
     "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
+    "id": "a4e41947-0f7f-4dd3-93ae-271964b83bdf",
+    "relationType": "verifies",
+    "sourceId": "d1dd9fd3-80c4-4b53-8d99-f3463b2d5b8a",
+    "targetId": "334e58d2-95bc-40af-9f8b-f4d44e126742"
+  },
+  {
     "id": "a4fd06a3-4a7e-40b6-904f-5ff773fb94bd",
     "relationType": "performed-by",
     "sourceId": "f3ff0130-b82a-46c4-bb0f-e31c67975dbd",
@@ -15442,6 +17007,12 @@
     "relationType": "derives",
     "sourceId": "8a276a1a-bb87-49ae-9325-34bddce6a6a7",
     "targetId": "647d92bf-5dfa-4d28-8979-fd74ea45aece"
+  },
+  {
+    "id": "a5078804-01b8-4603-87f5-94504964ace3",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "28d746a3-aee3-4622-a682-40bc3a340b98"
   },
   {
     "id": "a5134100-85d8-49b6-a0fa-07b248559dbf",
@@ -15522,6 +17093,12 @@
     "targetId": "b1b433f8-2c80-4c8b-b0fd-b11c3610544d"
   },
   {
+    "id": "a5e135ec-6fbf-419c-992e-35f19b4846ef",
+    "relationType": "satisfies",
+    "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
+    "targetId": "d69665b4-33bc-46e0-8edf-a41126bd4d10"
+  },
+  {
     "id": "a5eb156c-f319-4aa5-8d9e-0254d64e1eef",
     "label": "reads the Markdown folder",
     "relationType": "interacts",
@@ -15582,6 +17159,12 @@
     "relationType": "verifies",
     "sourceId": "30338aa6-aa0b-487f-a9ab-913edcb6d690",
     "targetId": "d622cf4f-ff24-4d2b-95f0-a7c3f17ba712"
+  },
+  {
+    "id": "a6f4cf40-38af-4bca-b9ca-495999a10b89",
+    "relationType": "satisfies",
+    "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+    "targetId": "b319c535-717f-46d5-aeb9-08c30c475ebb"
   },
   {
     "id": "a6fa4f7d-106b-4cfa-a228-8ed9f9e48eb1",
@@ -15655,6 +17238,12 @@
     "relationType": "satisfies",
     "sourceId": "76f6dad3-9f4d-4942-b9e4-4b6cb46b14fd",
     "targetId": "d72f71fa-a388-4a7e-b5b0-1c681468857e"
+  },
+  {
+    "id": "a780d1d7-c0e0-4cf5-a9fd-c5feda0f283c",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "b319c535-717f-46d5-aeb9-08c30c475ebb"
   },
   {
     "id": "a792f7f8-1c9a-495a-a69e-e640cd224428",
@@ -15731,10 +17320,22 @@
     "targetId": "edeed462-51eb-4468-86e0-fdd29f88d70f"
   },
   {
+    "id": "a7eb883b-3f76-4dd1-8b03-9e2c18506688",
+    "relationType": "satisfies",
+    "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+    "targetId": "478754a3-1569-4483-8890-5bd586eba6e1"
+  },
+  {
     "id": "a801f435-e1a6-465f-8115-a21f1e8c7c15",
     "relationType": "verifies",
     "sourceId": "0e76618e-7acf-46d3-bbc8-f9fdbfbdf7ea",
     "targetId": "10dd6e39-0a30-458a-964e-2bd422518401"
+  },
+  {
+    "id": "a805b107-555c-4868-8611-d67505b99561",
+    "relationType": "constrains",
+    "sourceId": "ec21907b-133e-4901-8585-dd34b5c52330",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
     "id": "a81c4627-b1cf-4fb1-88a7-12112e5af4b8",
@@ -15842,6 +17443,12 @@
     "targetId": "99d5dc89-e2bf-43ed-8208-64714fc6af43"
   },
   {
+    "id": "a902d82c-69e2-4a8a-90df-d523afc8dfac",
+    "relationType": "constrains",
+    "sourceId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae",
+    "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba"
+  },
+  {
     "id": "a911c08a-5e09-4e50-9b1e-14e54de965db",
     "relationType": "verifies",
     "sourceId": "65e808ff-ce03-47e6-85a2-fced65ddc2b2",
@@ -15864,6 +17471,12 @@
     "relationType": "derives",
     "sourceId": "56adf307-83f8-425b-b5dd-ce5ac7b9d5a0",
     "targetId": "20fa41e0-ed05-4b48-8359-579315041be2"
+  },
+  {
+    "id": "a92f3dc0-f398-47c6-8d2e-97d6730c270d",
+    "relationType": "constrains",
+    "sourceId": "80210184-8ca0-4fce-a5f7-d7006aad16e8",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
     "id": "a9560e76-c4f9-4931-9e65-4c8366309238",
@@ -15902,6 +17515,12 @@
     "targetId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e"
   },
   {
+    "id": "a9ab02bf-e9ab-40a1-8dca-ca7dfcffc493",
+    "relationType": "traces-to",
+    "sourceId": "b59c9923-232c-4759-a461-241946413179",
+    "targetId": "57da9569-ea1f-4f0f-bdb9-db525bbaa631"
+  },
+  {
     "id": "a9b9ed83-28e1-42af-aa19-7937d4afaf3b",
     "relationType": "derives",
     "sourceId": "ff39277b-2b38-473a-8ecc-e9d4944908ba",
@@ -15918,6 +17537,12 @@
     "relationType": "derives",
     "sourceId": "d8aa7883-ecda-4b18-ab27-452c13dac438",
     "targetId": "3b58e5d4-8d5c-4626-934d-6fbf154105fa"
+  },
+  {
+    "id": "a9e36fad-2a56-4e1d-8bae-18287381bcf5",
+    "relationType": "constrains",
+    "sourceId": "6fd21664-6402-4869-b26d-61cdf1ef681e",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "a9e39448-fd26-4674-8ff7-640a4d018bd8",
@@ -16006,6 +17631,12 @@
     "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
+    "id": "aaa6b354-4bbb-4b08-904e-eaa1baf429de",
+    "relationType": "satisfies",
+    "sourceId": "bdcfe019-e771-4c56-ba74-0ea611571502",
+    "targetId": "9cf4dc15-4d62-46f1-8ccd-19019ad0af3c"
+  },
+  {
     "id": "aab7e6aa-df1b-452a-9e90-5d4612591bf6",
     "relationType": "verifies",
     "sourceId": "902b5e8f-929b-4240-826c-e67ca67690ad",
@@ -16061,6 +17692,12 @@
     "targetId": "6fb01e7c-846d-417b-93f6-f236f9ac7989"
   },
   {
+    "id": "ab3a90ee-705e-400a-b483-0d44995585fb",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "590a80a7-fe6f-437a-83be-81002022e6c9"
+  },
+  {
     "id": "ab3fbdd2-e372-4911-9ca2-4b99ed7db7fe",
     "relationType": "verifies",
     "sourceId": "068e6dd3-6437-49a7-a136-38832dedb35a",
@@ -16090,6 +17727,13 @@
     "relationType": "derives",
     "sourceId": "cc126186-6fbd-4fd3-b241-8f3333905236",
     "targetId": "0b8590ab-daf6-4b95-972e-67d03a743b74"
+  },
+  {
+    "id": "ab920880-8162-4ef9-951d-6e04c71dd570",
+    "quote": "People with disabilities use this front end with a keyboard, a screen reader, magnification or voice control, and the law may require that they can. Every function of the main journeys must work for them, to a WCAG level that is decided and checked on every change, with what automated checks cannot see tested by people, what is not yet accessible stated openly, and failures fixed on a schedule rather than when someone complains. The checks assume Playwright tests under tests/a11y with tests/a11y/pages.ts listing the pages of the main journeys (PAGES: path) and the states worth checking (STATES: a name, a path and, where needed, the steps that open a dialog, show a form's errors or empty a list); playwright.config sets the baseURL and, for pages behind sign-in, a storageState. Each test fails on its own in a plain run and, run by radical sense playwright, writes what it measured as a radical-metrics/1 file into RADICAL_METRICS_DIR.",
+    "relationType": "derives",
+    "sourceId": "becedbca-1e35-4d1f-a25f-66a099004e40",
+    "targetId": "278066be-80d4-4e94-b25b-c9772c7c6bf6"
   },
   {
     "id": "aba343a6-a2cf-410a-9157-4654f11a3073",
@@ -16152,6 +17796,12 @@
     "targetId": "04279c33-97b6-44a4-95a5-68b1f1623115"
   },
   {
+    "id": "ac506f64-e583-4879-af81-fc2e181aa723",
+    "relationType": "constrains",
+    "sourceId": "2408cf76-ab15-49e4-b0ec-2dc3e2104366",
+    "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
+  },
+  {
     "id": "ac68b935-b31b-45a2-8d61-b1f0845da698",
     "relationType": "derives",
     "sourceId": "694bdc99-13bf-4e4c-ac8d-017a96546f70",
@@ -16193,6 +17843,12 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "e81279dc-b55b-4e18-b449-9ed917821dbf"
+  },
+  {
+    "id": "ace296d6-dd3e-4618-b1ed-cd026114646b",
+    "relationType": "constrains",
+    "sourceId": "2408cf76-ab15-49e4-b0ec-2dc3e2104366",
+    "targetId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3"
   },
   {
     "id": "ace7e18e-435b-47da-8a5c-d64dbfc3f6ed",
@@ -16239,10 +17895,22 @@
     "targetId": "f2d51835-1d89-4283-a8b9-6f3b3e060f05"
   },
   {
+    "id": "ad704e43-a2ca-4b6e-ae5e-1724a0901d77",
+    "relationType": "traces-to",
+    "sourceId": "cda13e7f-1703-4d3a-82f6-17b80acc2762",
+    "targetId": "000b9208-5963-41bd-8ddd-e69e571b5b36"
+  },
+  {
     "id": "ad72656e-67d8-47db-9935-cf0b47bac793",
     "relationType": "traces-to",
     "sourceId": "fe81322a-ee81-4eb8-9576-c420557dfe99",
     "targetId": "8a2fb157-4bb6-4043-9748-42152f8cb625"
+  },
+  {
+    "id": "ad799cac-8945-4e66-aa93-e90b36c6fd03",
+    "relationType": "implements",
+    "sourceId": "41d43d27-9948-4729-8a80-5fef3f720ac3",
+    "targetId": "fa30059d-5ec9-4a8c-9821-b5e3db19c812"
   },
   {
     "id": "ad8124d5-cb05-480b-9e7c-7b95af2b799d",
@@ -16361,6 +18029,12 @@
     "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
+    "id": "ae7ed606-2dac-45e4-987a-09f044f7f9e0",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "e1dd7654-02cb-4ee5-961a-c6520f58c890"
+  },
+  {
     "id": "ae8ab5e1-e55f-49f3-bd50-070078b79fa9",
     "relationType": "derives",
     "sourceId": "01140a26-a20b-4a3b-901a-be71a0d27c28",
@@ -16389,6 +18063,12 @@
     "relationType": "verifies",
     "sourceId": "c541d4a4-32e4-4481-b221-e6d4ac945338",
     "targetId": "1e13fc84-f4af-43e9-b8f8-2b1c71f06788"
+  },
+  {
+    "id": "aeb556b0-a4f9-49f9-a0bf-bd55f63638c4",
+    "relationType": "satisfies",
+    "sourceId": "bdcfe019-e771-4c56-ba74-0ea611571502",
+    "targetId": "b471b5b9-bdc2-450c-a6e7-baf31062c6c2"
   },
   {
     "id": "aeb8c7c4-18bf-4141-9c7f-8b2ee88d46c2",
@@ -16440,6 +18120,12 @@
     "targetId": "32fffe99-fc4f-4088-8719-9ac6c012d83d"
   },
   {
+    "id": "af419220-8324-485a-b4ab-d1dbca377240",
+    "relationType": "constrains",
+    "sourceId": "09634404-680b-4285-8cd7-d4af7d6c8374",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
     "id": "af431be2-e9d5-494d-8faa-92f974be685e",
     "relationType": "implements",
     "sourceId": "3015c7f5-e82a-4a9a-b0fb-b9990a5ef6eb",
@@ -16480,6 +18166,12 @@
     "relationType": "derives",
     "sourceId": "15abbc5b-e254-4559-aee5-8f9dd6ddbd9e",
     "targetId": "35ae3df9-1780-4173-97f6-790d110ab24d"
+  },
+  {
+    "id": "af7686e0-1675-4a6f-a1bb-bfbd54be62b4",
+    "relationType": "constrains",
+    "sourceId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae",
+    "targetId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3"
   },
   {
     "id": "af769610-4d62-4b19-a6e2-8bcf7df36003",
@@ -16671,6 +18363,12 @@
     "targetId": "91b50022-eace-4779-9f5d-44f6e186e62e"
   },
   {
+    "id": "b19125dc-9810-470f-b316-68013cab9444",
+    "relationType": "verifies",
+    "sourceId": "973c93be-4efe-4cf5-a72b-7f034ac09c24",
+    "targetId": "5bada32a-9246-4044-8b1a-a0a3cc7a9d91"
+  },
+  {
     "id": "b192ab8f-42ad-4a52-83d9-5abd3b227bbb",
     "relationType": "verifies",
     "sourceId": "cf8ebe65-f329-4766-b0b0-adebce8d17f9",
@@ -16697,6 +18395,13 @@
     "targetId": "4dd09e43-c313-4300-b9f2-d9f937b789bf"
   },
   {
+    "id": "b216497f-6032-471d-be96-9aae737fc01d",
+    "quote": "People use this front end to get their tasks done, most without training. They must find their way with navigation that stays the same from page to page, links that are neither repeated nor vague (not the same link five times on one page, not five links named \"Read more\"), forms that say what went wrong and where, and empty views that say why they are empty; and the usability of the whole must be reviewed against recognised principles on a schedule, not only after users complain. The checks assume Playwright tests under tests/ux with tests/ux/journeys.ts listing the main journeys' pages in the order a user walks them (PAGES: path, and the section where sections have their own navigation), their forms (FORMS: path, the submit button's name, the label of one field with a format to check) and the views that start empty for a new account (EMPTY_VIEWS: path); playwright.config sets the baseURL and, for pages behind sign-in, a storageState. Each test fails on its own in a plain run and, run by radical sense playwright, writes what it measured as a radical-metrics/1 file into RADICAL_METRICS_DIR.",
+    "relationType": "derives",
+    "sourceId": "8139f75f-7d85-487c-be5e-038877df549d",
+    "targetId": "9f04e33f-e331-4def-b39d-61307043c347"
+  },
+  {
     "id": "b241b2b6-6d35-4fc9-84bb-6419cc0c6e9e",
     "relationType": "derives",
     "sourceId": "740eea55-ef93-4964-822e-e69de9c3320b",
@@ -16719,6 +18424,12 @@
     "relationType": "verifies",
     "sourceId": "8ac06512-d368-463a-bb55-b2beb6af7374",
     "targetId": "90c740d9-296a-4acf-87c2-10186c1912b4"
+  },
+  {
+    "id": "b2617ea5-d293-4d88-bb90-b0d5f6f4b398",
+    "relationType": "constrains",
+    "sourceId": "65adadc6-1f32-41ff-a8b4-8f2e01920250",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
     "id": "b2695d48-dced-4c2e-bfdc-b15136ad1c6f",
@@ -16781,6 +18492,12 @@
     "targetId": "4b6b6f16-7b16-4e56-bcb9-edca1f583f3b"
   },
   {
+    "id": "b2f783fd-2547-40c9-b89d-3924fc9cfb37",
+    "relationType": "verifies",
+    "sourceId": "782f4aba-7ce3-4541-8571-58e043829569",
+    "targetId": "d69665b4-33bc-46e0-8edf-a41126bd4d10"
+  },
+  {
     "id": "b2feaca1-9c28-4be4-9896-34e7d792cdbd",
     "relationType": "satisfies",
     "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
@@ -16822,6 +18539,12 @@
     "relationType": "derives",
     "sourceId": "391bd89a-7595-40c9-bffa-ed6a0e49dbc4",
     "targetId": "c7800ee4-60c0-4d98-a317-00e58828fb6e"
+  },
+  {
+    "id": "b33e225b-b14e-4f84-b03b-3b5efa23f19d",
+    "relationType": "constrains",
+    "sourceId": "d0223cac-c464-4b5d-b2ba-7e266ff2b4c1",
+    "targetId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b"
   },
   {
     "id": "b34f38dc-015b-46bc-9b33-09621750d7f2",
@@ -16866,10 +18589,22 @@
     "targetId": "c9d4efcf-85b2-4d8d-b7b9-52c2aae14dc1"
   },
   {
+    "id": "b3b66343-2d56-4459-bcdd-3139d17ef45c",
+    "relationType": "implements",
+    "sourceId": "4dabc3ca-84ee-4081-8ded-6aea912acc88",
+    "targetId": "9b4ef8fc-9df8-4cd4-b88a-fa598c729b5c"
+  },
+  {
     "id": "b3ba78c2-97c4-4180-b1be-dd2e60d51291",
     "relationType": "satisfies",
     "sourceId": "917d9018-dff9-45b1-87dc-d01f8ac836bb",
     "targetId": "960faa6c-c23c-47cf-925a-fd3d4b8ff592"
+  },
+  {
+    "id": "b3be15aa-0744-4521-870f-410990c2adfe",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "3bec0807-a239-41d1-995e-b41ff50279c4"
   },
   {
     "id": "b3ca32b0-b863-475c-8fb9-74bdc21982b9",
@@ -16924,6 +18659,12 @@
     "relationType": "satisfies",
     "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
     "targetId": "4e2ace09-537e-4b2d-8739-844f096b98f2"
+  },
+  {
+    "id": "b430cf4b-42f9-4a94-b99c-ca2adcec6ccd",
+    "relationType": "satisfies",
+    "sourceId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b",
+    "targetId": "047d8115-3091-49c5-8a2a-44954a73b303"
   },
   {
     "id": "b43f1a14-2aa9-4cf7-83f6-049cc42d5946",
@@ -17058,6 +18799,12 @@
     "targetId": "694bdc99-13bf-4e4c-ac8d-017a96546f70"
   },
   {
+    "id": "b541bc3c-387a-446d-ac3b-583929ec9321",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "8139f75f-7d85-487c-be5e-038877df549d"
+  },
+  {
     "id": "b54599ce-7e31-40a7-87ef-3a1df60c0186",
     "relationType": "traces-to",
     "sourceId": "01922289-6b7d-4fce-8377-0abefb6d471a",
@@ -17106,6 +18853,12 @@
     "targetId": "99d5dc89-e2bf-43ed-8208-64714fc6af43"
   },
   {
+    "id": "b5da3a45-c5de-4e38-981c-36025b8ea6ee",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "478754a3-1569-4483-8890-5bd586eba6e1"
+  },
+  {
     "id": "b5db86a8-7c3b-495f-a0a7-d1d37bfac50a",
     "relationType": "derives",
     "sourceId": "f09ed7b4-d523-474f-a325-72e8376d39d5",
@@ -17123,6 +18876,12 @@
     "relationType": "satisfies",
     "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
     "targetId": "b683130f-b664-43ee-893a-c886902059e3"
+  },
+  {
+    "id": "b5f3263b-73e0-42a4-9726-7ad6c64339bc",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "640e1d91-fdf4-458b-9013-3571820a00a7"
   },
   {
     "id": "b606313b-1092-4db7-ad90-602774cdb4d7",
@@ -17155,6 +18914,12 @@
     "targetId": "3b101a8b-f56c-4483-a34d-d0ba0676ac15"
   },
   {
+    "id": "b65ff897-085c-41f3-8098-ac07969fe870",
+    "relationType": "constrains",
+    "sourceId": "16286b31-2fef-4d1a-8212-471cc68039b8",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
     "id": "b66d6f97-f8ce-4506-8c03-65d2aa68de10",
     "relationType": "verifies",
     "sourceId": "152a5514-7df3-4e87-8a6d-15da13c9e89a",
@@ -17184,6 +18949,12 @@
     "relationType": "derives",
     "sourceId": "5ee45d2e-340c-46b1-b898-4d05f9968fda",
     "targetId": "27094ec5-0ca1-4f27-93bc-d56e523b8cc0"
+  },
+  {
+    "id": "b6f0404d-4426-4d8f-b5e3-4980e373893b",
+    "relationType": "constrains",
+    "sourceId": "65adadc6-1f32-41ff-a8b4-8f2e01920250",
+    "targetId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b"
   },
   {
     "id": "b70bf369-0b13-4aff-8bf3-3dfb3091c3b4",
@@ -17277,6 +19048,12 @@
     "targetId": "5c2f7df2-9042-4d25-ae20-0bee0371ef0c"
   },
   {
+    "id": "b8897153-1817-4494-adec-2e41b4012c9d",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "047d8115-3091-49c5-8a2a-44954a73b303"
+  },
+  {
     "id": "b8978802-ff29-44e4-8a97-48b220afe1b6",
     "relationType": "verifies",
     "sourceId": "cdcdbab0-4bc8-429e-9375-13f460882b12",
@@ -17312,6 +19089,12 @@
     "relationType": "satisfies",
     "sourceId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e",
     "targetId": "f5b72a9c-6238-446b-bc89-37d98d5e162c"
+  },
+  {
+    "id": "b8f1135c-b7bc-4f63-b38d-3703b44c3e76",
+    "relationType": "satisfies",
+    "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+    "targetId": "fd4bbc67-0b08-414b-b976-68b7728a1d12"
   },
   {
     "id": "b8f9b82c-703d-45d1-b432-c709ef41aaeb",
@@ -17372,6 +19155,12 @@
     "relationType": "satisfies",
     "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
     "targetId": "c50054d8-2ca1-447d-bb06-fa3936cace38"
+  },
+  {
+    "id": "b9d606c4-4268-412b-bcdc-d02e6f5fe46b",
+    "relationType": "satisfies",
+    "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+    "targetId": "047d8115-3091-49c5-8a2a-44954a73b303"
   },
   {
     "id": "b9f7288c-0fb8-4a35-9f59-2abe954ac4b5",
@@ -17458,6 +19247,12 @@
     "targetId": "5d8ffddf-95d1-49ff-a154-98cf9737a094"
   },
   {
+    "id": "bab0ba71-8e06-452b-ab8c-3934f2af0d0d",
+    "relationType": "constrains",
+    "sourceId": "aed804e8-d136-4eb1-9199-942fa27af811",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
     "id": "bac75338-5343-4686-8418-de7277f9b442",
     "relationType": "implements",
     "sourceId": "f924ee45-d017-4bdf-8063-32eaf8584516",
@@ -17474,6 +19269,12 @@
     "relationType": "verifies",
     "sourceId": "4461312e-9243-4a09-afd8-6dbf3fa083d4",
     "targetId": "ef81bb0a-5cf7-4a59-a2a6-5386cfb9d070"
+  },
+  {
+    "id": "baed3710-0d1f-4d16-a4e8-143c9c0d247b",
+    "relationType": "constrains",
+    "sourceId": "09634404-680b-4285-8cd7-d4af7d6c8374",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
   },
   {
     "id": "bb086e0d-9e40-4264-aac6-71ae447b31db",
@@ -17518,6 +19319,12 @@
     "targetId": "d5b9e72b-18f9-4675-bcb2-9c1253125570"
   },
   {
+    "id": "bb868dc9-7e1e-4565-b758-d20448421470",
+    "relationType": "satisfies",
+    "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+    "targetId": "b319c535-717f-46d5-aeb9-08c30c475ebb"
+  },
+  {
     "id": "bba874e5-5013-43fb-bb93-8bdb31de7a5c",
     "relationType": "verifies",
     "sourceId": "a4a92be7-a50b-44ff-8cb1-e3f9e768a8d3",
@@ -17559,6 +19366,12 @@
     "relationType": "derives",
     "sourceId": "4fad78e7-46f0-431f-9477-4b6d09e95f55",
     "targetId": "f9154c36-a8c7-4440-9d59-9f8807f1939a"
+  },
+  {
+    "id": "bbeee12b-2ef3-4446-af41-ed8fadec1d96",
+    "relationType": "implements",
+    "sourceId": "da430403-1690-4a8a-97da-65af664af006",
+    "targetId": "84859577-2c97-4afe-928c-af4e3e34ad1a"
   },
   {
     "id": "bc00b217-de17-46c5-bd19-36fd79a3ccfc",
@@ -17681,6 +19494,12 @@
     "targetId": "cc7c679d-9419-422e-9747-cf061ba927b6"
   },
   {
+    "id": "bd4f9619-6297-411f-be6d-914ff134f139",
+    "relationType": "constrains",
+    "sourceId": "89100b5b-964b-42b7-ac74-f20a84cee6cc",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
     "id": "bd532e3e-466b-4b79-9261-37d4a1f8dfa3",
     "relationType": "satisfies",
     "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
@@ -17691,6 +19510,12 @@
     "relationType": "satisfies",
     "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
     "targetId": "280d506b-cf21-48a3-8652-9e5dab6b752f"
+  },
+  {
+    "id": "bd5f1b68-6d8d-4b1b-9116-a89d3751734a",
+    "relationType": "constrains",
+    "sourceId": "7d194b7a-6ee3-4361-963c-89de87743097",
+    "targetId": "bdcfe019-e771-4c56-ba74-0ea611571502"
   },
   {
     "id": "bd6caf9c-d024-44e6-be67-70c01540b58b",
@@ -17783,6 +19608,12 @@
     "targetId": "6f2e9a6a-ab1c-4773-9904-15ec6348a193"
   },
   {
+    "id": "be5c3e53-4b0d-4ff0-a5e0-ac50d692a50c",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "cc8568e0-1c2e-42d6-9fcc-90c98e32f910"
+  },
+  {
     "id": "be63831b-f457-4d4c-adbc-d77ba07139e8",
     "relationType": "derives",
     "sourceId": "2afd5639-ba40-4d52-bbc5-67d2488e7706",
@@ -17805,6 +19636,13 @@
     "relationType": "verifies",
     "sourceId": "a3ec67d3-a8af-4b0b-a932-b167fe67dda7",
     "targetId": "e02c1714-a9d7-43de-9afc-13e44525b9bf"
+  },
+  {
+    "id": "be8d3b20-8101-4ec5-8ef8-d919ca349ede",
+    "quote": "People open this front end on their own phones and computers, over networks they do not choose, some zoomed in, most with a thumb. A page that paints late, jumps while it loads, answers a tap slowly, scrolls sideways or has targets too small to hit loses them, however it looks on a developer's laptop. The budget it is held to and the rules for small screens must be written down, measured on every change and, once it is live, from real visits, and judged in one place. The checks assume the main pages are listed in the tests (/, /search and /checkout in the snippets), a preview server on http://localhost:4173 (npm run preview), and, with real-user monitoring, a table rum_events(name, value, device, page_group, received_at) that the page's beacons fill.",
+    "relationType": "derives",
+    "sourceId": "3bec0807-a239-41d1-995e-b41ff50279c4",
+    "targetId": "ce910f46-7e18-44d3-9e0b-811f4775fb57"
   },
   {
     "id": "be8f60cb-cb3b-4a69-80ef-2c112c85b9fd",
@@ -17860,6 +19698,18 @@
     "relationType": "derives",
     "sourceId": "836ccef2-64a4-4d27-82f1-ba64413242d7",
     "targetId": "0547a0d4-ee5c-4a35-a763-c3be86838039"
+  },
+  {
+    "id": "bf3be872-3a55-4330-a31c-52616ae94492",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "640e1d91-fdf4-458b-9013-3571820a00a7"
+  },
+  {
+    "id": "bf456f5a-ad04-42e2-bd36-b3e4064a0b3e",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "becedbca-1e35-4d1f-a25f-66a099004e40"
   },
   {
     "id": "bf4614a6-65a3-46e0-8053-b60acee6040e",
@@ -17940,6 +19790,12 @@
     "relationType": "satisfies",
     "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
     "targetId": "b6f52393-19f5-4632-ae4a-73e7c6232b25"
+  },
+  {
+    "id": "c08ab292-9cef-4b91-80cf-37f7e2d3d948",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "047d8115-3091-49c5-8a2a-44954a73b303"
   },
   {
     "id": "c0905860-76ab-4d7b-a446-f47eb46950b6",
@@ -18036,6 +19892,12 @@
     "relationType": "satisfies",
     "sourceId": "32793ee9-a939-498b-a71e-77831ce7ef4c",
     "targetId": "ef232b1c-c18e-4126-a683-a3073f2653e6"
+  },
+  {
+    "id": "c182de7e-a910-4326-8b47-39625351e4ee",
+    "relationType": "constrains",
+    "sourceId": "d2567b83-d48f-4fef-be18-0866b613f574",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
     "id": "c1901bf3-bbf4-42bd-a8eb-82ea7a3a903d",
@@ -18148,6 +20010,18 @@
     "targetId": "1398e996-e863-4aee-9f35-3c84059007be"
   },
   {
+    "id": "c27b80b3-e0b8-4c54-85b0-73897fb18f9f",
+    "relationType": "verifies",
+    "sourceId": "26212cbf-1206-43bc-853f-2c0e42d2f131",
+    "targetId": "cda13e7f-1703-4d3a-82f6-17b80acc2762"
+  },
+  {
+    "id": "c2815b19-4c8e-4514-b49b-ead263577dfb",
+    "relationType": "satisfies",
+    "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+    "targetId": "b59c9923-232c-4759-a461-241946413179"
+  },
+  {
     "id": "c29f04ee-6efc-498e-a5c8-e0156816b08f",
     "relationType": "derives",
     "sourceId": "c61f6622-0ece-4ed6-83a3-d6b390b7b461",
@@ -18166,10 +20040,22 @@
     "targetId": "8dd66f76-7dcc-411e-93f7-f89be1b81167"
   },
   {
+    "id": "c2b8c437-2c0b-4586-87f5-d7e8937ffce9",
+    "relationType": "satisfies",
+    "sourceId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3",
+    "targetId": "334e58d2-95bc-40af-9f8b-f4d44e126742"
+  },
+  {
     "id": "c2cecb54-0247-4fd2-82f2-7d907372a314",
     "relationType": "derives",
     "sourceId": "69ccf51a-ac68-4d60-9874-e65563df1f81",
     "targetId": "12e61bef-e093-4b42-9611-6a1b28196120"
+  },
+  {
+    "id": "c2d14c05-e5b6-412d-a896-905a52211967",
+    "relationType": "constrains",
+    "sourceId": "9b4ef8fc-9df8-4cd4-b88a-fa598c729b5c",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "c2d8a9cc-24f7-442a-85ae-a9c7d3179f13",
@@ -18275,6 +20161,12 @@
     "targetId": "6fb01e7c-846d-417b-93f6-f236f9ac7989"
   },
   {
+    "id": "c3cc226c-9a39-4090-99d4-9780e7997762",
+    "relationType": "satisfies",
+    "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+    "targetId": "cc8568e0-1c2e-42d6-9fcc-90c98e32f910"
+  },
+  {
     "id": "c3cda06f-a218-4dc7-a48b-ebbe4d611a9c",
     "relationType": "satisfies",
     "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
@@ -18305,6 +20197,12 @@
     "targetId": "614a7c57-75c9-4a79-a8d1-db74588b4aaa"
   },
   {
+    "id": "c408f3a1-1310-4cf1-9d42-e9588f5e7c12",
+    "relationType": "constrains",
+    "sourceId": "49c023a9-0046-4565-9bf8-75034af7cd6f",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
     "id": "c40d025c-2a7c-4fbf-8973-4b4ebce376ae",
     "relationType": "traces-to",
     "sourceId": "6ede1867-514a-4579-a8de-b9763f300f7d",
@@ -18321,6 +20219,12 @@
     "relationType": "verifies",
     "sourceId": "719dacab-88c7-47d8-b041-e33a3f5ca289",
     "targetId": "6ab7f200-95d0-45c6-b482-113389c1a739"
+  },
+  {
+    "id": "c4516bdf-4e4e-4f31-be04-eab8954eb23e",
+    "relationType": "constrains",
+    "sourceId": "41d43d27-9948-4729-8a80-5fef3f720ac3",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
     "id": "c455011a-f32e-4749-870f-26b6adec33ea",
@@ -18347,6 +20251,12 @@
     "targetId": "5ee45d2e-340c-46b1-b898-4d05f9968fda"
   },
   {
+    "id": "c4f064ec-bc5a-48e9-adca-386fa27ee424",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "d02b2b8d-622c-48ee-bf95-739b432944e8"
+  },
+  {
     "id": "c5023e12-7ad1-40cd-8fec-47e67d7047a9",
     "relationType": "derives",
     "sourceId": "eb4239bc-10bb-4747-a679-7142b5112e9e",
@@ -18365,6 +20275,12 @@
     "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
     "targetId": "38ef3bc6-f81d-4d7e-b942-bdb21e743db5",
     "technology": "Electron IPC"
+  },
+  {
+    "id": "c535e4a6-c2bd-4e61-b179-839e14519624",
+    "relationType": "constrains",
+    "sourceId": "a8d85e43-4d58-4cae-b61a-4de9f457194a",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
     "id": "c5375aef-d10a-44b8-9fff-5ab77dc7299f",
@@ -18421,6 +20337,18 @@
     "targetId": "e81279dc-b55b-4e18-b449-9ed917821dbf"
   },
   {
+    "id": "c5ab7a3d-1cee-4017-96c9-ca36c3d2b914",
+    "relationType": "constrains",
+    "sourceId": "65adadc6-1f32-41ff-a8b4-8f2e01920250",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
+  },
+  {
+    "id": "c5b55b45-fc8e-4540-b3d4-a7c1d3f71bd7",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "b319c535-717f-46d5-aeb9-08c30c475ebb"
+  },
+  {
     "id": "c5c47f9c-a277-4ec0-a02c-9007c020be53",
     "relationType": "satisfies",
     "sourceId": "43a5a0b6-073d-4a5d-be64-9ff5cd99303a",
@@ -18433,6 +20361,12 @@
     "targetId": "50743f08-d48d-4a29-a673-0c2e388d396c"
   },
   {
+    "id": "c5e7139d-d985-453b-8cb1-9faac7e01de8",
+    "relationType": "satisfies",
+    "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+    "targetId": "28d746a3-aee3-4622-a682-40bc3a340b98"
+  },
+  {
     "id": "c5ee8939-aa34-45b6-9163-b8edb5c49885",
     "relationType": "traces-to",
     "sourceId": "aa1dd847-37e0-44a5-b73e-0f6da024f402",
@@ -18443,6 +20377,12 @@
     "relationType": "verifies",
     "sourceId": "7e3eb2bb-b51a-48c7-9667-0cc3090c9587",
     "targetId": "62993f8e-93a7-4b61-8a98-e7a661c8a07d"
+  },
+  {
+    "id": "c5f5af10-4440-4df7-9a37-1a02ff1ee3a9",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "f6ead461-d897-4512-9d0d-6fb82419e413"
   },
   {
     "id": "c5fc9168-3fc5-493e-b3cf-11ac738fd938",
@@ -18671,6 +20611,13 @@
     "targetId": "a9394a73-6e11-43a8-a8af-1fa1e42ba31f"
   },
   {
+    "id": "c80e3a2c-665a-457c-96d9-9701d851601e",
+    "quote": "normalise the metrics to the machine that measured them\n`radical sense machine` measures Radical's fixed work (before and after the tests, the slower one wins) and writes the metric machine.speed\n`radical sense machine --reference` on the author's machine saves the reference to .radical/radical.json",
+    "relationType": "derives",
+    "sourceId": "5bada32a-9246-4044-8b1a-a0a3cc7a9d91",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
+  },
+  {
     "id": "c81938a5-113c-41a3-be5a-aa999b94ddaa",
     "relationType": "verifies",
     "sourceId": "e0003b37-6fa0-49f3-9a3b-a8f955e84058",
@@ -18827,6 +20774,12 @@
     "targetId": "60a37a79-3fb4-435d-82c9-87ec3582f2f8"
   },
   {
+    "id": "c96519a9-8b9b-4915-8161-c4ccf7fd2ba6",
+    "relationType": "constrains",
+    "sourceId": "80210184-8ca0-4fce-a5f7-d7006aad16e8",
+    "targetId": "60fb9531-8072-4f6d-804d-4a00a373a6ba"
+  },
+  {
     "id": "c96732bd-28f9-42c8-b76f-b6eef00264e4",
     "relationType": "traces-to",
     "sourceId": "0df91f39-96fa-45b0-8a41-4f1a859e4212",
@@ -18903,6 +20856,12 @@
     "relationType": "verifies",
     "sourceId": "efb0caf0-781e-4ca4-88ac-74cfe8eaa4c6",
     "targetId": "340419eb-3700-4438-b396-9cbab83e6878"
+  },
+  {
+    "id": "c9f7ff8d-8987-4705-84b2-06a7326f8172",
+    "relationType": "constrains",
+    "sourceId": "d0223cac-c464-4b5d-b2ba-7e266ff2b4c1",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
     "id": "ca010d7e-084e-4a57-a701-726f04442a46",
@@ -18990,6 +20949,12 @@
     "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
   },
   {
+    "id": "cafd7dad-f480-4410-a27d-9d88088c2a72",
+    "relationType": "constrains",
+    "sourceId": "0e7cbb1d-8c19-4928-a1d7-4fe97c2d6ad3",
+    "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
+  },
+  {
     "id": "cb1b19f5-d05c-4779-8969-c53d784358e2",
     "relationType": "satisfies",
     "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
@@ -19000,6 +20965,12 @@
     "relationType": "verifies",
     "sourceId": "a7bbb330-ad7b-4c5b-8c69-ed0300e292bb",
     "targetId": "0b8a85af-019b-4341-9191-466b1d461218"
+  },
+  {
+    "id": "cb2a67a5-fc30-4e54-a2ef-411fa78365fb",
+    "relationType": "satisfies",
+    "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
+    "targetId": "55aaeeca-7d93-4c88-b8f0-5050aca3d91a"
   },
   {
     "id": "cb2b0222-8652-4d5a-a5a3-16a70a810579",
@@ -19033,10 +21004,28 @@
     "targetId": "3e840f74-df4d-4117-8394-3b41823fd768"
   },
   {
+    "id": "cb3e8dc7-ebc2-4ea7-ab89-fd16db3dd470",
+    "relationType": "constrains",
+    "sourceId": "aed804e8-d136-4eb1-9199-942fa27af811",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
+    "id": "cb55e621-c238-49fd-a70a-19244ab29f23",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "590a80a7-fe6f-437a-83be-81002022e6c9"
+  },
+  {
     "id": "cb597ae2-65ba-4404-9ba4-f0a2790e52e9",
     "relationType": "traces-to",
     "sourceId": "d8f01f18-01c2-4bd2-a79e-3ea33fc0bfb7",
     "targetId": "eca513ec-ab15-4c82-b193-8d51581cb874"
+  },
+  {
+    "id": "cb5eab2e-c6d6-404c-8ffd-d703beb4fdf0",
+    "relationType": "constrains",
+    "sourceId": "57da9569-ea1f-4f0f-bdb9-db525bbaa631",
+    "targetId": "85565274-ba9a-4907-bd77-8df441930b28"
   },
   {
     "id": "cb6fe137-0aab-4de1-b300-20474e495662",
@@ -19179,6 +21168,12 @@
     "targetId": "48bc69bd-88bc-43f9-a948-b774b267eda9"
   },
   {
+    "id": "cd2ca135-b5ee-4279-9b30-b5c330b48f65",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "cc8568e0-1c2e-42d6-9fcc-90c98e32f910"
+  },
+  {
     "id": "cd302ea0-ffa0-40a9-ac61-646e69f76e6e",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -19300,6 +21295,13 @@
     "targetId": "10dd6e39-0a30-458a-964e-2bd422518401"
   },
   {
+    "id": "cdc6eebf-5259-4d3b-ae27-78c5c961f569",
+    "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/.",
+    "relationType": "derives",
+    "sourceId": "55aaeeca-7d93-4c88-b8f0-5050aca3d91a",
+    "targetId": "38242f71-4f98-4646-906a-ead71fbb49e5"
+  },
+  {
     "id": "cdf4171d-c6f5-48d6-b959-24fe6ba6dbfb",
     "relationType": "verifies",
     "sourceId": "22e9405a-6888-4535-adb9-9160a4459c7d",
@@ -19316,6 +21318,12 @@
     "relationType": "verifies",
     "sourceId": "3214006a-c156-431b-90dc-f6fe59669a59",
     "targetId": "ebfe2e99-e122-4bf8-ad76-a5841c1865d7"
+  },
+  {
+    "id": "ce015b0e-299f-4da7-8bd2-b1f0d730dccb",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "3bec0807-a239-41d1-995e-b41ff50279c4"
   },
   {
     "id": "ce02d7ae-c6da-491d-a633-831492916024",
@@ -19434,6 +21442,24 @@
     "targetId": "1cebc19f-7e5c-4d60-8220-057e294acd7e"
   },
   {
+    "id": "ced86795-233b-4eec-8b23-c9c345f1ed6f",
+    "relationType": "satisfies",
+    "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+    "targetId": "cc8568e0-1c2e-42d6-9fcc-90c98e32f910"
+  },
+  {
+    "id": "cee9eff5-d3d0-452f-85c5-47425dc08670",
+    "relationType": "satisfies",
+    "sourceId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f",
+    "targetId": "fd4bbc67-0b08-414b-b976-68b7728a1d12"
+  },
+  {
+    "id": "ceec0829-77d8-463d-bbf5-f872908d802a",
+    "relationType": "verifies",
+    "sourceId": "13737081-c66f-42b3-9e75-b13cf27728ca",
+    "targetId": "590a80a7-fe6f-437a-83be-81002022e6c9"
+  },
+  {
     "id": "cef7becc-ed44-4e25-88e3-8fe01683eee6",
     "relationType": "satisfies",
     "sourceId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e",
@@ -19548,6 +21574,12 @@
     "targetId": "b631eb97-6838-4027-8f77-6f93ae174aca"
   },
   {
+    "id": "d029c73b-771d-4fec-9561-664884507b40",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "590a80a7-fe6f-437a-83be-81002022e6c9"
+  },
+  {
     "id": "d04f6686-01c8-4da2-8a48-5b8f09cf10e9",
     "relationType": "derives",
     "sourceId": "c7ed708c-9b95-42b1-90f9-4d42ad67c627",
@@ -19608,6 +21640,12 @@
     "targetId": "ca229a9e-e250-49b7-90ce-011d16b48a28"
   },
   {
+    "id": "d0b5edf9-1c75-4555-ac83-301280096eb9",
+    "relationType": "constrains",
+    "sourceId": "80210184-8ca0-4fce-a5f7-d7006aad16e8",
+    "targetId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b"
+  },
+  {
     "id": "d0b77992-88f0-463a-8c6f-e5b7405495ba",
     "relationType": "verifies",
     "sourceId": "9e29c4f2-3e9b-4702-85e1-4e1bbe785f5d",
@@ -19631,6 +21669,12 @@
     "relationType": "verifies",
     "sourceId": "069bfc62-f673-446a-9e30-3aa8c37b6c52",
     "targetId": "1d76bc57-df23-4d1c-9f53-8407ec2ff575"
+  },
+  {
+    "id": "d0e7d10b-b2a5-4f50-a394-6af660a7f0cb",
+    "relationType": "constrains",
+    "sourceId": "6fd21664-6402-4869-b26d-61cdf1ef681e",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
   },
   {
     "id": "d0e7f921-afa1-4054-a61a-38dd3ba58124",
@@ -19664,6 +21708,13 @@
     "targetId": "7ef5cf61-e50b-4455-b7be-80ee13afafc2"
   },
   {
+    "id": "d17f5c14-ee2e-40da-9452-ae25bf5e45e2",
+    "quote": "People use this front end to get their tasks done, most without training. They must find their way with navigation that stays the same from page to page, links that are neither repeated nor vague (not the same link five times on one page, not five links named \"Read more\"), forms that say what went wrong and where, and empty views that say why they are empty; and the usability of the whole must be reviewed against recognised principles on a schedule, not only after users complain. The checks assume Playwright tests under tests/ux with tests/ux/journeys.ts listing the main journeys' pages in the order a user walks them (PAGES: path, and the section where sections have their own navigation), their forms (FORMS: path, the submit button's name, the label of one field with a format to check) and the views that start empty for a new account (EMPTY_VIEWS: path); playwright.config sets the baseURL and, for pages behind sign-in, a storageState. Each test fails on its own in a plain run and, run by radical sense playwright, writes what it measured as a radical-metrics/1 file into RADICAL_METRICS_DIR.",
+    "relationType": "derives",
+    "sourceId": "489f02f8-de47-415c-986a-ec32126fa7fe",
+    "targetId": "9f04e33f-e331-4def-b39d-61307043c347"
+  },
+  {
     "id": "d19609f9-17fe-45e5-a2e5-82e6fd05bb65",
     "relationType": "derives",
     "sourceId": "22418a18-7acd-45b7-a7de-790d90cda253",
@@ -19688,6 +21739,12 @@
     "targetId": "4d16f076-8787-4261-89a1-f7896a7c03be"
   },
   {
+    "id": "d1f894e3-b985-437e-9118-5e557afffa99",
+    "relationType": "satisfies",
+    "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
+    "targetId": "d69665b4-33bc-46e0-8edf-a41126bd4d10"
+  },
+  {
     "id": "d2079309-82b7-4822-8dce-7a20b8ac12d0",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -19704,6 +21761,12 @@
     "relationType": "constrains",
     "sourceId": "7bbeaca4-2a83-4111-81c3-e17d864d7db6",
     "targetId": "8976767a-65f3-4b1e-b5c3-db5d61409d0f"
+  },
+  {
+    "id": "d2157798-9793-4ceb-8378-06adc44b682f",
+    "relationType": "constrains",
+    "sourceId": "a8d85e43-4d58-4cae-b61a-4de9f457194a",
+    "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
   },
   {
     "id": "d222b20d-30f6-45d0-8a90-8c4158cdab59",
@@ -19790,6 +21853,12 @@
     "targetId": "f8a517f5-d99f-41c0-bde9-8a1859637804"
   },
   {
+    "id": "d2edbb77-8508-418a-bc0f-227d9429cb36",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "55aaeeca-7d93-4c88-b8f0-5050aca3d91a"
+  },
+  {
     "id": "d2fdcb2e-d86c-49cf-b069-2af82a6f8714",
     "relationType": "constrains",
     "sourceId": "80ad0d61-7922-49d8-919a-0cbdd58f0092",
@@ -19808,6 +21877,12 @@
     "targetId": "68aa50a2-b7e2-4be0-b886-c139d2ec3e83"
   },
   {
+    "id": "d3193b6d-fb6b-47c6-8a78-92ee90493e66",
+    "relationType": "satisfies",
+    "sourceId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3",
+    "targetId": "e1dd7654-02cb-4ee5-961a-c6520f58c890"
+  },
+  {
     "id": "d31951a9-b1ea-4de3-a22a-03d9777ea613",
     "relationType": "satisfies",
     "sourceId": "32793ee9-a939-498b-a71e-77831ce7ef4c",
@@ -19824,6 +21899,12 @@
     "relationType": "satisfies",
     "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
     "targetId": "a8f2e310-daf9-4560-bd8f-7933be8b1215"
+  },
+  {
+    "id": "d351d815-3991-417c-aef4-829e444a2a93",
+    "relationType": "constrains",
+    "sourceId": "6f184a44-80e3-485b-a003-b7c5eebcc904",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "d3523190-fdee-44df-b703-8ed62201ec7b",
@@ -20046,6 +22127,12 @@
     "targetId": "ff2352be-ff15-47cd-80a7-ea1845330830"
   },
   {
+    "id": "d4b0e67d-e58f-4b5c-b13d-79c6d42f28b3",
+    "relationType": "constrains",
+    "sourceId": "84859577-2c97-4afe-928c-af4e3e34ad1a",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
     "id": "d4ce2fe0-fed8-47d6-bc6e-798e2c15406b",
     "relationType": "satisfies",
     "sourceId": "44fbd164-6749-44bd-9c78-c4661649dd23",
@@ -20211,10 +22298,22 @@
     "targetId": "20ed3ed2-94d2-4a4e-bf76-7fbfcd6931bf"
   },
   {
+    "id": "d6651a40-8dc8-4dec-800b-6dee86af4d69",
+    "relationType": "verifies",
+    "sourceId": "e7514bfa-6fc2-4430-aeea-970d747db9e2",
+    "targetId": "9e09b3d9-9b21-487e-97de-2a692eb3f714"
+  },
+  {
     "id": "d665d146-9a84-4c88-a1eb-b5afba3ae5e0",
     "relationType": "satisfies",
     "sourceId": "d3ee2fc1-24f6-4646-af5f-7b98157ce4aa",
     "targetId": "a9f3a20d-4987-4478-9c5a-2ab9ec6e4b98"
+  },
+  {
+    "id": "d67f283f-af97-4216-9617-0077be60c8e0",
+    "relationType": "constrains",
+    "sourceId": "b524d3b8-4e48-4e63-ba30-1b0c38d96bbf",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "d6884ca5-b30f-4419-8b92-49721f0c7ed2",
@@ -20403,6 +22502,12 @@
     "targetId": "c3523870-7f44-418e-a30e-72a0a59425d7"
   },
   {
+    "id": "d8038bdc-9961-4142-949e-464091a8b68c",
+    "relationType": "constrains",
+    "sourceId": "16286b31-2fef-4d1a-8212-471cc68039b8",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
     "id": "d80f50d1-f246-4a60-bce5-a6eada08e804",
     "relationType": "satisfies",
     "sourceId": "11089086-6caa-4bd8-b5a4-2f6b58e0b96c",
@@ -20443,6 +22548,12 @@
     "relationType": "derives",
     "sourceId": "c4d5b3eb-dbb0-4f76-b78c-ef8b357157ad",
     "targetId": "320cca7d-ae05-48b4-9cdf-c7bc1d5a0d55"
+  },
+  {
+    "id": "d88d6efd-86eb-499f-860c-d586faf5c9f2",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "55aaeeca-7d93-4c88-b8f0-5050aca3d91a"
   },
   {
     "id": "d88dbdb4-ac2a-4351-a068-f7ee7f384966",
@@ -20554,10 +22665,29 @@
     "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
   },
   {
+    "id": "da10dd95-48e6-4057-8bd1-84fcb9c5e993",
+    "relationType": "constrains",
+    "sourceId": "d2567b83-d48f-4fef-be18-0866b613f574",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
+  },
+  {
     "id": "da124bf1-bdd5-449e-995f-6aef08cdbc88",
     "relationType": "satisfies",
     "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
     "targetId": "e176a386-bc23-4fc2-80f3-5735bac134ce"
+  },
+  {
+    "id": "da13bb38-eee8-4646-8a93-fbb3628c15bf",
+    "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/.",
+    "relationType": "derives",
+    "sourceId": "334e58d2-95bc-40af-9f8b-f4d44e126742",
+    "targetId": "38242f71-4f98-4646-906a-ead71fbb49e5"
+  },
+  {
+    "id": "da352aca-d2d1-455c-803e-349ca4acbda9",
+    "relationType": "implements",
+    "sourceId": "27dce77e-5ca2-4a3e-9ddb-f1d297b5b667",
+    "targetId": "09634404-680b-4285-8cd7-d4af7d6c8374"
   },
   {
     "id": "da37c36f-a0d9-4bad-9ffe-c98857d86927",
@@ -20639,6 +22769,13 @@
     "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
   },
   {
+    "id": "db051c53-c3cc-4ffa-b029-057523f671b7",
+    "quote": "Every change to this element reaches users through its pipeline, and the pipeline decides what a green check means. It has to be written down where changes are reviewed, run where nobody can skip it, deploy what was tested and nothing else, reach the cloud without keys that can leak, and answer quickly and reliably enough that people wait for it instead of working around it. The snippets assume a GitHub repository (our-org/shop) of a Node project: ci.yml runs on pull requests and ends in the gate job ci; deliver.yml runs on pushes to main, builds the image ghcr.io/our-org/shop/order-api in its job build and deploys it through the reusable workflow deploy.yml to the GitHub environments staging and production; the AWS roles ci-deploy-staging and ci-deploy-production are what the deploy jobs sign in as; and the checks of the pipeline itself are package.json scripts under scripts/.",
+    "relationType": "derives",
+    "sourceId": "28d746a3-aee3-4622-a682-40bc3a340b98",
+    "targetId": "38242f71-4f98-4646-906a-ead71fbb49e5"
+  },
+  {
     "id": "db100265-2a7c-4db0-9503-80e457abe081",
     "relationType": "constrains",
     "sourceId": "60273de4-a5e3-4079-87bd-bc69a280c84f",
@@ -20663,10 +22800,22 @@
     "targetId": "1f0281a3-3472-4c3d-b1cb-c9ec4f0e2473"
   },
   {
+    "id": "db39bf78-8682-49f4-ab2d-5ae6ed7d98bd",
+    "relationType": "constrains",
+    "sourceId": "49c023a9-0046-4565-9bf8-75034af7cd6f",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
     "id": "db5f4a07-71a9-4760-abfd-0a08945a54cc",
     "relationType": "derives",
     "sourceId": "bcde343d-1b42-45bb-b0a8-b9241d458fea",
     "targetId": "7ef5cf61-e50b-4455-b7be-80ee13afafc2"
+  },
+  {
+    "id": "db67b3a7-c678-4b65-98c6-6f227527e98b",
+    "relationType": "constrains",
+    "sourceId": "a5f1e099-e069-4eaf-8243-fe4bf80f49a9",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
     "id": "db793d74-a4c5-4fc0-bd15-4bfc45df0c62",
@@ -20780,6 +22929,12 @@
     "targetId": "ef167156-3308-4332-9354-889bb3691e38"
   },
   {
+    "id": "dc9eabb8-65b7-4789-9cbd-d0614820ba32",
+    "relationType": "implements",
+    "sourceId": "ec21907b-133e-4901-8585-dd34b5c52330",
+    "targetId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae"
+  },
+  {
     "id": "dca0f837-50a5-4c86-a4d7-cd4c6335398f",
     "relationType": "verifies",
     "sourceId": "fc70f487-3303-4450-bf11-ba366b44ed5e",
@@ -20790,6 +22945,12 @@
     "relationType": "satisfies",
     "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
     "targetId": "fd5442de-d28a-43ca-b0cf-cdbefc46981e"
+  },
+  {
+    "id": "dcab0d82-d878-4fc5-ab0c-70b14505fc36",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "d6fa7162-c43f-4a78-9f84-2b2a9c6f20a0"
   },
   {
     "id": "dcacaff4-1fc1-414d-893e-c1df8b3e1845",
@@ -20822,10 +22983,22 @@
     "targetId": "e113a02b-efc5-44f7-8448-286ca0d42c03"
   },
   {
+    "id": "dd0957b7-d69d-47de-86fe-d7846768a44d",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "80d49c76-ad53-4309-ae2f-fbf5faa449b8"
+  },
+  {
     "id": "dd15e365-f1f8-438e-a1eb-73ee2c44b339",
     "relationType": "implements",
     "sourceId": "9de03d6d-407f-45c9-b2d8-9ceab31dc074",
     "targetId": "c2b1af21-c12d-4a2c-8975-9cbf4dd84e8e"
+  },
+  {
+    "id": "dd1bdc59-a14d-423a-8a24-163a797dadab",
+    "relationType": "constrains",
+    "sourceId": "80210184-8ca0-4fce-a5f7-d7006aad16e8",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
   },
   {
     "id": "dd236513-338d-4157-a71f-554dcf6db69e",
@@ -20853,10 +23026,22 @@
     "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
   },
   {
+    "id": "dd7e4758-0fd2-4381-aeda-b233d1349e15",
+    "relationType": "constrains",
+    "sourceId": "2408cf76-ab15-49e4-b0ec-2dc3e2104366",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
+  },
+  {
     "id": "dd816f46-c0ee-4e31-9cea-b68db41baaeb",
     "relationType": "verifies",
     "sourceId": "0a3cb598-b880-4c3c-8d42-e9974dd727dd",
     "targetId": "22cdc4c2-842e-445e-a736-5fe055b53897"
+  },
+  {
+    "id": "ddb481e7-29e8-4448-b3df-c4bfc922010f",
+    "relationType": "satisfies",
+    "sourceId": "6a9e1c2b-cb04-4d65-93d7-758ba97867ea",
+    "targetId": "9e09b3d9-9b21-487e-97de-2a692eb3f714"
   },
   {
     "id": "ddce2e9f-93ea-4e29-be21-df9940a353df",
@@ -20888,6 +23073,12 @@
     "relationType": "derives",
     "sourceId": "bb5fe800-2f6a-4c09-89c9-9922ebeef052",
     "targetId": "4219a47d-6248-4bb6-a03a-231c5bb44773"
+  },
+  {
+    "id": "ddf2591e-403f-4e1e-b24e-837280249eac",
+    "relationType": "constrains",
+    "sourceId": "0e7cbb1d-8c19-4928-a1d7-4fe97c2d6ad3",
+    "targetId": "bdcfe019-e771-4c56-ba74-0ea611571502"
   },
   {
     "id": "ddf36776-6e01-4645-afdc-d3c80d55f932",
@@ -20950,6 +23141,12 @@
     "targetId": "27a0f3c8-055a-4a39-9040-656a0d192177"
   },
   {
+    "id": "de90c891-2501-489c-952c-4c0592a9fa5f",
+    "relationType": "verifies",
+    "sourceId": "1d597a0b-6963-41de-ab0e-4c7767a496e9",
+    "targetId": "9d945abc-1ed0-4581-968f-72b4874539f6"
+  },
+  {
     "id": "decd0440-7b41-4737-9047-4d3311cf0d1a",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -21010,6 +23207,18 @@
     "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
+    "id": "df090637-2294-4cba-81fb-d6b6ef0b09ba",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "e02ad18c-bbbc-4a2f-95f5-909b661ce105"
+  },
+  {
+    "id": "df197915-c735-4a89-bae1-17b9e04d6cd3",
+    "relationType": "constrains",
+    "sourceId": "d0223cac-c464-4b5d-b2ba-7e266ff2b4c1",
+    "targetId": "9617df9e-ab47-46c4-920c-4347b186eb0d"
+  },
+  {
     "id": "df24427a-51a2-490b-8892-e5b329a9be76",
     "relationType": "satisfies",
     "sourceId": "45c95a3b-968d-4b77-8fc3-94af06de5087",
@@ -21045,6 +23254,12 @@
     "relationType": "verifies",
     "sourceId": "d241f3b5-2ef2-4e8c-b65f-25f3045f9c71",
     "targetId": "6bac0ed5-1098-4e98-9d65-5d29819c56e5"
+  },
+  {
+    "id": "df64209c-133c-4edb-942c-7ac9b2136c35",
+    "relationType": "satisfies",
+    "sourceId": "85565274-ba9a-4907-bd77-8df441930b28",
+    "targetId": "f1cf2267-82df-4cd3-860d-c0b5df01dda0"
   },
   {
     "id": "df993b54-4bb0-408a-a576-8e80b0bde091",
@@ -21099,6 +23314,12 @@
     "relationType": "verifies",
     "sourceId": "8db2e300-6298-47d3-945c-f87c55428ccc",
     "targetId": "92cc1d25-e7f4-434d-963e-7ece6b4c44d4"
+  },
+  {
+    "id": "e04feb3f-5a88-42cc-9585-1546df69f2d4",
+    "relationType": "implements",
+    "sourceId": "4afeef62-f0ca-40f8-9d49-16d74a3ac1b4",
+    "targetId": "9b4ef8fc-9df8-4cd4-b88a-fa598c729b5c"
   },
   {
     "id": "e059b0af-b0e9-4acb-9524-066ec471a9c5",
@@ -21205,6 +23426,12 @@
     "targetId": "38f9a288-f924-4f37-96fd-bd1d78660415"
   },
   {
+    "id": "e153546a-237d-4bd0-a77d-7d2762b83c6b",
+    "relationType": "constrains",
+    "sourceId": "65adadc6-1f32-41ff-a8b4-8f2e01920250",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
     "id": "e15a0abc-9f23-4140-997b-e26a118f6ced",
     "label": "bundled into",
     "relationType": "interacts",
@@ -21309,6 +23536,12 @@
     "relationType": "derives",
     "sourceId": "6f84875d-7998-4d7f-a676-b2aa41dab92c",
     "targetId": "a2734db2-06ac-481e-ad00-9b5338a4420d"
+  },
+  {
+    "id": "e287351f-9ce8-4781-82ad-ec8ab6caadf8",
+    "relationType": "constrains",
+    "sourceId": "fa30059d-5ec9-4a8c-9821-b5e3db19c812",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "e293f6aa-d75b-497a-9de7-412586f56100",
@@ -21466,6 +23699,12 @@
     "targetId": "dd13d127-3eec-4dad-9503-cfc37aea8d91"
   },
   {
+    "id": "e4a2679c-6a38-48d9-b10f-e848286f4db5",
+    "relationType": "satisfies",
+    "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+    "targetId": "334e58d2-95bc-40af-9f8b-f4d44e126742"
+  },
+  {
     "id": "e4d24f5b-cbdb-4a27-ba8d-8c6dfd1d532d",
     "relationType": "verifies",
     "sourceId": "683429ce-65c5-416f-9490-eea5e0c6098f",
@@ -21512,6 +23751,12 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "9eb1254c-0c8f-4835-a384-61490b524da8"
+  },
+  {
+    "id": "e5323d77-9140-4314-9ae4-c2a6e5fd3c77",
+    "relationType": "satisfies",
+    "sourceId": "7a893e48-dc84-4f06-a189-e507c7427e3a",
+    "targetId": "89fa4a8f-2c19-4f02-b39b-cd6b3bf96833"
   },
   {
     "id": "e533ebc6-731f-4a42-b1c1-e4d4473d8004",
@@ -21584,6 +23829,12 @@
     "relationType": "verifies",
     "sourceId": "8176eef6-d3c2-4f7a-9c89-1634d162fa32",
     "targetId": "62993f8e-93a7-4b61-8a98-e7a661c8a07d"
+  },
+  {
+    "id": "e5cdda7d-1f77-4fd3-b5f2-ec7c9b1848e9",
+    "relationType": "constrains",
+    "sourceId": "89100b5b-964b-42b7-ac74-f20a84cee6cc",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
   },
   {
     "id": "e5f1134e-5a63-4e4e-8ad1-6d8162798769",
@@ -21695,6 +23946,12 @@
     "targetId": "56adf307-83f8-425b-b5dd-ce5ac7b9d5a0"
   },
   {
+    "id": "e6d50bda-8d56-41a1-a886-f7b7fbdb0c91",
+    "relationType": "constrains",
+    "sourceId": "d2567b83-d48f-4fef-be18-0866b613f574",
+    "targetId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b"
+  },
+  {
     "id": "e6ec0a67-033b-406a-8a15-7ab0cc1490d2",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -21725,6 +23982,12 @@
     "targetId": "c8ae3d34-1f27-46ad-86fe-cc5a4a37ff35"
   },
   {
+    "id": "e704859b-de25-4452-9bc1-e7e1ccfbb767",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "1a5aa622-3a32-4342-9c2a-2efae7463b84"
+  },
+  {
     "id": "e70c8c76-e08c-4315-a892-ae2e37b7d653",
     "relationType": "satisfies",
     "sourceId": "cb6a98d3-c5bf-4dab-a8c3-ef9072d77086",
@@ -21753,6 +24016,12 @@
     "relationType": "traces-to",
     "sourceId": "88679abf-e9c2-4735-aeaf-81889cfc7e4e",
     "targetId": "4707ec98-b00b-4497-8eee-6ed84a3b9903"
+  },
+  {
+    "id": "e756c2f7-5caa-4982-9ac8-638a6d21b5ba",
+    "relationType": "constrains",
+    "sourceId": "49c023a9-0046-4565-9bf8-75034af7cd6f",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
   },
   {
     "id": "e76c1104-2b5e-473e-b7df-320ab706daa6",
@@ -21904,6 +24173,12 @@
     "targetId": "45fe7daf-be38-40b8-8d7e-4286c482eb6d"
   },
   {
+    "id": "e922fa12-cf81-43c0-9dc2-0973d5703437",
+    "relationType": "constrains",
+    "sourceId": "6fd21664-6402-4869-b26d-61cdf1ef681e",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
     "id": "e94423d5-d1ab-44d5-811d-b8d58583d811",
     "relationType": "derives",
     "sourceId": "dad2535d-c7d6-4564-a9c2-6c65cc5e1032",
@@ -21914,6 +24189,12 @@
     "relationType": "verifies",
     "sourceId": "bbc2cdff-4358-41d3-9f00-434a83f0bb65",
     "targetId": "d7403bea-6d05-4284-b64f-8c2716d74963"
+  },
+  {
+    "id": "e970b07b-afd7-46ca-baa3-4884c46b1f2d",
+    "relationType": "constrains",
+    "sourceId": "d0223cac-c464-4b5d-b2ba-7e266ff2b4c1",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
   },
   {
     "id": "e9950e26-03f8-4246-9042-83866904d825",
@@ -22030,6 +24311,12 @@
     "targetId": "825b513d-d1f0-40b3-be59-7721cfde2082"
   },
   {
+    "id": "eb337a97-9c5d-4c6d-acc5-748d6831bf97",
+    "relationType": "constrains",
+    "sourceId": "d2567b83-d48f-4fef-be18-0866b613f574",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
     "id": "eb4dfe52-ae2a-41dd-8eee-e81024058308",
     "relationType": "verifies",
     "sourceId": "60b9c280-1c6a-49c7-ab8d-373ee6ddaa09",
@@ -22040,6 +24327,13 @@
     "relationType": "verifies",
     "sourceId": "23a37c7c-3d60-469c-a2ad-8ed12ca63872",
     "targetId": "cc714896-0081-4844-b0ee-763bf5a21e1f"
+  },
+  {
+    "id": "eb5e508f-03c6-4429-8806-42e8dfb078b3",
+    "quote": "Existing code (setup on a repository with code, Assay): the same rules as error, but with baselines from the first run, which --ratchet only lowers.",
+    "relationType": "derives",
+    "sourceId": "b471b5b9-bdc2-450c-a6e7-baf31062c6c2",
+    "targetId": "9ed63781-cf41-4f95-8654-329c75f5e763"
   },
   {
     "id": "eb794517-7dcd-4636-bc7b-709ab5b0142e",
@@ -22114,6 +24408,18 @@
     "targetId": "c92e6c44-7fb6-4d32-820e-0b974f895405"
   },
   {
+    "id": "ec5f13dc-957b-4833-9a26-3e9cd6a63b1a",
+    "relationType": "constrains",
+    "sourceId": "b524d3b8-4e48-4e63-ba30-1b0c38d96bbf",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
+  },
+  {
+    "id": "ec6271ca-8aca-4ef0-a92b-6e9885e86143",
+    "relationType": "constrains",
+    "sourceId": "ec21907b-133e-4901-8585-dd34b5c52330",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
     "id": "ec645042-74db-430e-bc86-3494137bb210",
     "relationType": "verifies",
     "sourceId": "c137bcd5-3fc2-4395-bcb6-4a3b8320fc7e",
@@ -22131,6 +24437,12 @@
     "relationType": "constrains",
     "sourceId": "938c5612-ec43-4d40-bea5-479f2c9f8c14",
     "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
+  },
+  {
+    "id": "ec9f6695-3d7c-4f70-8c21-5fd5887b2136",
+    "relationType": "implements",
+    "sourceId": "16286b31-2fef-4d1a-8212-471cc68039b8",
+    "targetId": "49c023a9-0046-4565-9bf8-75034af7cd6f"
   },
   {
     "id": "eca19ac2-1f8a-4b31-ac97-9daa5d3bc85d",
@@ -22169,6 +24481,12 @@
     "targetId": "827d6a5b-4ffc-45a2-b71c-bdfd57e2e6ee"
   },
   {
+    "id": "ed0f7b6a-35ed-4506-a0bd-c33c2c86343e",
+    "relationType": "constrains",
+    "sourceId": "84859577-2c97-4afe-928c-af4e3e34ad1a",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
     "id": "ed1cb04c-0613-4195-b097-27dc5f5930b1",
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
@@ -22191,6 +24509,12 @@
     "relationType": "traces-to",
     "sourceId": "8b9e3f42-d2de-48ff-9373-e1e6ff51c0a0",
     "targetId": "76ec53ca-f143-45c4-bf8e-f5b0abf5d631"
+  },
+  {
+    "id": "ed41a4f4-0d30-4ed7-956f-9a4c133ead79",
+    "relationType": "constrains",
+    "sourceId": "6f184a44-80e3-485b-a003-b7c5eebcc904",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
   },
   {
     "id": "ed823518-949d-45bc-a6dc-ed15e114a092",
@@ -22241,6 +24565,12 @@
     "targetId": "0e124100-20d0-487c-b89f-4c30d7f94fbe"
   },
   {
+    "id": "ee4f5871-d4a0-4434-9cb1-380644211600",
+    "relationType": "constrains",
+    "sourceId": "80210184-8ca0-4fce-a5f7-d7006aad16e8",
+    "targetId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7"
+  },
+  {
     "id": "ee511f60-dec9-46c0-8616-b214906ef84c",
     "relationType": "satisfies",
     "sourceId": "67e8199c-9c68-4ca4-9cbe-28b449acf5a4",
@@ -22271,10 +24601,28 @@
     "targetId": "320cca7d-ae05-48b4-9cdf-c7bc1d5a0d55"
   },
   {
+    "id": "eec7bb92-b523-467c-aaad-e279abfeb67e",
+    "relationType": "implements",
+    "sourceId": "a8d85e43-4d58-4cae-b61a-4de9f457194a",
+    "targetId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae"
+  },
+  {
     "id": "eed84368-667a-4086-b851-12dbd6bdbf0b",
     "relationType": "verifies",
     "sourceId": "fae99b57-0571-4d6e-b596-7e6efb8f2cc1",
     "targetId": "ead4cd36-5550-46dd-8f7b-39d7435d12ae"
+  },
+  {
+    "id": "ef0630ac-90ba-4768-aadc-540aa5f9f7f1",
+    "relationType": "implements",
+    "sourceId": "6fd21664-6402-4869-b26d-61cdf1ef681e",
+    "targetId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae"
+  },
+  {
+    "id": "ef1bf19b-a74a-4b3a-8508-c1d8e76939c9",
+    "relationType": "constrains",
+    "sourceId": "65adadc6-1f32-41ff-a8b4-8f2e01920250",
+    "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
     "id": "ef1fcce7-73c2-45b6-926d-e30e1a30b2e3",
@@ -22372,6 +24720,12 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "bca3bb31-0a06-4e9b-9e14-99268a48ef35"
+  },
+  {
+    "id": "efd972af-8fb4-4460-84e4-d50647cdef4d",
+    "relationType": "constrains",
+    "sourceId": "d0223cac-c464-4b5d-b2ba-7e266ff2b4c1",
+    "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
   },
   {
     "id": "efde71ea-cf04-4902-b84d-1a0b9002f9b0",
@@ -22477,6 +24831,12 @@
     "targetId": "49103558-00bb-4898-90bd-aaf0bc34ecbc"
   },
   {
+    "id": "f12a0bab-a9db-4c3f-bec3-2b46092ee56a",
+    "relationType": "verifies",
+    "sourceId": "17a35e8d-6e3a-418a-8fa1-3910dd40c4f6",
+    "targetId": "f1cf2267-82df-4cd3-860d-c0b5df01dda0"
+  },
+  {
     "id": "f1428b61-e0fc-4bb2-9b69-15844050413d",
     "relationType": "satisfies",
     "sourceId": "15700a5d-75a0-4f03-be4f-78f596580088",
@@ -22487,6 +24847,12 @@
     "relationType": "satisfies",
     "sourceId": "55cd24b4-b12b-4508-994b-de05fd43ce69",
     "targetId": "a612a705-a1dd-47f0-bea4-0cae6db91e6d"
+  },
+  {
+    "id": "f157d409-35df-4b42-9080-e983c1f53677",
+    "relationType": "constrains",
+    "sourceId": "2408cf76-ab15-49e4-b0ec-2dc3e2104366",
+    "targetId": "fc8ca3f9-74c2-42df-ab7c-3a11fcbf2e8b"
   },
   {
     "id": "f1603bac-67ce-4299-93e4-53af81fe5a4f",
@@ -22553,6 +24919,12 @@
     "relationType": "verifies",
     "sourceId": "e55c472a-8c17-4450-9130-d0b52e7194d5",
     "targetId": "ed01c892-c440-4072-a41d-cb3ffdaee97e"
+  },
+  {
+    "id": "f1d65483-0097-4ebd-acb5-4ceaa0cbe399",
+    "relationType": "satisfies",
+    "sourceId": "49fa95f2-b9ea-4884-9372-581264580278",
+    "targetId": "e1dd7654-02cb-4ee5-961a-c6520f58c890"
   },
   {
     "id": "f1fafe96-fd42-4ec0-b680-581098a0a49e",
@@ -22693,6 +25065,12 @@
     "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
+    "id": "f33e2d3c-a175-4999-8e47-ed8ca455bdac",
+    "relationType": "constrains",
+    "sourceId": "d2567b83-d48f-4fef-be18-0866b613f574",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
     "id": "f36f12cc-e728-4699-be53-0d720e177f34",
     "relationType": "traces-to",
     "sourceId": "61a77806-33f2-4564-b46e-143a9ff5977a",
@@ -22787,6 +25165,12 @@
     "relationType": "verifies",
     "sourceId": "8c78ab6a-de7c-4c03-9d7a-cbe7b87d61cc",
     "targetId": "e1de5d03-c7df-43d3-adec-aa0fc01fd655"
+  },
+  {
+    "id": "f42ef29c-89a0-4c31-866c-cf1c9a934055",
+    "relationType": "verifies",
+    "sourceId": "21ecc9fa-628e-49f2-9260-2a1f91590503",
+    "targetId": "e40075e8-83db-4645-9ff3-e754d236102e"
   },
   {
     "id": "f4472fd7-9500-48d7-82d7-77368c98bb94",
@@ -22892,6 +25276,12 @@
     "targetId": "60273de4-a5e3-4079-87bd-bc69a280c84f"
   },
   {
+    "id": "f54aef04-39e7-483a-9361-6259bb6c9ddb",
+    "relationType": "verifies",
+    "sourceId": "7b518aa0-7c33-439e-98de-fecacdf62bda",
+    "targetId": "28d746a3-aee3-4622-a682-40bc3a340b98"
+  },
+  {
     "id": "f55a0730-3e17-41da-9d93-8bc9cce778af",
     "relationType": "verifies",
     "sourceId": "049ee8fe-9cfa-4a0c-95a9-6f0cf2d27b1c",
@@ -22915,6 +25305,12 @@
     "relationType": "constrains",
     "sourceId": "20ed3ed2-94d2-4a4e-bf76-7fbfcd6931bf",
     "targetId": "eff2f9a4-1743-4db0-937d-2d94e6d7f68a"
+  },
+  {
+    "id": "f59e9562-70fc-465d-a912-dba85ca91e81",
+    "relationType": "satisfies",
+    "sourceId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3",
+    "targetId": "478754a3-1569-4483-8890-5bd586eba6e1"
   },
   {
     "id": "f5a712a7-5da5-4cad-b736-92c52c1ca198",
@@ -23031,6 +25427,12 @@
     "targetId": "342ffb40-823b-443c-9d1d-8655a5604dba"
   },
   {
+    "id": "f6acc5bb-c1c0-462d-95c0-8fbdedd85297",
+    "relationType": "constrains",
+    "sourceId": "2408cf76-ab15-49e4-b0ec-2dc3e2104366",
+    "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
+  },
+  {
     "id": "f6cb6c3b-ce5c-4b9b-a6f7-c60ada6d6e84",
     "relationType": "satisfies",
     "sourceId": "891a5219-56c7-4022-8218-0e681f0723ce",
@@ -23083,6 +25485,12 @@
     "relationType": "verifies",
     "sourceId": "1ac15ab1-7ac7-44d0-b40f-75e7c4996d4b",
     "targetId": "1a18617c-855c-44a9-96b9-ad5dd4bfcc16"
+  },
+  {
+    "id": "f75fc9b7-75be-4827-80bb-2c61acae411e",
+    "relationType": "verifies",
+    "sourceId": "2a7c0dea-9066-48a8-a2aa-c1d9a537ed8f",
+    "targetId": "9cf4dc15-4d62-46f1-8ccd-19019ad0af3c"
   },
   {
     "id": "f7627c51-f18d-4fba-8328-c3af8f777808",
@@ -23229,6 +25637,12 @@
     "targetId": "81aeb9d5-a134-408a-9c36-91a5c341b015"
   },
   {
+    "id": "f865bb83-c3a6-42bc-ad2e-afa202e7d13d",
+    "relationType": "constrains",
+    "sourceId": "80210184-8ca0-4fce-a5f7-d7006aad16e8",
+    "targetId": "7a893e48-dc84-4f06-a189-e507c7427e3a"
+  },
+  {
     "id": "f86bb988-8bc6-43ef-952c-c6b9e9cac062",
     "relationType": "verifies",
     "sourceId": "4955a303-1c74-42b8-91d1-50f355c59004",
@@ -23283,6 +25697,12 @@
     "targetId": "352c2e73-b3b4-409b-b140-1de6f9caaa0e"
   },
   {
+    "id": "f8f256e7-4732-4418-9f9b-45eb07ff35cf",
+    "relationType": "satisfies",
+    "sourceId": "60fb9531-8072-4f6d-804d-4a00a373a6ba",
+    "targetId": "478754a3-1569-4483-8890-5bd586eba6e1"
+  },
+  {
     "id": "f8f32917-265c-4104-a042-1c20a3b356a4",
     "relationType": "satisfies",
     "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
@@ -23293,6 +25713,12 @@
     "relationType": "satisfies",
     "sourceId": "cb6a98d3-c5bf-4dab-a8c3-ef9072d77086",
     "targetId": "ca229a9e-e250-49b7-90ce-011d16b48a28"
+  },
+  {
+    "id": "f92627d1-7ad2-4741-9c24-9243feaa1575",
+    "relationType": "constrains",
+    "sourceId": "6fd21664-6402-4869-b26d-61cdf1ef681e",
+    "targetId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3"
   },
   {
     "id": "f9340a41-2bde-4547-b979-070c9b5a2d80",
@@ -23404,6 +25830,12 @@
     "targetId": "1b2d5147-a847-4829-ba0b-df7274336af2"
   },
   {
+    "id": "fa40705d-a713-4ee8-8784-44845501c291",
+    "relationType": "implements",
+    "sourceId": "65adadc6-1f32-41ff-a8b4-8f2e01920250",
+    "targetId": "91e34d0a-b71e-4b8d-b4cb-55e63e0d5eae"
+  },
+  {
     "id": "fa40a1b5-cd1e-4b12-b45b-cfa3deee7c06",
     "relationType": "derives",
     "sourceId": "5bae57b7-ffe0-42b3-98ce-f96dfb62a3ef",
@@ -23439,6 +25871,12 @@
     "relationType": "satisfies",
     "sourceId": "9617df9e-ab47-46c4-920c-4347b186eb0d",
     "targetId": "488d1114-fb39-4ec0-8f4f-f3ec67af5862"
+  },
+  {
+    "id": "fa8ad716-17ff-46db-a822-72c92c1ce64c",
+    "relationType": "satisfies",
+    "sourceId": "7ab5d665-387a-42c1-9aa6-55815b1f55f7",
+    "targetId": "80d49c76-ad53-4309-ae2f-fbf5faa449b8"
   },
   {
     "id": "fa8fb346-8a7b-4f48-9f36-d870282c16c8",
@@ -23519,6 +25957,12 @@
     "targetId": "f600ab7a-c7a2-4b0c-87a7-d6513998ae23"
   },
   {
+    "id": "fb57dc5f-0b64-4b5d-a554-0b1f3bf053b5",
+    "relationType": "satisfies",
+    "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
+    "targetId": "e1dd7654-02cb-4ee5-961a-c6520f58c890"
+  },
+  {
     "id": "fb5f92e6-e8a6-4e88-8f55-83a7b3e453d9",
     "relationType": "derives",
     "sourceId": "1e13fc84-f4af-43e9-b8f8-2b1c71f06788",
@@ -23541,6 +25985,12 @@
     "relationType": "traces-to",
     "sourceId": "b4d521cd-b383-46a0-9e70-79b00acc9c74",
     "targetId": "5eab149c-520e-4e36-83c6-39e642ba65d0"
+  },
+  {
+    "id": "fb8d2ef4-1511-4256-a49f-5c1e65312890",
+    "relationType": "constrains",
+    "sourceId": "d2567b83-d48f-4fef-be18-0866b613f574",
+    "targetId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3"
   },
   {
     "id": "fb922af7-32b9-45b8-9824-636ecb7de489",
@@ -23566,6 +26016,12 @@
     "relationType": "satisfies",
     "sourceId": "eff2f9a4-1743-4db0-937d-2d94e6d7f68a",
     "targetId": "7c9e8a48-0312-4d0f-9df1-fe985fd46cb8"
+  },
+  {
+    "id": "fbf99241-afff-466b-9bcc-bee78a1b3338",
+    "relationType": "satisfies",
+    "sourceId": "cfe506af-85ba-4664-8fdc-dcb1a6e3afc3",
+    "targetId": "047d8115-3091-49c5-8a2a-44954a73b303"
   },
   {
     "id": "fc072dd9-47e8-43f1-9ab3-9a7f8ae49f89",
@@ -23678,6 +26134,12 @@
     "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
   },
   {
+    "id": "fcec0e29-fc7b-49b2-b606-2e2cc7ec10e1",
+    "relationType": "satisfies",
+    "sourceId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef",
+    "targetId": "640e1d91-fdf4-458b-9013-3571820a00a7"
+  },
+  {
     "id": "fcf1e430-359b-4a31-8d9a-2f41b277330f",
     "relationType": "satisfies",
     "sourceId": "024d390d-832f-4258-8ca2-89530b50877e",
@@ -23706,6 +26168,12 @@
     "relationType": "satisfies",
     "sourceId": "e6de1ab9-cff0-402b-a114-9b37b7c33dc5",
     "targetId": "8eb99c23-dc21-4c58-8ad2-e9bd66f877ec"
+  },
+  {
+    "id": "fd4eef6e-bb4e-410f-8516-5f7110a93b6d",
+    "relationType": "verifies",
+    "sourceId": "e7514bfa-6fc2-4430-aeea-970d747db9e2",
+    "targetId": "95058b84-577d-47ed-b8cb-65445f1c7aba"
   },
   {
     "id": "fd6c3c4e-3100-44e2-a016-01154a7c981f",
@@ -23891,10 +26359,22 @@
     "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
   },
   {
+    "id": "ffb3e747-64f2-4e2f-98c0-7c64f3913b96",
+    "relationType": "satisfies",
+    "sourceId": "d3f5a3c4-2f9b-41fd-8e38-b16c76f5863e",
+    "targetId": "54fbd45f-199b-41c2-8670-cfd0d756eb97"
+  },
+  {
     "id": "ffc07845-17c9-4783-b7a9-18c4904fdc0f",
     "relationType": "traces-to",
     "sourceId": "a77977b2-7c32-4dc1-ac33-a1f808a55235",
     "targetId": "fda3a1f9-d7f7-40da-9a9c-fff9d8c180d8"
+  },
+  {
+    "id": "ffd13f75-7ea9-4418-a6d0-33e45e7c0949",
+    "relationType": "traces-to",
+    "sourceId": "b471b5b9-bdc2-450c-a6e7-baf31062c6c2",
+    "targetId": "0e7cbb1d-8c19-4928-a1d7-4fe97c2d6ad3"
   },
   {
     "id": "ffe5f1b1-fbea-4ed9-9038-8b20e23415a3",

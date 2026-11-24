@@ -8,6 +8,7 @@
 // adapter in the registry on its fixture.
 
 import type { ParseArgsConfig } from 'node:util'
+import type { Measurement } from '@radical/common/check'
 
 /** One value an adapter read, before radical sense adds the labels given
  *  on the command line. */
@@ -25,6 +26,9 @@ export interface SensorInput {
   options: Record<string, string | boolean | string[] | undefined>
   /** The working directory the paths are relative to. */
   cwd: string
+  /** What was measured before, where radical sense writes this run: the
+   *  model folder's store, or the --out file when it exists. */
+  previous?: Measurement[]
 }
 
 export interface SensorAdapter {

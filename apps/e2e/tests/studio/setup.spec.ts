@@ -70,9 +70,10 @@ test('Settings → Setup… opens it with the settings in use', async ({ page, s
   })
   await studio.seed()
   await studio.open('v-context')
-  await expect(page.getByRole('combobox', { name: 'Special key' })).toHaveCount(0)
+  const specialKey = page.getByRole('group', { name: 'Special key' })
+  await expect(specialKey).toHaveCount(0)
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
-  await expect(page.getByRole('combobox', { name: 'Special key' })).toHaveValue('ctrl')
+  await expect(specialKey.getByRole('menuitemradio', { name: 'Ctrl' })).toHaveAttribute('aria-checked', 'true')
   await page.getByRole('menuitem', { name: 'Setup…' }).click()
   const wizard = wizardOf(page)
   await expect(wizard.getByRole('radio', { name: /Light/ })).toHaveAttribute('aria-checked', 'true')
@@ -88,7 +89,7 @@ test('the System theme follows the operating system', async ({ page, studio }) =
   await page.emulateMedia({ colorScheme: 'light' })
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
-  await expect(page.getByRole('combobox', { name: 'Theme' })).toHaveValue('system')
+  await expect(page.getByRole('group', { name: 'Theme' }).getByRole('menuitemradio', { name: 'System' })).toHaveAttribute('aria-checked', 'true')
 })
 
 test('the System theme follows the operating system while a presentation plays', async ({ page, studio }) => {

@@ -442,6 +442,7 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
   const relinking = useDiagramStore((s) => s.relinking)
   const selectedKey = useDiagramStore((s) => s.selectedNodeIds.join('\u0000'))
   const connectionModifier = useDiagramStore((s) => s.connectionModifier)
+  const spacePans = useSpaceOnCanvas()
   const cancelConnection = useDiagramStore((s) => s.cancelConnection)
 
   // Sequence editing mode
@@ -2135,6 +2136,10 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
         // mouseup above), a drag over the empty canvas draws a box.
         multiSelectionKeyCode={SPECIAL_KEY_CODE[connectionModifier]}
         selectionKeyCode={SPECIAL_KEY_CODE[connectionModifier]}
+        // Space held pans only while the focus is on the canvas (or on
+        // nothing): React Flow cancels Space everywhere in the document, and
+        // a button elsewhere did not press with it (WCAG 2.1.1).
+        panActivationKeyCode={spacePans ? 'Space' : null}
         selectNodesOnDrag={false}
         elevateEdgesOnSelect
         elevateNodesOnSelect
@@ -2231,6 +2236,25 @@ function StructuralCanvas({ onDiscuss, nodeDiscussions }: DiscussionCanvasProps)
 /** The canvas, with the elements palette down its left side in Designer and
  *  its controls centred at its bottom (neither while a presentation plays).
  *  `smartLayoutNote` goes to the Smart Layout button (CanvasControls). */
+/** Whether Space may pan the canvas now: the focus is on the canvas, or on
+ *  no control at all (the page's body, after a click on the canvas). */
+function useSpaceOnCanvas(): boolean {
+  const onCanvas = (): boolean => {
+    const at = typeof document !== 'undefined' ? document.activeElement : null
+    return !at || at === document.body || !!at.closest('.react-flow')
+  }
+  const [pans, setPans] = useState(onCanvas)
+  useEffect(() => {
+    const update = (): void => setPans(onCanvas())
+    // After the focus has moved: focusout's activeElement is still the old one.
+    const later = (): void => { setTimeout(update, 0) }
+    document.addEventListener('focusin', update)
+    document.addEventListener('focusout', later)
+    return () => { document.removeEventListener('focusin', update); document.removeEventListener('focusout', later) }
+  }, [])
+  return pans
+}
+
 export function Canvas({ smartLayoutNote, onDiscuss, nodeDiscussions }: { smartLayoutNote?: string } & DiscussionCanvasProps = {}): React.ReactElement {
   const presenting = useDiagramStore((s) => s.presentationActive)
   const showPalette = useDiagramStore((s) => s.appMode === 'designer' && !otherModelViewShown(s)) && !presenting

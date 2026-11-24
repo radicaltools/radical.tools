@@ -653,6 +653,7 @@ export function QuickSearch(): React.ReactElement | null {
         )}
         <input
           ref={inputRef}
+          aria-label={aiMode ? `Ask ${aiProviderLabel}` : 'Search'}
           value={q}
           onChange={(e) => { setQ(e.target.value); setFocused(true) }}
           onFocus={() => setFocused(true)}

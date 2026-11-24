@@ -14,7 +14,7 @@
 import { findingsByElement, useCardVerification } from '@radical/ui/store/verification'
 import { create } from 'zustand'
 import { useMemo } from 'react'
-import { checkModel, compareCheckConfig, defaultSeverity, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults, withRepositorySettings, withoutRepositorySettings } from '@radical/common/check'
+import { checkModel, compareCheckConfig, defaultSeverity, strictCheckConfig, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults, withRepositorySettings, withoutRepositorySettings } from '@radical/common/check'
 import { REPOSITORY_FILE, parseRepositoryFile, serializeRepositoryFile, type RepositoryFile } from '@radical/common/repositoryMapping'
 import { historyMark, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
@@ -149,6 +149,24 @@ export function inspectorMeasurements(storeText: string, reviewsText: string): M
 
 /** check.json as Settings write it. */
 export const serializeCheckConfig = (config: CheckConfig): string => JSON.stringify(config, null, 2) + '\n'
+
+/** The gate a model Forge builds starts with, written when the active
+ *  model is a folder without check.json (ADR Strict gate for new models):
+ *  every rule an error, every goal at 100%. False when nothing was written. */
+export async function saveForgeGate(): Promise<boolean> {
+  const id = documents.getActiveId()
+  if (!id) return false
+  const files = await documents.readCheckFiles(id).catch(() => null)
+  if (!files || files.config !== null) return false
+  try {
+    await documents.writeCheckConfig(id, serializeCheckConfig(strictCheckConfig()))
+  } catch {
+    // A model kept in the browser has no check.json.
+    return false
+  }
+  if (documents.getActiveId() === id) recheck()
+  return true
+}
 
 /** Saves `config` as the active document's check.json and checks the model
  *  with it at once, without waiting for the next poll to read it back. What

@@ -9,7 +9,7 @@
 // lists the same.
 
 /** The sensors of `radical sense` a measure line can name. */
-export const SENSOR_NAMES = ['command', 'json', 'playwright'] as const
+export const SENSOR_NAMES = ['command', 'github-actions', 'json', 'lighthouse', 'machine', 'playwright'] as const
 
 export interface MeasureLine {
   raw: string

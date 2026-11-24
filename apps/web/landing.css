@@ -43,8 +43,9 @@
   --text:          #1a1a2e;
   --text-2:        #44485a;
   --muted:         #6b6b80;
-  --accent:        #3b6fe6;
-  --accent-rgb:    59,111,230;
+  /* Studio's blue, a shade darker: 4.5:1 as text on the page and the panels (WCAG 1.4.3). */
+  --accent:        #2f62d8;
+  --accent-rgb:    47,98,216;
   --hover:         rgba(0,0,0,0.05);
   --hover-faint:   rgba(0,0,0,0.022);
   --shadow-sm: 0 1px 2px rgba(20,30,60,0.06);
@@ -57,7 +58,7 @@
   html:not([data-theme]) {
     --bg: #f4f5f9; --bg-panel: #ffffff; --border: #e1e3eb; --border-strong: #c8cbd6;
     --text: #1a1a2e; --text-2: #44485a; --muted: #6b6b80;
-    --accent: #3b6fe6; --accent-rgb: 59,111,230;
+    --accent: #2f62d8; --accent-rgb: 47,98,216;
     --hover: rgba(0,0,0,0.05); --hover-faint: rgba(0,0,0,0.022);
     --c-studio: #1168bd; --c-forge: #6d28d9; --c-hub: #0f766e; --c-mcp: #0e7490; --c-cli: #b45309; --c-code: #15803d; --c-assay: #be123c;
   }
@@ -195,7 +196,6 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .cta.ghost:hover { border-color: var(--border-strong); background: var(--hover); }
 .hero-note { margin-top: 16px; font-size: 12.5px; color: var(--muted); }
 .hero-note a { color: var(--accent); }
-.hero-note a:hover { text-decoration: underline; }
 
 /* Radical Assay, below the hero: the model of code that already exists. */
 .assay { max-width: 760px; margin: 0 auto; padding: 8px 0 64px; }
@@ -314,6 +314,8 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
   overflow-x: auto;
 }
 .code .cm { color: #9898b8; }
+/* A code block or table that scrolls sideways takes focus (docs.js). */
+.code:focus-visible, .doc-table-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ── Footer ──────────────────────────────────────────────────────── */
 .footer {
@@ -325,7 +327,24 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 }
 .footer a { color: var(--accent); }
 .footer a:hover { text-decoration: underline; }
-.footer-links { display: flex; gap: 16px; }
+/* Wraps on a narrow window instead of scrolling sideways (WCAG 1.4.10);
+   the row gap keeps each link clear of the next row (WCAG 2.5.8). */
+.footer-links { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+
+/* ── Links in running text ───────────────────────────────────────── */
+/* Underlined, not told apart from the words around them by colour alone
+   (WCAG 1.4.1): quietly, until the pointer is on them. Links that stand on
+   their own (buttons, lists of links, the map) keep their look. */
+:is(.hero-note, .uc-context p, .uc-benefits li, .blog-article p, .blog-article li, .blog-author span,
+    .doc-hero-sub, .doc-tip, .footer > span:not(.footer-links)) a,
+.doc-section :is(p, li, td, dd, figcaption) a:not(.cta) {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 2px;
+}
+:is(.hero-note, .uc-context p, .uc-benefits li, .blog-article p, .blog-article li, .blog-author span,
+    .doc-hero-sub, .doc-tip, .footer > span:not(.footer-links)) a:hover,
+.doc-section :is(p, li, td, dd, figcaption) a:not(.cta):hover { text-decoration-color: currentColor; }
 
 /* ── Responsive ──────────────────────────────────────────────────── */
 @media (max-width: 760px) {
@@ -443,6 +462,7 @@ main:not(.doc-main) > section { width: var(--w); margin: 0 auto; }
 .blog-article p strong { color: var(--text); }
 .blog-article a { color: var(--accent); }
 .blog-article a:hover { text-decoration: underline; }
+
 .blog-article ul { padding-left: 22px; margin: 0 0 18px; display: flex; flex-direction: column; gap: 8px; }
 .blog-article li { font-size: 1.02rem; line-height: 1.7; color: var(--text-2); }
 .blog-article li strong { color: var(--text); }

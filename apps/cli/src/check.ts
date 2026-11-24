@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/pro
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, formatTrace, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, ratchetConfig, reviewMeasurements, runCheck, serializeMeasurementStore, serializeTestResults, splitTestId, testsRanAt, traceOf, withBoundTests, type CheckConfig, type CiSource, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, formatTrace, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, adoptBaselines, existingCodeCheckConfig, ratchetConfig, reviewMeasurements, runCheck, serializeCheckConfig, serializeMeasurementStore, serializeTestResults, splitTestId, testsRanAt, traceOf, withBoundTests, type CheckConfig, type CiSource, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { DEPS_FILE } from '@radical/common/federation'
 import { STATE_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
@@ -77,6 +77,15 @@ its own ("model": { "repo": … }), it judges that repository's part of the mode
                       baseline of the model's check.json (exit 2): only one
                       --config names. With --alone or --trigger, which leave
                       part of the model out, it lowers none (exit 2)
+  --adopt             take the baselines of this first run into check.json
+                      once: each rule that finds something gets its count as
+                      max, each measured metric its share as the goal, and
+                      "adopt": true goes. Only for a check.json that waits for
+                      them (radical setup and Assay write one for existing
+                      code), or none (it writes one with every rule an error);
+                      from then on only --ratchet lowers them. Give the test
+                      reports and measurements too, or the rules that read
+                      them get no baseline
   --alone             check without the models deps.json names; with a
                       deps.json the model is checked composed with them, at
                       their pinned refs (radical federation --help)
@@ -147,6 +156,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
         evidence: { type: 'string' },
         trace: { type: 'string' },
         ratchet: { type: 'boolean', default: false },
+        adopt: { type: 'boolean', default: false },
         alone: { type: 'boolean', default: false },
         verbose: { type: 'boolean', default: false },
         'list-rules': { type: 'boolean', default: false },
@@ -168,7 +178,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   const fromCi = values['from-ci']
   if (positionals.length > 1 || !['text', 'json', 'github'].includes(values.format) || (fromCi && values.report?.length)
     || (values.evidence && !values.report?.length && !fromCi && !values.metrics?.length)
-    || (values.trace !== undefined && (!values.trace.trim() || values.format === 'github' || values.ratchet))) {
+    || (values.trace !== undefined && (!values.trace.trim() || values.format === 'github' || values.ratchet || values.adopt))) {
     io.err(CHECK_USAGE)
     return 2
   }
@@ -176,6 +186,10 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   // A baseline is the whole model's: a check that leaves part of it out
   // (the models deps.json names, the conditions of other events) finds less.
   const partial = values.alone ? '--alone' : values.trigger !== undefined ? '--trigger' : null
+  if (values.adopt && (values.ratchet || partial)) {
+    io.err(`radical check --adopt: ${values.ratchet ? 'takes the first baselines; --ratchet lowers them later, not in the same run' : `with ${partial} the check leaves part of the model out, and a baseline counts the whole model`}.`)
+    return 2
+  }
   if (values.ratchet && partial) {
     io.err(`radical check --ratchet: with ${partial} the check leaves part of the model out (${partial === '--alone' ? 'the models deps.json names' : 'the metric conditions of other events'}), and a baseline counts the whole model. Ratchet with a check of all of it.`)
     return 2
@@ -210,6 +224,8 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
       io.err(missing ? `No config at ${configPath}.` : `Cannot read the config ${configPath}: ${(error as Error).message}`)
       return 2
     }
+    // A model without check.json adopts the gate for existing code.
+    if (values.adopt) config = existingCodeCheckConfig()
   }
 
   // Where the repository builds the model's elements, and which of those
@@ -374,7 +390,22 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   const testSources = repository?.verifies?.length ? await boundTestSources(mappedFrom, repository.verifies) : undefined
   // The model at the base (where the branch left the default branch), for need-answer-changed.
   const baseNodes = await baseModelNodes(root)
-  const result = runCheck(files, config, { sensors, repository, missingPaths, ...(testSources ? { testSources } : {}), ...(baseNodes ? { baseNodes } : {}), ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) })
+  const checkOptions = { sensors, repository, missingPaths, ...(testSources ? { testSources } : {}), ...(baseNodes ? { baseNodes } : {}), ...(tests ? { tests } : {}), ...(testsReadAt ? { testsReadAt } : {}), ...(measurements ? { measurements } : {}), ...(baseline ? { baseline } : {}), ...(values.trigger ? { trigger: values.trigger } : {}), concerns: concernPacks(), ...(others ? { others } : {}) }
+  let result = runCheck(files, config, checkOptions)
+  if (values.adopt) {
+    let adopted
+    try { adopted = adoptBaselines(config, result) } catch (error) {
+      io.err(`radical check --adopt: ${(error as Error).message}.`)
+      return 2
+    }
+    await writeFile(configPath, serializeCheckConfig(adopted.config))
+    result = runCheck(files, adopted.config, checkOptions)
+    // To stderr: stdout may be the JSON result.
+    if (!values.quiet) {
+      io.err(`Adopted the first run's baselines into ${configPath}: ${adopted.baselines.length ? adopted.baselines.map((b) => `${b.id} max ${b.max}`).join(', ') : 'no rule found anything'}; goals ${adopted.goals.length ? adopted.goals.map((g) => `${g.id} ${g.min}%`).join(', ') : 'none measured'}. From now on only --ratchet lowers them. Commit it.`)
+      if (adopted.notRun.length) io.err(`Not run, so no baseline taken (give the test reports with --report, the measurements with --metrics): ${adopted.notRun.join(', ')}.`)
+    }
+  }
   if (tests && !fromKept && (keep || !fromCi)) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited; with the commit they were read at, so

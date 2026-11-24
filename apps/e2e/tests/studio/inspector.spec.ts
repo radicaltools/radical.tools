@@ -22,7 +22,7 @@ import { HUB_PORT } from '../../playwright.config'
 // check.json.
 
 /** The Inspector's button on the activity rail. */
-const inspectorButton = (page: Page) => page.locator('.activity-rail').getByRole('button', { name: 'Inspector', exact: true })
+const inspectorButton = (page: Page) => page.locator('.activity-rail').getByRole('button', { name: /^Inspector(,|$)/ })
 /** One of the Inspector's tabs, in the left panel. */
 const tab = (page: Page, name: RegExp) => page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab', { name })
 /** The Inspector's report, in place of the view. */

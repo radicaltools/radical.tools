@@ -242,7 +242,7 @@ test.describe('perspectives', () => {
 
   test('switching perspective keeps the view and updates the URL', async ({ page, studio }) => {
     await studio.open('v-containers')
-    await page.getByRole('button', { name: 'Presentations', exact: true }).click()
+    await page.getByRole('button', { name: /^Presentations(,|$)/ }).click()
     await studio.advance(500)
     await expect(page).toHaveURL(/\/m\/presenter\/v\/v-containers$/)
     await expect(page.getByRole('button', { name: 'Present', exact: true })).toBeVisible()
@@ -370,7 +370,7 @@ test.describe('what is arranged in Viewer and Presenter stays there', () => {
       const designer = await studio.positions()
       const saved = await studio.storedJson()
 
-      await page.getByRole('button', { name: perspective === 'Presenter' ? 'Presentations' : perspective, exact: true }).click()
+      await page.getByRole('button', { name: perspective === 'Presenter' ? /^Presentations(,|$)/ : perspective, exact: true }).click()
       await studio.settle()
       await studio.smartLayout()
       await page.waitForTimeout(1000)

@@ -82,7 +82,12 @@ describe('concern packs', () => {
     expect(problemsWith({ cadence: 'continual', trigger: 'nightly' }, ['every'])).toEqual([expect.stringContaining('has a trigger but is not triggered')])
     expect(problemsWith({ cadence: 'continual', every: '90d' }, ['trigger'])).toEqual([expect.stringContaining('has an every but is not temporal')])
     expect(problemsWith({ category: 'structural' })).toEqual([expect.stringContaining('still has a category')])
-    expect(problemsWith({ measure: 'test-results' })).toEqual([expect.stringContaining('states a measure')])
+    // A pack names only the built-in sensors whose metrics it knows, by name alone.
+    expect(problemsWith({ measure: 'test-results' })).toEqual([expect.stringContaining('measures with test-results: a pack names only the built-in sensors')])
+    expect(problemsWith({ measure: 'lighthouse .lighthouseci' })).toEqual([expect.stringContaining('has arguments')])
+    expect(problemsWith({ measure: 'github-actions', metrics: 'ci.pr.duration.p90 <= {{PR_MINUTES}} min' })).toEqual([])
+    expect(problemsWith({ measure: 'machine', metrics: 'test(a.test.ts › b) passed' })).toEqual([expect.stringContaining('names a test')])
+    expect(problemsWith({ metrics: 'ci.runs >= 1' })).toEqual([expect.stringContaining('states metrics but no measure')])
   })
 
   it('every pack imported and bound passes radical check', () => {

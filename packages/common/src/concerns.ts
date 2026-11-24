@@ -40,6 +40,7 @@ export const CONCERN_GROUPS = [
   { id: 'technology', label: 'Tech Radar', description: 'What it is built on and why: the stacks, the data stores and the infrastructure.', iso: ['Maintainability', 'Flexibility'] },
   { id: 'compliance', label: 'Compliance', description: 'What law and regulation require of the data and the system, such as the GDPR for personal data.', iso: ['Security'] },
   { id: 'operability', label: 'Operability & Reliability', description: 'How it is run, watched and kept available under failure and load.', iso: ['Reliability', 'Performance efficiency'] },
+  { id: 'ux', label: 'UX & Accessibility', description: 'How people use it: usability held to ISO 9241-110, accessibility held to WCAG 2.2 AA, and the experience on phones.', iso: ['Interaction capability', 'Performance efficiency'] },
 ] as const
 
 export type ConcernGroupId = typeof CONCERN_GROUPS[number]['id']
@@ -130,6 +131,16 @@ export function concernStatuses(packs: ConcernPack[], nodes: Record<string, C4No
     out.push({ pack, targets, open: targets.filter((id) => !covered(id)), pending: marked.filter((n) => prop(n, 'status') === 'proposed') })
   }
   return out
+}
+
+/** The concerns the model raises that are not settled: the packs whose
+ *  trigger finds an element no accepted ADR marked with the concern
+ *  constrains. What the check's concern-unaddressed reports, and what
+ *  Forge's Review stage asks about. None while the metamodel gives an ADR
+ *  no concern to mark. */
+export function openConcerns(packs: ConcernPack[], nodes: Record<string, C4Node>, relations: Record<string, C4Relation>, metamodel: Metamodel | undefined): ConcernStatus[] {
+  if (!holdsConcerns(metamodel)) return []
+  return concernStatuses(packs, nodes, relations).filter((s) => s.open.length)
 }
 
 const prop = (node: C4Node, key: string): string => {

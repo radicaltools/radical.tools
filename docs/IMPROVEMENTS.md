@@ -368,6 +368,30 @@ runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main. ~~Fixed on fix/round-211-220 (2026-11-15), where it failed in
 both full runs: the poll now asks again when a box is missing instead of failing.~~
 
+### Dogfooding (2026-11-24): what IsoStride found (UX and CI/CD packs, built-in sensors, scaled limits, strict gate)
+
+One need with six questions and answers, fifteen requirements, thirteen scenarios, two ADRs with their fitness
+functions and an amended one, written through the worktree's own MCP server before the code (112 calls in one run).
+
+- **The ad hoc stdio client a fourth time.** `@modelcontextprotocol/sdk` is not what the workspace has
+  (`@modelcontextprotocol/client` is), so the first script failed on its import. `radical mcp call <folder>
+  <calls.json>` is still overdue.
+- **`search_model` answers "Unsupported query: sensor" to a plain word.** It could say "use FIND sensor" instead;
+  the query language is not what an agent tries first.
+- **`review_requirements` takes requirement ids, not a need.** Reviewing what one need brought meant reviewing every
+  requirement changed on the branch, 150 KB of answer; `review_requirements { needId }` would give one need's.
+- **No way to ask which views show an element.** Placing new elements beside their neighbours meant `GET VIEW` on
+  all 50 views and looking for the neighbour's id. `GET VIEWS OF <id>` (or the views in GET NODE) would answer it.
+- **A baseline of 0 leaves no margin.** `<= baseline + 10%` of a Total Blocking Time or a layout shift of 0 is 0,
+  so any noise fails it, and a margin without a unit (`baseline + 0.05` for CLS) is refused. radical.tools' own
+  lab conditions took `baseline + 50 ms` for TBT and a fixed CLS limit instead. A margin of the larger of two
+  (`baseline + max(10%, 50 ms)`) and a unitless margin for a unitless metric would say what was meant.
+- **Lighthouse's `page` label drops the hash**, so Studio's and the Hub's routes (`#/cat/ux`) all measure as `/`.
+  A sensor option to keep the hash, or a label per URL given, would let a single-page app measure its places.
+- **Tightening check.json by hand (2026-11-19) is half answered.** `radical check --adopt` takes a model's
+  baselines once, for a check.json that waits for them; an existing model with a lenient check.json still has no
+  one-step way to turn every rule on at its count.
+
 ### Dogfooding (2026-11-19): the Measurements tab
 
 One need, four requirements and two scenarios, written through the worktree's own MCP server before the code.

@@ -21,7 +21,7 @@ describe('repository sensors', () => {
     const nodes = Object.fromEntries(data.nodes.map((n) => [n.id, n]))
     const model = { nodes, relations: Object.fromEntries(data.relations.map((r) => [r.id, r])) }
     const measured = data.nodes.filter((n) => n.type === 'fitness-fn' && parseMeasure(n.measure).some((line) => SENSORS[line.sensor]))
-    expect(measured.map((n) => n.label).sort()).toEqual(['Installable npm packages', 'Large model stays responsive', 'One mark everywhere', 'One product version', 'Workspace boundaries'])
+    expect(measured.map((n) => n.label).sort()).toEqual(['Installable npm packages', 'Large model stays responsive', 'No lab regression on desktops', 'No lab regression on phones', 'One mark everywhere', 'One product version', 'Tracked violations fixed in time', 'Workspace boundaries'])
     const mapped = (await readRepositoryMapping(ROOT)).implements
     const paths = (e) => elementPaths(mapped, e.id, (id) => nodes[id]?.parentId)
     const missing = measured.flatMap((ff) => appliedElements(model, ff)).filter((e) => !paths(e).length).map((e) => `${e.label} (${e.id})`)

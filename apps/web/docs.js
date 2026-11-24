@@ -63,3 +63,44 @@
   window.addEventListener('resize', queue);
   update();
 })();
+
+// A code block or table that scrolls sideways (always on a phone, some at
+// any width) can be scrolled with the keyboard: it takes focus while it
+// overflows (WCAG 2.1.1; axe's scrollable-region-focusable). A table's wrap
+// is named by the heading above it, a code block is read as its text.
+(function () {
+  var regions = Array.prototype.slice.call(document.querySelectorAll('pre, .doc-table-wrap'));
+  if (!regions.length) return;
+  function headingBefore(el) {
+    for (var node = el; node && node !== document.body; node = node.parentElement) {
+      for (var prev = node.previousElementSibling; prev; prev = prev.previousElementSibling) {
+        if (/^H[2-4]$/.test(prev.tagName)) return prev.textContent.trim();
+      }
+    }
+    return '';
+  }
+  function update() {
+    regions.forEach(function (el) {
+      var scrolls = el.scrollWidth > el.clientWidth + 1;
+      if (scrolls && !el.hasAttribute('tabindex')) {
+        el.setAttribute('tabindex', '0');
+        if (el.tagName !== 'PRE') {
+          var name = headingBefore(el);
+          el.setAttribute('role', 'region');
+          el.setAttribute('aria-label', name ? name + ' (table)' : 'Table');
+        }
+      } else if (!scrolls && el.getAttribute('tabindex') === '0') {
+        el.removeAttribute('tabindex');
+        if (el.tagName !== 'PRE') { el.removeAttribute('role'); el.removeAttribute('aria-label'); }
+      }
+    });
+  }
+  var queued = false;
+  window.addEventListener('resize', function () {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(function () { queued = false; update(); });
+  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(update);
+  update();
+})();

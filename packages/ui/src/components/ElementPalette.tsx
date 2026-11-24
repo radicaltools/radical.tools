@@ -96,7 +96,9 @@ export function ElementPalette(): React.ReactElement {
   const relations = useDiagramStore((s) => s.c4Relations)
   const shown = useMemo(() => chainTypes(view, { nodes, relations, metamodel: metamodel as Metamodel }), [view, nodes, relations, metamodel])
   return (
-    <div className="element-palette" role="toolbar" aria-label="Elements" aria-orientation="vertical">
+    // A region that scrolls: a stop of Tab, so the arrow keys scroll it
+    // (WCAG 2.1.1); its types are dragged, not pressed, so not a toolbar.
+    <div className="element-palette" role="region" aria-label="Elements" tabIndex={0}>
       {groups.map((group) => (
         <div className="palette-group" key={group.label} role="group" aria-label={group.label}>
           <div className="palette-group-label">{group.label}</div>

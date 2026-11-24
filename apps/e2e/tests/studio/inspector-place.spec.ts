@@ -46,7 +46,7 @@ test('the Inspector is a place of the rail: its tabs in the left panel, its repo
   await studio.ready()
 
   const rail = page.locator('.activity-rail')
-  const button = rail.getByRole('button', { name: 'Inspector', exact: true })
+  const button = rail.getByRole('button', { name: /^Inspector(,|$)/ })
   const report = page.getByRole('region', { name: 'Inspector' })
   const tabs = page.getByRole('tablist', { name: 'Inspector' })
   const left = page.locator('.left-panel')
@@ -118,7 +118,7 @@ test('after a reload, the rail button of an open Inspector works before the file
   await expect(page.locator('.welcome-overlay')).toBeHidden()
   await studio.ready()
 
-  const button = page.locator('.activity-rail').getByRole('button', { name: 'Inspector', exact: true })
+  const button = page.locator('.activity-rail').getByRole('button', { name: /^Inspector(,|$)/ })
   const report = page.getByRole('region', { name: 'Inspector' })
   await expect(button).toBeEnabled({ timeout: 10_000 })
   await button.click()

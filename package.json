@@ -33,9 +33,19 @@
     "release:tag": "node tools/release.mjs tag",
     "fuzz": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js fuzz",
     "check:architecture": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js check --report reports --trigger pull-request",
+    "build:cli": "npm run build -w @radicaltools/cli",
+    "browsers": "npx playwright install --with-deps chromium",
+    "sense:pull-request": "npm run build:cli && node apps/cli/dist/index.js sense run --trigger pull-request --out reports/metrics --context commit=${GITHUB_SHA:-$(git rev-parse HEAD)}",
+    "lint:workflows": "node tools/ci/actionlint.mjs",
+    "check:workflows": "node tools/ci/workflows.mjs",
+    "test:mcp-package": "npm run test:package -w ./apps/mcp",
+    "test:launcher": "node tools/ci/launcher.mjs",
+    "verify": "npm run check:workspaces && npm run typecheck && npm run lint:workflows && npm run check:workflows && npm run browsers && npm run test:reports && npm run sense:pull-request && npm run e2e && npm run check:architecture -- --metrics reports/metrics && npm run test:mcp-package && npm run test:launcher",
     "hooks": "npm run build -w @radicaltools/cli && node apps/cli/dist/index.js hooks install && node apps/cli/dist/index.js diff --save-base --quiet"
   },
   "devDependencies": {
+    "@lhci/cli": "0.15.1",
+    "js-yaml": "^4.3.2",
     "typescript": "^5.3.3"
   }
 }

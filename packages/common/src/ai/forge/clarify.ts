@@ -11,7 +11,7 @@
 // asks the user itself (apps/mcp's forge_clarify).
 
 import type { ConcernPack } from '../../concerns'
-import { CONCERNS_QUESTION_ID, CONCERN_QUESTION_PREFIX, concernQuestionLines, concernsClarifyLines, type ConcernProposal } from './concerns'
+import { CONCERNS_QUESTION_ID, CONCERN_QUESTION_PREFIX, concernQuestionLines, concernsClarifyLines, type ConcernProposal, type ConcernsClarifyOptions } from './concerns'
 
 export interface ClarifyStageQuestion {
   id: string
@@ -75,13 +75,16 @@ export function parseClarifyReply(text: string): ClarifyStageQuestion[] | null {
 export type ClarifyMode = 'json' | 'ask'
 
 /** `concernPacks` are the Hub's concern packs, offered in the Requirements
- *  stage: the model picks those the description calls for. */
+ *  stage: the model picks those the description calls for, the baseline
+ *  packs always among them. In the Review stage (`concerns.stage`) they are
+ *  the concerns the model raises that are still open. */
 export function buildClarifyPrompt(
   stageTitle: string,
   description: string,
   concernPacks: ConcernPack[] | undefined,
   priorQA?: string,
   mode: ClarifyMode = 'json',
+  concerns: ConcernsClarifyOptions = {},
 ): string {
   const lines = [
     `You are about to generate the "${stageTitle}" stage of a Radical Forge run for the system described below.`,
@@ -112,7 +115,7 @@ export function buildClarifyPrompt(
     lines.push(
       'Ask the user those questions and wait for the answers; offer options where',
       'an answer is a choice. If nothing needs clarifying, ask nothing.',
-      ...concernsClarifyLines(concernPacks ?? [], 'ask'),
+      ...concernsClarifyLines(concernPacks ?? [], 'ask', concerns),
       ...concernQuestionLines(concernPacks ?? []),
     )
     return lines.join('\n')
@@ -124,7 +127,7 @@ export function buildClarifyPrompt(
     'If nothing needs clarifying, respond with exactly: []',
   )
 
-  lines.push(...concernsClarifyLines(concernPacks ?? [], 'json'), ...concernQuestionLines(concernPacks ?? []))
+  lines.push(...concernsClarifyLines(concernPacks ?? [], 'json', concerns), ...concernQuestionLines(concernPacks ?? []))
   return lines.join('\n')
 }
 

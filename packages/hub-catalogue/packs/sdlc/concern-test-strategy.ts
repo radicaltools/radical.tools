@@ -194,7 +194,7 @@ const pack: PackSpec = {
     {
       id: 'ff-pr-time', label: 'Pull-request tests in time', characteristic: 'maintainability', scope: 'atomic', cadence: 'triggered', trigger: 'pull-request', invocation: 'automated', implements: SHAPES, checks: ['req-pr-suite'],
       threshold: 'The pull-request test job finishes within {{PIPELINE_MINUTES}} minutes',
-      description: 'The test job has a hard timeout of {{PIPELINE_MINUTES}} minutes, so a slow suite fails instead of quietly growing; it is listed among the checks the main branch requires, in the ruleset the Code review and branching pack keeps.',
+      description: 'The test job has a hard timeout of {{PIPELINE_MINUTES}} minutes, so a slow suite fails instead of quietly growing; it is listed among the checks the main branch requires, in the ruleset the Code review and branching pack keeps. This limit is the test job\'s own; the time of all the checks of a pull request together, measured over the last 30 days, is decided in the CI/CD pipeline pack.',
       tool: 'GitHub Actions (timeout-minutes) with Vitest; for the JVM: the same job running ./gradlew test',
       language: 'yaml',
       snippet: `# .github/workflows/test.yml

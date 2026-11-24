@@ -18,6 +18,12 @@ jobs:
     name: Build & Deploy
     needs: e2e
     runs-on: ubuntu-latest
+    # Deploys queue, one at a time, and are never cancelled halfway: two
+    # merges in a row must not upload over each other. A deploy still waiting
+    # gives way to a newer one, which deploys the newer main.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
 
     steps:
       - name: Checkout

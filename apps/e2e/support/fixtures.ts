@@ -126,7 +126,7 @@ export class Studio {
     await this.page.goto(`/#/d/${encodeURIComponent(`ls:${docId}`)}/m/${mode === 'presenter' ? 'designer' : mode}/v/${view}`)
     await this.ready()
     if (mode !== 'presenter') return
-    await this.page.getByRole('button', { name: 'Presentations', exact: true }).click()
+    await this.page.getByRole('button', { name: /^Presentations(,|$)/ }).click()
     await expect(this.page.locator('.pres-place')).toBeVisible()
     await this.settle()
   }

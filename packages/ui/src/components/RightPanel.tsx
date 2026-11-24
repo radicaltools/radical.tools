@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
+import React, { ChangeEvent, useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, useId } from 'react'
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { onExploration, tooLargeToExplore, useDiagramStore, viewById, type BranchOverlay } from '../store/diagramStore'
@@ -272,7 +272,9 @@ export function ActivityRail({ sections, collapsed = false, onToggleCollapsed, o
               <button id={`lp-tab-${x.id}`} type="button" role="tab"
                 className={`lp-rail-tab${shown ? ' active' : ''}`}
                 style={{ ['--sec-color' as string]: SECTION_COLORS[x.id] }}
-                aria-selected={shown} aria-controls={`lp-sec-${x.id}`} aria-label={x.title}
+                aria-selected={shown} aria-controls={`lp-sec-${x.id}`}
+                // Its name holds the count it shows (WCAG 2.5.3 Label in Name).
+                aria-label={`${x.title}, ${x.count}`}
                 tabIndex={x.id === open ? 0 : -1}
                 title={`${x.title} · ${x.preview}`}
                 onClick={() => pick(x.id)}>
@@ -499,16 +501,21 @@ function formatRelative(ts: number): string {
 /** A card a click opens (a view, a milestone, a sequence) opens from the
  *  keyboard as well: a Tab stop that Enter or Space opens. Only View
  *  properties' button could be reached, and in Viewer and Presenter nothing. */
-export function cardKeys(open: () => void): { role: 'button'; tabIndex: number; onKeyDown: (e: React.KeyboardEvent) => void } {
-  return {
-    role: 'button',
-    tabIndex: 0,
-    onKeyDown: (e) => {
-      if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
-      e.preventDefault()
-      open()
-    },
-  }
+/** A card's title: the card's one button (Tab, Enter, Space), whose click
+ *  is the card's. The card around it takes a pointer's click anywhere and
+ *  holds its other buttons beside it, none inside another (WCAG 4.1.2). */
+export function CardTitle({ current, expanded, className = '', children }: {
+  current?: boolean
+  expanded?: boolean
+  className?: string
+  children: React.ReactNode
+}): React.ReactElement {
+  return (
+    <button type="button" className={`lp-card-title lp-card-main${className ? ` ${className}` : ''}`}
+      aria-current={current ? 'true' : undefined} aria-expanded={expanded}>
+      {children}
+    </button>
+  )
 }
 
 // ── Milestone list (left panel) ──────────────────────────────────────────────
@@ -569,12 +576,11 @@ function SnapshotList({ readOnly = false, onOpenProps }: { readOnly?: boolean; o
       <div
         className={`lp-card lp-snap-card lp-snap-current${!activeSnapshotId ? ' active' : ''}`}
         onClick={() => { if (activeSnapshotId) clearMilestoneView() }}
-        {...cardKeys(() => { if (activeSnapshotId) clearMilestoneView() })}
         title="Current working state (live HEAD) — not yet saved as a milestone"
       >
         <div className="lp-snap-badge lp-snap-badge-live">●</div>
         <div className="lp-card-body">
-          <div className="lp-card-title">Current (live)</div>
+          <CardTitle current={!activeSnapshotId}>Current (live)</CardTitle>
           <div className="lp-card-meta">
             <span>working state</span>
             <span className="lp-meta-dot">·</span>
@@ -591,12 +597,11 @@ function SnapshotList({ readOnly = false, onOpenProps }: { readOnly?: boolean; o
             key={snap.id}
             className={`lp-card lp-snap-card${isActive ? ' active' : ''}`}
             onClick={() => viewMilestoneDiff(snap.id)}
-            {...cardKeys(() => viewMilestoneDiff(snap.id))}
             title={`${new Date(snap.timestamp).toLocaleString()}\nClick to load this milestone onto the canvas`}
           >
             <div className="lp-snap-badge">v{versionNum}</div>
             <div className="lp-card-body">
-              <div className="lp-card-title">{snap.name}</div>
+              <CardTitle current={isActive}>{snap.name}</CardTitle>
               <div className="lp-card-meta">
                 <span>{formatRelative(snap.timestamp)}</span>
                 <span className="lp-meta-dot">·</span>
@@ -688,13 +693,12 @@ function SequenceList({ readOnly = false, onOpenProps }: { readOnly?: boolean; o
             className={`lp-card lp-view-card${isActive ? ' active' : ''}`}
             style={{ ['--kind-color' as string]: SECTION_COLORS.sequences }}
             onClick={() => setActiveSequence(isActive ? null : seq.id)}
-            {...cardKeys(() => setActiveSequence(isActive ? null : seq.id))}
           >
             <div className="lp-view-icon">
               <Icon.Bolt />
             </div>
             <div className="lp-card-body">
-              <div className="lp-card-title">{seq.name}</div>
+              <CardTitle current={isActive}>{seq.name}</CardTitle>
               <div className="lp-card-meta">
                 <span>{seq.relationIds.length} {seq.relationIds.length === 1 ? 'step' : 'steps'}</span>
                 {isActive && !readOnly && <span style={{ marginLeft: 4, color: 'var(--accent)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>editing</span>}
@@ -1505,17 +1509,15 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
           className={`lp-card lp-view-card${isActive ? ' active' : ''}${group ? ' lp-view-group' : ''}`}
           style={{ ['--kind-color' as string]: VIEW_KIND_COLORS[badge] }}
           onClick={() => (group ? toggleGroup(v.id) : setActiveView(v.id))}
-          {...cardKeys(() => (group ? toggleGroup(v.id) : setActiveView(v.id)))}
-          aria-expanded={group ? groupOpen : undefined}
         >
           <div className="lp-view-icon">
             {isDynamic ? <Icon.Bolt /> : isTreemap ? <Icon.TreemapGrid /> : isTable ? <Icon.TableGrid /> : isMatrix ? <Icon.MatrixGrid /> : isWiki ? <Icon.Wiki /> : isWarnier ? <Icon.Warnier /> : isExplore ? <Icon.Explore /> : <Icon.Layers />}
           </div>
           <div className="lp-card-body">
-            <div className="lp-card-title">
+            <CardTitle current={isActive} expanded={group ? groupOpen : undefined}>
               {group && <span className={`lp-group-chevron${groupOpen ? ' open' : ''}`}><Icon.ChevronRight /></span>}
               {v.name}
-            </div>
+            </CardTitle>
             <div className="lp-card-meta">
               <span>{group ? `${members.length} ${members.length === 1 ? 'view' : 'views'}` : viewNodeCount(v, counts[v.id])}</span>
               {group && <span className="lp-view-kind lp-view-per" style={VIEW_BADGE_STYLE}>view per element</span>}
@@ -1599,12 +1601,11 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
           className={`lp-card lp-view-card lp-explore-card${exploring ? ' active' : ''}`}
           style={{ ['--kind-color' as string]: VIEW_KIND_COLORS.explore }}
           onClick={() => setActiveView(exploration.id)}
-          {...cardKeys(() => setActiveView(exploration.id))}
           title="A temporary view: not saved unless you save it as a view"
         >
           <div className="lp-view-icon"><Icon.Explore /></div>
           <div className="lp-card-body">
-            <div className="lp-card-title">{exploration.name}</div>
+            <CardTitle current={exploring}>{exploration.name}</CardTitle>
             <div className="lp-card-meta">
               <span>{explored} {explored === 1 ? 'node' : 'nodes'}</span>
               <span className="lp-view-kind" style={VIEW_BADGE_STYLE}>exploration</span>
@@ -1627,11 +1628,10 @@ function ViewList({ readOnly = false, onOpenProps, onOpenFolder }: {
         className={`lp-card lp-view-card${activeViewId === null ? ' active' : ''}`}
         style={{ ['--kind-color' as string]: VIEW_KIND_COLORS.table }}
         onClick={() => setActiveView(null)}
-        {...cardKeys(() => setActiveView(null))}
       >
         <div className="lp-view-icon"><Icon.TableGrid /></div>
         <div className="lp-card-body">
-          <div className="lp-card-title">All elements</div>
+          <CardTitle current={activeViewId === null}>All elements</CardTitle>
           <div className="lp-card-meta">
             <span>{totalNodes} {totalNodes === 1 ? 'node' : 'nodes'}</span>
             <BranchCount n={branchTotal} />
@@ -2318,6 +2318,7 @@ function MarkdownField({ label, value, readOnly, onChange }: {
   label: string; value: string; readOnly: boolean; onChange: (v: string) => void
 }) {
   const [editing, setEditing] = useState(false)
+  const id = useId()
   if (editing && !readOnly) {
     return (
       <AutoResizeTextarea autoFocus aria-label={label} value={value} placeholder={MARKDOWN_HINT}
@@ -2331,14 +2332,18 @@ function MarkdownField({ label, value, readOnly, onChange }: {
   }
   const edit = () => { if (!readOnly && !window.getSelection()?.toString()) setEditing(true) }
   return (
-    <div className={`pp-md${readOnly ? '' : ' editable'}${value ? '' : ' empty'}`}
-      role={readOnly ? undefined : 'button'} tabIndex={readOnly ? undefined : 0}
-      aria-label={readOnly ? undefined : `Edit ${label}`}
-      title={readOnly ? undefined : 'Click to edit'}
-      onClick={edit}
-      onKeyDown={(e) => { if (!readOnly && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setEditing(true) } }}>
-      {value ? <MarkdownText text={value} /> : <span className="pp-placeholder">{readOnly ? '—' : `Add ${label.toLowerCase()}…`}</span>}
-    </div>
+    <>
+      {/* Its name: "Edit <label>", then the text it shows (WCAG 2.5.3 Label in Name). */}
+      {!readOnly && <span id={`${id}-verb`} hidden>Edit {label}</span>}
+      <div id={id} className={`pp-md${readOnly ? '' : ' editable'}${value ? '' : ' empty'}`}
+        role={readOnly ? undefined : 'button'} tabIndex={readOnly ? undefined : 0}
+        aria-labelledby={readOnly ? undefined : `${id}-verb ${id}`}
+        title={readOnly ? undefined : 'Click to edit'}
+        onClick={edit}
+        onKeyDown={(e) => { if (!readOnly && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setEditing(true) } }}>
+        {value ? <MarkdownText text={value} /> : <span className="pp-placeholder">{readOnly ? '—' : `Add ${label.toLowerCase()}…`}</span>}
+      </div>
+    </>
   )
 }
 

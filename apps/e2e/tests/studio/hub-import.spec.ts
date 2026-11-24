@@ -55,7 +55,7 @@ test('a concept added from a Hub link in Presenter reaches the model, as from Vi
   await studio.ready()
   const before = (await studio.storedDoc()).nodes.length
   // The Presentations place, over Viewer.
-  await expect(page.getByRole('button', { name: 'Presentations', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: /^Presentations(,|$)/ })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
   await page.getByTestId('concern-wizard').getByRole('button', { name: 'Add to model' }).click()
   await expect.poll(async () => (await studio.storedDoc()).nodes.length).toBe(before + 20)
@@ -244,7 +244,7 @@ test('the import dialog filters concern packs by group, counts them and keeps it
   await page.getByText(/Import from Hub/).first().click()
   const dialog = page.locator('[aria-label="Import from Hub"]')
   const groups = dialog.getByRole('group', { name: 'Concern groups' })
-  await expect(groups.locator('.hi-group-label')).toHaveText(['All', 'Secure by Design', 'API Guidelines', 'Architecture', 'Coding Standards', 'SDLC Standard', 'Tech Radar', 'Compliance', 'Operability & Reliability'])
+  await expect(groups.locator('.hi-group-label')).toHaveText(['All', 'Secure by Design', 'API Guidelines', 'Architecture', 'Coding Standards', 'SDLC Standard', 'Tech Radar', 'Compliance', 'Operability & Reliability', 'UX & Accessibility'])
   await expect(dialog.getByRole('heading', { name: 'Authentication', exact: true })).toBeVisible()
   const all = await dialog.locator('h4').count()
   // All counts every pack, and each group as many as it lists.

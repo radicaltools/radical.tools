@@ -31,10 +31,12 @@
   --border-color: #dbe6e1;
   --border-color-strong: #bfd0c9;
   --text-secondary: #41524d;
-  --text-muted:   #64786f;
-  --accent:       #059669;
-  --accent-rgb:   5,150,105;
-  --accent-soft:  rgba(5,150,105,0.10);
+  /* Muted text and the accent as text reach 4.5:1 on the panels, the
+     tinted chips and the hover backgrounds (WCAG 1.4.3). */
+  --text-muted:   #56695f;
+  --accent:       #047857;
+  --accent-rgb:   4,120,87;
+  --accent-soft:  rgba(4,120,87,0.10);
   --accent-mix:   #0e7490;
   --minimap-mask: rgba(241,246,244,0.7);
   --hint-bg:      rgba(241,246,244,0.92);
@@ -207,8 +209,13 @@
   color: var(--text-muted);
 }
 [data-theme="light"] .hub-chip-count { background: rgba(0,0,0,0.08); }
+/* On the tinted background of a picked chip the muted grey is too faint. */
+.hub-chip.active .hub-chip-count { color: var(--text-secondary); }
 
 .hub-link {
+  /* A text button, at least 24 × 24 px to hit (WCAG 2.5.8). */
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 24px; min-width: 24px;
   border: none; background: none; padding: 0;
   color: var(--accent); font-size: 11px; cursor: pointer;
 }
@@ -228,7 +235,7 @@
 }
 .hub-facet-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .hub-facet-chips .hub-tag { cursor: pointer; }
-.hub-tag-count { opacity: 0.7; font-size: 9px; }
+.hub-tag-count { font-size: 9px; }
 .hub-facet-more { font-size: 10.5px; }
 
 /* ── List toolbar (count + sort) ──────────────────────────────────── */
@@ -327,9 +334,12 @@
 .hub-card-name {
   flex: 1; min-width: 0;
   font-size: 13.5px; font-weight: 650; letter-spacing: -0.01em;
-  color: var(--text-primary);
+  color: var(--text-primary); text-decoration: none;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* The title is the card's link: focused, it rings the title and the card. */
+.hub-card-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.hub-card:has(.hub-card-name:focus-visible) { border-color: var(--cat-color); }
 .hub-card-select {
   flex-shrink: 0;
   width: 24px; height: 24px;
@@ -387,6 +397,10 @@
   transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
 }
 .hub-tag:hover, .hub-tag.on { background: rgba(var(--accent-rgb), 0.22); border-color: rgba(var(--accent-rgb), 0.5); }
+/* On the light panel a stronger tint would take the accent text under
+   4.5:1: hover shows only the border, a picked tag is filled. */
+[data-theme="light"] .hub-tag:hover { background: rgba(var(--accent-rgb), 0.10); }
+[data-theme="light"] .hub-tag.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 /* ── Basket ───────────────────────────────────────────────────────── */
 .hub-basket {
@@ -400,6 +414,10 @@
 
 /* ── Viewer toolbar ───────────────────────────────────────────────── */
 .hub-toolbar { -webkit-app-region: no-drag; }
+/* Canvas · Wiki · Table: at least 24 px high to hit (WCAG 2.5.8). */
+.hub-toolbar .toolbar-mode-btn { min-height: 24px; }
+/* The preview takes focus when it opens; the panel itself is no control. */
+.hub-concept-panel:focus { outline: none; }
 .hub-toolbar-cat {
   display: inline-flex; align-items: center; gap: 5px;
   height: 22px; padding: 0 8px;
