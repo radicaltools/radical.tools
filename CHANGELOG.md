@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-24
+
 ### Added
 - A Hub group, UX & Accessibility, with three concern packs: Usability (held to ISO 9241-110 and Nielsen's heuristics: consistent navigation, how often one link may repeat on a page, link texts that say where they go, forms and error messages), Accessibility (WCAG 2.2 AA, EN 301 549 and the European Accessibility Act, with the axe-core and keyboard checks) and Mobile and perceived performance (the Web Vitals in the lab and the field, for mobile and desktop apart, Reflow at 320 px, touch targets, screenshots on phones). The Web Vitals and the accessibility checks moved whole from the Frontend stack pack, which keeps the framework, rendering, browsers and the JavaScript budget.
 - A CI/CD pipeline concern pack in the SDLC Standard group: the pipeline as code, required checks and branch protection, building once and promoting the same artifact, OIDC instead of long-lived secrets, and the pipeline's time and reliability, measured. The Release and versioning pack asks where the running version is shown, and checks after each deployment that the application shows the version and commit deployed.
@@ -461,7 +463,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Live physics: expanding a container in a grid of containers that sits in another alignment (a column of groups holding a grid of groups) could leave the canvas shaking for good, the groups flipping thousands of pixels between two places: a line inside a container now moves with it, and on a large diagram the elements aligned with a container that grows are no longer held in place. A run with an alignment of containers stops after 4 s if it has not come to rest by then
 - Presentation slides without a captured canvas (the sample model's walkthrough, imported slides) lay nodes out with their view's saved positions instead of whatever layout was on screen, so they no longer need a Smart Layout to look right; a slide after a milestone slide shows the live model again instead of the milestone's subset
 
-[Unreleased]: https://github.com/radicaltools/radical.tools/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/radicaltools/radical.tools/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/radicaltools/radical.tools/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/radicaltools/radical.tools/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/radicaltools/radical.tools/compare/v0.3.4...v0.4.0
 [0.3.4]: https://github.com/radicaltools/radical.tools/compare/v0.3.3...v0.3.4
