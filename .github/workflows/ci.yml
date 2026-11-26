@@ -3,8 +3,14 @@ name: CI
 # Runs once per pull request into main, on the PR's merge commit (the branch
 # as it would land). There is no `push` trigger: on a branch with an open PR
 # it ran the same jobs a second time, on the bare branch head. To check a
-# branch without a PR, start this workflow by hand (workflow_dispatch). On
-# main, deploy.yml runs the E2E suite before every deploy.
+# branch without a PR, start this workflow by hand (workflow_dispatch).
+#
+# A tree is checked once (ADR A tree checked once is not checked again): a
+# run whose every job passed marks the tree it checked (the gate job ci,
+# tools/ci/checked.mjs: an artifact named checked-<the tree's hash>), and
+# deploy.yml on main leaves its own E2E suite, type-check and tests out for
+# a tree with such a mark. A tree without one is checked whole before every
+# deploy.
 #
 # The "Protect main" ruleset requires the "Type-check & Test" check, and
 # main's branch protection also "E2E / E2E (Playwright)", the e2e.yml job that
@@ -16,7 +22,7 @@ name: CI
 # The `skip-e2e` label on a PR skips the E2E job (Type-check & Test still
 # runs). Labels are read when a run starts, so add it before pushing, or push
 # again; adding a label does not start a run. The E2E suite still runs before
-# every deploy from main (deploy.yml).
+# the deploy from main (deploy.yml): a run that skipped it marks no tree.
 #
 # Every run step of the checking jobs is `npm ci` or `npm run <script>`, and
 # `npm run verify` runs each of those scripts, so a developer runs what CI
@@ -235,6 +241,10 @@ jobs:
     needs: [workflows, test, e2e, architecture, mcp-package, launcher]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      # To read this run's artifacts before marking the tree.
+      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -244,3 +254,20 @@ jobs:
           NEEDS: ${{ toJSON(needs) }}
           MAY_SKIP: ${{ contains(github.event.pull_request.labels.*.name, 'skip-e2e') && 'e2e' || '' }}
         run: node tools/ci/gate.mjs
+      # The tree every job passed on is marked as checked, so that deploy.yml
+      # does not check it again on main. Not when E2E was skipped by the
+      # label, and not when the suite wrote new screenshot baselines
+      # (checked.mjs reads the run's artifacts): those were not checked whole.
+      - name: Mark the tree as checked
+        id: mark
+        if: ${{ success() && !contains(github.event.pull_request.labels.*.name, 'skip-e2e') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/ci/checked.mjs mark
+      - name: Keep the mark
+        if: ${{ steps.mark.outputs.name != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.mark.outputs.name }}
+          path: ${{ steps.mark.outputs.file }}
+          retention-days: 7

@@ -9,14 +9,51 @@ permissions:
   id-token: write  # Required for OIDC token exchange
   contents: read
 
+# A tree is checked once (ADR A tree checked once is not checked again). A
+# pull request's run of ci.yml checks the tree as it would land and, when
+# every job passed, marks it (an artifact named checked-<the tree's hash>).
+# Here the job known asks whether main's tree has such a mark. With one, the
+# E2E suite, the boundary check, the type-check and the unit tests are left
+# out: they passed on this very tree. Without one (a push straight to main, a
+# merge after main moved on, a mark expired, the question unanswered) the
+# tree is checked whole before it is deployed, as before.
+
 jobs:
+  known:
+    name: Tree checked before
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # To find the mark, an artifact of the run that checked the tree.
+      actions: read
+    outputs:
+      tree: ${{ steps.known.outputs.tree }}
+      checked: ${{ steps.known.outputs.checked }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/ci
+      - name: The tree and its mark
+        id: known
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/ci/checked.mjs known
+
+  # Left out only for a tree checked before; should the job that asks fail,
+  # it runs.
   e2e:
     name: E2E
+    needs: known
+    if: ${{ !cancelled() && needs.known.outputs.checked != 'true' }}
     uses: ./.github/workflows/e2e.yml
 
   deploy:
     name: Build & Deploy
-    needs: e2e
+    needs: [known, e2e]
+    # What passed is deployed: the suite here, or, for a tree checked before,
+    # the pull request's run. A failed or cancelled suite deploys nothing.
+    if: ${{ !cancelled() && (needs.e2e.result == 'success' || (needs.e2e.result == 'skipped' && needs.known.outputs.checked == 'true')) }}
     runs-on: ubuntu-latest
     # Deploys queue, one at a time, and are never cancelled halfway: two
     # merges in a row must not upload over each other. A deploy still waiting
@@ -38,17 +75,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The checks, for a tree no pull request's run marked as checked.
       - name: Check workspace boundaries
+        if: ${{ needs.known.outputs.checked != 'true' }}
         run: npm run check:workspaces
 
       - name: Type-check
+        if: ${{ needs.known.outputs.checked != 'true' }}
         run: npm run typecheck
 
       # Radical Assay's Explore tests drive a real Chromium, as the CI job does.
       - name: Install Chromium for the Explore tests
+        if: ${{ needs.known.outputs.checked != 'true' }}
         run: npx playwright install --with-deps chromium
 
       - name: Test
+        if: ${{ needs.known.outputs.checked != 'true' }}
         run: npm test
 
       - name: Build web renderer
