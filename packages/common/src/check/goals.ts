@@ -30,7 +30,7 @@ export const CHECK_DIMENSIONS: ReadonlyArray<{ id: CheckDimension; label: string
 /** The rule a goal below its minimum is a finding of. */
 export const GOAL_RULE = {
   id: 'goal-unmet',
-  description: 'Every metric check.json sets a goal for ("goals": { "<metric>": { "min": <percent> } }) reaches it. One finding per goal, with the metric as its code.',
+  description: '**Every metric check.json sets a goal for** ("goals": { "<metric>": { "min": <percent> } }) **reaches it**. One finding per goal, with the metric as its code.',
   severity: 'error' as CheckSeverity,
 }
 

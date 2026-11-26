@@ -70,7 +70,14 @@ test('the card says in every perspective what the check says of the element, and
   const verification = studio.properties.getByRole('region', { name: 'Verification' })
   await expect(verification.locator('.pp-ver-status')).toHaveText('✗ broken')
   await expect(verification.getByRole('group', { name: 'Checked by' }).getByRole('button')).toHaveText([/Paying by card.*✓/, /Refunding a card.*✗/])
-  await expect(verification.getByRole('group', { name: 'Findings' })).toContainText('test tests/pay.test.ts › refunds failed')
+  // What is wrong first, then the test by its title, its file apart, why it
+  // failed, and the scenario that names it.
+  const finding = verification.getByRole('group', { name: 'Findings' }).locator('.pp-ver-finding')
+  await expect(finding.locator('.pp-ver-verdict')).toHaveText(/Test failed$/)
+  await expect(finding.locator('.pp-ver-test b')).toHaveText('refunds')
+  await expect(finding.locator('.pp-ver-test code')).toHaveText('tests/pay.test.ts')
+  await expect(finding.locator('.pp-ver-reason')).toHaveText('AssertionError: expected "pending" to be "refunded"')
+  await expect(finding.locator('.pp-ver-down').filter({ hasText: 'Named by' }).getByRole('button', { name: /Refunding a card/ })).toBeVisible()
   await expect(verification.getByRole('button', { name: 'Path', exact: true })).toBeEnabled()
   // A link moves the card to the element it names.
   await verification.getByRole('group', { name: 'Checked by' }).getByRole('button', { name: /Refunding a card/ }).click()
@@ -79,17 +86,20 @@ test('the card says in every perspective what the check says of the element, and
 
   // A fitness function: its metric condition with what was measured.
   await open('Checkout latency')
-  const checks = studio.properties.getByRole('region', { name: 'Verification' }).getByRole('list', { name: 'Checks' })
-  await expect(checks.locator('.pp-ver-cond')).toHaveCount(1)
-  await expect(checks).toContainText('checkout.latency.p95 <= 300 ms')
-  await expect(checks).toContainText('failed')
-  await expect(checks.locator('.pp-ver-measured')).toHaveText('420 ms · k6 · 2 h ago')
+  // Off its limit, it is a finding, shown once: the condition, what was
+  // measured, and no second line among the checks.
+  const ffVerification = studio.properties.getByRole('region', { name: 'Verification' })
+  const off = ffVerification.getByRole('group', { name: 'Findings' }).locator('.pp-ver-finding[data-rule="metric-failed"]')
+  await expect(off.locator('.pp-ver-verdict')).toHaveText(/Metric failed$/)
+  await expect(off.locator('.pp-ver-condition')).toHaveText('checkout.latency.p95 <= 300 ms')
+  await expect(off.locator('.pp-ver-note')).toHaveText('Measured 420 ms · k6 · 2 h ago')
+  await expect(ffVerification.getByRole('list', { name: 'Checks' }).locator('.pp-ver-cond')).toHaveCount(0)
 
   // A link in the Inspector opens the same card, on the element's view, in
   // the perspective open: read-only in Viewer.
   await inspector.click()
-  await page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab', { name: /^Implementation/ }).click()
-  await page.locator('.insp-error').first().getByRole('button', { name: /Take card payments/ }).click()
+  await page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab', { name: /^Overview/ }).click()
+  await page.getByRole('region', { name: 'To fix' }).locator('.insp-finding').first().getByRole('button', { name: /Take card payments/ }).click()
   await expect(page.getByRole('region', { name: 'Inspector' })).toHaveCount(0)
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Viewer/)
   await expect(studio.node('req')).toHaveClass(/selected/)

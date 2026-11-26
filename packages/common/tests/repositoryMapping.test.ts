@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { checkModel, type RepositoryMapping } from '../src/check'
-import { OTHER_REPOSITORIES, builtIn, implementCommand, parseRepositoryFile, parseRepositoryMapping, repositoryPart, repositoryPartIds, serializeRepositoryFile } from '../src/repositoryMapping'
+import { OTHER_REPOSITORIES, builtIn, implementCommand, isBuiltByCode, parseRepositoryFile, parseRepositoryMapping, repositoryPart, repositoryPartIds, serializeRepositoryFile } from '../src/repositoryMapping'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
 import type { C4Node, DiagramData } from '../src/c4'
 
@@ -48,6 +48,25 @@ describe('where an element is built', () => {
     expect(implementCommand(nodes, nodes[2])).toBe('radical implement "Web shop" --path <folder>')
     expect(implementCommand(nodes, nodes[0])).toBe('radical implement api --path <folder>')
     expect(() => parseRepositoryMapping('{ "implements": [{ "element": "a" }] }')).toThrow('.radical/radical.json: implements[0] needs "element" (an id) and "paths" (a list of folders)')
+  })
+})
+
+describe('what code builds', () => {
+  it('is the software of the model that is not external, and what a type of the model\'s own may be', () => {
+    const types = builtInGovernanceMetamodel().nodeTypes
+    for (const type of ['system', 'container', 'component', 'database', 'webapp', 'queue']) expect(isBuiltByCode({ type }, types[type]), type).toBe(true)
+    // No repository's code builds a need, a requirement, a decision, a person or a group.
+    for (const type of ['need', 'requirement', 'adr', 'person', 'group', 'domain', 'entity', 'event', 'process', 'step', 'state-machine', 'mockup']) {
+      expect(isBuiltByCode({ type }, types[type]), type).toBe(false)
+    }
+    // Another party builds an external system.
+    expect(isBuiltByCode({ type: 'system', external: true }, types.system)).toBe(false)
+    // A type the metamodel adds may be code: its element is offered the command.
+    expect(isBuiltByCode({ type: 'lambda' }, { builtin: false })).toBe(true)
+    expect(isBuiltByCode({ type: 'lambda' }, {})).toBe(true)
+    expect(isBuiltByCode({ type: 'lambda', external: true }, {})).toBe(false)
+    // A type the metamodel does not have is none it adds.
+    expect(isBuiltByCode({ type: 'gone' })).toBe(false)
   })
 })
 

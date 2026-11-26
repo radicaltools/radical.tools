@@ -21,9 +21,13 @@ const SHOP: DiagramData = {
     node('api', 'container', 'Orders API', { parentId: 'shop', x: 80, y: 120, width: 520, height: 300 }),
     node('checkout', 'component', 'Checkout', { parentId: 'api', x: 120, y: 200 }),
     node('legacy', 'system', 'Legacy', { x: 820, y: 40 }),
+    // What no repository's code builds: another party's system, a person, a requirement.
+    node('bank', 'system', 'Bank', { x: 820, y: 240, external: true }),
+    node('buyer', 'person', 'Buyer', { x: 820, y: 440 }),
+    node('pay', 'requirement', 'Take card payments', { x: 820, y: 640, ears_type: 'ubiquitous', action: 'take card payments' }),
   ],
   relations: [],
-  views: [{ id: 'v-all', name: 'Everything', nodeIds: ['shop', 'api', 'checkout', 'legacy'], positions: {} }],
+  views: [{ id: 'v-all', name: 'Everything', nodeIds: ['shop', 'api', 'checkout', 'legacy', 'bank', 'buyer', 'pay'], positions: {} }],
 }
 
 const MAPPING = JSON.stringify({ implements: [
@@ -57,6 +61,15 @@ test('the card says where an element is built, for a repository opened', async (
   await studio.node('legacy').dblclick()
   await expect(builtIn).toContainText('radical implement "Legacy" --path <folder>')
   await expect(builtIn.getByRole('button', { name: 'Copy' })).toBeVisible()
+
+  // No code of the repository builds an external system, a person or a
+  // requirement: their cards have no Built in to say so.
+  for (const [id, name] of [['bank', 'Bank'], ['buyer', 'Buyer'], ['pay', 'Take card payments']]) {
+    await page.keyboard.press('Escape')
+    await studio.node(id).dblclick()
+    await expect(studio.properties.locator('.pp-title')).toHaveValue(name)
+    await expect(builtIn).toHaveCount(0)
+  }
 })
 
 test('the card says where an element is built, for a .radical folder opened', async ({ page, studio }) => {
@@ -106,7 +119,9 @@ test('the card of a scenario lists its tests', async ({ page, studio }) => {
 
   const tests = studio.properties.getByRole('region', { name: 'Tests' })
   await studio.node('pays').dblclick()
-  await expect(tests.locator('.pp-section-title')).toHaveText('Tests · 2')
+  // The head says how many, and what the results say of them.
+  await expect(tests.locator('.pp-fold-label')).toHaveText('Tests · 2')
+  await expect(tests.locator('.pp-fold-toggle .pp-test-outcome')).toHaveText(['1 gone', '1 passed'])
   await expect(tests.locator('li')).toHaveText(['tests/pay.test.ts › payspassed', 'tests/pay.test.ts › declinesgone'])
 
   await page.keyboard.press('Escape')

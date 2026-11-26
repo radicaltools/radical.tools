@@ -368,6 +368,17 @@ runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main. ~~Fixed on fix/round-211-220 (2026-11-15), where it failed in
 both full runs: the poll now asks again when a box is missing instead of failing.~~
 
+### Dogfooding (2026-11-26): the Inspector opens on what to fix
+
+Found while reworking the Inspector on this repository's own model and on IsoStride's:
+
+- **One finding over a baseline is every finding an error.** `scenario-not-verified-here` at 10 with a baseline of 7 was ten errors in `radical check` while three scenarios were to be settled. Studio now counts what is to settle; the CLI's text, its JSON and the GitHub annotations still count every finding. Open: say "3 over its baseline" there too.
+- **A model element is easy to write and hard to check from an agent's side.** `get_issues` answers with every unaddressed concern (some 800 lines here) before anything about the elements just written; the word rules (quotes, values) only show in `radical check` or in the note a write returns. Open: `get_issues` narrowed to the elements changed on the branch.
+- **"two" is read as a value.** A requirement that said "two equals signs" was reported as stating 2, which its quote does not hold; reworded as "doubled". Open: number words that are no quantity of the requirement.
+- **A worktree's model is written through a stdio client by hand.** The project's MCP server writes the main checkout's model, so a branch in a worktree needs a small JSON-RPC client to the worktree's own server. Open: `radical mcp call <tool> --args <json>` in the CLI.
+- **The manual's Forge figures cannot be retaken.** `npm run docs:screenshots` stops in `docs/studio.docs.ts` › forge at *Generate requirements*: since v0.6.0 the Requirements stage first proposes the Hub's concern packs with their questions, which the scripted run does not answer. The figures `forge` and `forge-refinements` are those of before (a rail 44 px wide); every other figure was retaken on 2026-11-26. Open: script the pack step in the docs run, and run the docs screenshots in CI so a stale one shows.
+- **Carried-over test results outlive a deleted test file.** A partial `--report` now keeps what was read of the other files; a file that leaves the reports for good keeps its last results until CI's results of a later commit replace them. Open: drop kept results whose file the repository no longer has.
+
 ### Dogfooding (2026-11-24): what IsoStride found (UX and CI/CD packs, built-in sensors, scaled limits, strict gate)
 
 One need with six questions and answers, fifteen requirements, thirteen scenarios, two ADRs with their fitness

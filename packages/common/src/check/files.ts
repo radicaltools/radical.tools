@@ -53,11 +53,54 @@ export interface TestResults {
   commit?: string
   /** Downloaded from CI (radical check --from-ci). */
   ci?: CiSource
+  /** The cases among them that the reports read last do not have: kept from
+   *  what was read before. */
+  kept?: KeptCases
 }
 
-export function serializeTestResults(cases: TestCase[], reports: string[], readAt = new Date(), from: { commit?: string; ci?: CiSource } = {}): string {
-  const results: TestResults = { version: 1, readAt: readAt.toISOString(), reports, cases, ...(from.commit ? { commit: from.commit } : {}), ...(from.ci ? { ci: from.ci } : {}) }
+/** What a run of some test files left in the results as it was. */
+export interface KeptCases {
+  /** The earliest reading they may come from (ISO time). */
+  since: string
+  /** How many test cases, in how many files. */
+  cases: number
+  files: number
+}
+
+export function serializeTestResults(cases: TestCase[], reports: string[], readAt = new Date(), from: { commit?: string; ci?: CiSource; kept?: KeptCases } = {}): string {
+  const results: TestResults = {
+    version: 1, readAt: readAt.toISOString(), reports, cases, ...(from.commit ? { commit: from.commit } : {}), ...(from.ci ? { ci: from.ci } : {}),
+    ...(from.kept ? { kept: from.kept } : {}),
+  }
   return JSON.stringify(results)
+}
+
+/** Two names of one test file: reports name a file by its whole path or by
+ *  the end of it, so paths that end one with the other are the same file. */
+const sameTestFile = (a: string, b: string): boolean => a === b || a.endsWith('/' + b) || b.endsWith('/' + a)
+
+/** The cases of a run with what `earlier` results say of the test files the
+ *  run does not have: a run of some tests replaces the results of its
+ *  files and leaves the others as they were, so the tests it did not run
+ *  keep the outcome they had. `kept` counts what was left, and since when. */
+export function withEarlierResults(cases: TestCase[], earlier: TestResults | null): { cases: TestCase[]; kept?: KeptCases } {
+  if (!earlier?.cases.length) return { cases }
+  const slash = (file: string): string => file.replace(/\\/g, '/')
+  const ran = [...new Set(cases.map((c) => slash(c.file)))]
+  const ranSet = new Set(ran)
+  // Decided once for each file of the earlier results.
+  const replaced = new Map<string, boolean>()
+  const isReplaced = (file: string): boolean => {
+    let r = replaced.get(file)
+    if (r === undefined) { r = ranSet.has(file) || ran.some((f) => sameTestFile(f, file)); replaced.set(file, r) }
+    return r
+  }
+  const left = earlier.cases.filter((c) => !isReplaced(slash(c.file)))
+  if (!left.length) return { cases }
+  return {
+    cases: [...cases, ...left],
+    kept: { since: earlier.kept?.since ?? testsRanAt(earlier), cases: left.length, files: new Set(left.map((c) => slash(c.file))).size },
+  }
 }
 
 /** When the tests behind `results` ran: the latest CI run for results from
@@ -86,9 +129,11 @@ export function parseTestResults(text: string): TestResults | null {
   const cases = r.cases.filter((c): c is TestCase =>
     !!c && typeof c.file === 'string' && Array.isArray(c.title) && c.title.every((t) => typeof t === 'string') && STATUSES.has(c.status))
   const ci = ciSourceOf(r.ci)
+  const k = r.kept as Partial<KeptCases> | undefined
+  const kept = k && typeof k.since === 'string' && typeof k.cases === 'number' && typeof k.files === 'number' ? { since: k.since, cases: k.cases, files: k.files } : undefined
   return {
     version: 1, readAt: r.readAt, reports: Array.isArray(r.reports) ? r.reports.filter((x) => typeof x === 'string') : [], cases,
-    ...(typeof r.commit === 'string' ? { commit: r.commit } : {}), ...(ci ? { ci } : {}),
+    ...(typeof r.commit === 'string' ? { commit: r.commit } : {}), ...(ci ? { ci } : {}), ...(kept ? { kept } : {}),
   }
 }
 

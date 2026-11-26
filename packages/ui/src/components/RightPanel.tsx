@@ -17,13 +17,14 @@ import { relationTypesAccepted } from '@radical/common/relationRules'
 import { viewChangeCounts, wordDiff } from '@radical/common/branchChanges'
 import { modelFieldChanges } from '@radical/common/modelChanges'
 import { originModel, originOf, otherModelFolder } from '@radical/common/model'
-import { builtIn, implementCommand, testsBoundTo, verifyCommand } from '@radical/common/repositoryMapping'
+import { builtIn, implementCommand, isBuiltByCode, testsBoundTo, verifyCommand } from '@radical/common/repositoryMapping'
 import { VIEW_KIND_LABELS, viewpointGroups, viewpointOfView, viewpointsOf } from '@radical/common/viewpoints'
 import { applyViewpoint as applyViewpointTo, firstViewOfGroup, groupLossesOf, groupLossesQuestion, isViewGroup, parentCandidates, viewsOfGroup, viewsShowingNode, type ModelState } from '@radical/common/model'
 import type { ViewpointKind } from '@radical/common/metamodel'
 import { useOutsideClick } from '../hooks/useOutsideClick'
 import { openCard, showNodeInView, useCardOpen } from '../store/showInView'
 import { CardNavigation, ElementVerification, useCardNavigate } from './ElementVerification'
+import { FoldSection } from './FoldSection'
 import { NodeActions, RelationActions } from './SelectionActions'
 import { OPEN_VIEW_PROPERTIES_EVENT } from './LargeCanvasNotice'
 import { keysOnTop } from './keysHere'
@@ -2596,15 +2597,22 @@ function useViewsShowing(nodeId: string): DiagramView[] {
 
 /** Where the repository builds the element, from its .radical/radical.json:
  *  its own paths or its nearest mapped ancestor's, named; for one built
- *  nowhere it says, the radical implement command that maps it. Nothing
- *  when Studio cannot read the file. */
+ *  nowhere it says, the radical implement command that maps it. Only for
+ *  what code builds (isBuiltByCode): of a requirement, a person or an
+ *  external system it says nothing, unless the file maps that element
+ *  itself. Nothing when Studio cannot read the file. */
 function ElementBuiltIn({ nodeId }: { nodeId: string }) {
   const mapping = useDiagramStore((s) => s.repository?.implements ?? null)
   const c4Nodes = useDiagramStore((s) => s.c4Nodes)
+  const typeDef = useDiagramStore((s) => s.metamodel.nodeTypes[s.c4Nodes[nodeId]?.type ?? ''])
   const [copied, setCopied] = useState(false)
   const node = c4Nodes[nodeId]
   if (!mapping || !node) return null
   const found = builtIn(mapping, nodeId, (id) => c4Nodes[id]?.parentId)
+  // Where code builds elements of its kind. No code builds a requirement, a
+  // person or an external system: their card says Built in only for an
+  // entry of their own, never for an ancestor's or with the command.
+  if (!isBuiltByCode(node, typeDef) && found?.from !== nodeId) return null
   const from = found && found.from !== nodeId ? c4Nodes[found.from] : undefined
   const command = implementCommand(Object.values(c4Nodes), node)
   const copy = () => {
@@ -2652,9 +2660,18 @@ function ElementTests({ nodeId }: { nodeId: string }) {
   const copy = () => {
     void navigator.clipboard?.writeText(command).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }, () => {})
   }
+  // What the head says of them: those that failed or are gone first.
+  const tally = new Map<string, number>()
+  for (const t of tests) {
+    const outcome = outcomes?.find((o) => o.id === t)?.outcome
+    if (outcome) tally.set(outcome, (tally.get(outcome) ?? 0) + 1)
+  }
+  const said = ['failed', 'not-found', 'not-run', 'skipped', 'passed'].filter((o) => tally.has(o))
   return (
-    <section className="pp-section" aria-label="Tests">
-      <div className="pp-section-title">Tests · {tests.length}</div>
+    <FoldSection id="tests" label="Tests" count={tests.length}
+      summary={<>
+        {said.map((o) => <span key={o} className={`pp-test-outcome ${o}`}>{tally.get(o)} {TEST_OUTCOME_LABEL[o] ?? o}</span>)}
+      </>}>
       {tests.length
         ? (
           <ul className="pp-tests">
@@ -2678,7 +2695,7 @@ function ElementTests({ nodeId }: { nodeId: string }) {
             </div>
           </div>
         )}
-    </section>
+    </FoldSection>
   )
 }
 
@@ -2689,8 +2706,7 @@ function ElementViews({ nodeId, onOpen }: { nodeId: string; onOpen: (viewId: str
   // The Inspector shows no view: none is open there.
   const activeViewId = useDiagramStore((s) => (s.appMode === 'designer' || s.appMode === 'viewer' ? s.activeViewId : null))
   return (
-    <section className="pp-section" aria-label="Views">
-      <div className="pp-section-title">Views · {shown.length}</div>
+    <FoldSection id="views" label="Views" count={shown.length}>
       {shown.length === 0
         ? <p className="pp-views-none">On no view: only All elements shows it.</p>
         : (
@@ -2713,7 +2729,7 @@ function ElementViews({ nodeId, onOpen }: { nodeId: string; onOpen: (viewId: str
             })}
           </ul>
         )}
-    </section>
+    </FoldSection>
   )
 }
 

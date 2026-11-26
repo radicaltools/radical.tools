@@ -970,6 +970,24 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
 .pp-foot .pp-section { padding-top: 10px; padding-bottom: 10px; }
 .pp-foot > .pp-delete { flex-shrink: 0; border-top: 1px solid var(--border-color); }
 .pp-foot-scroll > .pp-section:last-child { border-bottom: none; }
+/* A section that folds to its head (Verification, Tests, Views): the head
+   says what it holds, a click opens it. */
+.pp-fold > .pp-fold-head { margin-bottom: 0; gap: 8px; }
+.pp-fold.open > .pp-fold-head { margin-bottom: 8px; }
+.pp-foot .pp-fold { padding-top: 0; padding-bottom: 0; }
+.pp-foot .pp-fold.open { padding-bottom: 10px; }
+.pp-fold-toggle {
+  flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 9px 0; margin: 0;
+  border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: left; cursor: pointer;
+}
+.pp-fold-toggle:hover .pp-fold-label { color: var(--text-primary); }
+.pp-fold-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
+.pp-fold-chevron { flex: none; transition: transform 0.12s ease; }
+.pp-fold.open .pp-fold-chevron { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .pp-fold-chevron { transition: none; } }
+.pp-fold-toggle .pp-test-outcome, .pp-fold-count { font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.pp-fold-count.error { color: var(--danger, #dc2626); }
+.pp-fold-count.warning { color: var(--warning, #d97706); }
 /* A sequence's fields, under the card's head: the card's own margins. */
 .right-panel .props-content.props-sequence { padding: 12px 16px 14px; gap: 12px; }
 .right-panel .props-content > .props-empty { margin: 24px 16px; }
@@ -1168,7 +1186,7 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
 .activity-rail {
   grid-area: rail;
   display: flex; flex-direction: column;
-  min-height: 0; width: 44px;
+  min-height: 0; width: var(--rail-w, 54px);
   border-right: 1px solid var(--border-color);
   background: color-mix(in srgb, var(--text-primary) 2.5%, var(--bg-panel));
   /* Over the toolbar (100), which its Models menu opens beside. */
@@ -1224,19 +1242,20 @@ input.pp-title:focus { border-color: var(--accent); background: var(--input-bg);
   width: 3px; border-radius: 2px 0 0 2px; background: var(--sec-color);
 }
 .lp-rail-count {
-  font-size: 10.5px; font-weight: 600; line-height: 1;
+  font-size: 11px; font-weight: 600; line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 .lp-rail-tab.active .lp-rail-count { color: var(--sec-color); }
 .lp-section-icon {
-  width: 28px; height: 28px; flex-shrink: 0; border-radius: 8px;
+  width: 32px; height: 32px; flex-shrink: 0; border-radius: 9px;
   display: inline-flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, var(--sec-color) 14%, transparent); color: var(--sec-color);
   transition: background 0.15s, color 0.15s;
 }
 .lp-rail-tab.active .lp-section-icon { background: var(--sec-color); color: #fff; }
-/* The rail's icons a little larger than the panel heads' own. */
-.lp-rail-tab .lp-section-icon svg { width: 16px; height: 16px; }
+/* The rail's icons as large as its menus' own (Models, Settings): at 16 px
+   in a 28 px square they read small beside them and beside the toolbar. */
+.lp-rail-tab .lp-section-icon svg { width: 20px; height: 20px; }
 
 .lp-sections { overflow: hidden; }
 .lp-section { --sec-color: var(--accent); flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
@@ -5033,8 +5052,14 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .pp-ver-status.none { color: var(--text-muted); background: color-mix(in srgb, var(--text-muted) 13%, transparent); }
 .pp-ver-path { margin-left: auto; }
 .pp-ver-path:disabled { opacity: 0.5; cursor: default; }
-.pp-ver-group { display: grid; gap: 4px; }
-.pp-ver-sub { font-size: 11px; color: var(--text-muted); }
+/* Its parts apart: each a group under its own small head, a line between
+   them (open, they ran together as one block). */
+.pp-fold-body { display: grid; gap: 12px; }
+.pp-ver-group { display: grid; gap: 6px; }
+.pp-ver-group + .pp-ver-group { padding-top: 10px; border-top: 1px solid var(--border-color-subtle, color-mix(in srgb, var(--border-color) 60%, transparent)); }
+.pp-ver-sub { display: flex; align-items: baseline; gap: 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-muted); }
+.pp-ver-sub-note { font-weight: 600; letter-spacing: 0; text-transform: none; font-size: 11px; }
+.pp-ver-sub-note.bad { color: var(--danger, #dc2626); }
 .pp-ver-links { display: flex; flex-wrap: wrap; gap: 4px; }
 .pp-ver-none { font-size: 11.5px; color: var(--text-muted); }
 .pp-ver-link { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); border-radius: 4px; padding: 1px 6px 1px 1px; font: inherit; font-size: 11.5px; cursor: pointer; vertical-align: baseline; }
@@ -5043,13 +5068,26 @@ span.wiki-link:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .pp-ver-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pp-ver-mark { font-weight: 700; flex: none; }
 .pp-ver-mark.ok { color: #16a34a; } .pp-ver-mark.bad { color: #dc2626; } .pp-ver-mark.none { color: var(--text-muted); }
-.pp-ver-conds { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.pp-ver-conds { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
 .pp-ver-cond { display: grid; grid-template-columns: 1.1em minmax(0, 1fr) auto; gap: 2px 6px; align-items: baseline; font-size: 11.5px; }
 .pp-ver-cond code { overflow-wrap: anywhere; font-family: var(--font-mono, ui-monospace, monospace); }
 .pp-ver-measured { grid-column: 2 / -1; font-size: 11px; color: var(--text-muted); }
 .pp-ver-element { display: grid; gap: 3px; }
-.pp-ver-finding { font-size: 12px; line-height: 1.5; color: var(--text-secondary); border-left: 2px solid #d97706; padding-left: 8px; display: grid; gap: 3px; }
-.pp-ver-finding.error { border-color: #dc2626; }
+.pp-ver-finding { font-size: 12px; line-height: 1.5; color: var(--text-secondary); border-left: 3px solid var(--warning, #d97706); border-radius: 0 6px 6px 0; padding: 7px 10px; display: grid; gap: 4px; background: color-mix(in srgb, var(--warning, #d97706) 7%, transparent); }
+.pp-ver-finding.error { border-color: var(--danger, #dc2626); background: color-mix(in srgb, var(--danger, #dc2626) 7%, transparent); }
+.pp-ver-finding + .pp-ver-finding { margin-top: 2px; }
+/* The words and values a finding's sentence quotes. */
+.finding-quote { font-weight: 600; color: var(--text-primary); }
+/* What is wrong first, then what it is about: a test by its title, its file apart. */
+.pp-ver-verdict { font-weight: 600; color: var(--warning, #d97706); }
+.pp-ver-finding.error .pp-ver-verdict { color: var(--danger, #dc2626); }
+.pp-ver-test { display: grid; gap: 1px; color: var(--text-primary); }
+.pp-ver-test b { font-weight: 600; overflow-wrap: anywhere; }
+.pp-ver-test code { font-size: 11px; color: var(--text-muted); overflow-wrap: anywhere; }
+.pp-ver-test code.pp-ver-condition { font-size: 11.5px; color: var(--text-primary); }
+.pp-ver-note b { font-weight: 600; color: var(--text-primary); }
+.pp-ver-reason { margin: 0; padding: 4px 6px; border-radius: 4px; background: var(--hover-bg); font-size: 11px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 7.5em; overflow: auto; }
+.pp-ver-note { font-size: 11.5px; color: var(--text-muted); }
 .pp-ver-down { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 11px; color: var(--text-muted); }
 
 .pp-tests { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }

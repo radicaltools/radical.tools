@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canonicalTestId, checkModel, formatCheckGithub, formatCheckText, parseCheckConfig, parseTestIds, parseTestReport, parseTestResults, ratchetConfig, runCheck, serializeTestResults, type TestCase } from '../src/check'
+import { ADOPT_RULE, CHECK_RULES, FOLDER_RULES, GOAL_RULE, messageParts, plainRuleText, canonicalTestId, checkModel, formatCheckGithub, formatCheckText, parseCheckConfig, parseTestIds, parseTestReport, parseTestResults, ratchetConfig, runCheck, serializeTestResults, withEarlierResults, type TestCase, type TestResults } from '../src/check'
 import { findTests, globMatch, rebindTests } from '../src/check/reports'
 import { serializeToMdFolderWithPaths } from '../src/formats/mdFolder'
 import { builtInGovernanceMetamodel } from '../src/metamodel'
@@ -239,12 +239,85 @@ const checkWith = (data: DiagramData, withTests = true) =>
 const messages = (result: ReturnType<typeof checkWith>, rule: string) =>
   result.findings.filter((f) => f.rule === rule).map((f) => f.message)
 
+describe('the words of a rule and of a finding', () => {
+  it('marks in bold what each rule asks, and prints it without the marks', () => {
+    for (const rule of [...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE, ADOPT_RULE]) {
+      expect(rule.description, rule.id).toMatch(/\*\*[^*]+\*\*/)
+      // Whole marks only, and none left in what a terminal prints.
+      expect((rule.description.match(/\*\*/g) ?? []).length % 2, rule.id).toBe(0)
+      expect(plainRuleText(rule.description), rule.id).not.toContain('*')
+    }
+    expect(CHECK_RULES.find((r) => r.id === 'requirement-without-scenario')?.description).toBe('**Every requirement is verified by at least one scenario**.')
+    expect(plainRuleText('**Every scenario has what checks it**: tests, or metric conditions (property `metrics`).')).toBe('Every scenario has what checks it: tests, or metric conditions (property `metrics`).')
+  })
+
+  it('reads a finding by what it quotes: words and values in quotation marks, names in backticks', () => {
+    expect(messageParts('Requirement "Pay" does not say "20 %", which the words it quotes from "Pay online" say.')).toEqual([
+      { kind: 'text', text: 'Requirement ' }, { kind: 'quote', text: '"Pay"' }, { kind: 'text', text: ' does not say ' }, { kind: 'quote', text: '"20 %"' },
+      { kind: 'text', text: ', which the words it quotes from ' }, { kind: 'quote', text: '"Pay online"' }, { kind: 'text', text: ' say.' },
+    ])
+    expect(messageParts('Property `metrics` of "Guard" reads.')).toEqual([
+      { kind: 'text', text: 'Property ' }, { kind: 'code', text: 'metrics' }, { kind: 'text', text: ' of ' }, { kind: 'quote', text: '"Guard"' }, { kind: 'text', text: ' reads.' },
+    ])
+    // No quote: one part; an inch mark or an open quotation mark is text.
+    expect(messageParts('No report has its file.')).toEqual([{ kind: 'text', text: 'No report has its file.' }])
+    expect(messageParts('A 5" screen and "an end')).toEqual([{ kind: 'text', text: 'A 5" screen and "an end' }])
+    expect(messageParts('')).toEqual([])
+  })
+})
+
+describe('a run of some test files', () => {
+  const tc = (file: string, title: string, status: TestCase['status'] = 'passed'): TestCase => ({ file, title: [title], status })
+  const earlier = (cases: TestCase[], extra: Partial<TestResults> = {}): TestResults => ({ version: 1, readAt: '2026-11-20T10:00:00.000Z', reports: ['all.json'], cases, ...extra })
+
+  it('replaces the results of its files and keeps what was read before of the others', () => {
+    const before = earlier([tc('/repo/src/pay.test.ts', 'pays'), tc('/repo/src/pay.test.ts', 'refunds'), tc('/repo/src/ship.test.ts', 'ships'), tc('/repo/e2e/trend.spec.ts', 'draws')])
+    const merged = withEarlierResults([tc('/repo/src/pay.test.ts', 'pays', 'failed')], before)
+    // The file run again is as the run has it: a test it no longer has is gone.
+    expect(merged.cases.map((c) => [c.file, c.title[0], c.status])).toEqual([
+      ['/repo/src/pay.test.ts', 'pays', 'failed'],
+      ['/repo/src/ship.test.ts', 'ships', 'passed'],
+      ['/repo/e2e/trend.spec.ts', 'draws', 'passed'],
+    ])
+    expect(merged.kept).toEqual({ since: '2026-11-20T10:00:00.000Z', cases: 2, files: 2 })
+  })
+
+  it('takes a file named by its whole path and by the end of it for one file', () => {
+    const before = earlier([tc('/home/runner/work/app/e2e/trend.spec.ts', 'draws'), tc('src\\win.test.ts', 'runs'), tc('/repo/src/other.test.ts', 'stays')])
+    const merged = withEarlierResults([tc('trend.spec.ts', 'draws', 'failed'), tc('/repo/src/win.test.ts', 'runs')], before)
+    expect(merged.cases.map((c) => c.file)).toEqual(['trend.spec.ts', '/repo/src/win.test.ts', '/repo/src/other.test.ts'])
+    expect(merged.kept).toMatchObject({ cases: 1, files: 1 })
+  })
+
+  it('keeps nothing when the run has every file, or nothing was read before', () => {
+    const run = [tc('a.test.ts', 'a'), tc('b.test.ts', 'b')]
+    expect(withEarlierResults(run, earlier([tc('/repo/a.test.ts', 'a', 'failed'), tc('/repo/b.test.ts', 'old')]))).toEqual({ cases: run })
+    expect(withEarlierResults(run, null)).toEqual({ cases: run })
+    expect(withEarlierResults(run, earlier([]))).toEqual({ cases: run })
+  })
+
+  it('says since when the kept results are: the earliest reading, or the run of CI', () => {
+    const again = withEarlierResults([tc('a.test.ts', 'a')], earlier([tc('a.test.ts', 'a'), tc('b.test.ts', 'b')], { readAt: '2026-11-25T08:00:00.000Z', kept: { since: '2026-11-20T10:00:00.000Z', cases: 1, files: 1 } }))
+    expect(again.kept?.since).toBe('2026-11-20T10:00:00.000Z')
+    const ci = { provider: 'github' as const, commit: 'c0ffee', behind: 0, runs: [{ id: 1, url: 'u', sha: 'c0ffee', ranAt: '2026-11-19T07:00:00Z', workflow: 'CI', artifacts: ['r'] }] }
+    expect(withEarlierResults([tc('a.test.ts', 'a')], earlier([tc('b.test.ts', 'b')], { ci })).kept?.since).toBe('2026-11-19T07:00:00Z')
+  })
+
+  it('is kept with the results, and read back', () => {
+    const kept = { since: '2026-11-20T10:00:00.000Z', cases: 2, files: 1 }
+    const text = serializeTestResults([tc('a.test.ts', 'a')], ['a.json'], new Date('2026-11-26T12:00:00Z'), { commit: 'abc', kept })
+    expect(parseTestResults(text)).toMatchObject({ readAt: '2026-11-26T12:00:00.000Z', commit: 'abc', kept })
+    expect(parseTestResults(serializeTestResults([tc('a.test.ts', 'a')], ['a.json']))?.kept).toBeUndefined()
+    expect(parseTestResults(JSON.stringify({ version: 1, readAt: 'x', cases: [], kept: { since: 5 } }))?.kept).toBeUndefined()
+  })
+})
+
 describe('radical check with test reports', () => {
   it('finds each test outcome and names what it takes down', () => {
     const result = checkWith(model())
     expect(messages(result, 'test-failed')).toEqual(['Scenario "S-FAIL": test apps/cli/src/cli.test.ts › config › ratchets failed. Not verified now: requirement "Failing".'])
     expect(messages(result, 'test-not-found')).toEqual(['Scenario "S-GONE": no test apps/cli/src/cli.test.ts › radical check › old title in the reports, though its file ran; renamed or deleted? Not verified now: requirement "Renamed".'])
-    expect(messages(result, 'test-not-run')).toEqual(['Scenario "S-LATER": no report has the file of test apps/web/site.spec.ts › loads.'])
+    expect(messages(result, 'test-not-run')).toEqual(['Scenario "S-LATER": test apps/web/site.spec.ts › loads did not run: no report has its file.'])
     expect(messages(result, 'test-skipped')).toEqual(['Fitness function "Guard": test apps/e2e/tests/studio/boot.spec.ts › Forge › is skipped was skipped.'])
     expect(messages(result, 'scenario-without-metrics')).toEqual(['Scenario "S-NONE" names no check.'])
     expect(result.errors).toBe(2)

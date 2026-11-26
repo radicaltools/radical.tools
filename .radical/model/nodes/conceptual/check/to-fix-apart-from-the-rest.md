@@ -1,0 +1,9 @@
+---
+id: "0c8746d9-8f7a-4b76-81a2-a7f8bf22bc0a"
+type: "requirement"
+label: "To fix apart from the rest"
+action: "it shall show, under the scores, what the user has to fix: only the findings that fail the check, each rule as one group that says what it means and how many of its findings are to be settled (for a rule over its baseline the number over it, with the baseline), the findings about elements changed on this branch first and marked so, and for a rule over its baseline the others folded as findings any of which settles it too; a goal not met as one item that says how many more elements reach it and leads to the findings of the rule that marks those that miss it; each finding with its element (for a finding about a relation, the relation's source, such as the requirement of a derives relation), Open and, where the fix is one step (a requirement without a scenario, an accepted ADR without a fitness function, an unaddressed concern), the action that starts it as an edit of Designer's; with nothing to fix, say so in one line; and list no warning there, only how many findings the Debt tab holds; and the verdict in the Inspector's bar shall bring it into view"
+ears_type: "event-driven"
+rationale: "A person opens the Inspector to know what to do next. Until 2026-11-26 the list mixed what fails the check with the findings within their baselines, which nobody has to settle today (the user: what the user has to fix first, no warnings straight away). Built above the scores at first; the user, having used it, put the scores at the start and the fixes after them, so the verdict leads to them. A finding that named only a relation had no element to open (F-0129, round 201–210). Evidence: apps/studio/src/renderer/src/components/inspector/OverviewTab.tsx, ToFixSection.tsx, toFix.ts, shared.tsx; packages/common/src/check/index.ts (withElement)"
+trigger: "the user opens the Inspector's Overview"
+---

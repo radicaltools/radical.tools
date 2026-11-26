@@ -306,6 +306,7 @@ export async function isolatedStudio(browser: Browser): Promise<{ studio: Studio
   const context = await browser.newContext({ viewport, deviceScaleFactor, locale, timezoneId, colorScheme, baseURL, userAgent })
   const page = await context.newPage()
   await skipSetup(page)
+  await openCardSections(page)
   const problems = await guard(page)
   return { studio: new Studio(page), problems, close: () => context.close() }
 }
@@ -323,11 +324,28 @@ export async function skipSetup(page: Page): Promise<void> {
   })
 }
 
-export const test = base.extend<{ studio: Studio; guard: void; firstStart: boolean; setup: void }>({
+/**
+ * Leave the properties card's Verification, Tests and Views open, as a user
+ * who opened them has them: the tests read what the sections hold. Studio
+ * starts with them folded to their heads (`cardSections: 'folded'`), and
+ * keeps them as the user leaves them.
+ */
+export async function openCardSections(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('radical-card-sections')) {
+      localStorage.setItem('radical-card-sections', JSON.stringify({ verification: true, tests: true, views: true }))
+    }
+  })
+}
+
+export const test = base.extend<{ studio: Studio; guard: void; firstStart: boolean; cardSections: 'open' | 'folded'; setup: void }>({
   /** Leave the browser as on Studio's first start: the Setup wizard opens. */
   firstStart: [false, { option: true }],
-  setup: [async ({ page, firstStart }, use) => {
+  /** The card's Verification, Tests and Views: open, or folded as Studio starts with them. */
+  cardSections: ['open', { option: true }],
+  setup: [async ({ page, firstStart, cardSections }, use) => {
     if (!firstStart) await skipSetup(page)
+    if (cardSections === 'open') await openCardSections(page)
     await use()
   }, { auto: true }],
 

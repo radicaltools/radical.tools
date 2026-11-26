@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs'
-import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, realpath, rename, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, formatTrace, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, adoptBaselines, existingCodeCheckConfig, ratchetConfig, reviewMeasurements, runCheck, serializeCheckConfig, serializeMeasurementStore, serializeTestResults, splitTestId, testsRanAt, traceOf, withBoundTests, type CheckConfig, type CiSource, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, formatTrace, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, plainRuleText, adoptBaselines, existingCodeCheckConfig, ratchetConfig, reviewMeasurements, runCheck, serializeCheckConfig, serializeMeasurementStore, serializeTestResults, splitTestId, testsRanAt, traceOf, withBoundTests, withEarlierResults, type CheckConfig, type CiSource, type KeptCases, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { DEPS_FILE } from '@radical/common/federation'
 import { STATE_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
@@ -170,7 +170,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   const { values, positionals } = parsed
   if (values.help) { io.out(CHECK_USAGE); return 0 }
   if (values['list-rules']) {
-    for (const rule of [...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE]) io.out(`${rule.id.padEnd(30)} ${((rule as { off?: true }).off ? 'off' : rule.severity).padEnd(8)} ${rule.description}`)
+    for (const rule of [...FOLDER_RULES, ...CHECK_RULES, GOAL_RULE]) io.out(`${rule.id.padEnd(30)} ${((rule as { off?: true }).off ? 'off' : rule.severity).padEnd(8)} ${plainRuleText(rule.description)}`)
     io.out('\nMetrics for goals (in percent):')
     for (const metric of CHECK_METRICS) io.out(`${metric.id.padEnd(30)} ${(metric.tests ? 'evidence' : '').padEnd(8)} ${metric.description}`)
     return 0
@@ -258,6 +258,8 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   // Results that are not this run's: from CI, or kept from a later commit.
   let testsReadAt: string | undefined
   let keep: { reports: string[]; ci?: CiSource; commit?: string } | undefined
+  // What a run of some test files leaves of the results kept before it.
+  let keptCases: KeptCases | undefined
   if (fromCi) {
     const say = (text: string) => { if (!values.quiet) io.err(text) }
     const resultsPath = join(root, TEST_RESULTS_FILE)
@@ -312,6 +314,16 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
         io.err(`Cannot read the test report ${report}: ${(error as Error).message}`)
         return 2
       }
+    }
+    // A run of some test files replaces their results and leaves what the
+    // results kept beside the model say of the others: the tests it did not
+    // run keep the outcome they had (CI, with nothing kept, reads only its
+    // own reports).
+    const merged = withEarlierResults(tests, parseTestResults(await readEditorStateFile(root, TEST_RESULTS_FILE) ?? ''))
+    if (merged.kept) {
+      tests = merged.cases
+      keptCases = merged.kept
+      if (!values.quiet) io.err(`Kept the results of ${merged.kept.cases} test${merged.kept.cases === 1 ? '' : 's'} in ${merged.kept.files} file${merged.kept.files === 1 ? '' : 's'} the reports here do not have, read since ${merged.kept.since.slice(0, 10)}.`)
     }
   }
 
@@ -411,7 +423,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     // model while it is edited; with the commit they were read at, so
     // results of CI never replace those of a later one.
     await writeBeside(join(root, TEST_RESULTS_FILE), serializeTestResults(tests, keep?.reports ?? values.report ?? [], new Date(),
-      keep ?? { commit: (await headOf(root)) ?? undefined }))
+      keep ?? { commit: (await headOf(root)) ?? undefined, ...(keptCases ? { kept: keptCases } : {}) }))
   }
   if (values.evidence && result.evidence) await writeBeside(resolve(io.cwd, values.evidence), JSON.stringify(result.evidence, null, 2) + '\n')
   if (values.trace) {
@@ -477,7 +489,10 @@ export async function writeBeside(path: string, content: string): Promise<void> 
       if (error.code !== 'EEXIST') throw error
     })
   }
-  await writeFile(path, content)
+  // Whole or not at all: Studio reads these files while they are written.
+  const partial = join(dir, `.${basename(path)}.${process.pid}.tmp`)
+  await writeFile(partial, content)
+  await rename(partial, path)
 }
 
 /** The Hub's concern packs, for concern-unaddressed: from the copy the build

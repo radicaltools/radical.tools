@@ -137,6 +137,27 @@ describe('radical check --from-ci', () => {
     expect((await results(cwd)).ci.behind).toBe(3)
   })
 
+  it('replaces whole the results a run of some test files left', async () => {
+    const { cwd, merged } = await repository()
+    // Before the commit CI ran: a run of one file, then of another, which
+    // keeps the first.
+    await git(cwd, 'checkout', '-q', `${merged}~1`)
+    await writeFile(join(cwd, 'ship.json'), report('src/ship.test.ts', 'ships', 'passed'))
+    await writeFile(join(cwd, 'local.json'), report('src/pay.test.ts', 'pays', 'failed'))
+    await run(cwd, fakeGh(merged), 'check', 'model', '--report', 'ship.json')
+    await run(cwd, fakeGh(merged), 'check', 'model', '--report', 'local.json')
+    expect((await results(cwd)).kept).toMatchObject({ cases: 1, files: 1 })
+    expect((await results(cwd)).cases).toHaveLength(2)
+    await git(cwd, 'checkout', '-q', 'main')
+
+    // CI's results are of a whole run: nothing of before is kept with them.
+    expect((await run(cwd, fakeGh(merged), 'check', 'model', '--from-ci')).code).toBe(0)
+    const fromCi = await results(cwd)
+    expect(fromCi.ci.commit).toBe(merged)
+    expect(fromCi.kept).toBeUndefined()
+    expect(fromCi.cases.map((c: { file: string }) => c.file).some((file: string) => file.endsWith('ship.test.ts'))).toBe(false)
+  })
+
   it('downloads the artifacts .radical/radical.json names', async () => {
     const { cwd, merged } = await repository()
     const file = JSON.parse(await readFile(join(cwd, '.radical', 'radical.json'), 'utf8'))

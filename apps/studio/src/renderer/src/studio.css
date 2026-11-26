@@ -9,7 +9,7 @@
   --left-panel-w: 260px;
   /* The activity rail (ActivityRail) is the first column in every
      perspective but a slide show. */
-  --rail-w: 44px;
+  --rail-w: 54px;
   grid-template-columns: var(--rail-w) var(--left-panel-w) 1fr;
   /* The rail runs from the window's top to its foot, as VS Code's activity
      bar; the toolbar starts beside it. */
@@ -162,7 +162,7 @@
   /* The mark's ink: deeper on the light theme's tile, as bright as the
      mark's own on the dark one. */
   --mark-ink-a: #3b6fe0; --mark-ink-b: #6d4fe8;
-  width: 30px; height: 30px; border-radius: 8px;
+  width: 32px; height: 32px; border-radius: 9px;
   display: inline-flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, #6d6cf0 18%, transparent);
 }
@@ -3565,7 +3565,7 @@ div.milestone-option { cursor: default; }
 .rail-inspector { --sec-color: var(--accent); }
 .rail-inspector.e { --sec-color: var(--danger); }
 .rail-inspector.ok { --sec-color: var(--success); }
-.rail-inspector .lp-section-icon svg { width: 17px; height: 17px; }
+.rail-inspector .lp-section-icon svg { width: 20px; height: 20px; }
 .rail-inspector .lp-rail-count { color: var(--sec-color); }
 .rail-inspector:disabled { opacity: 0.4; cursor: default; }
 .rail-inspector:disabled:hover { background: none; }
@@ -3618,8 +3618,6 @@ div.milestone-option { cursor: default; }
 .insp-bar .bad, .insp-dot.bad { background: var(--danger); }
 .insp-bar .none, .insp-dot.none { background: var(--border-color-strong); }
 .insp-dot.warn { background: var(--warning); }
-.insp-errors { display: grid; gap: 8px; }
-.insp-error { background: var(--bg-panel); border: 1px solid var(--border-color); border-left: 3px solid var(--danger); border-radius: var(--radius-md); padding: 10px 14px; display: grid; gap: 6px; }
 .insp-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
 .insp-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
 .insp-rows { padding: 4px 14px; }
@@ -3634,17 +3632,16 @@ div.milestone-option { cursor: default; }
 .insp-mark.ok { color: var(--success); } .insp-mark.bad { color: var(--danger); } .insp-mark.none { color: var(--text-muted); }
 .insp-more { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 6px 0; font-size: 12px; justify-self: start; }
 .insp-sev { font-weight: 700; } .insp-sev.error { color: var(--danger); } .insp-sev.warning { color: var(--warning); }
-.insp-rid { font-family: var(--font-mono, ui-monospace, 'SF Mono', Menlo, monospace); font-size: 12px; font-weight: 500; }
 .insp-rdesc { display: block; font-size: 11.5px; color: var(--text-muted); }
+/* What the rule asks, in bold in its description; names as code. */
+.insp-rdesc strong { font-weight: 600; color: var(--text-secondary); }
+.insp-rdesc code { font-size: 0.95em; }
 .insp-rcount { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .insp-rcount small { font-weight: 500; color: var(--text-muted); }
-.insp-items { padding: 0 14px 10px 36px; display: grid; gap: 5px; }
-.insp-item { font-size: 12.5px; color: var(--text-secondary); display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
 .insp-path { color: var(--text-muted); }
 .insp-details { flex-basis: 100%; }
 .insp-details > summary { cursor: pointer; color: var(--accent); font-size: 12px; width: max-content; }
 .insp-details ul { margin: 4px 0 2px; padding-left: 18px; display: grid; gap: 2px; }
-.insp-concern { flex-basis: 100%; display: grid; gap: 6px; justify-items: start; }
 .insp-questions { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 12px; color: var(--text-secondary); }
 .insp-details code { color: var(--text-secondary); word-break: break-word; }
 .insp-pad { padding: 12px 14px; margin: 0; }
@@ -3742,16 +3739,7 @@ div.milestone-option { cursor: default; }
 .insp-goal > b, .insp-goal > span:nth-child(3) { text-align: right; }
 .insp-goal > .insp-pill { justify-self: end; }
 .insp-goal code { overflow: hidden; text-overflow: ellipsis; }
-.insp-dims .insp-dim { border-bottom: 1px solid var(--border-color); }
-.insp-dims .insp-dim:last-child { border-bottom: 0; }
-.insp-dim > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 1.2em minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 10px 14px; }
-.insp-dim > summary::-webkit-details-marker { display: none; }
-.insp-dim > summary:hover { background: var(--hover-bg-faint); }
 .insp-sev.ok { color: var(--success); }
-.insp-dim-empty { padding: 0 14px 10px 36px; margin: 0; }
-.insp-rule-block { padding: 2px 0 6px; scroll-margin-top: 12px; }
-.insp-rule-block.focused { background: var(--accent-soft); }
-.insp-rule-head { display: grid; grid-template-columns: 1.2em minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 6px 14px 4px 36px; }
 /* The header: how old the evidence is, each chip opening to where it came from. */
 .insp-meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 2px; }
 /* The bar over the report: how old the evidence is, the verdict;
@@ -3782,10 +3770,30 @@ div.milestone-option { cursor: default; }
 .insp-score:hover { border-color: var(--accent); }
 .insp-score:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .insp-score .insp-big { font-size: 21px; }
-.insp-attention { scroll-margin-top: 12px; }
-.insp-attention h2:focus { outline: none; }
-.insp-attention .insp-seg button:disabled { opacity: 0.5; }
-.insp-groups-sum { margin: 0; padding: 9px 14px; border-bottom: 1px solid var(--border-color); }
+/* To fix, under the Overview's scores: only what fails the check. */
+.insp-tofix { scroll-margin-top: 12px; }
+.insp-tofix h2:focus { outline: none; }
+.insp h2 > .insp-pill { margin-left: 8px; vertical-align: 1px; }
+.insp-clear { display: flex; align-items: baseline; gap: 10px; padding: 12px 14px; border-left: 3px solid var(--success); color: var(--text-secondary); }
+.insp-clear b { color: var(--text-primary); }
+.insp-tofix .insp-groups { border-left: 3px solid var(--danger); }
+.insp-debt-line { margin: 8px 0 0; }
+/* A rule over its baseline: how many of its findings are to be settled,
+   and the ones that were there before, folded. */
+.insp-settle { margin: 0; padding: 2px 0 8px; font-size: 12.5px; color: var(--text-secondary); }
+.insp-settle b { color: var(--text-primary); }
+.insp-others { border-top: 1px solid var(--border-color); }
+.insp-others > summary { cursor: pointer; color: var(--accent); font-size: 12px; padding: 7px 0; width: max-content; }
+.insp-others[open] > summary { padding-bottom: 5px; }
+/* Debt: what does not fail the check, a part for each kind. */
+.insp-debt-part { display: grid; }
+.insp-sec-head > .insp-tab-lede { margin: 0; flex: 1 1 320px; }
+.insp-seg button:disabled { opacity: 0.5; }
+.insp-notrun > .insp-group-items { padding-left: 14px; padding-top: 2px; }
+.insp-notrun .insp-finding:first-child { border-top: 0; }
+/* The rule a link of the chain or a goal asked for. */
+.insp-group { scroll-margin-top: 12px; }
+.insp-group.asked > summary { background: var(--accent-soft); }
 .insp-group { border-bottom: 1px solid var(--border-color); }
 .insp-group:last-child { border-bottom: 0; }
 .insp-group > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 1.2em minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 10px 14px; }
@@ -3796,6 +3804,19 @@ div.milestone-option { cursor: default; }
 .insp-finding { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 12px; padding: 6px 0; border-top: 1px solid var(--border-color); font-size: 12.5px; color: var(--text-secondary); }
 .insp-finding-what { flex: 1 1 360px; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
 .insp-finding-what .insp-msg { line-height: 1.6; }
+/* A finding about a test: the test by its title, its file and describes apart. */
+.insp-test { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; color: var(--text-primary); }
+.insp-test b { font-weight: 600; }
+.insp-test code { font-size: 11.5px; overflow-wrap: anywhere; }
+.insp-note { flex-basis: 100%; margin: 0; }
+/* What the scenario of a test expects, and a metric condition with what was measured. */
+.insp-expects { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; color: var(--text-secondary); }
+.insp-expects-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; color: var(--text-muted); }
+.insp-expects-part b { font-weight: 600; color: var(--text-primary); }
+.insp-cond { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 3px 12px; }
+.insp-cond code { font-size: 12px; color: var(--text-primary); overflow-wrap: anywhere; }
+.insp-measured b { font-weight: 600; color: var(--text-primary); }
+.insp-reason { margin: 4px 0 2px; padding: 6px 8px; border-radius: var(--radius-sm); background: var(--hover-bg); font-size: 11.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 14em; overflow: auto; }
 .insp-finding-acts { display: flex; gap: 6px; flex: none; }
 /* Not run: what runs on another event is expected here, no gap. */
 .insp-finding.expected .insp-finding-what { opacity: 0.72; }

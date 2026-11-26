@@ -40,6 +40,20 @@ test.describe('Markdown in an element\'s fields', () => {
     await expect(page.locator('textarea.wiki-lead')).toHaveValue(DESCRIPTION)
   })
 
+  // The library reads ==words== as a highlight: the conditions of a line
+  // lost their equals signs to a yellow background.
+  test('doubled equals signs are text, not a highlight', async ({ page, studio }) => {
+    await studio.open('v-wiki/f/payments')
+    await page.locator('.wiki-lead').getByText('refunds').click()
+    const text = '- quarantine.overdue == 0; quarantine.incomplete == 0 (static)\n\nAnd ==these words== too, in `a == b; c == d`.'
+    await page.locator('textarea.wiki-lead').fill(text)
+    await page.locator('.wiki-title').click()
+    const lead = page.locator('.wiki-lead')
+    await expect(lead.locator('li')).toHaveText('quarantine.overdue == 0; quarantine.incomplete == 0 (static)')
+    await expect(lead.locator('p')).toHaveText('And ==these words== too, in a == b; c == d.')
+    await expect(lead.locator('mark')).toHaveCount(0)
+  })
+
   // D13 and the open points of runs 45 to 64: a remote image was fetched
   // (a request that left the machine), links the sanitizer emptied were
   // drawn as links that did nothing, and a link to a wiki page opened a tab.

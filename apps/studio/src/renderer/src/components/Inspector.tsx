@@ -5,11 +5,16 @@
 // button on the rail, above Settings, shows its tabs in the left panel and
 // the tab picked in place of the view, in Designer, Viewer and Presenter.
 // A section's tab on the rail, the button again or ⌘J goes back to the
-// view. Four tabs: Overview (a score for each dimension and
-// what needs attention), Model (the model on its own: consistency,
-// completeness, traceability, decisions), Implementation (what the tests
-// say: requirements and ADRs verified, tests the model does not name) and
-// This branch (what changed since the base, with what the tests say of it).
+// view. Its tabs: Overview (a score for each dimension, then what is to
+// fix), Model (the model on its own: consistency, completeness,
+// traceability, decisions), Implementation (what the tests say:
+// requirements and ADRs verified, tests the model does not name),
+// Measurements (what the sensors measured), Debt (what the check finds
+// that does not fail it) and This branch (what changed since the base, with
+// what the tests say of it). Each finding is in one place: what fails the
+// check in To fix, the rest in Debt. What it counts, on the rail, in its
+// head and in its verdict, is what has to be settled for the check to pass
+// (toFix.ts), not every error radical check reports.
 // A bar over it says how old the test results, measurements and reviews
 // are, and gives the verdict.
 // Each element a tab names is a link: it shows the element in the
@@ -30,10 +35,13 @@ import { useBranchStore } from '../persistence/branchChanges'
 import { NoBase, ThisBranch } from './inspector/ThisChange'
 import { useDocumentsStore } from '../store/documentStore'
 import { changeTotal } from './BranchChanges'
-import { Errors, TabBadge, dimensionOfFinding, dimensionsOf, type Ctx } from './inspector/shared'
+import { TabBadge, dimensionsOf, type Ctx } from './inspector/shared'
 import { OverviewTab } from './inspector/OverviewTab'
 import { ModelTab } from './inspector/ModelTab'
 import { ImplementationTab } from './inspector/ImplementationTab'
+import { DebtTab } from './inspector/DebtTab'
+import { clearRuleFocus, showRule } from './inspector/ruleFocus'
+import { settleCount, toFix } from './inspector/toFix'
 import { MeasurementsTab, measurementsBadge } from './inspector/MeasurementsTab'
 import { FreshnessChips } from './inspector/Freshness'
 import { modelChangedAt, waitingForMeasurement } from './inspector/attention'
@@ -91,7 +99,7 @@ export function InspectorMain(): React.ReactElement {
   useEffect(() => {
     setTraceStack((s) => !traceId ? [] : s[s.length - 1] === traceId ? s : s[s.length - 2] === traceId ? s.slice(0, -1) : [...s, traceId])
   }, [traceId])
-  // The verdict asks the Overview to bring Needs attention into view.
+  // The verdict asks the Overview to bring To fix into view.
   const [attention, setAttention] = useState(0)
   // Until the user picks one, the first tab: Overview.
   // In a store, not in the component: the route names the tab.
@@ -113,8 +121,9 @@ export function InspectorMain(): React.ReactElement {
     }
   }, [])
 
-  // The verdict leads to what needs attention, on the Overview.
-  const onVerdict = (): void => { setTrace(null); setTab('overview'); setAttention((n) => n + 1) }
+  // The verdict leads to what is to fix, on the Overview.
+  const onVerdict = (): void => { setTrace(null); clearRuleFocus(); setTab('overview'); setAttention((n) => n + 1) }
+  const toSettle = useMemo(() => check ? settleCount(toFix(check)) : 0, [check])
 
   // The whole check, with what was read beside the model, or none: a check
   // without the test results said "no results" for a moment.
@@ -131,15 +140,8 @@ export function InspectorMain(): React.ReactElement {
   // The folder as the commands that read the evidence again name it.
   const folder = activeDoc?.folderPath?.split(/[\\/]/).filter(Boolean).pop() ?? activeDoc?.name ?? '<folder>'
   const changedAt = modelChangedAt(editedAt, branch.base, branch.changes ? changeTotal(branch.changes.counts) : 0)
-  const inPerspective = (perspective: 'model' | 'implementation') => {
-    const dims = new Set(dimensionsOf(perspective).map((d) => d.id))
-    return {
-      metrics: check.metrics.filter((m) => dims.has(m.dimension)),
-      errors: check.findings.filter((f) => f.severity === 'error' && dims.has(dimensionOfFinding(f)!)),
-    }
-  }
-  const model = inPerspective('model')
-  const impl = inPerspective('implementation')
+  const noBranch = 'No base beside this model, so Studio cannot tell what this branch changed: radical hooks install saves one.'
+  const onRule = (rule: string): void => showRule(rule, check)
 
   return (
     <Main>
@@ -147,7 +149,7 @@ export function InspectorMain(): React.ReactElement {
         <header className="insp-topbar">
           <FreshnessChips results={results} measurements={measurements} folder={folder} changedAt={changedAt}
             waiting={measurements ? [] : waitingForMeasurement(check.evidence?.nodes, nodes)} />
-          <Verdict check={check} onClick={onVerdict} />
+          <Verdict check={check} toSettle={toSettle} onClick={onVerdict} />
         </header>
       )}
       <div className="insp-body">
@@ -159,12 +161,11 @@ export function InspectorMain(): React.ReactElement {
         <div className="insp-main" hidden={tracing}>
           <div id="insp-panel" role="tabpanel" aria-labelledby={`insp-tab-${tab}`} className="insp-tabpanel">
             {configError && <p className="insp-notice warn">{configError}. The default rule settings apply.</p>}
-            {tab === 'overview' && <OverviewTab check={check} ctx={ctx} relations={relations} branchIds={branchIds}
-              noBranch="No base beside this model, so Studio cannot tell what this branch changed: radical hooks install saves one."
-              onTab={setTab} focus={attention} onCreated={show} />}
-            {tab === 'model' && <><Errors errors={model.errors} ctx={ctx} /><ModelTab check={check} ctx={ctx} relations={relations} onSettings={openCheckSettings} /></>}
-            {tab === 'implementation' && <><Errors errors={impl.errors} ctx={ctx} />
-              <ImplementationTab check={check} ctx={ctx} relations={relations} onSettings={openCheckSettings} /></>}
+            {tab === 'overview' && <OverviewTab check={check} ctx={ctx} branchIds={branchIds} debt={check.warnings}
+              onTab={setTab} onDebt={() => setTab('debt')} focus={attention} />}
+            {tab === 'model' && <ModelTab check={check} ctx={ctx} relations={relations} onSettings={openCheckSettings} onRule={onRule} />}
+            {tab === 'implementation' && <ImplementationTab check={check} ctx={ctx} relations={relations} onSettings={openCheckSettings} />}
+            {tab === 'debt' && <DebtTab check={check} ctx={ctx} relations={relations} branchIds={branchIds} noBranch={noBranch} folder={folder} onSettings={openCheckSettings} />}
             {tab === 'measurements' && <MeasurementsTab measurements={measurements} ctx={ctx} folder={folder} onTrace={setTrace} />}
             {tab === 'branch' && !branch.base && <NoBase />}
             {tab === 'branch' && branch.changes && branch.base && branch.baseModel && <ThisBranch work={work} changes={branch.changes} base={branch.base} baseModel={branch.baseModel} ctx={ctx} />}
@@ -181,10 +182,11 @@ function Main({ children }: { children: React.ReactNode }): React.ReactElement {
 }
 
 const TAB_INFO: Record<Tab, { label: string; about: string; icon: React.ReactNode }> = {
-  overview: { label: 'Overview', about: 'Scores and what needs attention', icon: <path d="M2.5 13.5h11M4 11V7m4 4V4m4 7V8.5" /> },
+  overview: { label: 'Overview', about: 'The scores, and what to fix', icon: <path d="M2.5 13.5h11M4 11V7m4 4V4m4 7V8.5" /> },
   model: { label: 'Model', about: 'The model on its own', icon: <><rect x="2" y="2.5" width="5" height="4" rx="1" /><rect x="9" y="9.5" width="5" height="4" rx="1" /><path d="M4.5 6.5v3.5a1.5 1.5 0 0 0 1.5 1.5h3" /></> },
   implementation: { label: 'Implementation', about: 'What the tests say', icon: <><path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5" /></> },
   measurements: { label: 'Measurements', about: 'What the sensors measured', icon: <><path d="M2.5 12.5h11" /><path d="M3.5 10.5 6 7l2.5 2 4-5" /><circle cx="12.5" cy="4" r="1" /></> },
+  debt: { label: 'Debt', about: 'Found, and not failing the check', icon: <><path d="M3 4.5h10M3 8h10M3 11.5h6" /><circle cx="12.5" cy="11.5" r="1" /></> },
   branch: { label: 'This branch', about: 'Changed since the base', icon: <><circle cx="4.5" cy="3.5" r="1.5" /><circle cx="4.5" cy="12.5" r="1.5" /><circle cx="11.5" cy="5.5" r="1.5" /><path d="M4.5 5v6M11.5 7c0 2.5-2 3-7 4" /></> },
 }
 
@@ -201,22 +203,26 @@ function SideNav({ tab, onTab, check, branch, work }: {
   const hasBranch = !!(branch.changes && branch.base)
   const measurements = useInspectorStore((s) => s.measurements)
   const measured = check ? measurementsBadge(measurements, check.evidence?.nodes) : null
-  const dims = (perspective: 'model' | 'implementation') => {
+  const metricsOf = (perspective: 'model' | 'implementation') => {
     if (!check) return null
     const ids = new Set(dimensionsOf(perspective).map((d) => d.id))
-    return { metrics: check.metrics.filter((m) => ids.has(m.dimension)), errors: check.findings.filter((f) => f.severity === 'error' && ids.has(dimensionOfFinding(f)!)).length }
+    return check.metrics.filter((m) => ids.has(m.dimension))
   }
-  const model = dims('model')
-  const impl = dims('implementation')
+  const model = metricsOf('model')
+  const impl = metricsOf('implementation')
+  // What has to be settled for the check to pass, not every error it reports.
+  const toSettle = useMemo(() => check ? settleCount(toFix(check)) : 0, [check])
   const tabs: Array<[Tab, React.ReactNode]> = [
-    ['overview', check?.errors ? <span key="b" className="insp-pill bad">✗ {check.errors}</span> : null],
-    ['model', model ? <TabBadge key="b" metrics={model.metrics} errors={model.errors} /> : null],
-    ['implementation', !check ? null : check.evidence && impl ? <TabBadge key="b" metrics={impl.metrics} errors={impl.errors} /> : <span key="b" className="insp-pill none">no results</span>],
+    ['overview', !check ? null : toSettle ? <span key="b" className="insp-pill bad" title={settleTitle(toSettle, check.errors)}>✗ {toSettle} to fix</span>
+      : <span key="b" className="insp-pill ok">✓ nothing to fix</span>],
+    ['model', model ? <TabBadge key="b" metrics={model} /> : null],
+    ['implementation', !check ? null : check.evidence && impl ? <TabBadge key="b" metrics={impl} /> : <span key="b" className="insp-pill none">no results</span>],
     ['measurements', !measured ? null : measured.count ? <React.Fragment key="b">
       <span className="insp-pill none" title="Measurements beside the model">{measured.count}</span>
       {measured.failed > 0 && <span className="insp-pill bad" title="Values off their condition">✗ {measured.failed}</span>}
       {measured.stale > 0 && <span className="insp-pill warn" title="Measurements too old for their condition">◷ {measured.stale}</span>}
     </React.Fragment> : <span key="b" className="insp-pill none">none</span>],
+    ['debt', !check ? null : check.warnings ? <span key="b" className="insp-pill none" title="Findings that do not fail the check">{check.warnings}</span> : <span key="b" className="insp-pill none">none</span>],
     // Changes on branch is here only: without a base, how to save one.
     ['branch', hasBranch ? <React.Fragment key="b">
       <span className="insp-pill none" title="Elements and relations changed since the base">{changeTotal(branch.changes!.counts)}</span>
@@ -224,7 +230,7 @@ function SideNav({ tab, onTab, check, branch, work }: {
       {branch.on && <span className="insp-pill new" title="Marked on the canvas">on the canvas</span>}
     </React.Fragment> : <span key="b" className="insp-pill none">no base</span>],
   ]
-  const pick = (id: Tab): void => { useInspectorNav.setState({ trace: null }); onTab(id) }
+  const pick = (id: Tab): void => { useInspectorNav.setState({ trace: null }); clearRuleFocus(); onTab(id) }
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>): void => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
     e.preventDefault()
@@ -234,10 +240,10 @@ function SideNav({ tab, onTab, check, branch, work }: {
     e.currentTarget.querySelector<HTMLElement>(`#insp-tab-${next}`)?.focus()
   }
   return (
-    <div className="insp-side lp-section" style={{ ['--sec-color' as string]: check?.errors ? 'var(--danger)' : 'var(--success)' }}>
+    <div className="insp-side lp-section" style={{ ['--sec-color' as string]: toSettle ? 'var(--danger)' : 'var(--success)' }}>
       <div className="lp-section-head">
         <span className="lp-section-title">Inspector</span>
-        {check && <span className="lp-section-count" title={`${check.errors} errors, ${check.warnings} warnings`}>{check.errors}</span>}
+        {check && <span className="lp-section-count" title={settleTitle(toSettle, check.errors)}>{toSettle}</span>}
       </div>
       <div className="lp-section-body">
         <div className="lp-section-body-pad">
@@ -262,12 +268,22 @@ function SideNav({ tab, onTab, check, branch, work }: {
   )
 }
 
-/** The check's verdict, which leads to what needs attention. The tab's
- *  name is in the left panel's list, so the report has no head of its own. */
-function Verdict({ check, onClick }: { check: NonNullable<ReturnType<typeof useInspectorStore.getState>['check']>; onClick: () => void }): React.ReactElement {
+/** What a count of findings to settle stands for, with the count of
+ *  errors radical check reports when that differs (a rule over its baseline
+ *  counts every finding it has as an error). */
+export function settleTitle(toSettle: number, errors: number): string {
+  if (!toSettle) return 'Nothing to fix: the check passes'
+  const settle = `${toSettle} to fix for the check to pass`
+  return errors === toSettle ? settle : `${settle}; radical check counts ${errors} errors, every finding of a rule over its baseline among them`
+}
+
+/** The check's verdict, which leads to what is to fix. It names no
+ *  warnings: they are the Debt tab's. The tab's name is in the left panel's
+ *  list, so the report has no head of its own. */
+function Verdict({ check, toSettle, onClick }: { check: NonNullable<ReturnType<typeof useInspectorStore.getState>['check']>; toSettle: number; onClick: () => void }): React.ReactElement {
   return (
-    <button type="button" className={`insp-verdict ${check.errors ? 'bad' : 'ok'}`} title="Show what needs attention" onClick={onClick}>
-      {check.errors ? `✖ ${check.errors} errors` : '✓ No errors'} · {check.warnings} warnings
+    <button type="button" className={`insp-verdict ${toSettle ? 'bad' : 'ok'}`} title={`${settleTitle(toSettle, check.errors)}. Show what is to fix`} onClick={onClick}>
+      {toSettle ? `✖ ${toSettle} to fix` : '✓ Nothing to fix'}
     </button>
   )
 }

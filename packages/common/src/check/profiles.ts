@@ -14,7 +14,7 @@ import type { CheckSeverity } from './rules'
 /** The rule that reports a check.json still waiting for its first baselines. */
 export const ADOPT_RULE = {
   id: 'baselines-pending',
-  description: 'check.json does not wait for the baselines of its first run ("adopt": true); radical check --adopt takes them once.',
+  description: '**check.json does not wait for the baselines of its first run** ("adopt": true); radical check --adopt takes them once.',
   severity: 'error' as CheckSeverity,
   dimension: 'consistency' as const,
 }

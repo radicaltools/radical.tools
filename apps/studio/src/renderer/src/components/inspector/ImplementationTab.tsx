@@ -3,12 +3,14 @@
 // How faithfully the code follows the model, by what the last test reports
 // say: requirements verified by scenarios and their functional tests,
 // decisions verified by fitness functions, tests the model does not name,
-// coverage by element of the architecture, and the checks that do not run.
+// coverage by element of the architecture, and the scenarios and fitness
+// functions that do not pass with what they leave unverified. It lists no
+// findings: what fails the check is in To fix, the rest in Debt.
 
 import React, { useMemo, useState } from 'react'
 import type { CheckMetricResult, CheckResult, EvidenceEntry } from '@radical/common/check'
 import type { C4Node, C4Relation } from '@radical/common/c4'
-import { Bar, Chip, FindingsByDimension, GoalPill, MetricBar, PASSING, metricOf, tally, type Ctx } from './shared'
+import { Bar, Chip, GoalPill, MetricBar, PASSING, metricOf, tally, type Ctx } from './shared'
 
 function MetricTile({ m, label, notes }: { m: CheckMetricResult | undefined; label: string; notes: React.ReactNode }): React.ReactElement {
   return (
@@ -162,8 +164,8 @@ export function ImplementationTab({ check, ctx, relations, onSettings }: {
             </div>
           </section>
         )}
-        <section>
-          <h2>Needs attention</h2>
+        <section aria-label="Not passing">
+          <h2>Not passing</h2>
           <p className="insp-lede">Scenarios and fitness functions that do not pass, and what they leave unverified.</p>
           <div className="insp-panel insp-attn">
             {view.attention.length === 0 && view.adrsWithout.length === 0 && <p className="insp-muted insp-pad">Every scenario and fitness function passed.</p>}
@@ -185,11 +187,6 @@ export function ImplementationTab({ check, ctx, relations, onSettings }: {
         </section>
       </div>
 
-      <section>
-        <h2>Findings by dimension</h2>
-        <p className="insp-lede">The rules about the tests, and the goals on what they verify.</p>
-        <FindingsByDimension check={check} ctx={ctx} perspective="implementation" />
-      </section>
     </>
   )
 }
