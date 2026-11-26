@@ -4136,6 +4136,16 @@
       "apps/studio/tests/inspectorToFix.test.ts › one cause › is one thing to fix, however many elements name it: a condition on one measurement, a test",
       "apps/studio/tests/inspectorToFix.test.ts › one cause › is not shared by another measurement, another rule, or findings that name no test or condition",
       "apps/studio/tests/inspectorToFix.test.ts › one cause › does not change what a rule over its baseline has to settle"
+    ] },
+    { "element": "e52f9956-98dc-44a7-bd7b-31144e2e465b", "name": "A checked tree is not checked again", "tests": [
+      "tools/ci/checked.test.mjs › A checked tree is not checked again › ci.yml marks the tree in its gate job, after the gate, and not when E2E was skipped by the label",
+      "tools/ci/checked.test.mjs › A checked tree is not checked again › deploy.yml asks first, leaves its checks out only for a checked tree, and deploys what passed here or there"
+    ] },
+    { "element": "f795e373-8262-4a69-a2e1-5a7967e77a8a", "name": "A checked tree deploys without a second check", "tests": [
+      "tools/ci/checked.test.mjs › A checked tree is not checked again › A checked tree deploys without a second check: a mark of a completed, successful run of ci.yml of this repository counts",
+      "tools/ci/checked.test.mjs › A checked tree is not checked again › A checked tree deploys without a second check: a tree with no mark, an expired one, or one of another tree is checked whole",
+      "tools/ci/checked.test.mjs › A checked tree is not checked again › A checked tree deploys without a second check: a mark of a failed or unfinished run, of another workflow or of a fork is not believed",
+      "tools/ci/checked.test.mjs › A checked tree is not checked again › A checked tree deploys without a second check: a run that wrote new screenshot baselines marks nothing"
     ] }
   ]
 }
