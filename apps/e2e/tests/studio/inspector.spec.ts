@@ -14,9 +14,10 @@ import { HUB_PORT } from '../../playwright.config'
 // model, and what sensors measured from .state/measurements.json, which
 // `radical sense` keeps there. It is a place of the activity rail, as the
 // Views section is: its button (above Settings) lists its tabs in the left
-// panel (Overview: the scores and what needs attention; Model;
+// panel (Overview: the scores, then what is to fix; Model;
 // Implementation: what the tests say; Measurements: what the sensors
-// measured; This branch) and shows the tab picked
+// measured; Debt: what the check finds that does not fail it; This branch)
+// and shows the tab picked
 // in place of the view, under a bar that says how old the evidence is and
 // gives the verdict. Settings → Inspector settings… edits the folder's
 // check.json.
@@ -34,6 +35,20 @@ async function openInspectorSettings(page: Page) {
   const dialog = page.getByRole('dialog', { name: 'Inspector settings' })
   await expect(dialog).toBeVisible()
   return dialog
+}
+
+/** The finding of an unaddressed concern whose sentence starts with `text`:
+ *  in Debt, in the group of its rule, opened to all its findings. */
+async function concernFinding(page: Page, text: string) {
+  await tab(page, /^Debt/).click()
+  const concerns = report(page).locator('details.insp-group[data-rule="concern-unaddressed"]')
+  await expect(concerns).toBeVisible({ timeout: 10_000 })
+  if ((await concerns.getAttribute('open')) === null) await concerns.locator('summary').click()
+  const more = concerns.getByRole('button', { name: /^Show \d+ more$/ })
+  if (await more.count()) await more.click()
+  const finding = concerns.getByTestId('concern-finding').filter({ hasText: text })
+  await expect(finding).toBeVisible({ timeout: 10_000 })
+  return finding
 }
 
 const node = (id: string, type: string, label: string, props: Record<string, unknown> = {}): C4Node =>
@@ -95,20 +110,27 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   await expect(inspector.locator('.lp-rail-count')).toHaveText('1')
 
   await inspector.click()
-  await expect(page.locator('.insp-topbar .insp-verdict')).toHaveText(/✖ 1 errors/)
+  await expect(page.locator('.insp-topbar .insp-verdict')).toHaveText('✖ 1 to fix')
   // In place of the view: it covers the view, which stays mounted under it.
   await expect(report(page)).toBeVisible()
   await expect.poll(() => viewCovered(page)).toBe(true)
-  // It opens on Overview. A failed test is about the implementation, not the model.
+  // It opens on Overview, with the failed test to fix: the test by its
+  // title, its file apart. Model and Implementation list no findings: each
+  // finding is in one place.
   await expect(tab(page, /^Overview/)).toHaveAttribute('aria-selected', 'true')
+  const toFix = page.getByRole('region', { name: 'To fix' })
+  const error = toFix.locator('.insp-finding')
+  await expect(toFix.locator('.insp-group-name')).toHaveText('Test failed')
+  await expect(error.locator('.insp-test b')).toHaveText('pays by card')
+  await expect(error.locator('.insp-test code')).toHaveText('tests/pay.test.ts')
   await tab(page, /^Model/).click()
-  await expect(page.locator('.insp-error')).toHaveCount(0)
+  await expect(page.locator('.insp-finding')).toHaveCount(0)
   await expect(page.locator('.insp-tile[data-dimension="traceability"]')).toContainText('100%')
   await tab(page, /^Implementation/).click()
-  const error = page.locator('.insp-error')
-  await expect(error).toContainText('test tests/pay.test.ts › pays by card failed.')
+  await expect(page.locator('.insp-finding')).toHaveCount(0)
   await expect(page.locator('.insp-tile').first()).toContainText('0% · 0 / 1')
   await expect(page.locator('.insp-tile').first()).toContainText('1 broken')
+  await tab(page, /^Overview/).click()
 
   // What the failure leaves unverified is a link: the element on the view
   // that shows it, in the perspective open, selected with its card.
@@ -127,7 +149,7 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   // One Back leads back to the Inspector: the move is one step.
   await page.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(report(page)).toBeVisible()
-  await expect(tab(page, /^Implementation/)).toHaveAttribute('aria-selected', 'true')
+  await expect(tab(page, /^Overview/)).toHaveAttribute('aria-selected', 'true')
   // Back to the view to go on (a section's tab).
   await page.locator('.activity-rail').getByRole('tab', { name: 'Views' }).click()
   await expect(report(page)).toHaveCount(0)
@@ -137,22 +159,28 @@ test('the Inspector shows what radical check says, and its links lead to the ele
   await expect(inspector).toHaveClass(/\bok\b/, { timeout: 10_000 })
   await expect(inspector.locator('.lp-rail-count')).toHaveText('0')
   await inspector.click()
-  await expect(page.locator('.insp-verdict')).toHaveText(/No errors/)
+  await expect(page.locator('.insp-verdict')).toHaveText('✓ Nothing to fix')
+  await expect(page.getByRole('region', { name: 'To fix' })).toContainText('Nothing to fix. The check passes')
   await tab(page, /^Implementation/).click()
   await expect(page.locator('.insp-tile').first()).toContainText('100% · 1 / 1')
   await expect(page.locator('.insp-tile').first()).toContainText('0 broken')
 })
 
-test('the Inspector opens on Overview with what needs attention, and each finding leads to its element or fixes it', async ({ page, studio }) => {
+test('the Inspector opens on what is to fix, keeps what does not fail the check in Debt, and each finding leads to its element or fixes it', async ({ page, studio }) => {
   const folder = new ModelFolder(page)
   await folder.install()
   await page.goto('/')
-  // The branch added a requirement no scenario verifies and an accepted
-  // decision no fitness function implements; the scenario's test failed.
-  const model: DiagramData = {
+  // The model had an accepted decision no fitness function implements. The
+  // branch added a requirement no scenario verifies and another such
+  // decision; the scenario's test failed.
+  const before: DiagramData = {
     ...MODEL,
+    nodes: [...MODEL.nodes, node('old', 'adr', 'One currency', { x: 40, y: 560, status: 'accepted', date: '2026-10-01', context: 'c', decision: 'd', consequences: 'q' })],
+  }
+  const model: DiagramData = {
+    ...before,
     nodes: [
-      ...MODEL.nodes,
+      ...before.nodes,
       node('refund', 'requirement', 'Refund payments', { x: 960, y: 220, ears_type: 'ubiquitous', action: 'refund payments' }),
       node('adr', 'adr', 'Card payments only', { x: 40, y: 400, status: 'accepted', date: '2026-10-29', context: 'c', decision: 'd', consequences: 'q' }),
     ],
@@ -161,46 +189,65 @@ test('the Inspector opens on Overview with what needs attention, and each findin
       { id: 'r4', relationType: 'derives', sourceId: 'refund', targetId: 'need' },
       { id: 'r5', relationType: 'satisfies', sourceId: 'api', targetId: 'refund' },
     ],
-    views: [MODEL.views![0], { id: 'v-spec', name: 'Specification', nodeIds: ['need', 'req', 'sc', 'refund', 'adr'], positions: {} }],
+    views: [MODEL.views![0], { id: 'v-spec', name: 'Specification', nodeIds: ['need', 'req', 'sc', 'refund', 'adr', 'old'], positions: {} }],
   }
   for (const [path, content] of Object.entries(serializeToMdFolder(model, 'Shop'))) await folder.write(path, content)
   await folder.write('.state/test-results.json', results('failed'))
-  await folder.write('.state/base.json', serializeModelBase({ commit: '534f32f0a1b2c3d4e5f60718293a4b5c6d7e8f90', described: 'merge base with origin/main', branch: 'feat/refunds', nodes: MODEL.nodes, relations: MODEL.relations }))
+  await folder.write('.state/base.json', serializeModelBase({ commit: '534f32f0a1b2c3d4e5f60718293a4b5c6d7e8f90', described: 'merge base with origin/main', branch: 'feat/refunds', nodes: before.nodes, relations: MODEL.relations }))
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await page.getByRole('button', { name: 'Folder…' }).click()
   await studio.ready()
   await inspectorButton(page).click({ timeout: 10_000 })
 
-  // Overview first: the scores of the model and of what the tests verify.
+  // Overview first: the scores of the model and of what the tests verify,
+  // and under them To fix.
   await expect(tab(page, /^Overview/)).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab')).toHaveText([/^Overview/, /^Model/, /^Implementation/, /^Measurements/, /^This branch/])
+  await expect(page.getByRole('tablist', { name: 'Inspector' }).getByRole('tab')).toHaveText([/^Overview/, /^Model/, /^Implementation/, /^Measurements/, /^Debt/, /^This branch/])
+  const toFix = page.getByRole('region', { name: 'To fix' })
   const scores = page.getByRole('region', { name: 'Model scores' }).locator('.insp-score')
   await expect(scores).toHaveCount(4)
   await expect(scores.first()).toContainText('Consistency')
+  expect((await toFix.boundingBox())!.y).toBeGreaterThan((await scores.first().boundingBox())!.y)
   const verified = page.getByRole('region', { name: 'Implementation scores' }).locator('.insp-score[data-metric="requirements-verified"]')
   await expect(verified).toContainText('Requirements verified')
   await expect(verified).toContainText('0%')
 
-  // Needs attention: the error first, then the warnings, a group per rule with its count.
-  const attention = page.getByRole('region', { name: 'Needs attention' })
-  const groups = attention.locator('details.insp-group')
-  await expect(groups.first()).toHaveAttribute('data-rule', 'test-failed')
-  await expect(groups.first()).toHaveClass(/error/)
-  await expect(groups.first()).toHaveAttribute('open', '')
-  await expect(groups.first()).toContainText('test tests/pay.test.ts › pays by card failed.')
-  const severities = await groups.evaluateAll((list) => list.map((g) => (g.classList.contains('error') ? 'error' : 'warning')))
-  expect(severities.lastIndexOf('error')).toBeLessThan(severities.indexOf('warning'))
-  const missing = attention.locator('details.insp-group[data-rule="requirement-without-scenario"]')
+  // To fix: the failed test and no warning; one to fix on the rail, on the
+  // Overview card and in the verdict, which names no warnings.
+  const failing = toFix.locator('details.insp-group')
+  await expect(failing).toHaveCount(1)
+  await expect(failing).toHaveAttribute('data-rule', 'test-failed')
+  await expect(failing).toHaveAttribute('open', '')
+  await expect(failing.locator('.insp-test b')).toHaveText('pays by card')
+  await expect(toFix.locator('.insp-sev.warning')).toHaveCount(0)
+  await expect(toFix.locator('[data-rule="requirement-without-scenario"], [data-rule="adr-without-fitness-fn"]')).toHaveCount(0)
+  await expect(inspectorButton(page).locator('.lp-rail-count')).toHaveText('1')
+  await expect(tab(page, /^Overview/)).toContainText('1 to fix')
+  await expect(page.locator('.insp-verdict')).toHaveText('✖ 1 to fix')
+  // What does not fail the check is one line here (the model's unaddressed
+  // concerns are among it).
+  await expect(toFix.locator('.insp-debt-line')).toHaveText(/^\d+ more findings do not fail the check: see Debt$/)
+
+  // The "Debt" tab holds them: a group per rule with its count.
+  await toFix.getByRole('button', { name: 'see Debt' }).click()
+  await expect(tab(page, /^Debt/)).toHaveAttribute('aria-selected', 'true')
+  await expect(tab(page, /^Debt/).locator('.insp-pill')).toHaveText(/^\d+$/)
+  const debt = report(page)
+  await expect(debt.locator('details.insp-group[data-rule="test-failed"]')).toHaveCount(0)
+  const missing = debt.locator('details.insp-group[data-rule="requirement-without-scenario"]')
   await expect(missing.locator('summary')).toContainText('Requirement without scenario')
   await expect(missing.locator('summary')).toContainText('Every requirement is verified by at least one scenario.')
   await expect(missing.locator('summary .insp-rcount')).toHaveText('1')
-  const undecided = attention.locator('details.insp-group[data-rule="adr-without-fitness-fn"]')
-  await expect(undecided.locator('summary .insp-rcount')).toHaveText('1')
-  // Warnings wait closed; a click opens the group to its elements. Viewer
-  // changes nothing: the fix is made in Designer, and says so.
+  const undecided = debt.locator('details.insp-group[data-rule="adr-without-fitness-fn"]')
+  await expect(undecided.locator('summary .insp-rcount')).toHaveText('2')
+  // They wait closed; a click opens the group to its elements, the one of
+  // the branch marked. Viewer changes nothing: the fix is made in Designer,
+  // and says so.
   await expect(undecided).not.toHaveAttribute('open')
   await undecided.locator('summary').click()
-  await expect(undecided.getByRole('button', { name: 'Add fitness function in Designer' })).toBeVisible()
+  await expect(undecided.locator('.insp-finding')).toHaveCount(2)
+  await expect(undecided.locator('.insp-finding[data-branch]')).toContainText('Card payments only')
+  await expect(undecided.getByRole('button', { name: 'Add fitness function in Designer' })).toHaveCount(2)
   // Open shows the element on a view that has it, with its card.
   await undecided.getByRole('button', { name: 'Open Card payments only' }).click()
   const card = page.getByRole('complementary', { name: 'Properties' })
@@ -212,6 +259,7 @@ test('the Inspector opens on Overview with what needs attention, and each findin
   // Inspector still open, and the scenario's wizard offers the requirement
   // as what it verifies.
   await inspectorButton(page).click()
+  await expect(tab(page, /^Debt/)).toHaveAttribute('aria-selected', 'true')
   await missing.locator('summary').click()
   await missing.getByRole('button', { name: 'Add scenario in Designer' }).click()
   const wizard = page.getByRole('dialog', { name: 'New Scenario — wizard' })
@@ -228,23 +276,24 @@ test('the Inspector opens on Overview with what needs attention, and each findin
   await inspectorButton(page).click()
   await expect(missing).toHaveCount(0, { timeout: 10_000 })
   await undecided.locator('summary').click()
-  await expect(undecided.getByRole('button', { name: 'Add fitness function', exact: true })).toBeVisible()
+  await expect(undecided.getByRole('button', { name: 'Add fitness function', exact: true })).toHaveCount(2)
+
+  // This branch: only what the branch changed, so not the decision of before.
+  const onBranch = debt.getByRole('button', { name: 'This branch' })
+  await expect(onBranch).toBeEnabled()
+  await onBranch.click()
+  await expect(undecided.locator('.insp-finding')).toHaveCount(1)
+  await expect(undecided.locator('.insp-finding')).toContainText('Card payments only')
+  await debt.getByRole('button', { name: 'All', exact: true }).click()
+  await expect(undecided.locator('.insp-finding')).toHaveCount(2)
+
   // It verifies the requirement: This branch lists it as the requirement's scenario.
   await tab(page, /^This branch/).click()
   await expect(page.locator('.insp-branch-row', { hasText: 'Refund payments' }).first()).toContainText('Refunding a payment')
-  // The verdict leads back to what needs attention.
+  // The verdict leads back to what is to fix.
   await page.locator('.insp-verdict').click()
   await expect(tab(page, /^Overview/)).toHaveAttribute('aria-selected', 'true')
-  await expect(attention.getByRole('heading', { name: 'Needs attention' })).toBeFocused()
-
-  // This branch: only what the branch changed, so not the failed test.
-  const onBranch = attention.getByRole('button', { name: 'This branch' })
-  await expect(onBranch).toBeEnabled()
-  await onBranch.click()
-  await expect(attention.locator('details.insp-group[data-rule="test-failed"]')).toHaveCount(0)
-  await expect(undecided).toBeVisible()
-  await attention.getByRole('button', { name: 'All', exact: true }).click()
-  await expect(attention.locator('details.insp-group[data-rule="test-failed"]')).toBeVisible()
+  await expect(toFix.getByRole('heading', { name: /^To fix/ })).toBeFocused()
 
   // Made as Designer makes it: saved to the folder, and one Undo takes it
   // back (the scenario, its link and its place in the view).
@@ -329,14 +378,12 @@ test('the Overview tells an ADR without a fitness function from one whose fitnes
   await expect(decisions).toContainText('0 of 5')
   await expect(decisions.locator('[data-why]')).toHaveText(['1 no fitness function', '1 no check', '2 not run (1 measured nightly)', '1 failing'])
 
-  // Not run: both fitness functions nothing measured, with when they run;
-  // the nightly one is expected not to have run here.
-  const attention = page.getByRole('region', { name: 'Needs attention' })
-  const notRun = attention.locator('details.insp-group[data-rule="not-run"]')
-  await expect(notRun.locator('summary')).toContainText('Not run')
-  await expect(notRun.locator('summary')).toContainText('Scenarios and fitness functions whose checks nothing ran in the results and measurements here.')
-  await expect(notRun.locator('summary .insp-rcount')).toHaveText('2')
-  await notRun.locator('summary').click()
+  // Not run, in Debt: both fitness functions nothing measured, with when
+  // they run; the nightly one is expected not to have run here.
+  await tab(page, /^Debt/).click()
+  const notRun = page.getByRole('region', { name: 'Not run' })
+  await expect(notRun.getByRole('heading')).toHaveText(/^Not run\s*2$/)
+  await expect(notRun).toContainText('Scenarios and fitness functions whose checks nothing ran in the results and measurements here.')
   const pr = notRun.locator('.insp-finding[data-trigger="pull-request"]')
   await expect(pr).toContainText('Workspaces build')
   await expect(pr).toContainText('nothing measured workspaces.exit_code == 0')
@@ -345,8 +392,8 @@ test('the Overview tells an ADR without a fitness function from one whose fitnes
   await expect(nightly).toContainText('Open time')
   await expect(nightly).toHaveClass(/expected/)
   await expect(nightly).toContainText('measured nightly — expected here')
-  // After the rule groups.
-  await expect(attention.locator('details.insp-group').last()).toHaveAttribute('data-rule', 'not-run')
+  // After the rules' parts.
+  await expect(page.locator('.insp-debt-part').last()).toHaveAttribute('aria-label', 'Not run')
   await nightly.getByRole('button', { name: 'Open Open time' }).click()
   await expect(page.getByRole('complementary', { name: 'Properties' }).locator('.pp-title')).toHaveText('Open time')
 
@@ -393,20 +440,38 @@ test('the Inspector shows each condition with its measurement', async ({ page, s
   const inspector = inspectorButton(page)
   await expect(inspector).toBeEnabled({ timeout: 10_000 })
   await inspector.click()
+  // To fix: the condition as written, and apart from it what was measured,
+  // by which sensor and how long ago.
+  const off = page.getByRole('region', { name: 'To fix' }).locator('.insp-finding')
+  await expect(off.locator('.insp-cond code')).toHaveText('checkout.latency.p95{env=staging} <= 300 ms')
+  await expect(off.locator('.insp-measured')).toHaveText('Measured 0.42 s · json · 2 h ago')
+  await expect(off.locator('.insp-measured b')).toHaveText('0.42 s')
+  // Debt: the condition nothing measured, saying so.
+  await tab(page, /^Debt/).click()
+  const unmeasured = report(page).locator('details.insp-group[data-rule="metric-not-measured"]')
+  await unmeasured.locator('summary').click()
+  await expect(unmeasured.locator('.insp-cond code')).toHaveText('checkout.errors.rate{env=staging} < 1 %')
+  await expect(unmeasured.locator('.insp-measured')).toHaveText('nothing measured it')
   await tab(page, /^Implementation/).click()
-  await expect(page.locator('.insp-error')).toContainText('checkout.latency.p95{env=staging} <= 300 ms does not hold (0.42 s from json, 2 h ago).')
   const item = page.locator('.insp-attn-item').filter({ hasText: 'Checkout latency' })
   await expect(item).toContainText('a value is off its threshold, nothing measured a value')
   await item.getByRole('button', { name: /Checkout latency/ }).click()
 
-  const checks = page.getByRole('complementary', { name: 'Properties' }).getByRole('list', { name: 'Checks' })
+  // The card: each condition once. Those a finding is about show with
+  // the finding (what is wrong first: the one off its limit, with what was
+  // measured, then the one nothing measured), not again among the checks.
+  const verification = page.getByRole('complementary', { name: 'Properties' }).getByRole('region', { name: 'Verification' })
+  const found = verification.getByRole('group', { name: 'Findings' }).locator('.pp-ver-finding[data-rule^="metric-"]')
+  await expect(found).toHaveCount(2)
+  await expect(found.nth(0).locator('.pp-ver-verdict')).toHaveText(/Metric failed$/)
+  await expect(found.nth(0).locator('.pp-ver-condition')).toHaveText('checkout.latency.p95{env=staging} <= 300 ms')
+  await expect(found.nth(0).locator('.pp-ver-note')).toHaveText('Measured 0.42 s · json · 2 h ago')
+  await expect(found.nth(1).locator('.pp-ver-verdict')).toHaveText(/Metric not measured$/)
+  await expect(found.nth(1).locator('.pp-ver-condition')).toHaveText('checkout.errors.rate{env=staging} < 1 %')
+  await expect(found.nth(1).locator('.pp-ver-note')).toHaveText('Nothing measured it.')
+  const checks = verification.getByRole('list', { name: 'Checks' })
   const lines = checks.locator('.pp-ver-cond')
-  await expect(lines).toHaveCount(2)
-  await expect(lines.nth(0)).toContainText('checkout.latency.p95{env=staging} <= 300 ms')
-  await expect(lines.nth(0)).toContainText('failed')
-  await expect(lines.nth(0).locator('.pp-ver-measured')).toHaveText('0.42 s · json · 2 h ago')
-  await expect(lines.nth(1)).toContainText('checkout.errors.rate{env=staging} < 1 %')
-  await expect(lines.nth(1)).toContainText('not measured')
+  await expect(lines).toHaveCount(0)
 
   // Measured again, both within their thresholds: the decision is verified.
   const now = new Date().toISOString()
@@ -414,11 +479,17 @@ test('the Inspector shows each condition with its measurement', async ({ page, s
     { metric: 'checkout.errors.rate', value: 0.2, unit: '%', labels: { env: 'staging' }, source: 'json', at: now },
     { metric: 'checkout.latency.p95', value: 210, unit: 'ms', labels: { env: 'staging' }, source: 'json', at: now },
   ]))
-  await expect(lines.nth(0).locator('.pp-ver-measured')).toHaveText('210 ms · json · 0 min ago', { timeout: 10_000 })
+  // No finding is left: both conditions are among the checks, with what was measured.
+  await expect(lines).toHaveCount(2, { timeout: 10_000 })
+  await expect(found).toHaveCount(0)
+  await expect(lines.nth(0)).toContainText('checkout.latency.p95{env=staging} <= 300 ms')
+  await expect(lines.nth(0).locator('.pp-ver-measured')).toHaveText('210 ms · json · 0 min ago')
+  await expect(lines.nth(1)).toContainText('checkout.errors.rate{env=staging} < 1 %')
   await expect(lines.nth(1)).not.toContainText('not measured')
   await inspector.click()
   await expect(tab(page, /^Implementation/)).toHaveAttribute('aria-selected', 'true')
-  await expect(page.locator('.insp-error')).toHaveCount(0)
+  await tab(page, /^Overview/).click()
+  await expect(page.getByRole('region', { name: 'To fix' })).toContainText('Nothing to fix')
 })
 
 test('a deep link opens the Inspector at once, and only with all it reads', async ({ page, studio }) => {
@@ -446,9 +517,9 @@ test('a deep link opens the Inspector at once, and only with all it reads', asyn
     }).observe(document, { childList: true, subtree: true, characterData: true })
   })
   await page.reload()
-  await expect(page.locator('.insp-verdict')).toHaveText(/✖ 1 errors/, { timeout: 15_000 })
+  await expect(page.locator('.insp-verdict')).toHaveText('✖ 1 to fix', { timeout: 15_000 })
   await expect(tab(page, /^Overview/)).toHaveAttribute('aria-selected', 'true')
-  await expect(tab(page, /^Implementation/)).toContainText('✗ 1')
+  await expect(tab(page, /^Overview/)).toContainText('1 to fix')
   expect(await page.evaluate(() => [...(window as unknown as { __seen: Set<string> }).__seen])).toEqual([])
 })
 
@@ -643,17 +714,11 @@ test('the Inspector asks the questions of an unaddressed concern and the import 
   await page.getByRole('button', { name: 'Folder…' }).click()
   await studio.ready()
   await inspectorButton(page).click({ timeout: 10_000 })
-  await tab(page, /^Model/).click()
-
-  const decisions = page.locator('details.insp-dim[data-dimension="decisions"]')
-  await expect(decisions).toBeVisible({ timeout: 10_000 })
-  if ((await decisions.getAttribute('open')) === null) await decisions.locator('summary').click()
+  // A concern nobody decided is a warning: in Debt, under its rule.
+  const finding = await concernFinding(page, 'Authentication:')
   // Several packs apply to a web app people use; authentication is one.
-  const item = page.locator('.insp-item', { has: page.getByTestId('concern-finding') }).filter({ hasText: 'Authentication:' })
-  await expect(item).toBeVisible({ timeout: 10_000 })
-  const finding = item.getByTestId('concern-finding')
-  await expect(item).toContainText('Authentication: people or external systems reach these elements')
-  await expect(item).toContainText('Storefront')
+  await expect(finding).toContainText('Authentication: people or external systems reach these elements')
+  await expect(finding).toContainText('Storefront')
   await expect(finding).toContainText('How do people sign in?')
 
   await finding.getByRole('button', { name: 'Answer the questions…' }).click()
@@ -676,7 +741,7 @@ test('the Inspector asks the questions of an unaddressed concern and the import 
   // in the Inspector, the concern settled.
   await expect(page.locator('.toolbar-mode-btn.active')).toHaveText(/Designer/)
   await expect(report(page)).toBeVisible()
-  await expect(page.locator('.insp-item').filter({ hasText: 'Authentication:' })).toHaveCount(0, { timeout: 10_000 })
+  await expect(page.getByTestId('concern-finding').filter({ hasText: 'Authentication:' })).toHaveCount(0, { timeout: 10_000 })
   await expect(page.getByTestId('concern-finding').first()).toBeVisible()
 
   // Made as Designer makes it: the pack's elements and its view are saved to
@@ -730,11 +795,7 @@ test('a concern answered in the Inspector goes into its own view, not into the v
   await expect(page).toHaveURL(/\/v\/v-pay/)
   await expect(page.locator('.react-flow__node')).toHaveCount(1)
   await inspectorButton(page).click({ timeout: 10_000 })
-  await tab(page, /^Model/).click()
-  const decisions = page.locator('details.insp-dim[data-dimension="decisions"]')
-  await expect(decisions).toBeVisible({ timeout: 10_000 })
-  if ((await decisions.getAttribute('open')) === null) await decisions.locator('summary').click()
-  const finding = page.locator('.insp-item', { has: page.getByTestId('concern-finding') }).filter({ hasText: 'Authentication:' }).getByTestId('concern-finding')
+  const finding = await concernFinding(page, 'Authentication:')
   await finding.getByRole('button', { name: 'Answer the questions…' }).click()
   await page.getByTestId('concern-wizard').getByRole('button', { name: 'Add to model' }).click()
   await expect(page.getByTestId('concern-wizard')).toHaveCount(0)

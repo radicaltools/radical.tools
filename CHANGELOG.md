@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The Inspector says what you have to fix, apart from the rest. Under the Overview's scores, **To fix** lists only what fails the check, and no warnings. What the check finds that does not fail it has a tab of its own, **Debt** (within baselines, warnings, read from old test results, not run). Each finding is in one place: Model and Implementation list none, and a link of the traceability chain or a goal not met opens the findings of its rule where they are.
+- The Inspector counts what has to be settled for the check to pass, on its rail button, in its head and in its verdict, which names no warnings. A rule one finding over its baseline is one to fix, with the findings about what the branch changed first and the others folded (any of them settles it too); `radical check` still reports every finding of such a rule as an error, and the tooltips give that count. A goal not met says how many more elements reach it. Findings of one cause are one row and count as one: a test several scenarios name, or a metric condition several elements state of the same measurement, with every element that names it and all it leaves unverified.
+- A finding says what is wrong first. In the Inspector and on an element's card a finding about a test shows the test by its title, with its file and describes apart, why it failed as the runner wrote it and what it leaves unverified, in place of one sentence that ended in the verdict; a test that did not run, was skipped or is not found says what that means. With the finding of a scenario's test the Inspector shows what the scenario expects (its given, when and then), and a finding about a metric condition shows the condition and, apart from it, what was measured, by which sensor and how long ago. `radical check` words a test that did not run as "test … did not run: no report has its file".
+- Rules and findings mark what matters. A rule's description shows what the rule asks in bold and the names of properties and files as code, in the Inspector, in its settings and wherever a rule is named; a finding's sentence shows the words and values it quotes in bold. `radical check --list-rules` prints the descriptions without the marks.
+- The properties card folds Verification, Tests and Views to their heads, which say what each holds (the status and the findings, how many tests failed, did not run or passed, how many views show the element). A click, Enter or Space opens one, and it stays as left for every element and across reloads. Open, Verification shows its parts apart, each under its own head: the findings first, then the checks, then what checks the element; a condition a finding is about shows with that finding only.
+- The activity rail's icons are larger (20 px in a 32 px square, the rail 54 px wide): at 16 px they read small beside the rail's own menus and the toolbar.
+- The card shows **Built in** only for what code builds: software that is not external, or an element of a type the model's metamodel adds. A requirement, a need, an ADR, a person or an external system no longer gets the `radical implement` command.
+
+### Fixed
+- `radical check --report` on some test files no longer drops the results of the others. The reports replace the results of the test files they have; those kept beside the model for the other files stay, the check judges by both and says how many it kept and since when, and the Inspector's Tests chip says so too. A local run of one test turned every other test of the model into one that did not run, and the implementation's metrics fell to nothing. Results of CI (`--from-ci`) still replace them whole; CI itself starts with none kept.
+- The files `radical check` keeps beside the model are written whole (to a file beside, then renamed), so Studio never reads one half written.
+- Doubled equals signs in a Markdown field are text. `a == 0; b == 0` was read as a highlight: the words between the signs got a yellow background and the signs were gone.
+
 ## [0.6.0] - 2026-11-24
 
 ### Added

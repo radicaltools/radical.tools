@@ -69,6 +69,9 @@ export function FreshnessChips({ results, measurements, folder, changedAt, waiti
           <p><b>{ci ? `Test results of CI, run ${when(readAt)}` : `Test results read ${when(readAt)}`}</b>, {plural(results!.cases.length, 'test case')}.</p>
           {isOutdated(readAt, now, changedAt) && <p className="insp-age-why">{why}</p>}
           <p>{testsSource(results!)}.</p>
+          {results!.kept && (
+            <p data-testid="tests-kept">Of these, {plural(results!.kept.cases, 'test case')} in {plural(results!.kept.files, 'file')} {results!.kept.cases === 1 ? 'is' : 'are'} kept from what was read since {when(Date.parse(results!.kept.since))}: the reports read last do not have {results!.kept.files === 1 ? 'that file' : 'those files'}.</p>
+          )}
           {ci ? (
             <p className="insp-muted">{ci.runs.map((r, i) => <React.Fragment key={r.id}>{i ? ', ' : ''}<a href={r.url} target="_blank" rel="noreferrer">{r.workflow} run {r.id}</a> ({r.artifacts.join(', ')})</React.Fragment>)}.</p>
           ) : (

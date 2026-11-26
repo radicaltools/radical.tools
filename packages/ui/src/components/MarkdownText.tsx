@@ -1,5 +1,5 @@
 import React from 'react'
-import Markdown, { type MarkdownToJSX } from 'markdown-to-jsx/react'
+import Markdown, { RuleType, type MarkdownToJSX } from 'markdown-to-jsx/react'
 import { isRemoteUrl, keepLineBreaks } from '@radical/common/markdown'
 
 // ─── Markdown text ───────────────────────────────────────────────────────────
@@ -9,6 +9,9 @@ import { isRemoteUrl, keepLineBreaks } from '@radical/common/markdown'
 // browser from Studio), but for one into the app itself (#/…), and does not
 // reach what is around it: a click on a link in the wiki opens the link, not
 // the text's editor. An image on another site is a link, never fetched.
+// Doubled equals signs are text: the library reads ==words== as a
+// highlight, which this Markdown does not have, and the conditions of a
+// line (`a == 0; b == 0`) lost their signs to a yellow background.
 //
 // `inline` renders one line (a summary) in a span; otherwise the text is
 // blocks (paragraphs, lists, …) in a div.
@@ -50,7 +53,16 @@ const HEADINGS = Object.fromEntries(
   ]),
 )
 
+/** `==words==` as it was written: no highlight, the signs kept. */
+const renderRule: NonNullable<MarkdownToJSX.Options['renderRule']> = (next, node, renderChildren, state) => {
+  if (node.type === RuleType.textFormatted && node.tag === 'mark') {
+    return <React.Fragment key={state.key}>=={renderChildren(node.children, state)}==</React.Fragment>
+  }
+  return next()
+}
+
 const BASE: MarkdownToJSX.Options = {
+  renderRule,
   disableParsingRawHTML: true,
   disableFrontmatter: true,
   forceWrapper: true,

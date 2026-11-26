@@ -8,30 +8,11 @@
 
 import type { CheckFinding, CheckResult, CheckSeverity, EvidenceEntry, Measurement, TestResults } from '@radical/common/check'
 import type { C4Node, C4Relation } from '@radical/common/c4'
-import { formatAge } from '@radical/common/check'
+import { formatAge, ruleName } from '@radical/common/check'
 
-/** Words a rule id spells short. */
-const WORDS: Record<string, string> = { adr: 'ADR', adrs: 'ADRs', fn: 'function', json: 'JSON', sm: 'state machine' }
-/** Rules whose id reads badly as words. */
-const NAMES: Record<string, string> = {
-  metamodel: 'Breaks the metamodel',
-  'goal-unmet': 'Goal not met',
-  'test-unbound': 'Test the model does not name',
-  'folder-not-a-node': 'Node file without id or type',
-  'folder-json': 'JSON file that does not parse',
-  'folder-manifest': 'Folder without its manifest',
-  'folder-conflict': 'Git conflict markers',
-  'folder-duplicate-id': 'Two files with one id',
-}
-
-/** "requirement-without-scenario" → "Requirement without scenario";
- *  `rule/code` keys name their code after the rule. */
-export function ruleName(key: string): string {
-  const [rule, code] = key.split('/')
-  const named = NAMES[rule] ?? rule.split('-').map((w) => WORDS[w] ?? w).join(' ')
-  const name = named.charAt(0).toUpperCase() + named.slice(1)
-  return code ? `${name}: ${code}` : name
-}
+/** A rule's name as a person reads it (the check's own: the card of an
+ *  element names its findings the same way). */
+export { ruleName }
 
 export interface AttentionGroup {
   severity: CheckSeverity

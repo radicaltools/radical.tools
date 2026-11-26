@@ -27,7 +27,7 @@ export { CHECK_RULES, hardValues, needAnswers, needParts, quoteFragments, quoteS
 export { splitTestId } from './testSource'
 export { MESSAGE_LINES, canonicalTestId, failureMessage, parseTestReport, parseTestIds, rebindTests, testIdParts, type TestCase, type TestId, type TestStatus } from './reports'
 export { TRACE_TYPES, formatTrace, rankOf, traceGap, traceOf, traceTypeLabel, type Trace, type TraceInput, type TraceNode, type TraceResult } from './trace'
-export { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, testsRanAt, type CiRun, type CiSource, type TestResults } from './files'
+export { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, TEST_RESULTS_FILE, parseCheckConfig, parseTestResults, serializeTestResults, testsRanAt, withEarlierResults, type CiRun, type CiSource, type KeptCases, type TestResults } from './files'
 export { BOUND_TESTS, ELEMENT_LABEL, TESTED_TYPES, appliedElements, computeEvidence, conditionResults, conditionsOf, measuredElements, withBoundTests, type Evidence, type EvidenceEntry, type CheckedStatus, type VerifiedStatus, type TestOutcome, type ConditionOutcome, type ConditionResult } from './evidence'
 export { MACHINE_SPEED_METRIC, MACHINE_WORK_METRIC, METRICS_FORMAT, REVIEW_METRIC, convertUnit, machineSpeedAt, scaledLimit, evaluateMetric, fitnessResult, formatAge, mergeMeasurements, metricsFileProblems, parseCombine, parseCondition, parseConditions, parseMaxAge, parseMeasurementStore, parseMetricsFile, serializeMeasurementStore, serializeMetricsFile, type Combine, type Condition, type Measurement, type MeasurementStore, type MetricsFile } from './metrics'
 export { REVIEWS_FILE, REVIEWS_FORMAT, addReview, parseReviewsFile, reviewMeasurements, type Review, type ReviewsFile } from './reviews'
@@ -36,12 +36,12 @@ export { CHECK_DIMENSIONS, CHECK_METRICS, GOAL_RULE, type CheckDimension, type C
 
 /** Rules about the folder's files and its views, sequences and slides. */
 export const FOLDER_RULES: ReadonlyArray<{ id: string; description: string; severity: CheckSeverity; dimension: CheckDimension }> = [
-  { id: 'folder-manifest', description: 'The folder has a radical.md manifest of the Markdown-folder format, version 1.', severity: 'error', dimension: 'consistency' },
-  { id: 'folder-json', description: 'Every JSON sidecar (relations.json, views.json, …) parses.', severity: 'error', dimension: 'consistency' },
-  { id: 'folder-conflict', description: 'No node file holds git conflict markers.', severity: 'error', dimension: 'consistency' },
-  { id: 'folder-not-a-node', description: 'A node file with frontmatter has an id and a type (one without them is skipped on loading, and its element is gone).', severity: 'error', dimension: 'consistency' },
-  { id: 'folder-duplicate-id', description: 'No two node files hold the same id.', severity: 'error', dimension: 'consistency' },
-  { id: 'stale-reference', description: 'Views, sequences and slides point only at elements, relations and views the model has.', severity: 'warning', dimension: 'consistency' },
+  { id: 'folder-manifest', description: '**The folder has a radical.md manifest** of the Markdown-folder format, version 1.', severity: 'error', dimension: 'consistency' },
+  { id: 'folder-json', description: '**Every JSON sidecar** (relations.json, views.json, …) **parses**.', severity: 'error', dimension: 'consistency' },
+  { id: 'folder-conflict', description: '**No node file holds git conflict markers**.', severity: 'error', dimension: 'consistency' },
+  { id: 'folder-not-a-node', description: '**A node file with frontmatter has an id and a type** (one without them is skipped on loading, and its element is gone).', severity: 'error', dimension: 'consistency' },
+  { id: 'folder-duplicate-id', description: '**No two node files hold the same id**.', severity: 'error', dimension: 'consistency' },
+  { id: 'stale-reference', description: '**Views, sequences and slides point only at elements, relations and views the model has**.', severity: 'warning', dimension: 'consistency' },
 ]
 
 /** Rules whose findings stop the check: nothing else can be read. */
@@ -503,6 +503,7 @@ export function ratchetConfig(config: CheckConfig, result: CheckResult): { confi
 }
 
 export { formatCheckText, formatCheckGithub, type FormatOptions } from './format'
+export { messageParts, plainRuleText, ruleName, testFindingNote, testIdentity } from './findingWords'
 export { ADOPT_RULE, adoptBaselines, type AdoptedBaselines } from './profiles'
 
 /** The strict profile: every rule an error, every goal at 100%. */

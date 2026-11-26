@@ -15,6 +15,7 @@ import {
 import { saveCheckConfig, serializeCheckConfig, setSettingsDraft, settingsOf, useInspectorStore, useSettingsDraft } from '../../persistence/inspector'
 import { DIMENSIONS, RULE_INFO, dimensionOfKey, metricOf } from './shared'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
+import { RuleText } from '@radical/ui/components/FindingText'
 import { lineDiff, patchRule, setGoal, type RulePatch } from './settingsDraft'
 
 // The rules only radical check counts, on the folder's files; Studio checks
@@ -133,7 +134,7 @@ export function SettingsTab({ check, editable, readOnlyReason }: { check: CheckR
         <div className={`insp-set-row rule${change ? (change.loosens ? ' loose' : ' changed') : ''}`} data-rule={key}>
           <span>
             <code className="insp-rid">{key}</code>{change && <span className={`insp-pill ${change.loosens ? 'warn' : 'new'}`}>changed</span>}
-            <span className="insp-rdesc">{RULE_INFO.get(base) ?? ''}</span>
+            <RuleText className="insp-rdesc" text={RULE_INFO.get(base) ?? ''} />
             {base === 'test-unbound' && (
               <span className="insp-globs-wrap">
                 <GlobList label="Include" globs={setting.include ?? []} disabled={disabled} onChange={(include) => rule(key, { include })} />

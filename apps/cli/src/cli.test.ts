@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
@@ -224,6 +224,54 @@ describe('radical check', () => {
     expect(dir.out).toContain('Test reports: 2 test cases')
   })
 
+  it('keeps what the results beside the model say of the test files a run does not have', async () => {
+    const cwd = await workspace({
+      nodes: [
+        node('pay', 'requirement', 'Pay', { action: 'take the payment' }),
+        node('ship', 'requirement', 'Ship', { action: 'ship the order' }),
+        node('s-pay', 'scenario', 'Paying', { given: 'g', when: 'w', then: 't', metrics: 'test(src/pay.test.ts › pays) passed' }),
+        node('s-ship', 'scenario', 'Shipping', { given: 'g', when: 'w', then: 't', metrics: 'test(src/ship.test.ts › ships) passed' }),
+      ],
+      relations: [{ id: 'v1', relationType: 'verifies', sourceId: 's-pay', targetId: 'pay' }, { id: 'v2', relationType: 'verifies', sourceId: 's-ship', targetId: 'ship' }],
+    })
+    const file = (name: string, title: string, status: string) => ({ name: `${cwd}/src/${name}`, assertionResults: [{ ancestorTitles: [], title, status }] })
+    await writeFile(join(cwd, 'all.json'), JSON.stringify({ testResults: [file('pay.test.ts', 'pays', 'passed'), file('ship.test.ts', 'ships', 'passed')] }))
+    await writeFile(join(cwd, 'pay.json'), JSON.stringify({ testResults: [file('pay.test.ts', 'pays', 'failed')] }))
+    const kept = async () => JSON.parse(await readFile(join(cwd, 'model/.state/test-results.json'), 'utf8'))
+
+    // The whole run: both files, nothing kept from before.
+    const whole = await run(cwd, 'check', 'model', '--report', 'all.json')
+    expect(whole.code).toBe(0)
+    expect(whole.err).not.toContain('Kept the results')
+    expect((await kept()).kept).toBeUndefined()
+    const since = (await kept()).readAt as string
+
+    // A run of one file: its test failed, and the other file's test keeps
+    // the outcome it had, so it is no test that did not run.
+    const one = await run(cwd, 'check', 'model', '--report', 'pay.json')
+    expect(one.code).toBe(1)
+    expect(one.out).toContain('Scenario "Paying": test src/pay.test.ts › pays failed.')
+    expect(one.out).not.toContain('did not run')
+    expect(one.out).toContain('  Requirements: 1 verified, 1 broken')
+    expect(one.err).toContain(`Kept the results of 1 test in 1 file the reports here do not have, read since ${since.slice(0, 10)}.`)
+    const merged = await kept()
+    expect(merged.reports).toEqual(['pay.json'])
+    expect(merged.cases.map((c: { file: string; status: string }) => [c.file.replace(`${cwd}/`, ''), c.status])).toEqual([['src/pay.test.ts', 'failed'], ['src/ship.test.ts', 'passed']])
+    expect(merged.kept).toEqual({ since, cases: 1, files: 1 })
+    // Written whole: no part of a file is left beside it.
+    expect((await readdir(join(cwd, 'model/.state'))).filter((name) => name.endsWith('.tmp'))).toEqual([])
+
+    // Once more: what was kept is as old as it was.
+    await run(cwd, 'check', 'model', '--report', 'pay.json')
+    expect((await kept()).kept).toEqual({ since, cases: 1, files: 1 })
+    // --quiet says nothing of it.
+    expect((await run(cwd, 'check', 'model', '--report', 'pay.json', '--quiet')).err).toBe('')
+    // The whole run again replaces every file: nothing is kept.
+    expect((await run(cwd, 'check', 'model', '--report', 'all.json')).code).toBe(0)
+    expect((await kept()).kept).toBeUndefined()
+    expect((await kept()).cases).toHaveLength(2)
+  })
+
   it('compares a condition against a baseline with the median of the --baseline files, keeping none of them beside the model', async () => {
     const cwd = await workspace({
       nodes: [
@@ -379,6 +427,8 @@ describe('radical check', () => {
     const { code, out } = await run(await workspace(), 'check', '--list-rules')
     expect(code).toBe(0)
     expect(out).toMatch(/^requirement-without-scenario +warning +Every requirement is verified by at least one scenario\.$/m)
+    // What a rule asks is in bold where it is drawn; a terminal gets no marks.
+    expect(out).not.toContain('**')
   })
 })
 

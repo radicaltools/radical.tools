@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useLayoutEffect, useRef, useId } from 'react'
+import React, { useCallback, useState, useEffect, useLayoutEffect, useMemo, useRef, useId } from 'react'
 import { createPortal } from 'react-dom'
 import { useRailSlot } from '@radical/ui/components/RightPanel'
 import { useDiagramStore } from '@radical/ui/store/diagramStore'
@@ -11,7 +11,8 @@ import { inspectorAvailable, useInspectorAvailable, useInspectorMayShow, useInsp
 import { toggleInspector, useInspectorNav } from '../navigation'
 import { setLeftCollapsed, toggleLeftPanel } from '../leftPanelFold'
 import { closePresentations, openPresentations, switchPerspective, usePresentationsFrom, usePresentationsOpen } from '../presentationsPlace'
-import { INSPECTOR_KEYS } from './Inspector'
+import { INSPECTOR_KEYS, settleTitle } from './Inspector'
+import { settleCount, toFix } from './inspector/toFix'
 import { openCheckSettings } from './inspector/checkSettingsOpen'
 import { dropPendingMode, placeGone, useShownMode } from '../route'
 import { useRegisterCommands } from '../commands'
@@ -321,8 +322,9 @@ const RailIconInspector = () => (
  *  section is, its tabs in the left panel and the tab picked in place of
  *  the view; pressed again, it folds the left panel and opens it again, as
  *  a section's tab does. A section's tab, or ⌘J, goes back to the view. As
- *  the panel's verdict: red with the count of errors, green with none (the
- *  warnings are in its tooltip). Greyed out
+ *  the panel's verdict: red with the count of what is to fix (what has to
+ *  be settled for the check to pass), green with none (the count of errors
+ *  radical check reports, and of what is in Debt, in its tooltip). Greyed out
  *  while there is nothing to inspect; not in the metamodel editor, which
  *  shows no panel. */
 function InspectorRailButton(): React.ReactElement | null {
@@ -335,12 +337,14 @@ function InspectorRailButton(): React.ReactElement | null {
   const enabled = available || (isOpen && mayShow)
   const open = isOpen && enabled
   const metamodel = useDiagramStore((s) => s.appMode === 'metamodel')
+  // What has to be settled for the check to pass, as the Inspector counts it.
+  const toSettle = useMemo(() => check ? settleCount(toFix(check)) : 0, [check])
   if (metamodel) return null
   const title = !enabled
     ? 'Inspector — no check report or measurements beside this model yet. Run radical check <model folder> --report <test reports>, or radical sense, to make one; Studio picks it up by itself.'
-    : `Inspector — what radical check says about the model${check ? `: ${check.errors} errors, ${check.warnings} warnings` : ''} (${INSPECTOR_KEYS})`
-  const count = !enabled || !check ? null : check.errors
-  const tone = !enabled || !check ? 'none' : check.errors ? 'e' : 'ok'
+    : `Inspector — what radical check says about the model${check ? `: ${settleTitle(toSettle, check.errors)}; ${check.warnings} in Debt` : ''} (${INSPECTOR_KEYS})`
+  const count = !enabled || !check ? null : toSettle
+  const tone = !enabled || !check ? 'none' : toSettle ? 'e' : 'ok'
   const short = (n: number): string => n > 999 ? `${Math.floor(n / 100) / 10}k` : String(n)
   return (
     <button type="button" className={`lp-rail-tab rail-inspector ${tone}${open ? ' active' : ''}`} disabled={!enabled}
@@ -349,7 +353,7 @@ function InspectorRailButton(): React.ReactElement | null {
         // lit, it folds the left panel and opens it again, the report staying.
         if (!open) { closePresentations(); toggleInspector(true); setLeftCollapsed(false) } else toggleLeftPanel()
       }}
-      title={title} aria-label={count === null ? 'Inspector' : `Inspector, ${short(count)} error${count === 1 ? '' : 's'}`} aria-pressed={open}
+      title={title} aria-label={count === null ? 'Inspector' : `Inspector, ${short(count)} to fix`} aria-pressed={open}
       // The Inspector's place is drawn only while it is open.
       aria-controls={open ? 'insp-dock' : undefined}>
       <span className="lp-section-icon"><RailIconInspector /></span>

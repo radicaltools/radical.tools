@@ -288,11 +288,11 @@ test('a click on a pinned container\'s pin unpins it, and leaves it expanded (F-
 })
 
 test('a drop onto a node pushes that node clear and nothing else', async ({ page, studio }) => {
-  // The canvas as wide as before the activity rail took 44 px of it, from
+  // The canvas as wide as before the activity rail took 54 px of it, from
   // the first frame: at the zoom a narrower canvas fits the grid at, the
   // drop pushes n8_8 too (docs/IMPROVEMENTS.md).
   const size = page.viewportSize()!
-  await page.setViewportSize({ width: size.width + 44, height: size.height })
+  await page.setViewportSize({ width: size.width + 54, height: size.height })
   await studio.seedDocument(gridDocument())
   await studio.open(WHOLE)
   const previous = await untilStill(page, studio)

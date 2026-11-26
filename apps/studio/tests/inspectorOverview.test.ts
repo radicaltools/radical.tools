@@ -197,7 +197,7 @@ describe('what did not run, and why a decision is not verified', () => {
       ['Open time', 'nightly', true, ['nothing measured studio.open_ms <= 11000 ms']],
     ])
     expect(items.find((i) => i.label === 'Workspaces')!.checks).toEqual(['a-pr'])
-    const reported: CheckFinding[] = [{ rule: 'test-not-run', key: 'test-not-run', severity: 'warning', nodeId: 's-pay', message: 'Scenario "Paying": no report has the file of test tests/pay.test.ts › pays.' }]
+    const reported: CheckFinding[] = [{ rule: 'test-not-run', key: 'test-not-run', severity: 'warning', nodeId: 's-pay', message: 'Scenario "Paying": test tests/pay.test.ts › pays did not run: no report has its file.' }]
     expect(notRunItems(evidence, nodes, relations, reported).map((i) => i.label)).toEqual(['Workspaces', 'Open time'])
   })
 

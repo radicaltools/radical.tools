@@ -41,6 +41,18 @@ export interface RuleFinding {
   /** A test file the finding is about, as the reports name it but cut to
    *  the repository path the rule's `include` matched. */
   testFile?: string
+  /** The test the finding is about, as the model names it (`<file> ›
+   *  <title>…`): what shows it reads the file, the describes and the title
+   *  apart, not out of the sentence. */
+  test?: string
+  /** Why the test failed, as the runner wrote it (its first lines). */
+  reason?: string
+  /** The metric condition the finding is about, as written, with the
+   *  measurement it was decided by (none: nothing measured it) and what
+   *  more there is to say (a unit that does not convert, an age). */
+  condition?: string
+  measured?: Measurement
+  why?: string
   /** Lines that belong to the finding, such as the titles of the tests it
    *  counts. */
   details?: string[]
@@ -229,7 +241,8 @@ function testRule(outcome: TestOutcome, message: (node: C4Node, id: string, mode
         .filter((o) => o.outcome === outcome)
         .map((o) => {
           const related = failing ? affectedBy(model, node).map((n) => n.id) : []
-          return { nodeId: node.id, message: message(node, o.id.raw, model), ...(related.length ? { relatedIds: related } : {}) }
+          const reason = outcome === 'failed' ? findTests(o.id, model.tests ?? []).matches.find((c) => c.status === 'failed' && c.message)?.message : undefined
+          return { nodeId: node.id, test: o.id.raw, message: message(node, o.id.raw, model), ...(reason ? { reason } : {}), ...(related.length ? { relatedIds: related } : {}) }
         }))
   }
 }
@@ -267,6 +280,7 @@ function metricRule(outcome: ConditionOutcome, message: (node: C4Node, condition
             .filter((r) => r.outcome === outcome)
             .map((r) => ({
               nodeId: origin ? element.id : node.id,
+              condition: r.condition, ...(r.measurement ? { measured: r.measurement } : {}), ...(r.detail ? { why: r.detail } : {}),
               message: `${message(node, r.condition, seen(r), r.detail).replace(/\.$/, '')} for ${TYPE_NAME[element.type] ?? element.type} ${quote(element)}${origin ? ` (a fitness function of ${origin})` : ''}.`,
               ...(origin ? { relatedIds: [node.id] } : outcome === 'failed' ? { relatedIds: [element.id] } : {}),
             })))
@@ -276,7 +290,10 @@ function metricRule(outcome: ConditionOutcome, message: (node: C4Node, condition
           .filter((r) => r.outcome === outcome && metricLines.has(r.condition))
           .map((r) => {
             const related = outcome === 'failed' ? affectedBy(model, node).map((n) => n.id) : []
-            return { nodeId: node.id, message: message(node, r.condition, seen(r), r.detail), ...(related.length ? { relatedIds: related } : {}) }
+            return {
+              nodeId: node.id, condition: r.condition, ...(r.measurement ? { measured: r.measurement } : {}), ...(r.detail ? { why: r.detail } : {}),
+              message: message(node, r.condition, seen(r), r.detail), ...(related.length ? { relatedIds: related } : {}),
+            }
           })
       })
   }
@@ -538,7 +555,7 @@ const sourceReading = (text: string): ValueReading => reading(text
 export const CHECK_RULES: CheckRule[] = [
   {
     id: 'metamodel',
-    description: 'The model follows its metamodel: types, parents, relation pairs, required properties, references and the state machine rules. The Validation list in Studio and get_issues over MCP, with their severities: an unknown type or a relation to no element is an error, a relation pair the metamodel does not allow a warning (`"metamodel": "error"` makes every issue one).',
+    description: '**The model follows its metamodel**: types, parents, relation pairs, required properties, references and the state machine rules. The Validation list in Studio and get_issues over MCP, with their severities: an unknown type or a relation to no element is an error, a relation pair the metamodel does not allow a warning (`"metamodel": "error"` makes every issue one).',
     severity: 'error',
     dimension: 'consistency',
     run: (model) => validateModel(model.nodes, model.relations, model.metamodel).map((issue) => ({
@@ -551,7 +568,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'requirement-incomplete',
-    description: 'A requirement has an action and every field its EARS type reads (an event-driven one a trigger, a state-driven one a precondition, …).',
+    description: '**A requirement has an action and every field its EARS type reads** (an event-driven one a trigger, a state-driven one a precondition, …).',
     severity: 'warning',
     dimension: 'completeness',
     run: (model) => nodesOf(model, 'requirement')
@@ -560,7 +577,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'requirement-without-scenario',
-    description: 'Every requirement is verified by at least one scenario.',
+    description: '**Every requirement is verified by at least one scenario**.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => model.metamodel.nodeTypes.scenario
@@ -570,7 +587,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'requirement-unsatisfied',
-    description: 'Every requirement is satisfied by an element of the architecture.',
+    description: '**Every requirement is satisfied by an element of the architecture**.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => unlinked(model, 'requirement', 'satisfies', 'in')
@@ -578,7 +595,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'requirement-without-origin',
-    description: 'Every requirement derives from a need or from another requirement.',
+    description: '**Every requirement derives from a need or from another requirement**.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => unlinked(model, 'requirement', 'derives', 'out', ['need', 'requirement'])
@@ -586,7 +603,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'need-without-requirement',
-    description: 'Every need has at least one requirement derived from it, or from a need inside it (a need that derives from it, Part of).',
+    description: '**Every need has at least one requirement derived from it**, or from a need inside it (a need that derives from it, Part of).',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => unlinked(model, 'need', 'derives', 'in', ['requirement'])
@@ -595,7 +612,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'derives-quote-missing',
-    description: 'A requirement\'s derives relation to a need quotes the words of the need it rests on (property quote, one verbatim fragment per line). Off unless check.json turns it on; the goal requirements-quoting-need follows it in percent.',
+    description: 'A requirement\'s derives relation to a need **quotes the words of the need it rests on** (property quote, one verbatim fragment per line). Off unless check.json turns it on; the goal requirements-quoting-need follows it in percent.',
     severity: 'warning',
     off: true,
     dimension: 'traceability',
@@ -604,7 +621,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'derives-quote-not-in-need',
-    description: 'Every fragment a derives relation quotes is in the need\'s text outside its superseded answers, as whole words (case, white space, Markdown marks, dashes and quotation marks aside; an ellipsis joins pieces that must be there in that order, within one question, answer or the text before the questions), and holds at least two words; only a relation to a need quotes.',
+    description: '**Every fragment a derives relation quotes is in the need\'s text** outside its superseded answers, as whole words (case, white space, Markdown marks, dashes and quotation marks aside; an ellipsis joins pieces that must be there in that order, within one question, answer or the text before the questions), and holds at least two words; only a relation to a need quotes.',
     severity: 'error',
     dimension: 'traceability',
     run: (model) => Object.values(model.relations).filter((r) => r.relationType === 'derives' && relationQuote(r).trim()
@@ -623,7 +640,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'quote-value-missing',
-    description: 'Every hard value a derives relation quotes (a number, null, true or false, a date or time, an identifier in backticks or quotation marks) is in the requirement\'s sentence, in that form or another (20 percent as 20%, 15 minutes as 900 seconds, 12.30 € as 1230 cents).',
+    description: '**Every hard value a derives relation quotes** (a number, null, true or false, a date or time, an identifier in backticks or quotation marks) **is in the requirement\'s sentence**, in that form or another (20 percent as 20%, 15 minutes as 900 seconds, 12.30 € as 1230 cents).',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => {
@@ -634,14 +651,14 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'quote-value-differs',
-    description: 'A requirement keeps the sense the words it quotes give a value: the same side of a limit (at most, more than, from … to; a refusal speaks of the other side), the same unit, the same order of a list, the same rounding.',
+    description: '**A requirement keeps the sense the words it quotes give a value**: the same side of a limit (at most, more than, from … to; a refusal speaks of the other side), the same unit, the same order of a list, the same rounding.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => quoteSenseGaps(model, req)),
   },
   {
     id: 'requirement-value-unquoted',
-    description: 'Every hard value a requirement states that quotes its need is in those quotes (or in those of the requirements it derives from), in that form or another, or its rationale names it as a decision of the model.',
+    description: '**Every hard value a requirement states that quotes its need is in those quotes** (or in those of the requirements it derives from), in that form or another, or its rationale names it as a decision of the model.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => {
@@ -651,7 +668,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'scenario-value-missing',
-    description: 'Every hard value a requirement takes from the words it quotes is in a scenario that verifies it (its given, when, then or Gherkin text): what the person said reaches a check.',
+    description: '**Every hard value a requirement takes from the words it quotes is in a scenario that verifies it** (its given, when, then or Gherkin text): what the person said reaches a check.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => nodesOf(model, 'requirement').filter((n) => !originOf(n)).flatMap((req) => {
@@ -668,7 +685,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'example-not-in-scenario',
-    description: 'Every example a need gives with values ("for example", "e.g.", "Example:") is whole in one scenario of the requirements derived from the need: the person\'s own case checks what they meant.',
+    description: '**Every example a need gives with values** ("for example", "e.g.", "Example:") **is whole in one scenario** of the requirements derived from the need: the person\'s own case checks what they meant.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => nodesOf(model, 'need').filter((n) => !originOf(n)).flatMap((need) => {
@@ -688,7 +705,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'scenario-value-untested',
-    description: 'With the test sources (radical check reads the files of the tests .radical/radical.json binds): every hard value a scenario names that tells a case apart (not a count below 10) is in the file of a test bound to it.',
+    description: 'With the test sources (radical check reads the files of the tests .radical/radical.json binds): **every hard value a scenario names that tells a case apart** (not a count below 10) **is in the file of a test bound to it**.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => {
@@ -709,7 +726,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'need-answer-unquoted',
-    description: 'Every paragraph and list item of an answer of a person in a need (from a line that starts with A:, Answer: or A1:, or an answer on its question\'s line; lead-ins and lines of fewer than four words aside) is quoted by a requirement that derives from the need, or the answer is marked (no requirement) or (superseded).',
+    description: '**Every paragraph and list item of an answer of a person in a need** (from a line that starts with A:, Answer: or A1:, or an answer on its question\'s line; lead-ins and lines of fewer than four words aside) **is quoted by a requirement that derives from the need**, or the answer is marked (no requirement) or (superseded).',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => {
@@ -729,7 +746,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'need-answer-changed',
-    description: 'With the model at the base (radical check in git, the Inspector with the branch\'s base): every answer of a person a need held there it still holds, word for word; a person\'s words are only added to, and an answer a later one replaces is marked (superseded).',
+    description: 'With the model at the base (radical check in git, the Inspector with the branch\'s base): **every answer of a person a need held there it still holds, word for word**; a person\'s words are only added to, and an answer a later one replaces is marked (superseded).',
     severity: 'error',
     dimension: 'traceability',
     run: (model) => {
@@ -744,7 +761,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'scenario-verifies-nothing',
-    description: 'Every scenario verifies a requirement or a state machine.',
+    description: '**Every scenario verifies a requirement or a state machine**.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => unlinked(model, 'scenario', 'verifies', 'out')
@@ -752,7 +769,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'adr-without-fitness-fn',
-    description: 'Every accepted ADR is implemented by a fitness function that checks it.',
+    description: '**Every accepted ADR is implemented by a fitness function** that checks it.',
     severity: 'warning',
     dimension: 'decisions',
     run: (model) => model.metamodel.nodeTypes['fitness-fn']
@@ -765,7 +782,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'inherited-adr-unapplied',
-    description: 'Every accepted ADR of a model this one depends on (deps.json) binds it: it constrains at least one of this model\'s elements, or an accepted ADR of this model waives it and says why.',
+    description: '**Every accepted ADR of a model this one depends on** (deps.json) **binds it**: it constrains at least one of this model\'s elements, or an accepted ADR of this model waives it and says why.',
     severity: 'error',
     dimension: 'decisions',
     run: (model) => inheritedDecisions(model).filter((d) => !d.elements.length).map(({ adr, origin }) => ({
@@ -775,7 +792,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'inherited-adr-unchecked',
-    description: 'Every element an accepted ADR of a model this one depends on constrains is checked: a fitness function implements the ADR (this model\'s or the other\'s) and names its check (metric conditions, or tests .radical/radical.json binds to it).',
+    description: '**Every element an accepted ADR of a model this one depends on constrains is checked**: a fitness function implements the ADR (this model\'s or the other\'s) and names its check (metric conditions, or tests .radical/radical.json binds to it).',
     severity: 'error',
     dimension: 'decisions',
     run: (model) => inheritedDecisions(model).flatMap(({ adr, origin, elements }) => {
@@ -789,7 +806,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'adr-incomplete',
-    description: 'An accepted ADR records its date, context, decision and consequences.',
+    description: '**An accepted ADR records its date, context, decision and consequences**.',
     severity: 'warning',
     dimension: 'completeness',
     run: (model) => nodesOf(model, 'adr')
@@ -801,7 +818,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'adr-superseded-unlinked',
-    description: 'An ADR is superseded exactly when a newer ADR supersedes it.',
+    description: '**An ADR is superseded exactly when a newer ADR supersedes it**.',
     severity: 'warning',
     dimension: 'consistency',
     run: (model) => {
@@ -818,7 +835,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'fitness-fn-unlinked',
-    description: 'Every fitness function implements an ADR or constrains an element.',
+    description: '**Every fitness function implements an ADR or constrains an element**.',
     severity: 'warning',
     dimension: 'decisions',
     run: (model) => {
@@ -830,7 +847,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'concern-unaddressed',
-    description: 'Every concern a Hub concern pack finds in the model is settled by an accepted ADR marked with it (property `concern`) that constrains the elements it applies to, or what contains them.',
+    description: '**Every concern a Hub concern pack finds in the model is settled by an accepted ADR marked with it** (property `concern`) that constrains the elements it applies to, or what contains them.',
     severity: 'warning',
     dimension: 'decisions',
     run: (model) => openConcerns(model.concerns ?? [], model.nodes, model.relations, model.metamodel).map(({ pack, open, pending }) => {
@@ -847,7 +864,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'concern-unbound',
-    description: 'Every accepted ADR marked with a concern (property `concern`, set by a Hub concern pack) constrains the elements it settles the concern for.',
+    description: '**Every accepted ADR marked with a concern** (property `concern`, set by a Hub concern pack) **constrains the elements it settles the concern for**.',
     severity: 'warning',
     dimension: 'decisions',
     run: (model) => unboundDecisions(model.concerns ?? [], model.nodes, model.relations, model.metamodel)
@@ -860,7 +877,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'scenario-without-metrics',
-    description: 'Every scenario has what checks it: tests the repository\'s .radical/radical.json binds to it, or metric conditions (property `metrics`, one per line: `<metric>{<labels>} <op> <number> [unit]`). One the repository must verify is scenario-not-verified-here\'s.',
+    description: '**Every scenario has what checks it**: tests the repository\'s .radical/radical.json binds to it, or metric conditions (property `metrics`, one per line: `<metric>{<labels>} <op> <number> [unit]`). One the repository must verify is scenario-not-verified-here\'s.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => nodesOf(model, 'scenario').filter((n) => !conditionsOf(n).length && !verifiedHere(model, n))
@@ -868,7 +885,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'scenario-not-verified-here',
-    description: 'With the repository\'s .radical/radical.json (the CLI): every scenario of a requirement an element the repository builds satisfies has tests the file binds to it, or metric conditions.',
+    description: 'With the repository\'s .radical/radical.json (the CLI): **every scenario of a requirement an element the repository builds satisfies has tests the file binds to it, or metric conditions**.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => nodesOf(model, 'scenario').filter((n) => !conditionsOf(n).length && verifiedHere(model, n))
@@ -876,7 +893,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'model-names-tests',
-    description: 'A scenario or fitness function names no test in its Metrics: the repository binds its tests in .radical/radical.json (radical setup moves them there). A test named in Metrics still counts.',
+    description: '**A scenario or fitness function names no test in its Metrics**: the repository binds its tests in .radical/radical.json (radical setup moves them there). A test named in Metrics still counts.',
     severity: 'warning',
     dimension: 'traceability',
     run: (model) => Object.values(model.nodes).filter((n) => (TESTED_TYPES as readonly string[]).includes(n.type) && !originOf(n))
@@ -887,7 +904,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'fitness-fn-without-metrics',
-    description: 'Every fitness function states what checks it and when it passes (property `metrics`, one condition per line).',
+    description: '**Every fitness function states what checks it and when it passes** (property `metrics`, one condition per line).',
     severity: 'warning',
     dimension: 'decisions',
     run: (model) => nodesOf(model, 'fitness-fn').filter((n) => !conditionsOf(n).length)
@@ -895,7 +912,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'fitness-fn-unclassified',
-    description: 'Every fitness function states its characteristic (ISO/IEC 25010), scope, cadence (with the event it is triggered on, or how often a temporal one falls due) and invocation.',
+    description: '**Every fitness function states its characteristic** (ISO/IEC 25010), scope, cadence (with the event it is triggered on, or how often a temporal one falls due) and invocation.',
     severity: 'warning',
     dimension: 'decisions',
     run: (model) => nodesOf(model, 'fitness-fn').flatMap((n) => {
@@ -908,7 +925,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'fitness-fn-measure-invalid',
-    description: `Every line of a fitness function's \`measure\` names a sensor of radical sense (${SENSOR_NAMES.join(', ')}) or, run by the CLI, one of the repository's .radical/sensors/sensors.json.`,
+    description: `**Every line of a fitness function's \`measure\` names a sensor** of radical sense (${SENSOR_NAMES.join(', ')}) or, run by the CLI, one of the repository's .radical/sensors/sensors.json.`,
     severity: 'error',
     dimension: 'completeness',
     run: (model) => model.sensors === undefined ? [] : nodesOf(model, 'fitness-fn').flatMap((n) => parseMeasure((n as unknown as Props).measure)
@@ -922,14 +939,14 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'repository-mapping',
-    description: 'With the repository\'s .radical/radical.json (the CLI): each entry names an element of the model, its own or another model\'s of the federation, under the element\'s name, with paths the repository has; tests are bound to scenarios and fitness functions.',
+    description: 'With the repository\'s .radical/radical.json (the CLI): **each entry names an element of the model**, its own or another model\'s of the federation, under the element\'s name, with paths the repository has; tests are bound to scenarios and fitness functions.',
     severity: 'warning',
     dimension: 'traceability',
     run: repositoryMapping,
   },
   {
     id: 'repository-settings-in-model',
-    description: 'The model\'s check.json holds the model\'s rules and goals; the repository\'s test files (test-unbound\'s include and exclude) and CI\'s artifacts belong in .radical/radical.json ("tests", "ci"). Those in check.json are still read.',
+    description: 'The model\'s check.json holds the model\'s rules and goals; **the repository\'s test files** (test-unbound\'s include and exclude) and CI\'s artifacts **belong in .radical/radical.json** ("tests", "ci"). Those in check.json are still read.',
     severity: 'warning',
     dimension: 'completeness',
     run: (model) => (model.settingsInModel ?? []).map((what) => ({
@@ -939,7 +956,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'description-path-missing',
-    description: 'With the repository (the CLI): a path from the repository\'s root an element\'s description names (apps/cli/src/sense.ts) is in the repository; one that is gone tells of code that moved.',
+    description: 'With the repository (the CLI): **a path from the repository\'s root an element\'s description names** (apps/cli/src/sense.ts) **is in the repository**; one that is gone tells of code that moved.',
     severity: 'warning',
     dimension: 'consistency',
     run: (model) => Object.entries(model.missingPaths ?? {}).flatMap(([id, paths]) => {
@@ -949,7 +966,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'measure-with-arguments',
-    description: 'A fitness function\'s measure lines name sensors only: an adapter\'s arguments (files, options of the repository) belong to a sensor of .radical/sensors/sensors.json ({ "adapter": "playwright", "args": [...] }). A line with arguments still runs.',
+    description: '**A fitness function\'s measure lines name sensors only**: an adapter\'s arguments (files, options of the repository) belong to a sensor of .radical/sensors/sensors.json ({ "adapter": "playwright", "args": [...] }). A line with arguments still runs.',
     severity: 'warning',
     dimension: 'completeness',
     run: (model) => nodesOf(model, 'fitness-fn').flatMap((n) => parseMeasure((n as unknown as Props).measure)
@@ -958,14 +975,14 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'metric-invalid',
-    description: 'Every line of a scenario\'s or fitness function\'s `metrics` reads as a condition, its unit converts to the unit of the measurement it matches, and `combine` and `max_age` read.',
+    description: '**Every line of a scenario\'s or fitness function\'s `metrics` reads as a condition**, its unit converts to the unit of the measurement it matches, and `combine` and `max_age` read.',
     severity: 'error',
     dimension: 'completeness',
     run: invalidChecks,
   },
   {
     id: 'test-failed',
-    description: 'With --report: every test a scenario or fitness function names passed.',
+    description: 'With --report: **every test a scenario or fitness function names passed**.',
     severity: 'error',
     dimension: 'tests',
     readsReports: true,
@@ -973,7 +990,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'test-not-found',
-    description: 'With --report: every test a scenario or fitness function names is in the report of its file (a renamed or deleted test is not).',
+    description: 'With --report: **every test a scenario or fitness function names is in the report of its file** (a renamed or deleted test is not).',
     severity: 'error',
     dimension: 'tests',
     readsReports: true,
@@ -984,7 +1001,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'test-skipped',
-    description: 'With --report: no test a scenario or fitness function names was skipped.',
+    description: 'With --report: **no test a scenario or fitness function names was skipped**.',
     severity: 'warning',
     dimension: 'tests',
     readsReports: true,
@@ -992,15 +1009,15 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'test-not-run',
-    description: 'With --report: every file a scenario or fitness function names a test in is in the reports.',
+    description: 'With --report: **every file a scenario or fitness function names a test in is in the reports**.',
     severity: 'warning',
     dimension: 'tests',
     readsReports: true,
-    run: testRule('not-run', (node, id) => `${testedName(node)}: no report has the file of test ${id}.`),
+    run: testRule('not-run', (node, id) => `${testedName(node)}: test ${id} did not run: no report has its file.`),
   },
   {
     id: 'metric-failed',
-    description: 'With measurements: every metric condition a scenario or fitness function states holds for the latest measurement it matches.',
+    description: 'With measurements: **every metric condition a scenario or fitness function states holds** for the latest measurement it matches.',
     severity: 'error',
     dimension: 'tests',
     readsMeasurements: true,
@@ -1008,7 +1025,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'metric-stale',
-    description: 'With measurements: the latest measurement each metric condition matches is no older than the element\'s max_age (a stale one never passes).',
+    description: 'With measurements: **the latest measurement each metric condition matches is no older than the element\'s max_age** (a stale one never passes).',
     severity: 'warning',
     dimension: 'tests',
     readsMeasurements: true,
@@ -1016,7 +1033,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'metric-not-measured',
-    description: 'With measurements: a measurement matches every metric condition a scenario or fitness function states.',
+    description: 'With measurements: **a measurement matches every metric condition a scenario or fitness function states**.',
     severity: 'warning',
     dimension: 'tests',
     readsMeasurements: true,
@@ -1026,7 +1043,7 @@ export const CHECK_RULES: CheckRule[] = [
   },
   {
     id: 'test-unbound',
-    description: 'With --report and an include in check.json: every test in the files it includes is named by a scenario or a fitness function, by its title or its describe block (a whole file or directory does not count). One finding per test file.',
+    description: 'With --report and an include in check.json: **every test in the files it includes is named by a scenario or a fitness function**, by its title or its describe block (a whole file or directory does not count). One finding per test file.',
     severity: 'warning',
     dimension: 'tests',
     readsReports: true,

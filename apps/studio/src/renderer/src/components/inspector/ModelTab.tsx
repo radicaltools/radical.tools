@@ -2,13 +2,15 @@
 //
 // How good the model is on its own, before any test runs: a tile per
 // dimension (as strong as its weakest metric), the chain from needs to
-// tests, where the weakest metric falls short by group, the goals the
-// model's check.json sets, and the findings by dimension.
+// tests, where the weakest metric falls short by group, and the goals the
+// model's check.json sets. It lists no findings: what fails the check is in
+// To fix, the rest in Debt, and a link of the chain that falls short leads
+// to the findings of its rule there.
 
 import React, { useMemo, useState } from 'react'
 import type { CheckMetricResult, CheckResult } from '@radical/common/check'
 import type { C4Node, C4Relation } from '@radical/common/c4'
-import { Bar, FindingsByDimension, GoalPill, MetricBar, dimensionOfKey, dimensionsOf, metricOf, modelScores, weakest, type Ctx } from './shared'
+import { Bar, GoalPill, MetricBar, dimensionOfKey, dimensionsOf, metricOf, modelScores, weakest, type Ctx } from './shared'
 
 /** A link of the traceability chain: the share of what is on its left that
  *  has what is on its right. A click opens the findings that break it. */
@@ -27,9 +29,12 @@ function Link({ m, text, onOpen }: { m: CheckMetricResult | undefined; text: str
 const Stop = ({ label, value }: { label: string; value: number | string }): React.ReactElement =>
   <div className="insp-stop"><span className="insp-label">{label}</span><span className="insp-stop-n">{value}</span></div>
 
-export function ModelTab({ check, ctx, relations, onSettings }: { check: CheckResult; ctx: Ctx; relations: Record<string, C4Relation>; onSettings: () => void }): React.ReactElement {
-  const [focus, setFocus] = useState<string | null>(null)
-  const open = (rule: string): void => { setFocus(null); requestAnimationFrame(() => setFocus(rule)) }
+export function ModelTab({ check, ctx, relations, onSettings, onRule }: {
+  check: CheckResult; ctx: Ctx; relations: Record<string, C4Relation>; onSettings: () => void
+  /** Shows the findings of a rule where they are: To fix or Debt. */
+  onRule: (rule: string) => void
+}): React.ReactElement {
+  const open = onRule
   const m = (id: string): CheckMetricResult | undefined => metricOf(check, id)
 
   const dims = modelScores(check)
@@ -127,7 +132,7 @@ export function ModelTab({ check, ctx, relations, onSettings }: { check: CheckRe
               <div key={r.id} className="insp-goal">
                 <code>{r.id}</code><b>{r.count}</b><span>≤ {r.max}</span>
                 {r.count > r.max! ? <span className="insp-pill bad">✗</span>
-                  : r.count < r.max! ? <span className="insp-pill warn" title={`${r.max! - r.count} under its baseline: Ratchet in Settings lowers it`}>↓ {r.max! - r.count}</span>
+                  : r.count < r.max! ? <span className="insp-pill warn" title={`${r.max! - r.count} under its baseline: Ratchet in Inspector settings lowers it`}>↓ {r.max! - r.count}</span>
                     : <span className="insp-pill ok">✓</span>}
               </div>
             ))}
@@ -135,11 +140,6 @@ export function ModelTab({ check, ctx, relations, onSettings }: { check: CheckRe
         </section>
       </div>
 
-      <section>
-        <h2>Findings by dimension</h2>
-        <p className="insp-lede">Every rule about the model, grouped as above. Each finding links to its element.</p>
-        <FindingsByDimension check={check} ctx={ctx} perspective="model" focus={focus} />
-      </section>
     </>
   )
 }

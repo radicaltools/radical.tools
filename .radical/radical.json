@@ -417,8 +417,12 @@
       "packages/common/tests/check.test.ts › radical check: concerns › reports a concern its trigger finds and no ADR addresses",
       "apps/cli/src/cli.test.ts › radical check › reports an unaddressed concern from the bundled catalogue"
     ] },
-    { "element": "bb8b7ee1-a961-48ea-85fa-c5787153f67c", "name": "Overview lists what needs attention", "tests": [
-      "apps/e2e/tests/studio/inspector.spec.ts › the Inspector opens on Overview with what needs attention, and each finding leads to its element or fixes it"
+    { "element": "bb8b7ee1-a961-48ea-85fa-c5787153f67c", "name": "Overview says what is to fix", "tests": [
+      "apps/e2e/tests/studio/inspector.spec.ts › the Inspector opens on what is to fix, keeps what does not fail the check in Debt, and each finding leads to its element or fixes it",
+      "apps/studio/tests/inspectorToFix.test.ts › the debt › is what does not fail the check: within baselines, warnings, and what old test results say",
+      "apps/studio/tests/inspectorToFix.test.ts › the debt › names the baselines above what the check finds now, which Ratchet lowers",
+      "apps/studio/tests/inspectorToFix.test.ts › the debt › narrows to the findings about the elements given",
+      "apps/studio/tests/inspectorToFix.test.ts › what is to fix › is only what fails the check, by rule in the order the check ran them"
     ] },
     { "element": "cf8ebe65-f329-4766-b0b0-adebce8d17f9", "name": "Ratchet lowers a baseline", "tests": [
       "apps/cli/src/cli.test.ts › radical check › ratchets the baseline in the config file",
@@ -1773,7 +1777,8 @@
       "apps/e2e/tests/studio/markdown.spec.ts › Markdown in an element's fields › a remote image is a link with its address, an emptied link is text, a link into the app opens here",
       "apps/e2e/tests/studio/markdown.spec.ts › Markdown in an element's fields › an image the browser would fetch from another host is a link, whatever form its address has",
       "packages/common/tests/markdown.test.ts",
-      "packages/common/tests/nodeSummary.test.ts › element summary: Markdown"
+      "packages/common/tests/nodeSummary.test.ts › element summary: Markdown",
+      "apps/e2e/tests/studio/markdown.spec.ts › Markdown in an element's fields › doubled equals signs are text, not a highlight"
     ] },
     { "element": "12ce904b-16a0-479c-8107-3fe2064957e8", "name": "Move into a folded container", "tests": [
       "packages/ui/tests/reparentOnEveryCanvas.test.ts › Move to… a folded container",
@@ -2693,7 +2698,8 @@
       "apps/studio/tests/webFolder.test.ts › a repository laid out with .radical/ › reads the repository's mapping through the repository picked",
       "apps/e2e/tests/studio/repository-mapping.spec.ts › the card says where an element is built, for a repository opened",
       "apps/e2e/tests/studio/repository-mapping.spec.ts › the card says where an element is built, for a .radical folder opened",
-      "apps/studio/tests/webFolder.test.ts › a repository laid out with .radical/ › opens the model of a .radical folder picked, and reads its mapping"
+      "apps/studio/tests/webFolder.test.ts › a repository laid out with .radical/ › opens the model of a .radical folder picked, and reads its mapping",
+      "packages/common/tests/repositoryMapping.test.ts › what code builds › is the software of the model that is not external, and what a type of the model's own may be"
     ] },
     { "element": "c3ddd6d9-b198-4152-b1ae-19c371217541", "name": "The other models are fetched", "tests": [
       "apps/cli/src/federation.test.ts › radical federation › fetches the other models with their origin into .state/federation.json",
@@ -3723,10 +3729,10 @@
       "apps/e2e/tests/studio/folders.spec.ts › Open → Folder… on a repository opens its model in architecture/, and refuses a folder that holds no model"
     ] },
     { "element": "20e794ae-756e-46d3-99b0-c3e6b3899af8", "name": "An offered edit lands in Designer", "tests": [
-      "apps/e2e/tests/studio/inspector.spec.ts › the Inspector opens on Overview with what needs attention, and each finding leads to its element or fixes it",
       "apps/e2e/tests/studio/inspector.spec.ts › the Inspector asks the questions of an unaddressed concern and the import settles it",
       "apps/e2e/tests/studio/hub-import.spec.ts › a concept added from a Hub link in Presenter reaches the model, as from Viewer",
-      "packages/ui/tests/designerEdit.test.ts"
+      "packages/ui/tests/designerEdit.test.ts",
+      "apps/e2e/tests/studio/inspector.spec.ts › the Inspector opens on what is to fix, keeps what does not fail the check in Debt, and each finding leads to its element or fixes it"
     ] },
     { "element": "74e1f02b-c50a-4a19-9306-2c402a759d19", "name": "Inspector with a milestone shown", "tests": [
       "apps/studio/tests/inspector.test.ts › going to an element › says so when the milestone shown lacks the element",
@@ -3822,7 +3828,7 @@
       "apps/e2e/tests/studio/inspector.spec.ts › a link to the Inspector perspective of before opens Viewer with the Inspector on its tab"
     ] },
     { "element": "7c34dde6-5289-4338-a9f8-39078c609bed", "name": "Inspector in Viewer fixes in Designer", "tests": [
-      "apps/e2e/tests/studio/inspector.spec.ts › the Inspector opens on Overview with what needs attention, and each finding leads to its element or fixes it"
+      "apps/e2e/tests/studio/inspector.spec.ts › the Inspector opens on what is to fix, keeps what does not fail the check in Debt, and each finding leads to its element or fixes it"
     ] },
     { "element": "5cf16eff-2c71-49c0-a2d9-445dc92367d2", "name": "Inspector settings from the Settings menu", "tests": [
       "apps/e2e/tests/studio/inspector.spec.ts › Inspector settings wait for Save while the dialog is closed and after Back, and the Settings menu says so"
@@ -4085,6 +4091,51 @@
     { "element": "ebb6b3df-cbb4-4819-80d3-e745bf92fe03", "name": "Overdue violation fails the night", "tests": [
       "tools/a11y-deadlines.test.mjs › tracked accessibility violations fixed in time › fails the night once a due date has passed, naming the violation and its issue",
       "tools/a11y-deadlines.test.mjs › tracked accessibility violations fixed in time › fails an entry due more than FIX_DAYS after it was found, one without an issue, and one without dates"
+    ] },
+    { "element": "1c278031-645d-41c4-915b-f8ef17de7e88", "name": "One over the baseline is one to fix", "tests": [
+      "apps/e2e/tests/studio/inspector-tofix.spec.ts › a rule one finding over its baseline is one to fix, and the finding of the branch comes first",
+      "apps/studio/tests/inspectorToFix.test.ts › what is to fix › counts a rule over its baseline as the number over it, as the check itself makes every finding an error",
+      "apps/studio/tests/inspectorToFix.test.ts › what is to fix › puts the findings about what the branch changed first, their own element or one they name",
+      "apps/studio/tests/inspectorToFix.test.ts › what is to fix › leaves out the findings that warn of a rule that fails, and never settles more than its errors"
+    ] },
+    { "element": "034866df-546d-4940-b971-a43b4a13dd58", "name": "Goal not met says how many more", "tests": [
+      "apps/e2e/tests/studio/inspector-tofix.spec.ts › a goal not met is one to fix that says how many more reach it, and leads to what misses it",
+      "apps/studio/tests/inspectorToFix.test.ts › what is to fix › makes a goal not met one item that says how many more reach it"
+    ] },
+    { "element": "6a8062df-69bb-4f22-9920-0abdf8df3b5c", "name": "Model and Implementation list no findings", "tests": [
+      "apps/e2e/tests/studio/inspector-tofix.spec.ts › Model and Implementation list no findings, and a link of the chain opens the findings of its rule"
+    ] },
+    { "element": "34321ea1-ccca-45e6-8053-c63e058d2755", "name": "A test finding reads by its parts", "tests": [
+      "apps/e2e/tests/studio/inspector-tofix.spec.ts › a finding about a test says what is wrong first, and shows the test by its title, its file apart",
+      "packages/common/tests/checkReports.test.ts › radical check with test reports › finds each test outcome and names what it takes down"
+    ] },
+    { "element": "70b20ba0-13b3-4b3e-9e0a-a68fd957a8f5", "name": "A run of one test file keeps the rest", "tests": [
+      "apps/cli/src/cli.test.ts › radical check › keeps what the results beside the model say of the test files a run does not have",
+      "apps/cli/src/ciResults.test.ts › radical check --from-ci › replaces whole the results a run of some test files left",
+      "packages/common/tests/checkReports.test.ts › a run of some test files › replaces the results of its files and keeps what was read before of the others",
+      "packages/common/tests/checkReports.test.ts › a run of some test files › takes a file named by its whole path and by the end of it for one file",
+      "packages/common/tests/checkReports.test.ts › a run of some test files › keeps nothing when the run has every file, or nothing was read before",
+      "packages/common/tests/checkReports.test.ts › a run of some test files › says since when the kept results are: the earliest reading, or the run of CI",
+      "packages/common/tests/checkReports.test.ts › a run of some test files › is kept with the results, and read back"
+    ] },
+    { "element": "68a909a2-d320-4b94-8466-780dda875f8f", "name": "Card sections fold to their heads", "tests": [
+      "apps/e2e/tests/studio/card-sections.spec.ts › the card folds Verification, Tests and Views to their heads, and keeps them as the user leaves them",
+      "apps/e2e/tests/studio/cardVerification.spec.ts › the card says in every perspective what the check says of the element, and the Inspector opens the same card"
+    ] },
+    { "element": "dbb85ddc-9382-4a04-ae14-f8a0ff9dcfe1", "name": "A rule says what it asks in bold", "tests": [
+      "packages/common/tests/checkReports.test.ts › the words of a rule and of a finding › marks in bold what each rule asks, and prints it without the marks",
+      "packages/common/tests/checkReports.test.ts › the words of a rule and of a finding › reads a finding by what it quotes: words and values in quotation marks, names in backticks",
+      "apps/cli/src/cli.test.ts › radical check › lists the rules",
+      "apps/e2e/tests/studio/inspector-tofix.spec.ts › Model and Implementation list no findings, and a link of the chain opens the findings of its rule"
+    ] },
+    { "element": "9707fd9e-e895-4b64-974c-feb588d2e643", "name": "A metric finding shows its condition and what was measured", "tests": [
+      "apps/e2e/tests/studio/inspector.spec.ts › the Inspector shows each condition with its measurement"
+    ] },
+    { "element": "4998b0ca-eb2a-4778-bd61-32e5e5e7820e", "name": "One cause is one to fix", "tests": [
+      "apps/e2e/tests/studio/inspector-cause.spec.ts › a condition two elements state of one measurement is one row, and one to fix",
+      "apps/studio/tests/inspectorToFix.test.ts › one cause › is one thing to fix, however many elements name it: a condition on one measurement, a test",
+      "apps/studio/tests/inspectorToFix.test.ts › one cause › is not shared by another measurement, another rule, or findings that name no test or condition",
+      "apps/studio/tests/inspectorToFix.test.ts › one cause › does not change what a rule over its baseline has to settle"
     ] }
   ]
 }

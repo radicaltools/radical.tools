@@ -225,6 +225,19 @@ export function verifyCommand(nodes: Iterable<{ id: string; label: string; type:
   return `radical verify ${named} --test "<file> › <title>"`
 }
 
+/** The built-in types a repository's code builds: the software of a C4
+ *  model. A need, a requirement, an ADR, a person, a group and the like are
+ *  built by no code; a type a model's own metamodel adds may be. */
+const SOFTWARE_TYPES: ReadonlySet<string> = new Set(['system', 'container', 'component', 'database', 'webapp', 'queue'])
+
+/** Whether a repository's code may build `node`, so that an element of no
+ *  entry is worth the command that maps it: software that is not external
+ *  (another party builds that), or an element of a type the metamodel adds. */
+export function isBuiltByCode(node: { type: string; external?: boolean }, typeDef?: { builtin?: boolean }): boolean {
+  if (node.external) return false
+  return SOFTWARE_TYPES.has(node.type) || (!!typeDef && !typeDef.builtin)
+}
+
 /** The command that maps `node` to a folder: by its name when no other
  *  element has it, else by its id. */
 export function implementCommand(nodes: Iterable<{ id: string; label: string }>, node: { id: string; label: string }): string {

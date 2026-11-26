@@ -52,8 +52,7 @@ test('the verification path goes from a requirement to its need and to the test 
   const inspector = inspectorButton(page)
   await expect(inspector).toBeEnabled({ timeout: 10_000 })
   await inspector.click()
-  await inspectorTab(page, /^Implementation/).click()
-  await page.locator('.insp-error .insp-chain').getByRole('button', { name: /Take card payments/ }).click()
+  await page.getByRole('region', { name: 'To fix' }).locator('.insp-chain').getByRole('button', { name: /Take card payments/ }).click()
 
   // The link shows the element on its view, in the perspective open, with
   // its card, as in every perspective, and a way to the whole path.
@@ -69,7 +68,7 @@ test('the verification path goes from a requirement to its need and to the test 
   await expect(panel).toBeVisible()
   // The path is a place of its own: a link opens it, Back leaves it. It
   // stands in place of the view, the Inspector's tabs in the left panel.
-  await expect(page).toHaveURL(/\/m\/viewer\/.*\/i\/implementation\/tr\/req/)
+  await expect(page).toHaveURL(/\/m\/viewer\/.*\/i\/overview\/tr\/req/)
   await expect(report).toBeVisible()
   await expect(page.locator('.insp-main')).toBeHidden()
   await expect(panel.locator('.trace-col-head')).toHaveText(['Need', 'Requirement', 'Scenario', 'Test'])
@@ -120,7 +119,7 @@ test('the verification path goes from a requirement to its need and to the test 
 
   await panel.getByRole('button', { name: 'Close' }).click()
   await expect(panel).toBeHidden()
-  await expect(inspectorTab(page, /^Implementation/)).toHaveAttribute('aria-selected', 'true')
+  await expect(inspectorTab(page, /^Overview/)).toHaveAttribute('aria-selected', 'true')
   await expect(page.locator('.insp-main')).toBeVisible()
   await expect(page).not.toHaveURL(/\/tr\//)
   // Studio's Back returns to the path, Forward leaves it again.
@@ -239,7 +238,8 @@ test('with a milestone shown, the Inspector checks the live model, its links and
   // since. Its fix waits for the live model, and its link says the
   // milestone shown lacks the element.
   await inspectorButton(page).click()
-  const missing = page.getByRole('region', { name: 'Needs attention' }).locator('details.insp-group[data-rule="requirement-without-scenario"]')
+  await inspectorTab(page, /^Debt/).click()
+  const missing = page.getByRole('region', { name: 'Inspector' }).locator('details.insp-group[data-rule="requirement-without-scenario"]')
   await missing.locator('summary').click()
   const fix = missing.getByRole('button', { name: /^Add scenario/ })
   await expect(fix).toBeDisabled()
