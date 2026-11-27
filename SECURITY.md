@@ -10,10 +10,7 @@
 
 **Please do not report security vulnerabilities through public GitHub Issues.**
 
-If you discover a security vulnerability, please report it via one of these channels:
-
-- **GitHub Private Vulnerability Reporting** — use the [Security tab](https://github.com/radicaltools/radical.tools/security/advisories/new) on this repository
-- **Email** — contact the maintainer directly (see the GitHub profile)
+If you discover a security vulnerability, report it privately through **GitHub Private Vulnerability Reporting**: [open a draft advisory](https://github.com/radicaltools/radical.tools/security/advisories/new) in the Security tab of this repository. Only the maintainers see it.
 
 Please include the following in your report:
 - Description of the vulnerability
