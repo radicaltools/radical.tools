@@ -62,3 +62,29 @@ variable "hub_domain" {
   type        = string
   default     = ""
 }
+
+# ── Mail (Zoho) ─────────────────────────────────────────────────────────────
+
+variable "zoho_verification" {
+  description = "Zoho Mail's domain verification TXT value (zoho-verification=…zmverify.zoho.eu). Leave empty to create no mail records."
+  type        = string
+  default     = ""
+}
+
+variable "zoho_region" {
+  description = "Zoho's data centre the account lives in, as the domain ending of its mail servers: eu or com."
+  type        = string
+  default     = "eu"
+}
+
+variable "zoho_dkim_selector" {
+  description = "Selector of the DKIM key generated in Zoho's Admin Console (the part before ._domainkey)."
+  type        = string
+  default     = "zmail"
+}
+
+variable "zoho_dkim_value" {
+  description = "The DKIM TXT value Zoho gives (v=DKIM1; k=rsa; p=…). Leave empty until Zoho has generated it."
+  type        = string
+  default     = ""
+}
