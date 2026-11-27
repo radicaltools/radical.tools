@@ -246,7 +246,7 @@ If radical.tools is useful to you, a ⭐ on GitHub helps others find it.
 - Questions and ideas: [GitHub Discussions](https://github.com/radicaltools/radical.tools/discussions)
 - Bugs and feature requests: [GitHub Issues](https://github.com/radicaltools/radical.tools/issues)
 - Security vulnerabilities: report them privately, see [SECURITY.md](SECURITY.md)
-- Anything else, consulting included: [Tomasz Zając on LinkedIn](https://www.linkedin.com/in/tzajac-myprofile/)
+- Anything else, consulting included: [contact@radical.tools](mailto:contact@radical.tools)
 
 ## License
 
