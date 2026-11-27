@@ -4146,6 +4146,22 @@
       "tools/ci/checked.test.mjs › A checked tree is not checked again › A checked tree deploys without a second check: a tree with no mark, an expired one, or one of another tree is checked whole",
       "tools/ci/checked.test.mjs › A checked tree is not checked again › A checked tree deploys without a second check: a mark of a failed or unfinished run, of another workflow or of a fork is not believed",
       "tools/ci/checked.test.mjs › A checked tree is not checked again › A checked tree deploys without a second check: a run that wrote new screenshot baselines marks nothing"
+    ] },
+    { "element": "858a1762-b233-4f71-aaac-e3ec2e2cd8f5", "name": "Failed fetch recorded", "tests": [
+      "apps/cli/src/ciResults.test.ts › radical check --from-ci › records what a fetch found, with --quiet too, and when it found no test report"
+    ] },
+    { "element": "e5ca32d4-6d70-46d3-8c31-d421db9c25a5", "name": "Failed fetch marked in the header", "tests": [
+      "apps/e2e/tests/studio/inspector.spec.ts › the Tests chip says when the last fetch from CI found no test results, and which measurements came from CI"
+    ] },
+    { "element": "2071d95e-73e5-4d05-9cc7-eaea6ddd9656", "name": "Setup status warns of a failed fetch", "tests": [
+      "apps/cli/src/status.test.ts › radical setup --status › names the last fetch from CI, and warns when it found no test results"
+    ] },
+    { "element": "568c3709-5675-4bc0-80d3-0f1b6e1c686e", "name": "Gate check keeps nothing", "tests": [
+      "apps/cli/src/ciResults.test.ts › radical check --from-ci › keeps nothing beside the model with --no-keep"
+    ] },
+    { "element": "7b5e2584-3d78-4530-aac8-734cabe989b8", "name": "Measurements fetched from CI", "tests": [
+      "apps/cli/src/ciResults.test.ts › radical check --from-ci › adds the measurements in the artifacts of CI to those kept",
+      "apps/e2e/tests/studio/inspector.spec.ts › the Tests chip says when the last fetch from CI found no test results, and which measurements came from CI"
     ] }
   ]
 }

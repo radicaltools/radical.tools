@@ -275,7 +275,10 @@ the base Studio compares with follows the branch checked out, and then
 `radical check <folder> --from-ci --quiet --detach`, which fetches the test
 results of CI for the commit checked out in the background (a command of its
 own, its output closed: a CLI built before `--from-ci` still saves the
-base, and without the GitHub CLI nothing is fetched). The line goes
+base, and without the GitHub CLI nothing is fetched). What it found, or why
+it found nothing, is kept in the model folder's `.state/ci-fetch.json`, which
+the Inspector and `radical setup --status` show; CI has to keep its test
+reports as artifacts (see *Test results from CI*). The line goes
 right after the hook's `#!` line, where an `exit` or `exec` further down
 cannot skip it; what the hooks already do stays. Each model folder of the
 repository has a line of its own, a second install adds nothing (or brings
@@ -512,14 +515,50 @@ test reports in it. Which artifacts hold reports is set in the repository's
 { "ci": { "artifacts": ["test-reports", "e2e-report"] } }
 ```
 
-(every artifact of the run without it). The results are kept in
+(every artifact of the run without it). **CI has to keep the reports as
+artifacts of the run**: reports kept elsewhere (S3, say) are not found. A
+GitHub Actions step after the tests:
+
+```yaml
+- uses: actions/upload-artifact@v4
+  if: always()          # failed tests are results too
+  with:
+    name: test-reports  # as "ci": { "artifacts": [...] } names it
+    path: reports/      # the Vitest/Jest/Playwright JSON or JUnit XML,
+                        # and the radical sense --out files
+```
+
+The results are kept in
 `.state/test-results.json` with the commit they stand for, the runs, when
 each ran and how many commits HEAD is past it, which the Inspector's *Tests*
-chip shows; the same runs a second time download nothing. Results read with
-`--report` at that commit or a later one are kept, and checked. `--quiet`
-prints nothing; `--detach` starts the check in the background and returns,
-as the git hooks of `radical hooks install` do after every checkout, commit,
-pull and rebase.
+chip shows (*· CI*, or *· local* for results read with `--report`); the same
+runs a second time download nothing. Results read with `--report` at that
+commit or a later one are kept, and checked. The `radical-metrics/1` files
+in the artifacts (what `radical sense --out` wrote in CI) are added to
+`.state/measurements.json` as `--metrics` adds them, each with the run and
+commit in its context (`ci.run`, `ci.commit`), so metrics measured in CI
+reach Studio too. `--quiet` prints nothing; `--detach` starts the check in
+the background and returns, as the git hooks of `radical hooks install` do
+after every checkout, commit, pull and rebase.
+
+What each fetch found is kept in `.state/ci-fetch.json`, with `--quiet` too:
+the runs and what was read, or why nothing was (no `gh`, no run with
+artifacts, no test report in them). The Inspector marks its *Tests* chip
+when the last fetch found no test results and says what it said, and
+`radical setup --status` prints the last fetch.
+
+### A check that keeps nothing
+
+```sh
+radical check path/to/model --report broken.json --no-keep
+```
+
+`--no-keep` reads the reports and measurements given and judges with them,
+but writes nothing beside the model: neither `.state/test-results.json` nor
+`.state/measurements.json` (nor, with `--from-ci`, `.state/ci-fetch.json`).
+For a check used as a gate whose verdict Studio should not show, such as a
+test of the gate on a deliberately broken report. `--evidence`, `--ratchet`
+and `--adopt` still write the file they name.
 
 ### Measured values
 

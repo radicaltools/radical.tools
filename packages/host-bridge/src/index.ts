@@ -118,7 +118,7 @@ export interface HostCapabilities {
    *  measurements (`.state/measurements.json`) and the rule settings
    *  (`check.json`), and the repository's `.radical/radical.json` (where it
    *  builds the model's elements); each is null when there is none. */
-  readCheckFiles?(folderPath: string): Promise<HostResult & { results?: string | null; measurements?: string | null; config?: string | null; reviews?: string | null; repository?: string | null }>
+  readCheckFiles?(folderPath: string): Promise<HostResult & { results?: string | null; measurements?: string | null; ciFetch?: string | null; config?: string | null; reviews?: string | null; repository?: string | null }>
   /** Write the rule settings and goals (`check.json`) of an md-folder model,
    *  as the Inspector's Settings save them. */
   writeCheckConfig?(folderPath: string, content: string): Promise<HostResult>

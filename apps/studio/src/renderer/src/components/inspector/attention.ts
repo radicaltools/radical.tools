@@ -73,13 +73,16 @@ export function modelChangedAt(editedAt: number | null, base: { savedAt: string 
 
 /** The latest of the measurements a sensor took (`reviews` false) or of the
  *  reviews (true), with their sources and count; null when there is none. */
-export function latestOf(measurements: Measurement[] | null, reviews: boolean): { at: number; count: number; sources: string[] } | null {
+export function latestOf(measurements: Measurement[] | null, reviews: boolean): { at: number; count: number; sources: string[]; fromCi: { count: number; runs: string[] } } | null {
   const list = (measurements ?? []).filter((m) => (m.source === 'review') === reviews)
   if (!list.length) return null
+  // Those radical check --from-ci read from the artifacts of a CI run.
+  const ci = list.filter((m) => m.context?.['ci.run'])
   return {
     at: Math.max(...list.map((m) => Date.parse(m.at)).filter((t) => Number.isFinite(t))),
     count: list.length,
     sources: [...new Set(list.map((m) => m.source))].sort(),
+    fromCi: { count: ci.length, runs: [...new Set(ci.map((m) => m.context!['ci.run']))].sort() },
   }
 }
 

@@ -5,10 +5,11 @@
 // manual fitness functions. A chip is marked when the model changed after
 // what it reads (or, when Studio cannot tell, when that is older than a
 // day), and opens to when it was read, from what, and the command that
-// reads it again.
+// reads it again. The Tests chip is marked too when the last fetch from CI
+// found no test results: the git hooks fetch with their output closed.
 
 import React, { useEffect, useRef, useState } from 'react'
-import { formatAge, testsRanAt, type Measurement, type TestResults } from '@radical/common/check'
+import { CI_ARTIFACTS_HINT, ciFetchProblem, formatAge, testsRanAt, type CiFetch, type Measurement, type TestResults } from '@radical/common/check'
 import { Command } from '../BranchChanges'
 import { ciTestsCommand, isOutdated, latestOf, measureCommands, measuredWhen, reviewCommand, runsWithPullRequest, testsAge, testsCommand, testsSource } from './attention'
 
@@ -48,8 +49,20 @@ function Chip({ name, text, marked, none, why, children }: ChipProps): React.Rea
   )
 }
 
-export function FreshnessChips({ results, measurements, folder, changedAt, waiting }: {
+/** What the last fetch from CI said, when it found no test results. */
+function FailedFetch({ fetch, problem }: { fetch: CiFetch; problem: string }): React.ReactElement {
+  return (
+    <div data-testid="ci-fetch-failed">
+      <p className="insp-age-why"><b>The last fetch from CI, {when(Date.parse(fetch.at))}, found no test results:</b> {problem.replace(/^radical check --from-ci: /, '')}</p>
+      <p>{CI_ARTIFACTS_HINT}.</p>
+    </div>
+  )
+}
+
+export function FreshnessChips({ results, measurements, ciFetch = null, folder, changedAt, waiting }: {
   results: TestResults | null; measurements: Measurement[] | null; folder: string
+  /** What the last fetch from CI found, when one ran. */
+  ciFetch?: CiFetch | null
   /** The fitness functions whose metric conditions wait for a measurement. */
   waiting: Array<{ id: string; label: string; trigger: string }>
   /** When the model last changed, when Studio knows (modelChangedAt). */
@@ -62,12 +75,16 @@ export function FreshnessChips({ results, measurements, folder, changedAt, waiti
   const ci = results?.ci
   const sensed = latestOf(measurements, false)
   const reviewed = latestOf(measurements, true)
+  const problem = ciFetchProblem(ciFetch)
+  const failedWhy = 'The last fetch from CI found no test results: the git hooks fetch them, and found none.'
+  const testsMarked = readAt !== null && isOutdated(readAt, now, changedAt)
   return (
     <span className="insp-ages" aria-label="Evidence">
       {readAt !== null ? (
-        <Chip name="Tests" text={`${testsAge(readAt, now)}${ci ? ' · CI' : ''}`} marked={isOutdated(readAt, now, changedAt)} why={why}>
+        <Chip name="Tests" text={`${testsAge(readAt, now)}${ci ? ' · CI' : ' · local'}`} marked={testsMarked || !!problem} why={problem && !testsMarked ? failedWhy : why}>
           <p><b>{ci ? `Test results of CI, run ${when(readAt)}` : `Test results read ${when(readAt)}`}</b>, {plural(results!.cases.length, 'test case')}.</p>
-          {isOutdated(readAt, now, changedAt) && <p className="insp-age-why">{why}</p>}
+          {testsMarked && <p className="insp-age-why">{why}</p>}
+          {problem && <FailedFetch fetch={ciFetch!} problem={problem} />}
           <p>{testsSource(results!)}.</p>
           {results!.kept && (
             <p data-testid="tests-kept">Of these, {plural(results!.kept.cases, 'test case')} in {plural(results!.kept.files, 'file')} {results!.kept.cases === 1 ? 'is' : 'are'} kept from what was read since {when(Date.parse(results!.kept.since))}: the reports read last do not have {results!.kept.files === 1 ? 'that file' : 'those files'}.</p>
@@ -82,8 +99,9 @@ export function FreshnessChips({ results, measurements, folder, changedAt, waiti
           <Command text={ci ? testsCommand(folder) : ciTestsCommand(folder)} />
         </Chip>
       ) : (
-        <Chip name="Tests" marked={false} none why={why}>
+        <Chip name="Tests" marked={!!problem} none why={problem ? failedWhy : why}>
           <p><b>No test results beside this model.</b></p>
+          {problem && <FailedFetch fetch={ciFetch!} problem={problem} />}
           <p>Fetch those of CI for the commit checked out, or run the tests and read their reports in the repository:</p>
           <Command text={ciTestsCommand(folder)} />
           <Command text={testsCommand(folder)} />
@@ -94,6 +112,7 @@ export function FreshnessChips({ results, measurements, folder, changedAt, waiti
           <p><b>Last measured {when(sensed.at)}</b>, {plural(sensed.count, 'measurement')}.</p>
           {isOutdated(sensed.at, now, changedAt) && <p className="insp-age-why">{why}</p>}
           <p className="insp-muted">By {sensed.sources.map((s, i) => <React.Fragment key={s}>{i ? ', ' : ''}<code>{s}</code></React.Fragment>)}.</p>
+          {sensed.fromCi.count > 0 && <p data-testid="measurements-from-ci">{sensed.fromCi.count === sensed.count ? 'All' : `${sensed.fromCi.count} of them`} from CI, run{sensed.fromCi.runs.length > 1 ? 's' : ''} {sensed.fromCi.runs.join(', ')}: <code>radical check --from-ci</code> reads them with the test results.</p>}
           <p>Measure again, and read what was measured:</p>
           {measureCommands(folder).map((c) => <Command key={c} text={c} />)}
         </Chip>

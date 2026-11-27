@@ -5,8 +5,9 @@
 // .state/test-results.json holds the test cases of the last run read with
 // --report, or downloaded from CI with --from-ci, for Studio to work out what
 // they say about the model as it is edited; .state/measurements.json holds
-// what sensors measured. Like the rest of .state/ they stay out of git: a
-// commit cannot hold the results of its own tests.
+// what sensors measured, and .state/ci-fetch.json what the last fetch from
+// CI found. Like the rest of .state/ they stay out of git: a commit cannot
+// hold the results of its own tests.
 
 import { STATE_DIR } from '../formats/canvasSelection'
 import { stripBom } from '../formats/mdFolder'
@@ -18,6 +19,9 @@ export const TEST_RESULTS_FILE = `${STATE_DIR}/test-results.json`
 /** The latest measurement of each metric and labels, as `radical sense`
  *  and `radical check --metrics` keep them for Studio (metrics.ts). */
 export const MEASUREMENTS_FILE = `${STATE_DIR}/measurements.json`
+/** What the last `radical check --from-ci` found, written also when it found
+ *  nothing: the git hooks run it with their output closed. */
+export const CI_FETCH_FILE = `${STATE_DIR}/ci-fetch.json`
 
 /** A CI run whose artifacts held test reports. */
 export interface CiRun {
@@ -40,6 +44,9 @@ export interface CiSource {
   /** How many commits HEAD was past it when they were downloaded. */
   behind: number
   runs: CiRun[]
+  /** How many measurements (radical-metrics/1 files) the runs' artifacts
+   *  held; absent in results downloaded before they were read. */
+  measurements?: number
 }
 
 export interface TestResults {
@@ -115,7 +122,7 @@ function ciSourceOf(value: unknown): CiSource | undefined {
   if (!ci || ci.provider !== 'github' || typeof ci.commit !== 'string' || typeof ci.behind !== 'number' || !Array.isArray(ci.runs)) return undefined
   const runs = ci.runs.filter((r): r is CiRun => !!r && typeof r.id === 'number' && typeof r.url === 'string' && typeof r.sha === 'string'
     && typeof r.ranAt === 'string' && typeof r.workflow === 'string' && Array.isArray(r.artifacts))
-  return { provider: 'github', commit: ci.commit, behind: ci.behind, runs }
+  return { provider: 'github', commit: ci.commit, behind: ci.behind, runs, ...(typeof ci.measurements === 'number' ? { measurements: ci.measurements } : {}) }
 }
 
 const STATUSES = new Set<TestStatus>(['passed', 'failed', 'skipped'])
@@ -161,4 +168,58 @@ export function parseCheckConfig(text: string): CheckConfig {
       throw new Error('"ci" is an object whose "artifacts" lists the names of the CI artifacts that hold test reports')
   }
   return data as CheckConfig
+}
+
+// ─── The last fetch from CI ─────────────────────────────────────────────────
+
+/** What a fetch from CI found: the results of CI read, the same runs as
+ *  the results kept, results kept that were read with --report at a later
+ *  commit, or nothing (no gh, no run with artifacts, no report in them). */
+export type CiFetchOutcome = 'read' | 'same' | 'kept' | 'failed'
+
+export interface CiFetch {
+  version: 1
+  /** When it fetched (ISO time). */
+  at: string
+  /** HEAD when it fetched. */
+  head?: string
+  outcome: CiFetchOutcome
+  /** What it said, as the command prints it. */
+  message: string
+  /** The commit the runs stand for, and the runs. */
+  commit?: string
+  runs?: Array<{ id: number; url: string }>
+  /** How many test cases and measurements the artifacts held. */
+  tests?: number
+  measurements?: number
+}
+
+/** What CI has to do for --from-ci to find something: said where a fetch found nothing. */
+export const CI_ARTIFACTS_HINT = 'CI has to keep its test reports (and its radical sense --out files) as artifacts of the run, named in .radical/radical.json\'s "ci": { "artifacts": [...] }'
+
+export const serializeCiFetch = (fetch: Omit<CiFetch, 'version'>): string => JSON.stringify({ version: 1, ...fetch } satisfies CiFetch, null, 2) + '\n'
+
+const OUTCOMES = new Set<CiFetchOutcome>(['read', 'same', 'kept', 'failed'])
+
+/** The record in `text`, or null when it is none. */
+export function parseCiFetch(text: string): CiFetch | null {
+  let data: unknown
+  try { data = JSON.parse(text) } catch { return null }
+  const f = data as Partial<CiFetch>
+  if (f?.version !== 1 || typeof f.at !== 'string' || Number.isNaN(Date.parse(f.at)) || !OUTCOMES.has(f.outcome as CiFetchOutcome) || typeof f.message !== 'string') return null
+  const runs = Array.isArray(f.runs) ? f.runs.filter((r) => !!r && typeof r.id === 'number' && typeof r.url === 'string').map((r) => ({ id: r.id, url: r.url })) : undefined
+  return {
+    version: 1, at: f.at, outcome: f.outcome as CiFetchOutcome, message: f.message,
+    ...(typeof f.head === 'string' ? { head: f.head } : {}), ...(typeof f.commit === 'string' ? { commit: f.commit } : {}),
+    ...(runs?.length ? { runs } : {}), ...(typeof f.tests === 'number' ? { tests: f.tests } : {}), ...(typeof f.measurements === 'number' ? { measurements: f.measurements } : {}),
+  }
+}
+
+/** Why the last fetch left the results of CI out, or null when it read
+ *  them: it could not fetch, or the artifacts held no test report. */
+export function ciFetchProblem(fetch: CiFetch | null): string | null {
+  if (!fetch) return null
+  if (fetch.outcome === 'failed') return fetch.message
+  if (fetch.outcome === 'read' && fetch.tests === 0) return fetch.message
+  return null
 }

@@ -1018,7 +1018,7 @@ export interface DocumentsAPI {
    *  all null for a document
    *  that is no folder. Null when the folder cannot be read yet (a browser
    *  folder before its access is back). */
-  readCheckFiles(id: string): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null; repository: string | null } | null>
+  readCheckFiles(id: string): Promise<{ results: string | null; measurements: string | null; ciFetch: string | null; config: string | null; reviews: string | null; repository: string | null } | null>
   /** Writes check.json beside an md-folder model; throws when the document
    *  is no folder or its folder cannot be written. */
   writeCheckConfig(id: string, content: string): Promise<void>
@@ -1673,11 +1673,11 @@ export const documents: DocumentsAPI = {
 
   async readCheckFiles(id) {
     const meta = readIndex().docs.find((d) => d.id === id)
-    if (meta?.source !== 'md') return { results: null, measurements: null, config: null, reviews: null, repository: null }
+    if (meta?.source !== 'md') return { results: null, measurements: null, ciFetch: null, config: null, reviews: null, repository: null }
     const h = host()
     if (meta.folderPath && h.readCheckFiles) {
       const res = await h.readCheckFiles(meta.folderPath)
-      return res.success ? { results: res.results ?? null, measurements: res.measurements ?? null, config: res.config ?? null, reviews: res.reviews ?? null, repository: res.repository ?? null } : null
+      return res.success ? { results: res.results ?? null, measurements: res.measurements ?? null, ciFetch: res.ciFetch ?? null, config: res.config ?? null, reviews: res.reviews ?? null, repository: res.repository ?? null } : null
     }
     if (h.readFolder || !connectedWebHandles.has(id)) return null
     const handle = await loadHandle(id)

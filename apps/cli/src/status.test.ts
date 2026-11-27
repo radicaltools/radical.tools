@@ -55,6 +55,25 @@ describe('radical setup --status', () => {
       .toMatch(/✗ its repository's mapping does not read: .*radical\.json: implements\[0\] needs "element" \(an id\) and "paths" \(a list of folders\)/)
   })
 
+  it('names the last fetch from CI, and warns when it found no test results', async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), 'radical-status-')))
+    dirs.push(root)
+    const folder = join(root, '.radical', 'model')
+    for (const [path, content] of Object.entries(serializeToMdFolder({ metamodel: builtInGovernanceMetamodel(), nodes: [], relations: [] }, 'shop'))) {
+      await mkdir(dirname(join(folder, path)), { recursive: true })
+      await writeFile(join(folder, path), content)
+    }
+    await exec('git', ['init', '-q'], { cwd: root })
+    await mkdir(join(folder, '.state'), { recursive: true })
+    const at = new Date(Date.now() - 3 * 3600e3).toISOString()
+    await writeFile(join(folder, '.state', 'ci-fetch.json'), JSON.stringify({ version: 1, at, outcome: 'failed', message: 'radical check --from-ci: the artifacts of run 11 hold no test report and no radical-metrics/1 file' }))
+    const failed = await run(root, join(root, 'home'), ['setup', '--status', '--no-start'])
+    expect(failed.out).toContain('! the last fetch from CI (3 h ago) found no test results: the artifacts of run 11 hold no test report and no radical-metrics/1 file. CI has to keep its test reports')
+    expect(failed.out).toContain('"ci": { "artifacts": [...] }')
+    await writeFile(join(folder, '.state', 'ci-fetch.json'), JSON.stringify({ version: 1, at, outcome: 'read', message: 'Test results of CI run 11 for 0023cdb.', commit: '0023cdb', runs: [{ id: 11, url: 'https://github.com/o/r/actions/runs/11' }], tests: 2 }))
+    expect((await run(root, join(root, 'home'), ['setup', '--status', '--no-start'])).out).toContain('✓ the last fetch from CI (3 h ago): Test results of CI run 11 for 0023cdb.')
+  })
+
   it('reports what works and what stops the agent, and starts the servers for the folder', async () => {
     const root = await realpath(await mkdtemp(join(tmpdir(), 'radical-status-')))
     dirs.push(root)

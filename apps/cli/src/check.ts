@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, realpath, rename, stat, writeFile } from 'nod
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { CHECK_CONFIG_FILE, CHECK_METRICS, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, formatTrace, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, plainRuleText, adoptBaselines, existingCodeCheckConfig, ratchetConfig, reviewMeasurements, runCheck, serializeCheckConfig, serializeMeasurementStore, serializeTestResults, splitTestId, testsRanAt, traceOf, withBoundTests, withEarlierResults, type CheckConfig, type CiSource, type KeptCases, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CHECK_METRICS, CI_FETCH_FILE, serializeCiFetch, type CiFetch, CHECK_RULES, FOLDER_RULES, GOAL_RULE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE, formatCheckGithub, formatCheckText, formatTrace, mergeMeasurements, parseCheckConfig, parseMeasurementStore, parseMetricsFile, parseReviewsFile, parseTestReport, parseTestResults, plainRuleText, adoptBaselines, existingCodeCheckConfig, ratchetConfig, reviewMeasurements, runCheck, serializeCheckConfig, serializeMeasurementStore, serializeTestResults, splitTestId, testsRanAt, traceOf, withBoundTests, withEarlierResults, type CheckConfig, type CiSource, type KeptCases, type Measurement, type RepositoryMapping, type TestCase } from '@radical/common/check'
 import { MdFolderSession } from '@radical/common/formats/mdFolderSync'
 import { DEPS_FILE } from '@radical/common/federation'
 import { STATE_DIR, SELECTION_GITIGNORE_CONTENT } from '@radical/common/formats/canvasSelection'
@@ -43,8 +43,19 @@ its own ("model": { "repo": … }), it judges that repository's part of the mode
                       the run. They are kept for Studio as --report keeps
                       them, with the commit and runs they come from, unless
                       the results there were read with --report at that
-                      commit or a later one. radical hooks install fetches
+                      commit or a later one. The radical-metrics/1 files in
+                      the artifacts (radical sense --out) are added to the
+                      measurements, as --metrics adds them. What it found,
+                      or why it found nothing, is kept in the folder's
+                      .state/ci-fetch.json, with --quiet too, for Studio and
+                      radical setup --status. CI has to keep the reports as
+                      artifacts of the run. radical hooks install fetches
                       them after a checkout, a commit, a pull and a rebase
+  --no-keep           read the reports and measurements given and judge with
+                      them, but keep nothing beside the model: what Studio
+                      shows stays as it was (a check used as a gate, a test
+                      of the gate). --evidence, --ratchet and --adopt still
+                      write the file they name
   --quiet             print nothing (the git hooks fetch with --from-ci --quiet)
   --detach            start this check in the background and return at once
                       (the git hooks, which git waits for)
@@ -148,6 +159,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
         format: { type: 'string', default: 'text' },
         report: { type: 'string', multiple: true },
         'from-ci': { type: 'boolean', default: false },
+        'no-keep': { type: 'boolean', default: false },
         quiet: { type: 'boolean', default: false },
         detach: { type: 'boolean', default: false },
         metrics: { type: 'string', multiple: true },
@@ -176,6 +188,8 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     return 0
   }
   const fromCi = values['from-ci']
+  // Nothing kept beside the model: what Studio shows stays as it was.
+  const keepBeside = !values['no-keep']
   if (positionals.length > 1 || !['text', 'json', 'github'].includes(values.format) || (fromCi && values.report?.length)
     || (values.evidence && !values.report?.length && !fromCi && !values.metrics?.length)
     || (values.trace !== undefined && (!values.trace.trim() || values.format === 'github' || values.ratchet || values.adopt))) {
@@ -260,22 +274,32 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   let keep: { reports: string[]; ci?: CiSource; commit?: string } | undefined
   // What a run of some test files leaves of the results kept before it.
   let keptCases: KeptCases | undefined
+  // The measurements in CI's artifacts, added to those kept.
+  let ciMeasurements: Measurement[] = []
   if (fromCi) {
     const say = (text: string) => { if (!values.quiet) io.err(text) }
-    const resultsPath = join(root, TEST_RESULTS_FILE)
     const existing = parseTestResults(await readEditorStateFile(root, TEST_RESULTS_FILE) ?? '')
     const gh = io.gh ?? ghCli(io.env ?? process.env)
+    const head = (await headOf(root)) ?? undefined
+    // What this fetch found, kept also when it found nothing: the git hooks
+    // run it with their output closed.
+    const record = async (fetch: Omit<CiFetch, 'version' | 'at' | 'head'>): Promise<void> => {
+      if (keepBeside) await writeBeside(join(root, CI_FETCH_FILE), serializeCiFetch({ at: new Date().toISOString(), ...(head ? { head } : {}), ...fetch }))
+    }
     let got
     try {
       got = await withFetchLock(root, async () => {
         // CI's artifacts: the repository's .radical/radical.json says, else check.json.
         const source = await findCiRuns(root, gh, repository?.ci?.artifacts ?? config.ci?.artifacts)
         if (await readLater(root, existing, source.commit)) return { source, kept: existing! }
-        if (sameRuns(existing, source)) return { source, cases: existing!.cases, reports: existing!.reports }
-        return { source, ...await downloadCiReports(root, gh, source) }
+        if (sameRuns(existing, source)) return { source: { ...source, measurements: existing!.ci!.measurements }, same: true, cases: existing!.cases, reports: existing!.reports, measurements: [] }
+        const read = await downloadCiReports(root, gh, source)
+        return { source: { ...source, measurements: read.measurements.length }, ...read }
       })
     } catch (error) {
-      say(`radical check --from-ci: ${error instanceof CiError ? error.message : (error as Error).message}`)
+      const message = error instanceof CiError ? error.message : (error as Error).message
+      await record({ outcome: 'failed', message: `radical check --from-ci: ${message}` }).catch(() => {})
+      say(`radical check --from-ci: ${message}`)
       return 2
     }
     if (!got) {
@@ -284,15 +308,30 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
     }
     const { source } = got
     const runs = `run${source.runs.length > 1 ? 's' : ''} ${source.runs.map((r) => r.id).join(', ')}${source.runs[0]?.pr ? ` (pull request #${source.runs[0].pr})` : ''}`
+    const from = { commit: source.commit, runs: source.runs.map((r) => ({ id: r.id, url: r.url })) }
+    const behind = source.behind ? `, ${source.behind} commit${source.behind > 1 ? 's' : ''} before HEAD` : ''
     if (got.kept) {
       tests = got.kept.cases
       testsReadAt = got.kept.readAt
-      say(`Kept the test results read with --report at ${got.kept.commit!.slice(0, 7)}: CI's (${runs}) are of ${source.commit.slice(0, 7)}, before it.`)
+      const message = `Kept the test results read with --report at ${got.kept.commit!.slice(0, 7)}: CI's (${runs}) are of ${source.commit.slice(0, 7)}, before it.`
+      await record({ outcome: 'kept', message, ...from })
+      say(message)
     } else {
-      tests = got.cases!
-      testsReadAt = testsRanAt({ version: 1, readAt: new Date().toISOString(), reports: [], cases: [], ci: source })
-      keep = { reports: got.reports!, ci: source, commit: (await headOf(root)) ?? undefined }
-      say(`Test results of CI ${runs} for ${source.commit.slice(0, 7)}${source.behind ? `, ${source.behind} commit${source.behind > 1 ? 's' : ''} before HEAD` : ''}.`)
+      ciMeasurements = got.measurements!
+      const measured = ciMeasurements.length ? `; ${ciMeasurements.length} measurement${ciMeasurements.length === 1 ? '' : 's'}` : ''
+      if (got.cases!.length) {
+        tests = got.cases!
+        testsReadAt = testsRanAt({ version: 1, readAt: new Date().toISOString(), reports: [], cases: [], ci: source })
+        keep = { reports: got.reports!, ci: source, commit: head }
+        const message = `${got.same ? 'The same test results of CI' : 'Test results of CI'} ${runs} for ${source.commit.slice(0, 7)}${behind}${measured}.`
+        await record({ outcome: got.same ? 'same' : 'read', message, ...from, tests: tests.length, ...(got.same ? {} : { measurements: ciMeasurements.length }) })
+        say(message)
+      } else {
+        // Measurements only: the test results kept stay as they were.
+        const message = `The artifacts of CI ${runs} for ${source.commit.slice(0, 7)}${behind} hold no test report${measured}.`
+        await record({ outcome: 'read', message, ...from, tests: 0, measurements: ciMeasurements.length })
+        say(message)
+      }
     }
   } else if (values.report?.length) {
     tests = []
@@ -338,16 +377,18 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
   const kept = await readEditorStateFile(root, MEASUREMENTS_FILE)
   const stored = kept === null ? null : parseMeasurementStore(kept)
   let measurements: Measurement[] | undefined = stored ?? undefined
+  const read: Measurement[] = [...ciMeasurements]
   if (values.metrics?.length) {
-    const read: Measurement[] = []
     try {
       for (const file of await reportFiles(values.metrics, io.cwd, /\.json$/i, 'measurement')) read.push(...parseMetricsFile(await readFile(resolve(io.cwd, file), 'utf8'), file))
     } catch (error) {
       io.err((error as NodeJS.ErrnoException).code === 'ENOENT' ? `Cannot read the measurements ${(error as NodeJS.ErrnoException).path}: no such file.` : (error as Error).message)
       return 2
     }
+  }
+  if (read.length) {
     measurements = mergeMeasurements(stored ?? [], read)
-    await writeBeside(join(root, MEASUREMENTS_FILE), serializeMeasurementStore(measurements))
+    if (keepBeside) await writeBeside(join(root, MEASUREMENTS_FILE), serializeMeasurementStore(measurements))
   }
 
   // The reviews of manual fitness functions, kept in git beside the model.
@@ -418,7 +459,7 @@ export async function checkCommand(args: string[], io: Io): Promise<number> {
       if (adopted.notRun.length) io.err(`Not run, so no baseline taken (give the test reports with --report, the measurements with --metrics): ${adopted.notRun.join(', ')}.`)
     }
   }
-  if (tests && !fromKept && (keep || !fromCi)) {
+  if (tests && keepBeside && !fromKept && (keep || !fromCi)) {
     // For Studio, which works out from them what the tests say about the
     // model while it is edited; with the commit they were read at, so
     // results of CI never replace those of a later one.

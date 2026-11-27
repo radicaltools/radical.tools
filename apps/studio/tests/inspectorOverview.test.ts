@@ -93,8 +93,11 @@ describe('how old the evidence is', () => {
   it('tells the measurements a sensor took from the reviews', () => {
     const m = (source: string, at: number): Measurement => ({ metric: 'x', value: 1, labels: {}, source, at: new Date(at).toISOString() })
     const all = [m('json', now - 3 * 3600e3), m('k6', now - 2 * 3600e3), m('review', now - 2 * DAY)]
-    expect(latestOf(all, false)).toEqual({ at: now - 2 * 3600e3, count: 2, sources: ['json', 'k6'] })
-    expect(latestOf(all, true)).toEqual({ at: now - 2 * DAY, count: 1, sources: ['review'] })
+    expect(latestOf(all, false)).toEqual({ at: now - 2 * 3600e3, count: 2, sources: ['json', 'k6'], fromCi: { count: 0, runs: [] } })
+    expect(latestOf(all, true)).toEqual({ at: now - 2 * DAY, count: 1, sources: ['review'], fromCi: { count: 0, runs: [] } })
+    // Those radical check --from-ci read from a run's artifacts.
+    const ci = { ...m('json', now), context: { 'ci.run': '11', 'ci.commit': 'feedface' } }
+    expect(latestOf([...all, ci, { ...ci, metric: 'y' }], false)!.fromCi).toEqual({ count: 2, runs: ['11'] })
     expect(latestOf([m('json', now)], true)).toBeNull()
     expect(latestOf(null, false)).toBeNull()
   })

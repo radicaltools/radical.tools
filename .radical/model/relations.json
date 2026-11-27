@@ -3204,6 +3204,13 @@
     "targetId": "49fa95f2-b9ea-4884-9372-581264580278"
   },
   {
+    "id": "20e40013-e0d6-4bca-a664-9fd191cd1cbb",
+    "quote": "--from-ci reads the metrics too (Recommended): the same artifacts (ci.artifacts in radical.json): radical-metrics/1 files go to .state/measurements.json, merged by the time of measurement (the latest wins, as today). … The Measurements chip says which come from CI (run, commit).",
+    "relationType": "derives",
+    "sourceId": "6e373c10-1d13-411c-893d-0c6ee252fc11",
+    "targetId": "2a496bde-c1cf-4a4a-b21f-c284328d0946"
+  },
+  {
     "id": "21061cf9-78ee-4fd6-8d11-5f3852392174",
     "relationType": "derives",
     "sourceId": "95b99c2c-25b2-45a4-96b5-b2197f8dd151",
@@ -4881,6 +4888,12 @@
     "targetId": "84c3c340-640a-4800-9129-a0ef02aff439"
   },
   {
+    "id": "30b60283-ece3-4db9-8b83-b949630ae102",
+    "relationType": "satisfies",
+    "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
+    "targetId": "2e699d1c-077b-43c0-ad14-38fc74b322ae"
+  },
+  {
     "id": "30c625f5-ca12-46b6-af41-19cba6319bcb",
     "relationType": "verifies",
     "sourceId": "105c1efd-b898-431c-a02f-0fa75eb8d159",
@@ -6431,6 +6444,13 @@
     "relationType": "verifies",
     "sourceId": "482dadb5-2870-478f-8ca9-dad42e0e797f",
     "targetId": "f5f7cd11-2115-4632-8785-5bdf4e67cb80"
+  },
+  {
+    "id": "3ecc658c-f531-421a-8e9c-6a11751f4209",
+    "quote": "check reads --report and --metrics and judges, but writes nothing beside the model (neither test-results.json nor measurements.json). --evidence, --ratchet and --adopt still write",
+    "relationType": "derives",
+    "sourceId": "996d50e9-092d-4908-873c-d08fe5bb0372",
+    "targetId": "2a496bde-c1cf-4a4a-b21f-c284328d0946"
   },
   {
     "id": "3ed5407d-d49c-4a07-b2fa-ee0c02aba210",
@@ -8258,6 +8278,13 @@
     "targetId": "8c66e024-79f9-42d0-86cd-843cefd2a7ef"
   },
   {
+    "id": "4f832317-1116-4e04-a2ce-86b80e564262",
+    "quote": "The Inspector's Tests chip marks a failed last fetch and gives the message and what to do (e.g. \"CI does not upload test reports as artifacts\"). … Plus \"· local\" on the chip for --report results.",
+    "relationType": "derives",
+    "sourceId": "6a7e1aa4-6624-416d-848f-72c6ab944684",
+    "targetId": "2a496bde-c1cf-4a4a-b21f-c284328d0946"
+  },
+  {
     "id": "4fb0b566-687b-4afd-b5cb-8641d3b0e78e",
     "relationType": "verifies",
     "sourceId": "8019ac4c-df3a-491c-8c24-e2f91f41b29d",
@@ -9498,6 +9525,12 @@
     "relationType": "derives",
     "sourceId": "8a276a1a-bb87-49ae-9325-34bddce6a6a7",
     "targetId": "104eb9ed-8c87-4875-9339-a251240b3897"
+  },
+  {
+    "id": "5c6c7dfc-14d6-47b8-95d9-2040bab75611",
+    "relationType": "verifies",
+    "sourceId": "e5ca32d4-6d70-46d3-8c31-d421db9c25a5",
+    "targetId": "6a7e1aa4-6624-416d-848f-72c6ab944684"
   },
   {
     "description": "Modelling provides node discussions for desktop and connected browser folder models; broader object targets and Confluence synchronization remain future scope.",
@@ -14886,6 +14919,12 @@
     "targetId": "e3f93dc0-7070-42c9-8480-649e366a328b"
   },
   {
+    "id": "8f109b56-525b-4eef-b933-f161ea0eeedf",
+    "relationType": "verifies",
+    "sourceId": "568c3709-5675-4bc0-80d3-0f1b6e1c686e",
+    "targetId": "996d50e9-092d-4908-873c-d08fe5bb0372"
+  },
+  {
     "id": "8f14b97c-b39f-43ae-99f0-c937c746feb1",
     "relationType": "verifies",
     "sourceId": "d6a339c2-2253-4eee-a91e-8e234d7d8788",
@@ -16059,6 +16098,12 @@
     "relationType": "satisfies",
     "sourceId": "ff9c535a-4924-4b30-b055-0a329c542dea",
     "targetId": "1533ed1d-a405-4cb8-bc92-491e292d0cc8"
+  },
+  {
+    "id": "9a868b4a-b025-46b7-a5ae-59eb91b33e68",
+    "relationType": "verifies",
+    "sourceId": "2071d95e-73e5-4d05-9cc7-eaea6ddd9656",
+    "targetId": "e61e1909-8819-4213-aa6f-5780c2eb0607"
   },
   {
     "id": "9a8b88a9-e10a-42ea-8992-b725933f2eb7",
@@ -17546,6 +17591,12 @@
     "targetId": "f37f49bf-f711-4f4e-8979-286492a7d484"
   },
   {
+    "id": "a8ae5b2f-703f-4b52-98af-ecd11cf68d12",
+    "relationType": "satisfies",
+    "sourceId": "3027b577-5042-4975-a7cf-0aad08adb14f",
+    "targetId": "e61e1909-8819-4213-aa6f-5780c2eb0607"
+  },
+  {
     "id": "a8b1e042-84b7-4e66-b7fa-18fc4f3ce29d",
     "relationType": "satisfies",
     "sourceId": "08c445dd-e14d-47dd-b4b1-1776a539dcbc",
@@ -18721,6 +18772,12 @@
     "relationType": "constrains",
     "sourceId": "1dcb9da1-2feb-417a-9529-49085beb63d4",
     "targetId": "c681fcc0-29ea-49b4-827a-2b2db809a513"
+  },
+  {
+    "id": "b35c738b-4dff-4879-9e54-ac6551a93e8d",
+    "relationType": "verifies",
+    "sourceId": "7b5e2584-3d78-4530-aac8-734cabe989b8",
+    "targetId": "6e373c10-1d13-411c-893d-0c6ee252fc11"
   },
   {
     "id": "b36fdcae-e811-4418-bf9f-daf9d2c2d5e5",
@@ -20332,6 +20389,13 @@
     "targetId": "ff9c535a-4924-4b30-b055-0a329c542dea"
   },
   {
+    "id": "c3b54b12-ec1f-4315-8dc3-19f82689fb1f",
+    "quote": "radical setup --status prints the last fetch too.",
+    "relationType": "derives",
+    "sourceId": "e61e1909-8819-4213-aa6f-5780c2eb0607",
+    "targetId": "2a496bde-c1cf-4a4a-b21f-c284328d0946"
+  },
+  {
     "id": "c3c0be3d-ce5e-40e7-8dda-437005d89251",
     "relationType": "verifies",
     "sourceId": "6e105358-ed25-489c-931f-d35768dcfcbb",
@@ -20780,6 +20844,12 @@
     "relationType": "derives",
     "sourceId": "06516616-7c8d-48a6-a951-b1e2e23fecc2",
     "targetId": "a6fb0b37-f3ed-4e0c-84a5-1e2b313bed12"
+  },
+  {
+    "id": "c7c151f1-b226-4786-b31c-c39576601085",
+    "relationType": "satisfies",
+    "sourceId": "67e8199c-9c68-4ca4-9cbe-28b449acf5a4",
+    "targetId": "6a7e1aa4-6624-416d-848f-72c6ab944684"
   },
   {
     "id": "c7df6c85-a914-45ec-9217-eb9c8b838b62",
@@ -23627,6 +23697,12 @@
     "targetId": "b648d253-5b56-4e46-8f44-1a720925fefb"
   },
   {
+    "id": "e108974c-1564-4925-807c-855ac5e2f1be",
+    "relationType": "satisfies",
+    "sourceId": "67e8199c-9c68-4ca4-9cbe-28b449acf5a4",
+    "targetId": "6e373c10-1d13-411c-893d-0c6ee252fc11"
+  },
+  {
     "id": "e117dc04-393d-4d54-8626-a240dfb4b6ee",
     "label": "bundled into",
     "relationType": "interacts",
@@ -24033,6 +24109,12 @@
     "targetId": "827d041a-94b9-4875-a336-90aab022a628"
   },
   {
+    "id": "e5a32c55-359b-485c-9126-0077008fa76b",
+    "relationType": "verifies",
+    "sourceId": "858a1762-b233-4f71-aaac-e3ec2e2cd8f5",
+    "targetId": "2e699d1c-077b-43c0-ad14-38fc74b322ae"
+  },
+  {
     "id": "e5aa0c57-1268-43ef-9ee0-0bd820567f3f",
     "relationType": "traces-to",
     "sourceId": "648c3c4c-96a7-42dc-99af-9941090d6183",
@@ -24098,6 +24180,13 @@
     "relationType": "satisfies",
     "sourceId": "c681fcc0-29ea-49b4-827a-2b2db809a513",
     "targetId": "7d3b91fe-3717-465a-89e3-46a0e1f88681"
+  },
+  {
+    "id": "e6257e44-ffd6-44a7-8db0-2d1b3c7451f5",
+    "quote": "every --from-ci attempt, --quiet included, writes .state/ci-fetch.json (time, HEAD, outcome, CI's message)",
+    "relationType": "derives",
+    "sourceId": "2e699d1c-077b-43c0-ad14-38fc74b322ae",
+    "targetId": "2a496bde-c1cf-4a4a-b21f-c284328d0946"
   },
   {
     "id": "e64277f9-6a62-4cca-970b-7cdba721ddde",
@@ -25310,6 +25399,12 @@
     "targetId": "a9394a73-6e11-43a8-a8af-1fa1e42ba31f"
   },
   {
+    "id": "f3197e1a-5cc1-46ab-8d54-3d22806df1c5",
+    "relationType": "satisfies",
+    "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
+    "targetId": "6e373c10-1d13-411c-893d-0c6ee252fc11"
+  },
+  {
     "id": "f333424c-f4f9-40f8-b552-96d3a2140d5d",
     "relationType": "constrains",
     "sourceId": "ebfb317a-e388-4c3c-85f9-7dcdd7c5316a",
@@ -26431,6 +26526,12 @@
     "relationType": "verifies",
     "sourceId": "e7514bfa-6fc2-4430-aeea-970d747db9e2",
     "targetId": "95058b84-577d-47ed-b8cb-65445f1c7aba"
+  },
+  {
+    "id": "fd64b31d-7c64-46c4-a8ed-381b0c68f6eb",
+    "relationType": "satisfies",
+    "sourceId": "0af45fb7-1a0a-48d6-a284-1d8af52a44a1",
+    "targetId": "996d50e9-092d-4908-873c-d08fe5bb0372"
   },
   {
     "id": "fd6c3c4e-3100-44e2-a016-01154a7c981f",
