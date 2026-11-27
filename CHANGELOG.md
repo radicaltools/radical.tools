@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- radical.tools links to the [Radical Tools YouTube channel](https://www.youtube.com/@Radical-Tools): an icon in the site navigation (the web pages and the Hub) and a link in the footer. The videos play on the page, in a dialog: the home page has the two-minute introduction (**Watch the introduction**), the Use cases page the playlist of all seven (**Watch all seven**) and each use case its own video (**Watch**), which goes on to the next. The player is loaded from youtube-nocookie only when a video is opened and removed when it is closed; without script each button is a link to the video on YouTube.
+
 ## [0.6.1] - 2026-11-27
 
 ### Added
