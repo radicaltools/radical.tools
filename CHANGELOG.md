@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-27
+
 ### Added
 - A fetch from CI that finds nothing is no longer silent. Every `radical check --from-ci`, with `--quiet` too, keeps what it found in `.state/ci-fetch.json`: the runs and what it read, or why it read nothing (no `gh`, no run with artifacts, no test report in them). The Inspector marks its Tests chip when the last fetch found no test results and says what it said and what CI has to do; `radical setup --status` prints the last fetch and warns of one that found nothing. The git hooks run the fetch with their output closed, so a CI that kept its reports elsewhere left Studio showing old results without a word.
 - `radical check --no-keep` judges with the reports and measurements it is given and keeps nothing beside the model, so a check used as a gate (a test of the gate on a deliberately broken report) no longer changes what Studio shows.
@@ -484,7 +486,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Live physics: expanding a container in a grid of containers that sits in another alignment (a column of groups holding a grid of groups) could leave the canvas shaking for good, the groups flipping thousands of pixels between two places: a line inside a container now moves with it, and on a large diagram the elements aligned with a container that grows are no longer held in place. A run with an alignment of containers stops after 4 s if it has not come to rest by then
 - Presentation slides without a captured canvas (the sample model's walkthrough, imported slides) lay nodes out with their view's saved positions instead of whatever layout was on screen, so they no longer need a Smart Layout to look right; a slide after a milestone slide shows the live model again instead of the milestone's subset
 
-[Unreleased]: https://github.com/radicaltools/radical.tools/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/radicaltools/radical.tools/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/radicaltools/radical.tools/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/radicaltools/radical.tools/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/radicaltools/radical.tools/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/radicaltools/radical.tools/compare/v0.3.4...v0.4.0
