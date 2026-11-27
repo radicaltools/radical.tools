@@ -6,7 +6,7 @@ import {
 } from '@radical/common/formats/canvasSelection'
 import { FORGE_RUN_FILE, parseForgeRun, type ForgeRunStatus } from '@radical/common/formats/forgeRunStatus'
 import { ASSAY_RUN_FILE } from '@radical/common/formats/assayRunStatus'
-import { CHECK_CONFIG_FILE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE } from '@radical/common/check'
+import { CHECK_CONFIG_FILE, CI_FETCH_FILE, MEASUREMENTS_FILE, REVIEWS_FILE, TEST_RESULTS_FILE } from '@radical/common/check'
 import { DEPS_FILE, FEDERATION_FILE } from '@radical/common/federation'
 import { REPOSITORY_FILE } from '@radical/common/repositoryMapping'
 import { REVIEWS_FILE as REPOSITORY_REVIEWS, findRepositoryFile, mappingRoot, repositoryFileOf } from './repositoryLayout'
@@ -98,20 +98,22 @@ async function readModelFile(root: string, name: string): Promise<string | null>
 }
 
 /** What `radical check` and `radical sense` keep beside a model for Studio:
- *  the test results and the measurements under `.state/`, and the model's
+ *  the test results, the measurements and the record of the last fetch
+ *  from CI under `.state/`, and the model's
  *  own check.json and reviews.json (the reviews of its manual fitness
  *  functions, kept in git), and the repository's .radical/radical.json;
  *  null for one that is not there. */
-export async function readCheckFiles(root: string): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null; repository: string | null }> {
+export async function readCheckFiles(root: string): Promise<{ results: string | null; measurements: string | null; ciFetch: string | null; config: string | null; reviews: string | null; repository: string | null }> {
   const results = await readEditorStateFile(root, TEST_RESULTS_FILE)
   const measurements = await readEditorStateFile(root, MEASUREMENTS_FILE)
+  const ciFetch = await readEditorStateFile(root, CI_FETCH_FILE)
   const config = await readModelFile(root, CHECK_CONFIG_FILE)
   // The repository's .radical/reviews.json, else the model folder's.
   const reviews = await readFile(join(await mappingRoot(root), REPOSITORY_REVIEWS), 'utf-8').catch(() => null) ?? await readModelFile(root, REVIEWS_FILE)
   // Where the repository builds the model's elements, for the card.
   const found = await findRepositoryFile(root, REPOSITORY_FILE, REPOSITORY_FILE)
   const repository = found ? await readFile(found.path, 'utf-8').catch(() => null) : null
-  return { results, measurements, config, reviews, repository }
+  return { results, measurements, ciFetch, config, reviews, repository }
 }
 
 /** What a federation keeps beside a model for Studio: its own deps.json

@@ -2,7 +2,7 @@ import { expect } from '../../support/fixtures'
 import { ModelFolder, test } from '../../support/folder'
 import { serializeToMdFolder } from '@radical/common/formats/mdFolder'
 import { builtInGovernanceMetamodel } from '@radical/common/metamodel'
-import { serializeMeasurementStore, serializeTestResults, type TestCase } from '@radical/common/check'
+import { serializeCiFetch, serializeMeasurementStore, serializeTestResults, type TestCase } from '@radical/common/check'
 import { serializeModelBase } from '@radical/common/formats/modelBase'
 import type { C4Node, DiagramData } from '@radical/common/c4'
 import type { Page } from '@playwright/test'
@@ -338,6 +338,46 @@ test('the Inspector header says how old the test results are, and how to read th
   // Nothing measured, and no reviews to speak of.
   await expect(page.locator('.insp-topbar .insp-age', { hasText: /measurements/i })).toHaveText('No measurements')
   await expect(page.locator('.insp-topbar .insp-age', { hasText: /reviews/i })).toHaveCount(0)
+})
+
+test('the Tests chip says when the last fetch from CI found no test results, and which measurements came from CI', async ({ page, studio }) => {
+  const folder = new ModelFolder(page)
+  await folder.install()
+  await page.goto('/')
+  for (const [path, content] of Object.entries(serializeToMdFolder(MODEL, 'Shop'))) await folder.write(path, content)
+  // Results read here an hour ago; the hooks' fetch since found no test report.
+  await folder.write('.state/test-results.json', serializeTestResults([{ file: '/repo/tests/pay.test.ts', title: ['pays by card'], status: 'passed' }], ['reports/unit.json'], new Date(Date.now() - 3600e3)))
+  const fetchedAt = new Date(Date.now() - 600e3)
+  await folder.write('.state/ci-fetch.json', serializeCiFetch({ at: fetchedAt.toISOString(), outcome: 'failed', message: 'radical check --from-ci: the artifacts of run 11 hold no test report and no radical-metrics/1 file' }))
+  // Two measurements, one of them from CI run 11.
+  await folder.write('.state/measurements.json', serializeMeasurementStore([
+    { metric: 'coverage.lines', value: 91, unit: '%', labels: {}, source: 'coverage', at: new Date(Date.now() - 900e3).toISOString(), context: { 'ci.run': '11', 'ci.commit': 'feedface' } },
+    { metric: 'bundle.size', value: 300, unit: 'kB', labels: {}, source: 'bundle', at: new Date(Date.now() - 1200e3).toISOString() },
+  ]))
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: 'Folder…' }).click()
+  await studio.ready()
+  await inspectorButton(page).click({ timeout: 10_000 })
+
+  // Read here: · local; marked, for the fetch that found nothing.
+  const tests = page.locator('.insp-topbar .insp-age', { hasText: /Tests/ })
+  await expect(tests).toContainText('· local')
+  await expect(tests).toHaveClass(/marked/)
+  await expect(tests).toHaveAttribute('title', /last fetch from CI found no test results/)
+  await tests.click()
+  const failed = page.getByRole('dialog', { name: 'Tests' }).getByTestId('ci-fetch-failed')
+  const when = await page.evaluate((iso) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }), fetchedAt.toISOString())
+  await expect(failed).toContainText(`The last fetch from CI, ${when}, found no test results: the artifacts of run 11 hold no test report and no radical-metrics/1 file`)
+  await expect(failed).toContainText('CI has to keep its test reports (and its radical sense --out files) as artifacts of the run, named in .radical/radical.json\'s "ci": { "artifacts": [...] }.')
+  await page.keyboard.press('Escape')
+
+  // A fetch that read the results of CI clears the mark.
+  await folder.write('.state/ci-fetch.json', serializeCiFetch({ at: new Date().toISOString(), outcome: 'read', message: 'Test results of CI run 12 for feedfac.', tests: 1 }))
+  await expect(tests).not.toHaveClass(/marked/, { timeout: 10_000 })
+
+  // The measurements say how many came from CI, and from which run.
+  await page.locator('.insp-topbar .insp-age', { hasText: /Measurements/ }).click()
+  await expect(page.getByRole('dialog', { name: 'Measurements' }).getByTestId('measurements-from-ci')).toContainText('1 of them from CI, run 11')
 })
 
 test('the Overview tells an ADR without a fitness function from one whose fitness function has not run', async ({ page, studio }) => {

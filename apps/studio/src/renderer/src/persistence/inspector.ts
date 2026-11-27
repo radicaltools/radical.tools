@@ -14,7 +14,7 @@
 import { findingsByElement, useCardVerification } from '@radical/ui/store/verification'
 import { create } from 'zustand'
 import { useMemo } from 'react'
-import { checkModel, compareCheckConfig, defaultSeverity, strictCheckConfig, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults, withRepositorySettings, withoutRepositorySettings } from '@radical/common/check'
+import { parseCiFetch, type CiFetch, checkModel, compareCheckConfig, defaultSeverity, strictCheckConfig, parseCheckConfig, parseMeasurementStore, parseReviewsFile, parseTestResults, reviewMeasurements, testsRanAt, type CheckConfig, type CheckResult, type Measurement, type TestResults, withRepositorySettings, withoutRepositorySettings } from '@radical/common/check'
 import { REPOSITORY_FILE, parseRepositoryFile, serializeRepositoryFile, type RepositoryFile } from '@radical/common/repositoryMapping'
 import { historyMark, useDiagramStore } from '@radical/ui/store/diagramStore'
 import { loadBundledConcepts } from '@radical/ui/store/hubStore'
@@ -34,6 +34,9 @@ interface InspectorState {
   /** What `radical sense` measured, kept beside the model, and the reviews
    *  in the model's reviews.json, when there is either. */
   measurements: Measurement[] | null
+  /** What the last fetch from CI found (radical check --from-ci), when
+   *  one ran: the hooks run it with their output closed. */
+  ciFetch: CiFetch | null
   config: CheckConfig
   /** Why check.json could not be read, when it could not. */
   configError: string | null
@@ -56,7 +59,7 @@ interface InspectorState {
   readFor: string | null
 }
 
-export const useInspectorStore = create<InspectorState>(() => ({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', settingsDrafts: {}, settingsBases: {}, editedAt: null, readFor: null }))
+export const useInspectorStore = create<InspectorState>(() => ({ results: null, measurements: null, ciFetch: null, config: {}, configError: null, check: null, configText: '', settingsDrafts: {}, settingsBases: {}, editedAt: null, readFor: null }))
 
 /** The Settings as the Inspector shows them: check.json, with the test files
  *  and CI artifacts the repository's .radical/radical.json names over its
@@ -282,6 +285,7 @@ if (typeof window !== 'undefined') {
   let lastResults = ''
   let lastMeasurements = ''
   let lastReviews = ''
+  let lastCiFetch = ''
   let lastRepository: string | null = null
 
   const poll = async (): Promise<void> => {
@@ -289,11 +293,11 @@ if (typeof window !== 'undefined') {
     if (id !== polledFor) {
       polledFor = id
       filesReadFor = null
-      lastResults = lastConfig = lastMeasurements = lastReviews = ''
+      lastResults = lastConfig = lastMeasurements = lastReviews = lastCiFetch = ''
       lastRepository = null
       useDiagramStore.setState({ repository: null, testOutcomes: null })
       useCardVerification.setState({ evidence: null, findings: {} })
-      useInspectorStore.setState({ results: null, measurements: null, config: {}, configError: null, check: null, configText: '', editedAt: null, readFor: null })
+      useInspectorStore.setState({ results: null, measurements: null, ciFetch: null, config: {}, configError: null, check: null, configText: '', editedAt: null, readFor: null })
     }
     if (!id) return
     const files = await documents.readCheckFiles(id).catch(() => null)
@@ -304,6 +308,13 @@ if (typeof window !== 'undefined') {
     const configText = files.config ?? ''
     const measurementsText = files.measurements ?? ''
     const reviewsText = files.reviews ?? ''
+    // The record of the last fetch from CI says nothing to the check: only
+    // the chips read it.
+    const ciFetchText = files.ciFetch ?? ''
+    if (ciFetchText !== lastCiFetch) {
+      lastCiFetch = ciFetchText
+      useInspectorStore.setState({ ciFetch: ciFetchText ? parseCiFetch(ciFetchText) : null })
+    }
     // Where the repository builds the model's elements, for the card; none
     // shown while the file does not read.
     if (files.repository !== lastRepository) {

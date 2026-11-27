@@ -368,6 +368,19 @@ runs alone (`boundingBox()` null while the list re-renders, line 123); then
 8 of 8 passed, as 8 of 8 did on main. ~~Fixed on fix/round-211-220 (2026-11-15), where it failed in
 both full runs: the poll now asks again when a box is missing instead of failing.~~
 
+### Dogfooding (2026-11-27): isostride's silent fetch from CI
+
+One need with three questions and answers, five requirements and five scenarios, written through the worktree's own
+MCP server before the code.
+
+- **A quote has to lie inside one answer, and a picked option's words sit in the question.** The answers were the
+  labels of the options picked ("Record + chip + status (Recommended)"), their descriptions in the question, so every
+  quote of what the option said was "not in that order within one answer". Written again with each answer holding the
+  option picked with its description. Open: read a question's offered options as words the answer that names one says.
+- **`review_requirements` and the write notes disagree on rationale.** A value the requirement states and its
+  rationale names as the model's decision ("CI", "artifacts") is still listed as "Values it says and no quote says".
+- **The stdio client a fifth time**, and `search_model` still answers "Unsupported query" to plain words.
+
 ### Dogfooding (2026-11-26): the Inspector opens on what to fix
 
 Found while reworking the Inspector on this repository's own model and on IsoStride's:

@@ -381,16 +381,18 @@ export async function writeRepositoryFileToHandle(repository: FsDirHandle, conte
 }
 
 /** What `radical check` and `radical sense` keep beside the model:
- *  `.state/test-results.json`, `.state/measurements.json` and the
+ *  `.state/test-results.json`, `.state/measurements.json`,
+ *  `.state/ci-fetch.json` and the
  *  model's check.json and reviews.json, and with the repository's .radical/
  *  folder (`repository`) its radical.json; each null when there is none. */
-export async function readCheckFilesFromHandle(root: FsDirHandle, repository?: FsDirHandle | null): Promise<{ results: string | null; measurements: string | null; config: string | null; reviews: string | null; repository: string | null }> {
+export async function readCheckFilesFromHandle(root: FsDirHandle, repository?: FsDirHandle | null): Promise<{ results: string | null; measurements: string | null; ciFetch: string | null; config: string | null; reviews: string | null; repository: string | null }> {
   const text = async (dir: FsDirHandle, name: string): Promise<string | null> => {
     try { return await (await (await dir.getFileHandle(name)).getFile()).text() } catch { return null }
   }
   return {
     results: await readStateFromHandle(root, 'test-results.json'),
     measurements: await readStateFromHandle(root, 'measurements.json'),
+    ciFetch: await readStateFromHandle(root, 'ci-fetch.json'),
     config: await text(root, 'check.json'),
     // The repository's .radical/reviews.json, else the model folder's.
     reviews: (repository ? await text(repository.name === '.radical' ? repository : await repository.getDirectoryHandle('.radical').catch(() => repository), 'reviews.json') : null) ?? await text(root, 'reviews.json'),

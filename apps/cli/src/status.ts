@@ -14,6 +14,7 @@ import type { Io } from './check'
 import { readDependencies } from './federation'
 import { DEPS_FILE, FEDERATION_FILE, originFor, parseFederationFile, refShown } from '@radical/common/federation'
 import { readEditorStateFile } from '@radical/node-files/selectionFile'
+import { CI_ARTIFACTS_HINT, CI_FETCH_FILE, ciFetchProblem, formatAge, parseCiFetch } from '@radical/common/check'
 import { findModelFolder, oldLayout, readRepositoryMapping } from '@radical/node-files/repositoryLayout'
 import { testsNamedIn } from './moveTests'
 
@@ -163,6 +164,15 @@ export async function statusCommand(options: StatusOptions, io: Io): Promise<num
         const fromTop = relative(top, folder).replace(/\\/g, '/')
         if (await hooksSaveBase(hooksDir, fromTop)) ok('the git hooks save its base for Studio\'s Changes on branch')
         else warn(`the git hooks do not save its base for Studio's Changes on branch: radical hooks install ${shown(folder, place)}`)
+        // What the last fetch of CI's results found: the hooks run it with
+        // their output closed, so here is where a failed one shows.
+        const fetch = parseCiFetch(await readEditorStateFile(folder, CI_FETCH_FILE).catch(() => null) ?? '')
+        if (fetch) {
+          const when = `the last fetch from CI (${formatAge(Date.now() - Date.parse(fetch.at))} ago)`
+          const problem = ciFetchProblem(fetch)
+          if (problem) warn(`${when} found no test results: ${problem.replace(/^radical check --from-ci: /, '').replace(/\.$/, '')}. ${CI_ARTIFACTS_HINT}`)
+          else ok(`${when}: ${fetch.message}`)
+        }
       }
     }
   }

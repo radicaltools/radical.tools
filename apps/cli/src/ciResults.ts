@@ -13,7 +13,7 @@ import { mkdir, mkdtemp, open, readdir, readFile, rm, stat } from 'node:fs/promi
 import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import { promisify } from 'node:util'
-import { parseTestReport, type CiRun, type CiSource, type TestCase, type TestResults } from '@radical/common/check'
+import { METRICS_FORMAT, parseMetricsFile, parseTestReport, type CiRun, type CiSource, type Measurement, type TestCase, type TestResults } from '@radical/common/check'
 import { STATE_DIR } from '@radical/common/formats/canvasSelection'
 
 const exec = promisify(execFile)
@@ -137,37 +137,58 @@ async function filesUnder(dir: string): Promise<string[]> {
   return files.sort()
 }
 
-/** Downloads the artifacts of `source`'s runs and reads the test reports in
- *  them; a file that is no test report is passed over. */
-export async function downloadCiReports(root: string, gh: Gh, source: CiSource): Promise<{ cases: TestCase[]; reports: string[] }> {
+/** Downloads the artifacts of `source`'s runs and reads the test reports
+ *  and the radical-metrics/1 files (radical sense --out) in them, each
+ *  measurement with the run and the commit in its context; a file that is
+ *  neither is passed over. Throws when they hold neither. */
+export async function downloadCiReports(root: string, gh: Gh, source: CiSource): Promise<{ cases: TestCase[]; reports: string[]; measurements: Measurement[] }> {
   const dir = await mkdtemp(join(tmpdir(), 'radical-ci-'))
   try {
     const cases: TestCase[] = []
     const reports: string[] = []
+    const measurements: Measurement[] = []
     for (const run of source.runs) {
       for (const artifact of run.artifacts) {
         const into = join(dir, String(run.id), artifact)
         await gh(['run', 'download', String(run.id), '--name', artifact, '--dir', into], root)
         for (const file of await filesUnder(into)) {
+          const text = await readFile(file, 'utf8')
+          const measured = metricsIn(text, file)
+          if (measured) {
+            measurements.push(...measured.map((m) => ({ ...m, context: { ...m.context, 'ci.run': String(run.id), 'ci.commit': source.commit } })))
+            continue
+          }
           let read: TestCase[]
-          try { read = parseTestReport(await readFile(file, 'utf8'), file) } catch { continue }
+          try { read = parseTestReport(text, file) } catch { continue }
           if (!read.length) continue
           cases.push(...read)
           reports.push(`run ${run.id} ${artifact}/${relative(into, file).replace(/\\/g, '/')}`)
         }
       }
     }
-    if (!reports.length) throw new CiError(`the artifacts of run${source.runs.length > 1 ? 's' : ''} ${source.runs.map((r) => r.id).join(', ')} hold no test report`)
-    return { cases, reports }
+    if (!reports.length && !measurements.length) throw new CiError(`the artifacts of run${source.runs.length > 1 ? 's' : ''} ${source.runs.map((r) => r.id).join(', ')} hold no test report and no radical-metrics/1 file`)
+    return { cases, reports, measurements }
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
 }
 
-/** The same runs and artifacts as `results` came from. */
+/** The measurements of a radical-metrics/1 file, or null for another file. */
+function metricsIn(text: string, file: string): Measurement[] | null {
+  if (!text.includes(METRICS_FORMAT)) return null
+  try {
+    const data = JSON.parse(text) as { format?: unknown }
+    return data?.format === METRICS_FORMAT ? parseMetricsFile(text, file) : null
+  } catch {
+    return null
+  }
+}
+
+/** The same runs and artifacts as `results` came from, downloaded since
+ *  --from-ci reads measurements too. */
 export function sameRuns(results: TestResults | null, source: CiSource): boolean {
   const key = (s: CiSource) => s.runs.map((r) => `${r.id}:${r.artifacts.join(',')}`).join(' ')
-  return !!results?.ci && key(results.ci) === key(source)
+  return !!results?.ci && results.ci.measurements !== undefined && key(results.ci) === key(source)
 }
 
 /** True when `results`, read locally with --report, are of `commit` or a

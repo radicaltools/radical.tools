@@ -215,7 +215,7 @@ describe('the files beside the model, for the Inspector', () => {
     root.children.set('check.json', new FakeFile('{}'))
     root.children.set('reviews.json', new FakeFile(REVIEWS))
     const files = await readCheckFilesFromHandle(root)
-    expect(files).toEqual({ results: null, measurements: null, config: '{}', reviews: REVIEWS, repository: null })
+    expect(files).toEqual({ results: null, measurements: null, ciFetch: null, config: '{}', reviews: REVIEWS, repository: null })
     expect(inspectorMeasurements(files.measurements ?? '', files.reviews ?? '')).toEqual([
       { metric: 'review', value: 1, labels: { name: 'threat-model' }, source: 'review', at: '2026-10-30T10:00:00.000Z', context: { by: 'ana' } },
     ])

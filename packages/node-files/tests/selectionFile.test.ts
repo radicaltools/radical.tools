@@ -17,9 +17,10 @@ describe('readCheckFiles', () => {
     await mkdir(join(dir, '.state'))
     await writeFile(join(dir, '.state', 'test-results.json'), 'results')
     await writeFile(join(dir, '.state', 'measurements.json'), 'measurements')
+    await writeFile(join(dir, '.state', 'ci-fetch.json'), 'fetch')
     await writeFile(join(dir, 'check.json'), '{}')
     await writeFile(join(dir, 'reviews.json'), 'reviews')
-    expect(await readCheckFiles(dir)).toEqual({ results: 'results', measurements: 'measurements', config: '{}', reviews: 'reviews', repository: null })
+    expect(await readCheckFiles(dir)).toEqual({ results: 'results', measurements: 'measurements', ciFetch: 'fetch', config: '{}', reviews: 'reviews', repository: null })
   })
 
   it('gives null for a reviews.json that is not there, and refuses a symlinked one', async () => {

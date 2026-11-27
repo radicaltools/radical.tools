@@ -28,7 +28,7 @@ const report = (file: string, title: string, status = 'passed') =>
 
 /** A repository whose model names two tests: the commit merged from pull
  *  request #7, then two more. */
-async function repository(): Promise<{ cwd: string; merged: string; head: string }> {
+async function repository(metrics?: string): Promise<{ cwd: string; merged: string; head: string }> {
   const cwd = await mkdtemp(join(tmpdir(), 'radical-ci-'))
   dirs.push(cwd)
   await git(cwd, 'init', '-q', '-b', 'main')
@@ -36,7 +36,7 @@ async function repository(): Promise<{ cwd: string; merged: string; head: string
     metamodel: builtInGovernanceMetamodel(),
     nodes: [
       node('req', 'requirement', 'Pay', { action: 'take the payment' }),
-      node('sc', 'scenario', 'Paying', { given: 'g', when: 'w', then: 't' }),
+      node('sc', 'scenario', 'Paying', { given: 'g', when: 'w', then: 't', ...(metrics ? { metrics } : {}) }),
     ],
     relations: [{ id: 'v', relationType: 'verifies', sourceId: 'sc', targetId: 'req' }],
   }, 'Shop')
@@ -59,7 +59,7 @@ async function repository(): Promise<{ cwd: string; merged: string; head: string
 /** Stands in for gh: pull request #7, merged as `merged`, was tested at its
  *  head by run 11, which kept both reports; run 12 on it is still going, and
  *  run 5's artifact expired. Records what it was asked. */
-function fakeGh(merged: string, calls: string[][] = []): Gh {
+function fakeGh(merged: string, calls: string[][] = [], artifacts: (dir: string, name: string) => Promise<boolean> = async () => false): Gh {
   const PR_HEAD = 'feedface'.repeat(5)
   return async (args) => {
     calls.push(args)
@@ -86,6 +86,7 @@ function fakeGh(merged: string, calls: string[][] = []): Gh {
     if (command === 'run' && path === 'download') {
       const dir = args[args.indexOf('--dir') + 1]
       const name = args[args.indexOf('--name') + 1]
+      if (await artifacts(dir, name)) return ''
       if (name === 'test-reports') {
         await mkdir(join(dir, 'metrics'), { recursive: true })
         await writeFile(join(dir, 'radical-shop.json'), report('src/pay.test.ts', 'pays'))
@@ -110,6 +111,9 @@ async function run(cwd: string, gh: Gh | undefined, ...args: string[]) {
 }
 
 const results = async (cwd: string) => JSON.parse(await readFile(join(cwd, 'model/.state/test-results.json'), 'utf8'))
+const fetchRecord = async (cwd: string) => JSON.parse(await readFile(join(cwd, 'model/.state/ci-fetch.json'), 'utf8'))
+const exists = (path: string) => readFile(path).then(() => true, () => false)
+const metricsFile = (at: string, value: number) => JSON.stringify({ format: 'radical-metrics', version: 1, source: 'coverage', at, measurements: [{ metric: 'coverage.lines', value, unit: '%' }] })
 
 describe('radical check --from-ci', () => {
   it('reads the reports of the nearest commit CI ran, a squash merge standing for its pull request', async () => {
@@ -202,5 +206,84 @@ describe('radical check --from-ci', () => {
     expect(noRun.err).toContain('found no CI artifact in the repository\'s runs (they expire)')
     // Not with --report: one source of test results at a time.
     expect((await run(cwd, none, 'check', 'model', '--from-ci', '--report', 'local.json')).code).toBe(2)
+  })
+
+  it('records what a fetch found, with --quiet too, and when it found no test report', async () => {
+    const { cwd, merged, head } = await repository()
+    // CI keeps its reports elsewhere: the artifacts hold an HTML report only.
+    const elsewhere = fakeGh(merged, [], async (dir) => {
+      await mkdir(dir, { recursive: true })
+      await writeFile(join(dir, 'index.html'), '<html></html>')
+      return true
+    })
+    expect(await run(cwd, elsewhere, 'check', 'model', '--from-ci', '--quiet')).toEqual({ code: 2, out: '', err: '' })
+    const failed = await fetchRecord(cwd)
+    expect(failed).toMatchObject({ version: 1, head, outcome: 'failed' })
+    expect(failed.message).toContain('radical check --from-ci: the artifacts of run 11 hold no test report and no radical-metrics/1 file')
+    expect(Date.parse(failed.at)).not.toBeNaN()
+    expect(await exists(join(cwd, 'model/.state/test-results.json'))).toBe(false)
+
+    // Without gh: what it said is kept too.
+    await run(cwd, undefined, 'check', 'model', '--from-ci', '--quiet')
+    expect((await fetchRecord(cwd)).message).toContain('needs the GitHub CLI (gh)')
+
+    // Once CI keeps its reports, the record says what was read, and from which run.
+    expect((await run(cwd, fakeGh(merged), 'check', 'model', '--from-ci', '--quiet')).code).toBe(0)
+    expect(await fetchRecord(cwd)).toMatchObject({ outcome: 'read', head, commit: merged, runs: [{ id: 11, url: 'https://github.com/o/r/actions/runs/11' }], tests: 2, measurements: 0 })
+    expect((await run(cwd, fakeGh(merged), 'check', 'model', '--from-ci', '--quiet')).code).toBe(0)
+    expect((await fetchRecord(cwd)).outcome).toBe('same')
+  })
+
+  it('adds the measurements in the artifacts of CI to those kept', async () => {
+    const { cwd, merged } = await repository('coverage.lines >= 80 %')
+    // Measured here earlier, and again in CI later.
+    await mkdir(join(cwd, 'model/.state'), { recursive: true })
+    await writeFile(join(cwd, 'model/.state/measurements.json'), JSON.stringify({ version: 1, measurements: [
+      { metric: 'coverage.lines', value: 50, unit: '%', labels: {}, source: 'coverage', at: '2026-10-30T08:00:00.000Z' },
+      { metric: 'bundle.size', value: 300, unit: 'kB', labels: {}, source: 'bundle', at: '2026-10-30T08:00:00.000Z' },
+    ] }))
+    const withMetrics = fakeGh(merged, [], async (dir, name) => {
+      if (name !== 'test-reports') return false
+      await mkdir(join(dir, 'metrics'), { recursive: true })
+      await writeFile(join(dir, 'radical-shop.json'), report('src/pay.test.ts', 'pays'))
+      await writeFile(join(dir, 'metrics/coverage.json'), metricsFile('2026-10-31T10:20:00Z', 91))
+      return true
+    })
+    const checked = await run(cwd, withMetrics, 'check', 'model', '--from-ci', '--format', 'json')
+    expect(checked.err).toContain('; 1 measurement.')
+    const store = JSON.parse(await readFile(join(cwd, 'model/.state/measurements.json'), 'utf8')).measurements
+    expect(store).toEqual(expect.arrayContaining([
+      expect.objectContaining({ metric: 'coverage.lines', value: 91, context: { 'ci.run': '11', 'ci.commit': merged } }),
+      expect.objectContaining({ metric: 'bundle.size', value: 300 }),
+    ]))
+    expect(store).toHaveLength(2)
+    // The condition on it is evaluated with the value from CI.
+    const evidence = JSON.parse(checked.out).evidence.nodes.sc
+    expect(JSON.stringify(evidence)).toContain('91')
+    expect(await fetchRecord(cwd)).toMatchObject({ outcome: 'read', tests: 2, measurements: 1 })
+    expect((await results(cwd)).ci.measurements).toBe(1)
+  })
+
+  it('keeps nothing beside the model with --no-keep', async () => {
+    const { cwd, merged } = await repository()
+    await writeFile(join(cwd, 'broken.json'), report('src/pay.test.ts', 'pays', 'failed'))
+    await writeFile(join(cwd, 'metrics.json'), metricsFile('2026-10-31T10:20:00Z', 10))
+    // Results and measurements kept from before.
+    expect((await run(cwd, fakeGh(merged), 'check', 'model', '--from-ci', '--quiet')).code).toBe(0)
+    const state = join(cwd, 'model/.state')
+    await writeFile(join(state, 'measurements.json'), JSON.stringify({ version: 1, measurements: [] }))
+    const before = await Promise.all(['test-results.json', 'measurements.json', 'ci-fetch.json'].map((f) => readFile(join(state, f), 'utf8')))
+
+    // A test of the gate: a broken report fails it, and Studio sees nothing of it.
+    const gate = await run(cwd, fakeGh(merged), 'check', 'model', '--report', 'broken.json', '--metrics', 'metrics.json', '--no-keep', '--format', 'json')
+    expect(gate.code).toBe(1)
+    expect(gate.out).toContain('pays')
+    expect((await run(cwd, fakeGh(merged), 'check', 'model', '--from-ci', '--no-keep', '--quiet')).code).toBe(0)
+    expect(await Promise.all(['test-results.json', 'measurements.json', 'ci-fetch.json'].map((f) => readFile(join(state, f), 'utf8')))).toEqual(before)
+
+    // Without it, both are kept.
+    expect((await run(cwd, fakeGh(merged), 'check', 'model', '--report', 'broken.json', '--metrics', 'metrics.json', '--quiet')).code).toBe(1)
+    expect((await results(cwd)).reports).toEqual(['broken.json'])
+    expect(JSON.parse(await readFile(join(state, 'measurements.json'), 'utf8')).measurements).toHaveLength(1)
   })
 })

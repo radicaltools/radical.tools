@@ -83,6 +83,7 @@ export function InspectorMain(): React.ReactElement {
   const read = useEvidenceRead()
   const results = useInspectorStore((s) => s.results)
   const measurements = useInspectorStore((s) => s.measurements)
+  const ciFetch = useInspectorStore((s) => s.ciFetch)
   const configError = useInspectorStore((s) => s.configError)
   const editedAt = useInspectorStore((s) => s.editedAt)
   // The live model, as the check and the changes read it, also while a
@@ -147,7 +148,7 @@ export function InspectorMain(): React.ReactElement {
     <Main>
       {!tracing && (
         <header className="insp-topbar">
-          <FreshnessChips results={results} measurements={measurements} folder={folder} changedAt={changedAt}
+          <FreshnessChips results={results} measurements={measurements} ciFetch={ciFetch} folder={folder} changedAt={changedAt}
             waiting={measurements ? [] : waitingForMeasurement(check.evidence?.nodes, nodes)} />
           <Verdict check={check} toSettle={toSettle} onClick={onVerdict} />
         </header>
